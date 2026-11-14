@@ -7,7 +7,7 @@
 use serde_json::Value;
 
 use crate::error::CommandError;
-use crate::registry::{Command, Query};
+use crate::registry::{Action, Command, Query};
 
 pub const UNDO: &str = "history.undo";
 pub const REDO: &str = "history.redo";
@@ -18,6 +18,8 @@ pub const BATCH: &str = "batch";
 pub enum Step {
     Command(Command),
     Query(Query),
+    /// Writes files; needs a project folder (see `Workspace`).
+    Action(Action),
     Undo,
     Redo,
     Batch(Vec<Command>),
@@ -47,6 +49,10 @@ fn is_command(name: &str) -> bool {
 
 fn is_query(name: &str) -> bool {
     Query::registry().iter().any(|i| i.name == name)
+}
+
+fn is_action(name: &str) -> bool {
+    Action::registry().iter().any(|i| i.name == name)
 }
 
 /// Parse a command, with clear errors for unknown names.
@@ -95,6 +101,9 @@ impl Step {
             }
             n if is_command(n) => parse_command(value).map(Step::Command),
             n if is_query(n) => parse_query(value).map(Step::Query),
+            n if is_action(n) => serde_json::from_value(value)
+                .map(Step::Action)
+                .map_err(|e| malformed(&name, e)),
             _ => Err(CommandError::UnknownType { name }),
         }
     }

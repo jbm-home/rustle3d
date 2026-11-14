@@ -75,6 +75,8 @@ pub enum CommandError {
         index: usize,
         source: Box<CommandError>,
     },
+    #[error("`{name}` writes files and needs a project folder")]
+    NeedsProject { name: &'static str },
     #[error("internal error: {detail}")]
     Internal { detail: String },
 }
@@ -125,6 +127,7 @@ impl Localizable for CommandError {
                 m.text = text;
                 m
             }
+            Self::NeedsProject { name } => Message::new("needs_project", text).arg("name", name),
             Self::Internal { detail } => Message::new("internal", text).arg("detail", detail),
         }
     }

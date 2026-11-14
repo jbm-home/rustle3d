@@ -6,10 +6,12 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::actions::*;
 use crate::commands::*;
 use crate::error::CommandError;
 use crate::queries::*;
 use crate::spec::{CommandOutput, CommandSpec, Info, Named, QuerySpec, schema_value};
+use crate::workspace::{Workspace, WorkspaceError};
 
 macro_rules! command_registry {
     ($($name:literal => $T:ident,)*) => {
@@ -82,6 +84,37 @@ macro_rules! query_registry {
     };
 }
 
+macro_rules! action_registry {
+    ($($name:literal => $T:ident,)*) => {
+        /// Any action, tagged by its name in the `type` field.
+        #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+        #[serde(tag = "type")]
+        pub enum Action {
+            $( #[serde(rename = $name)] $T($T), )*
+        }
+
+        $( impl Named for $T { const NAME: &'static str = $name; } )*
+
+        impl Action {
+            pub fn name(&self) -> &'static str {
+                match self { $( Action::$T(_) => $name, )* }
+            }
+            pub fn run(&self, ws: &Workspace) -> Result<Value, WorkspaceError> {
+                match self { $( Action::$T(a) => a.run(ws), )* }
+            }
+            /// Every action, in registry order.
+            pub fn registry() -> Vec<Info> {
+                vec![ $( Info {
+                    name: $name,
+                    summary: <$T as crate::spec::Described>::SUMMARY,
+                    destructive: false,
+                    schema: schema_value::<$T>,
+                }, )* ]
+            }
+        }
+    };
+}
+
 command_registry! {
     "project.rename" => ProjectRename,
     "project.set_display_unit" => ProjectSetDisplayUnit,
@@ -111,4 +144,9 @@ query_registry! {
     "panel.get" => PanelGet,
     "measure.distance" => MeasureDistance,
     "measure.contour_length" => MeasureContourLength,
+}
+
+action_registry! {
+    "export.svg" => ExportSvg,
+    "export.pdf" => ExportPdf,
 }

@@ -140,6 +140,7 @@ impl Session {
             Step::Query(q) => self.query(q),
             Step::Undo => Ok(json!({ "undone": self.undo()? })),
             Step::Redo => Ok(json!({ "redone": self.redo()? })),
+            Step::Action(a) => Err(CommandError::NeedsProject { name: a.name() }),
         }
     }
 }

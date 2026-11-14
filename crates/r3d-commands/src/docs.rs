@@ -3,7 +3,7 @@
 
 use std::fmt::Write;
 
-use crate::registry::{Command, Query};
+use crate::registry::{Action, Command, Query};
 use crate::spec::Info;
 use crate::step::{BATCH, REDO, UNDO};
 
@@ -49,6 +49,11 @@ pub fn commands_markdown() -> String {
     section(&mut out, &Command::registry());
     out.push_str("## Queries\n\nRead-only. Lengths in mm, areas in mm², rounded to 0.001.\n\n");
     section(&mut out, &Query::registry());
+    out.push_str(
+        "## Actions\n\nOperations that write files (not undoable). Paths are relative to \
+         the project folder and cannot leave it.\n\n",
+    );
+    section(&mut out, &Action::registry());
     while out.ends_with("\n\n") {
         out.pop();
     }

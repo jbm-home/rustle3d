@@ -188,6 +188,7 @@ fn command_and_query_names_are_distinct_and_well_formed() {
         .map(|i| i.name)
         .collect();
     names.extend(Query::registry().iter().map(|i| i.name));
+    names.extend(r3d_commands::Action::registry().iter().map(|i| i.name));
     names.extend([
         r3d_commands::step::UNDO,
         r3d_commands::step::REDO,

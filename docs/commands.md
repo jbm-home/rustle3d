@@ -1119,3 +1119,88 @@ Length (mm) along a panel contour from one point to another, walking in contour 
 
 </details>
 
+## Actions
+
+Operations that write files (not undoable). Paths are relative to the project folder and cannot leave it.
+
+### `export.svg`
+
+Export all panels as an SVG at 1:1 scale (cutting and sewing lines, notches, internal lines, grainlines, labels, 100 mm test square). Returns the written path, relative to the project folder.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Export the pattern as SVG at 1:1 scale.",
+  "properties": {
+    "path": {
+      "description": "Output path relative to the project folder. Defaults to\n`exports/<project name>.svg`.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "title": "ExportSvg",
+  "type": "object"
+}
+```
+
+</details>
+
+### `export.pdf`
+
+Export all panels as a PDF at 1:1 scale, tiled on A4/Letter pages (labelled A1, A2…, with overlap guides) or on one large page. Print at 100 % and check the 100 mm test square. Returns the written path and page count.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "PaperSpec": {
+      "description": "Page layout of a PDF export.",
+      "oneOf": [
+        {
+          "const": "a4",
+          "description": "A4 tiles to print at home.",
+          "type": "string"
+        },
+        {
+          "const": "letter",
+          "description": "US Letter tiles to print at home.",
+          "type": "string"
+        },
+        {
+          "const": "single",
+          "description": "One page as large as the pattern (plotter, print shop).",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Export the pattern as a PDF at 1:1 scale.",
+  "properties": {
+    "paper": {
+      "$ref": "#/$defs/PaperSpec",
+      "default": "a4",
+      "description": "`a4` (default) or `letter` tiles with overlap and assembly guides,\nor `single` for one large page."
+    },
+    "path": {
+      "description": "Output path relative to the project folder. Defaults to\n`exports/<project name>.pdf`.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "title": "ExportPdf",
+  "type": "object"
+}
+```
+
+</details>
+

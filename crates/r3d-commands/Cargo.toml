@@ -11,10 +11,14 @@ publish.workspace = true
 [dependencies]
 r3d-core.workspace = true
 r3d-geom.workspace = true
+r3d-io.workspace = true
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
 
 [lints]
 workspace = true
