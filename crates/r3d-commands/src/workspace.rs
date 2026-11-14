@@ -81,10 +81,6 @@ impl Workspace {
         &self.session
     }
 
-    pub fn session_mut(&mut self) -> &mut Session {
-        &mut self.session
-    }
-
     /// Save the project. The first save after a migration keeps the
     /// original file as `project.v{N}.json.bak`.
     pub fn save(&mut self) -> Result<(), WorkspaceError> {

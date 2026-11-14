@@ -15,6 +15,7 @@ path = "src/main.rs"
 [dependencies]
 r3d-core.workspace = true
 r3d-commands.workspace = true
+r3d-mcp.workspace = true
 clap.workspace = true
 serde_json.workspace = true
 
