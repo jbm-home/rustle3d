@@ -20,12 +20,36 @@ use crate::model::Project;
 /// Identifies a Rustle3D project file.
 pub const FORMAT: &str = "rustle3d.project";
 /// Version written by this build.
-pub const SCHEMA_VERSION: u32 = 1;
+pub const SCHEMA_VERSION: u32 = 2;
 
 type Migration = fn(Value) -> Result<Value, FileError>;
 
 /// `MIGRATIONS[i]` migrates schema version `i + 1` to `i + 2`.
-const MIGRATIONS: &[Migration] = &[];
+const MIGRATIONS: &[Migration] = &[migrate_v1_to_v2];
+
+fn object<'a>(
+    value: &'a mut Value,
+    what: &str,
+) -> Result<&'a mut serde_json::Map<String, Value>, FileError> {
+    value.as_object_mut().ok_or_else(|| FileError::Json {
+        detail: format!("{what} is not an object"),
+    })
+}
+
+/// v2 adds notches, internal lines, seam allowances and mirror links.
+fn migrate_v1_to_v2(mut project: Value) -> Result<Value, FileError> {
+    let root = object(&mut project, "project")?;
+    root.insert("notches".into(), Value::Object(Default::default()));
+    root.insert("internal_lines".into(), Value::Object(Default::default()));
+    if let Some(panels) = root.get_mut("panels") {
+        for panel in object(panels, "panels")?.values_mut() {
+            let panel = object(panel, "panel")?;
+            panel.insert("seam_allowance_mm".into(), Value::from(0.0));
+            panel.insert("mirror_of".into(), Value::Null);
+        }
+    }
+    Ok(project)
+}
 
 // Every version below the current one must have a migration.
 const _: () = assert!(MIGRATIONS.len() as u32 + 1 == SCHEMA_VERSION);

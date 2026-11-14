@@ -5,7 +5,7 @@
 
 use crate::id::AnyId;
 use crate::message::{Localizable, Message};
-use crate::model::{EdgeCurve, Project};
+use crate::model::{EdgeCurve, PathSegment, Project};
 
 /// A broken invariant.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
@@ -26,6 +26,10 @@ pub enum IntegrityError {
     IdCounter { entity: AnyId },
     #[error("the project has no garment")]
     NoGarment,
+    #[error("{entity} has an out-of-range value")]
+    OutOfRange { entity: AnyId },
+    #[error("{panel} has an invalid mirror link (missing axis, self or chained source)")]
+    BadMirror { panel: AnyId },
 }
 
 impl Localizable for IntegrityError {
@@ -56,6 +60,12 @@ impl Localizable for IntegrityError {
                 Message::new("integrity.id_counter", text).arg("entity", entity)
             }
             Self::NoGarment => Message::new("integrity.no_garment", text),
+            Self::OutOfRange { entity } => {
+                Message::new("integrity.out_of_range", text).arg("entity", entity)
+            }
+            Self::BadMirror { panel } => {
+                Message::new("integrity.bad_mirror", text).arg("panel", panel)
+            }
         }
     }
 }
@@ -73,7 +83,13 @@ impl Project {
             .map(|k| (AnyId::from(*k), k.raw()))
             .chain(self.panels.keys().map(|k| (AnyId::from(*k), k.raw())))
             .chain(self.points.keys().map(|k| (AnyId::from(*k), k.raw())))
-            .chain(self.edges.keys().map(|k| (AnyId::from(*k), k.raw())));
+            .chain(self.edges.keys().map(|k| (AnyId::from(*k), k.raw())))
+            .chain(self.notches.keys().map(|k| (AnyId::from(*k), k.raw())))
+            .chain(
+                self.internal_lines
+                    .keys()
+                    .map(|k| (AnyId::from(*k), k.raw())),
+            );
         for (entity, raw) in ids {
             if raw >= self.next_id {
                 return Err(E::IdCounter { entity });
@@ -113,10 +129,10 @@ impl Project {
                     return Err(E::WrongOwner { entity });
                 }
             }
-            if let EdgeCurve::Cubic { c1, c2 } = &edge.curve {
-                if !c1.is_finite() || !c2.is_finite() {
-                    return Err(E::NonFinite { entity });
-                }
+            if let EdgeCurve::Cubic { c1, c2 } = &edge.curve
+                && (!c1.is_finite() || !c2.is_finite())
+            {
+                return Err(E::NonFinite { entity });
             }
         }
 
@@ -129,8 +145,25 @@ impl Project {
                     missing: panel.garment.into(),
                 });
             }
-            if !panel.grain_angle_deg.is_finite() {
+            if !panel.grain_angle_deg.is_finite() || !panel.seam_allowance_mm.is_finite() {
                 return Err(E::NonFinite { entity: pid });
+            }
+            if panel.seam_allowance_mm < 0.0 {
+                return Err(E::OutOfRange { entity: pid });
+            }
+            if let Some(link) = &panel.mirror_of {
+                let source_ok = link.source != *id
+                    && self
+                        .panels
+                        .get(&link.source)
+                        .is_some_and(|s| s.mirror_of.is_none());
+                let axis_ok = link.origin.is_finite()
+                    && link.offset.is_finite()
+                    && link.dir.is_finite()
+                    && link.dir.length_squared() > 0.0;
+                if !source_ok || !axis_ok {
+                    return Err(E::BadMirror { panel: pid });
+                }
             }
             if panel.contour.len() < 2 {
                 return Err(E::ContourTooShort { panel: pid });
@@ -161,6 +194,45 @@ impl Project {
         for id in self.edges.keys() {
             if usage.get(id).copied() != Some(1) {
                 return Err(E::EdgeUsage { edge: (*id).into() });
+            }
+        }
+
+        for (id, notch) in &self.notches {
+            let entity = AnyId::from(*id);
+            if !self.edges.contains_key(&notch.edge) {
+                return Err(E::DanglingReference {
+                    entity,
+                    missing: notch.edge.into(),
+                });
+            }
+            if !notch.offset_mm.is_finite() {
+                return Err(E::NonFinite { entity });
+            }
+            if notch.offset_mm < 0.0 {
+                return Err(E::OutOfRange { entity });
+            }
+        }
+
+        for (id, line) in &self.internal_lines {
+            let entity = AnyId::from(*id);
+            if !self.panels.contains_key(&line.panel) {
+                return Err(E::DanglingReference {
+                    entity,
+                    missing: line.panel.into(),
+                });
+            }
+            if line.segments.is_empty() {
+                return Err(E::OutOfRange { entity });
+            }
+            let finite = line.start.is_finite()
+                && line.segments.iter().all(|s| match s {
+                    PathSegment::Line { to } => to.is_finite(),
+                    PathSegment::Cubic { c1, c2, to } => {
+                        c1.is_finite() && c2.is_finite() && to.is_finite()
+                    }
+                });
+            if !finite {
+                return Err(E::NonFinite { entity });
             }
         }
         Ok(())

@@ -10,7 +10,7 @@ use glam::DVec2;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::id::{EdgeId, GarmentId, PanelId, PointId};
+use crate::id::{EdgeId, GarmentId, InternalLineId, NotchId, PanelId, PointId};
 
 /// Ordered entity map.
 pub type IdMap<K, V> = BTreeMap<K, V>;
@@ -37,6 +37,8 @@ pub struct Project {
     pub(crate) panels: IdMap<PanelId, Panel>,
     pub(crate) points: IdMap<PointId, Point>,
     pub(crate) edges: IdMap<EdgeId, Edge>,
+    pub(crate) notches: IdMap<NotchId, Notch>,
+    pub(crate) internal_lines: IdMap<InternalLineId, InternalLine>,
 }
 
 /// A group of panels worn together. v0.1 uses a single garment, but the
@@ -58,6 +60,61 @@ pub struct Panel {
     pub contour: Vec<EdgeId>,
     /// Grainline (warp direction) angle in degrees from the board's +X axis.
     pub grain_angle_deg: f64,
+    /// Seam allowance added around the panel when exporting (mm, ≥ 0).
+    pub seam_allowance_mm: f64,
+    /// Set when this panel is a linked mirror copy: its geometry is derived
+    /// from `source` and kept in sync by the command layer.
+    pub mirror_of: Option<MirrorLink>,
+}
+
+/// Link from a mirror copy to its source panel: the copy is the source
+/// reflected across the axis (`origin`, `dir`), then moved by `offset`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MirrorLink {
+    pub source: PanelId,
+    /// A point on the mirror axis (mm).
+    pub origin: DVec2,
+    /// Direction of the mirror axis (non-zero).
+    pub dir: DVec2,
+    /// Translation applied after the reflection (mm), so the copy can be
+    /// placed anywhere on the board.
+    pub offset: DVec2,
+}
+
+/// An alignment mark on an edge, `offset_mm` from the edge's start point
+/// along the edge. If the edge becomes shorter, the notch sits at its end.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Notch {
+    pub edge: EdgeId,
+    pub offset_mm: f64,
+}
+
+/// An open path drawn inside a panel.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InternalLine {
+    pub panel: PanelId,
+    pub start: DVec2,
+    /// At least one segment.
+    pub segments: Vec<PathSegment>,
+}
+
+/// One segment of an open path, starting where the previous one ended.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum PathSegment {
+    Line { to: DVec2 },
+    Cubic { c1: DVec2, c2: DVec2, to: DVec2 },
+}
+
+impl PathSegment {
+    pub fn end(&self) -> DVec2 {
+        match self {
+            PathSegment::Line { to } | PathSegment::Cubic { to, .. } => *to,
+        }
+    }
 }
 
 /// A point of a panel contour, in board coordinates (mm).
@@ -111,6 +168,8 @@ impl Project {
             panels: IdMap::new(),
             points: IdMap::new(),
             edges: IdMap::new(),
+            notches: IdMap::new(),
+            internal_lines: IdMap::new(),
         }
     }
 
@@ -136,6 +195,22 @@ impl Project {
 
     pub fn edges(&self) -> &IdMap<EdgeId, Edge> {
         &self.edges
+    }
+
+    pub fn notches(&self) -> &IdMap<NotchId, Notch> {
+        &self.notches
+    }
+
+    pub fn internal_lines(&self) -> &IdMap<InternalLineId, InternalLine> {
+        &self.internal_lines
+    }
+
+    pub fn notch(&self, id: NotchId) -> Option<&Notch> {
+        self.notches.get(&id)
+    }
+
+    pub fn internal_line(&self, id: InternalLineId) -> Option<&InternalLine> {
+        self.internal_lines.get(&id)
     }
 
     pub fn panel(&self, id: PanelId) -> Option<&Panel> {

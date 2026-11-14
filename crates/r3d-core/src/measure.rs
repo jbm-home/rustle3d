@@ -3,8 +3,8 @@
 use glam::DVec2;
 use r3d_geom::{Aabb, CubicBez, polygon};
 
-use crate::id::{EdgeId, PanelId};
-use crate::model::{EdgeCurve, Project};
+use crate::id::{EdgeId, InternalLineId, NotchId, PanelId};
+use crate::model::{EdgeCurve, PathSegment, Project};
 
 /// Max distance between a curve and its flattened polyline, in mm.
 pub const FLATTEN_TOLERANCE_MM: f64 = 0.01;
@@ -26,6 +26,26 @@ impl EdgeGeometry {
         }
     }
 
+    /// Point and unit tangent at `length` mm from the start (clamped).
+    pub fn point_at_length(&self, length: f64) -> (DVec2, DVec2) {
+        match self {
+            EdgeGeometry::Line(a, b) => {
+                let d = *b - *a;
+                let len = d.length();
+                let t = if len > 0.0 {
+                    (length / len).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+                (a.lerp(*b, t), d.try_normalize().unwrap_or(DVec2::X))
+            }
+            EdgeGeometry::Cubic(c) => {
+                let t = c.param_at_length(length, LENGTH_TOLERANCE_MM);
+                (c.eval(t), c.tangent(t))
+            }
+        }
+    }
+
     /// Append the flattened edge to `out`, excluding its start point.
     pub fn flatten_into(&self, out: &mut Vec<DVec2>) {
         match self {
@@ -33,6 +53,16 @@ impl EdgeGeometry {
             EdgeGeometry::Cubic(c) => c.flatten_into(FLATTEN_TOLERANCE_MM, out),
         }
     }
+}
+
+/// Resolved position of a notch.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct NotchPlacement {
+    pub pos: DVec2,
+    /// Unit tangent of the edge at the notch (contour direction).
+    pub tangent: DVec2,
+    /// The stored offset exceeds the edge length; the notch sits at the end.
+    pub clamped: bool,
 }
 
 impl Project {
@@ -62,6 +92,37 @@ impl Project {
         // first edge's start point (= the last pushed point).
         if let Some(last) = out.pop() {
             out.insert(0, last);
+        }
+        Some(out)
+    }
+
+    /// Where a notch sits: position, unit tangent of its edge there, and
+    /// whether its offset was clamped because the edge is shorter.
+    pub fn notch_placement(&self, id: NotchId) -> Option<NotchPlacement> {
+        let notch = self.notch(id)?;
+        let geom = self.edge_geometry(notch.edge)?;
+        let length = geom.length();
+        let (pos, tangent) = geom.point_at_length(notch.offset_mm);
+        Some(NotchPlacement {
+            pos,
+            tangent,
+            clamped: notch.offset_mm > length,
+        })
+    }
+
+    /// Flattened polyline of an internal line.
+    pub fn internal_line_polyline(&self, id: InternalLineId) -> Option<Vec<DVec2>> {
+        let line = self.internal_line(id)?;
+        let mut out = vec![line.start];
+        let mut from = line.start;
+        for seg in &line.segments {
+            match seg {
+                PathSegment::Line { to } => out.push(*to),
+                PathSegment::Cubic { c1, c2, to } => {
+                    CubicBez::new(from, *c1, *c2, *to).flatten_into(FLATTEN_TOLERANCE_MM, &mut out)
+                }
+            }
+            from = seg.end();
         }
         Some(out)
     }

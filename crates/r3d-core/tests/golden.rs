@@ -11,13 +11,15 @@ use std::path::PathBuf;
 
 use glam::DVec2;
 use r3d_core::file::{self, SCHEMA_VERSION};
-use r3d_core::{Edge, EdgeCurve, Panel, Point, Project, Transaction};
+use r3d_core::{
+    Edge, EdgeCurve, InternalLine, Notch, Panel, PathSegment, Point, Project, Transaction,
+};
 
 fn golden_dir(version: u32) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("tests/golden/v{version}"))
 }
 
-/// A small project with one straight-edged panel and one curved edge.
+/// A small project exercising every entity kind of the current schema.
 fn sample() -> Project {
     let mut p = Project::new("Golden sample");
     let mut tx = Transaction::begin(&mut p);
@@ -65,8 +67,36 @@ fn sample() -> Project {
         Panel {
             name: "Front".into(),
             garment,
-            contour,
+            contour: contour.clone(),
             grain_angle_deg: 90.0,
+            seam_allowance_mm: 10.0,
+            mirror_of: None,
+        },
+    );
+    let notch = tx.new_notch_id();
+    tx.put_notch(
+        notch,
+        Notch {
+            edge: contour[1],
+            offset_mm: 180.0,
+        },
+    );
+    let line = tx.new_internal_line_id();
+    tx.put_internal_line(
+        line,
+        InternalLine {
+            panel,
+            start: DVec2::new(200.0, 600.0),
+            segments: vec![
+                PathSegment::Line {
+                    to: DVec2::new(200.0, 480.0),
+                },
+                PathSegment::Cubic {
+                    c1: DVec2::new(200.0, 400.0),
+                    c2: DVec2::new(180.0, 350.0),
+                    to: DVec2::new(160.0, 300.0),
+                },
+            ],
         },
     );
     tx.commit();
@@ -100,6 +130,9 @@ fn every_golden_file_loads_and_resaves_identically_at_current_version() {
             let resaved = file::to_json(&loaded.project).unwrap();
             if version == SCHEMA_VERSION {
                 assert_eq!(resaved, text, "{} is not byte-stable", path.display());
+                assert_eq!(loaded.migrated_from, None);
+            } else {
+                assert_eq!(loaded.migrated_from, Some(version));
             }
             // Saving then loading again must be lossless.
             assert_eq!(file::from_json(&resaved).unwrap().project, loaded.project);

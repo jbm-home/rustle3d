@@ -18,6 +18,9 @@ pub mod model;
 pub mod project_dir;
 
 pub use edit::{ChangeSet, Transaction};
-pub use id::{AnyId, EdgeId, GarmentId, PanelId, PointId};
+pub use id::{AnyId, EdgeId, GarmentId, InternalLineId, NotchId, PanelId, PointId};
 pub use message::{Localizable, Message};
-pub use model::{DisplayUnit, Edge, EdgeCurve, Garment, Panel, Point, Project};
+pub use model::{
+    DisplayUnit, Edge, EdgeCurve, Garment, InternalLine, MirrorLink, Notch, Panel, PathSegment,
+    Point, Project,
+};

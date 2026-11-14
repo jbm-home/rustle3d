@@ -126,6 +126,18 @@ define_id!(
     Edge,
     "edge"
 );
+define_id!(
+    /// A notch: an alignment mark on an edge.
+    NotchId,
+    Notch,
+    "notch"
+);
+define_id!(
+    /// An internal line drawn inside a panel (fold, placement, dart leg…).
+    InternalLineId,
+    InternalLine,
+    "line"
+);
 
 /// Any entity ID, for messages and command outputs.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -134,6 +146,8 @@ pub enum AnyId {
     Panel(PanelId),
     Point(PointId),
     Edge(EdgeId),
+    Notch(NotchId),
+    InternalLine(InternalLineId),
 }
 
 impl fmt::Display for AnyId {
@@ -143,6 +157,8 @@ impl fmt::Display for AnyId {
             AnyId::Panel(id) => id.fmt(f),
             AnyId::Point(id) => id.fmt(f),
             AnyId::Edge(id) => id.fmt(f),
+            AnyId::Notch(id) => id.fmt(f),
+            AnyId::InternalLine(id) => id.fmt(f),
         }
     }
 }
@@ -162,9 +178,11 @@ impl FromStr for AnyId {
             PanelId::PREFIX => s.parse().map(AnyId::Panel),
             PointId::PREFIX => s.parse().map(AnyId::Point),
             EdgeId::PREFIX => s.parse().map(AnyId::Edge),
+            NotchId::PREFIX => s.parse().map(AnyId::Notch),
+            InternalLineId::PREFIX => s.parse().map(AnyId::InternalLine),
             _ => Err(ParseIdError {
                 text: s.to_owned(),
-                expected: "garment|panel|point|edge",
+                expected: "garment|panel|point|edge|notch|line",
             }),
         }
     }
@@ -190,7 +208,7 @@ impl JsonSchema for AnyId {
     fn json_schema(_: &mut SchemaGenerator) -> Schema {
         json_schema!({
             "type": "string",
-            "pattern": "^(garment|panel|point|edge):[1-9][0-9]*$",
+            "pattern": "^(garment|panel|point|edge|notch|line):[1-9][0-9]*$",
         })
     }
 }

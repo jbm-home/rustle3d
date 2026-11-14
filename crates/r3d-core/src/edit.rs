@@ -7,8 +7,8 @@
 
 use std::mem;
 
-use crate::id::{EdgeId, GarmentId, PanelId, PointId};
-use crate::model::{DisplayUnit, Edge, Garment, IdMap, Panel, Point, Project};
+use crate::id::{EdgeId, GarmentId, InternalLineId, NotchId, PanelId, PointId};
+use crate::model::{DisplayUnit, Edge, Garment, IdMap, InternalLine, Notch, Panel, Point, Project};
 
 /// Before/after values of one entity. `None` means "absent".
 #[derive(Clone, Debug, PartialEq)]
@@ -25,6 +25,8 @@ pub enum Change {
     Panel(EntityChange<PanelId, Panel>),
     Point(EntityChange<PointId, Point>),
     Edge(EntityChange<EdgeId, Edge>),
+    Notch(EntityChange<NotchId, Notch>),
+    InternalLine(EntityChange<InternalLineId, InternalLine>),
     Name {
         before: String,
         after: String,
@@ -58,6 +60,8 @@ impl Change {
             Change::Panel(c) => set(&mut p.panels, c.id, pick!(c)),
             Change::Point(c) => set(&mut p.points, c.id, pick!(c)),
             Change::Edge(c) => set(&mut p.edges, c.id, pick!(c)),
+            Change::Notch(c) => set(&mut p.notches, c.id, pick!(c)),
+            Change::InternalLine(c) => set(&mut p.internal_lines, c.id, pick!(c)),
             Change::Name { before, after } => {
                 p.name = if forward { after } else { before }.clone();
             }
@@ -75,6 +79,10 @@ impl Change {
             (Change::Panel(a), Change::Panel(b)) if a.id == b.id => a.after = b.after.clone(),
             (Change::Point(a), Change::Point(b)) if a.id == b.id => a.after = b.after.clone(),
             (Change::Edge(a), Change::Edge(b)) if a.id == b.id => a.after = b.after.clone(),
+            (Change::Notch(a), Change::Notch(b)) if a.id == b.id => a.after = b.after.clone(),
+            (Change::InternalLine(a), Change::InternalLine(b)) if a.id == b.id => {
+                a.after = b.after.clone()
+            }
             (Change::Name { after, .. }, Change::Name { after: b, .. }) => *after = b.clone(),
             (Change::DisplayUnit { after, .. }, Change::DisplayUnit { after: b, .. }) => {
                 *after = *b
@@ -229,6 +237,26 @@ impl<'a> Transaction<'a> {
         new_edge_id,
         put_edge,
         remove_edge
+    );
+    entity_ops!(
+        "notch",
+        NotchId,
+        Notch,
+        notches,
+        Notch,
+        new_notch_id,
+        put_notch,
+        remove_notch
+    );
+    entity_ops!(
+        "internal line",
+        InternalLineId,
+        InternalLine,
+        internal_lines,
+        InternalLine,
+        new_internal_line_id,
+        put_internal_line,
+        remove_internal_line
     );
 
     pub fn set_name(&mut self, name: String) {

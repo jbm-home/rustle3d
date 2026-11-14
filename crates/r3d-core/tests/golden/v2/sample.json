@@ -1,0 +1,140 @@
+{
+  "format": "rustle3d.project",
+  "schema_version": 2,
+  "project": {
+    "name": "Golden sample",
+    "display_unit": "mm",
+    "next_id": 13,
+    "garments": {
+      "garment:1": {
+        "name": "Garment 1"
+      }
+    },
+    "panels": {
+      "panel:2": {
+        "name": "Front",
+        "garment": "garment:1",
+        "contour": [
+          "edge:7",
+          "edge:8",
+          "edge:9",
+          "edge:10"
+        ],
+        "grain_angle_deg": 90.0,
+        "seam_allowance_mm": 10.0,
+        "mirror_of": null
+      }
+    },
+    "points": {
+      "point:3": {
+        "panel": "panel:2",
+        "pos": [
+          0.0,
+          0.0
+        ]
+      },
+      "point:4": {
+        "panel": "panel:2",
+        "pos": [
+          400.0,
+          0.0
+        ]
+      },
+      "point:5": {
+        "panel": "panel:2",
+        "pos": [
+          380.0,
+          600.0
+        ]
+      },
+      "point:6": {
+        "panel": "panel:2",
+        "pos": [
+          20.0,
+          600.0
+        ]
+      }
+    },
+    "edges": {
+      "edge:7": {
+        "panel": "panel:2",
+        "start": "point:3",
+        "end": "point:4",
+        "curve": {
+          "kind": "line"
+        }
+      },
+      "edge:8": {
+        "panel": "panel:2",
+        "start": "point:4",
+        "end": "point:5",
+        "curve": {
+          "kind": "line"
+        }
+      },
+      "edge:9": {
+        "panel": "panel:2",
+        "start": "point:5",
+        "end": "point:6",
+        "curve": {
+          "kind": "cubic",
+          "c1": [
+            260.0,
+            615.0
+          ],
+          "c2": [
+            140.0,
+            615.0
+          ]
+        }
+      },
+      "edge:10": {
+        "panel": "panel:2",
+        "start": "point:6",
+        "end": "point:3",
+        "curve": {
+          "kind": "line"
+        }
+      }
+    },
+    "notches": {
+      "notch:11": {
+        "edge": "edge:8",
+        "offset_mm": 180.0
+      }
+    },
+    "internal_lines": {
+      "line:12": {
+        "panel": "panel:2",
+        "start": [
+          200.0,
+          600.0
+        ],
+        "segments": [
+          {
+            "kind": "line",
+            "to": [
+              200.0,
+              480.0
+            ]
+          },
+          {
+            "kind": "cubic",
+            "c1": [
+              200.0,
+              400.0
+            ],
+            "c2": [
+              180.0,
+              350.0
+            ],
+            "to": [
+              160.0,
+              300.0
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
