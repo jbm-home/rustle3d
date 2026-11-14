@@ -106,7 +106,7 @@ If `cargo` is not on `PATH`, run `source ~/.cargo/env` first.
 | `r3d-render`   | wgpu renderers for the 2D board and 3D view, on-screen and offscreen |
 | `r3d-mcp`      | MCP server over the command layer (stdio or local socket)            |
 | `r3d-cli`      | `r3d` binary: scripts, simulate, export, render, `mcp`               |
-| `r3d-app`      | `rustle3d` binary: egui + wgpu desktop app                           |
+| `r3d-app`      | `rustle3d` binary: desktop app (GUI stack open, see architecture 7.1)  |
 
 ## 5. Workflow
 

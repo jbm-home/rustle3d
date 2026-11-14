@@ -53,17 +53,17 @@ the change log at the end. Sections marked **Open** are explicitly undecided.
 | `r3d-sim` | `r3d-geom`, `glam`, `rayon` | core, GUI, GPU (for the CPU backend) |
 | `r3d-io` | `r3d-core`, `r3d-geom`, `gltf`, `tobj`, PDF writer | sim, GUI, GPU |
 | `r3d-commands` | core, geom, sim, io | GUI, GPU |
-| `r3d-render` | core, geom, `wgpu`, `image` | commands, egui |
-| `r3d-mcp` | commands, render, `rmcp`, `tokio` | egui |
-| `r3d-cli` | commands, render, mcp, `clap` | egui |
-| `r3d-app` | commands, render, mcp, `eframe`/`egui`, `egui-wgpu` | |
+| `r3d-render` | core, geom, `wgpu`, `image` | commands, GUI toolkit |
+| `r3d-mcp` | commands, render, `rmcp`, `tokio` | GUI toolkit |
+| `r3d-cli` | commands, render, mcp, `clap` | GUI toolkit |
+| `r3d-app` | commands, render, mcp, GUI toolkit (open, see 7.1) | |
 
 Changes to the split suggested in the brief:
 
 - **Added `r3d-render`.** The brief requires PNG renders of the 2D board and
   the 3D view for agents, from the CLI (headless) and the app. If rendering
   lived in `r3d-app`, the CLI would have to depend on the whole GUI. A shared
-  renderer crate draws to an egui viewport in the app and to an offscreen
+  renderer crate draws to the app viewports and to an offscreen
   texture in the CLI and MCP, with the same code and the same visuals.
 - **`r3d-sim` does not depend on `r3d-core`.** The solver works with a plain
   `SimScene` (particles, triangles, constraints, colliders, materials as
@@ -197,7 +197,7 @@ pub trait CommandSpec: Serialize + DeserializeOwned + JsonSchema {
 
 | Thread | Owns | Talks via |
 |---|---|---|
-| **UI / main** (eframe) | `Session` (document, history, selection) | Executes commands synchronously, which is cheap. Reads sim frames without blocking. |
+| **UI / main** | `Session` (document, history, selection) | Executes commands synchronously, which is cheap. Reads sim frames without blocking. |
 | **Simulation** | `SimScene`, solver state | `crossbeam` channel in (`SimControl`: rebuild, start/pause, pin, grab target, params). Triple buffer out (latest positions plus stats). |
 | **Rayon pool** | n/a | Used by the solver inside a step (parallel per constraint color). |
 | **Remote/MCP** (app only, tokio) | MCP server on a local socket | Sends `(Command, reply_tx)` to the UI thread over a channel. The UI drains it each frame and calls `request_repaint`. |
@@ -215,37 +215,47 @@ pub trait CommandSpec: Serialize + DeserializeOwned + JsonSchema {
 
 ## 7. Key technical choices
 
-### 7.1 GUI: `egui` + `wgpu` (via `eframe`) — current choice
+### 7.1 GUI stack — **Open** (to be decided by a spike at the start of M3)
 
-- **Chosen because**: pure Rust; immediate mode suits a tool UI with many
-  panels; `egui_wgpu` paint callbacks let us draw the 2D board and the 3D
-  view with our own wgpu pipelines; it is cross-platform, with Metal,
-  Vulkan and DX12 through wgpu.
-- **Alternatives considered**: Bevy (strong 3D, weak editing UI, heavy and
-  changes fast), Slint (good declarative UI, embedding custom wgpu viewports
-  is less mature), Tauri + web front-end (flexible UI, but two languages and
-  an IPC bridge in the real-time path).
-- **Risk**: a beautiful UI is a top-level product goal (see [`ux.md`](ux.md)),
-  and egui looks "tool-like" by default. Mitigation: a dedicated design
-  system module (`r3d-app::ui_kit`) built **before** the feature screens. It
-  covers our own theme tokens (colors, radii, spacing, typography with
-  embedded fonts), an SVG icon set, custom widgets (tool rail, cards,
-  segmented controls, toasts, inspector rows), and motion through egui's
-  animation helpers. A **visual validation gate in M3** (screenshots of the
-  main screens in light and dark) must be approved before more UI is built.
-  If the gate shows that egui cannot reach the target look, we reconsider
-  Slint for the chrome while keeping the wgpu viewports. The command layer
-  makes such a switch survivable.
+A beautiful, modern UI with a very short learning curve is a top-level
+product goal (see [`ux.md`](ux.md)). **egui was ruled out** (2026-11-14)
+because its look is tool-like and its polish ceiling is too low for that goal.
+
+Candidates to evaluate:
+
+| Candidate | Strengths | Concerns |
+|---|---|---|
+| **Tauri 2 + web UI** (TypeScript, Svelte or React, CSS) | Highest polish ceiling, huge ecosystem (animation, a11y, i18n, design systems), easy to theme | Two languages; the 3D view has to be either rendered in the webview (WebGPU/WebGL fed with positions over IPC) or composited from native wgpu |
+| **Slint** (+ wgpu viewports) | Declarative, designer-friendly, good-looking, Rust-native, built-in translations | Smaller ecosystem; custom wgpu viewport integration must be proven |
+| **Iced** (+ `shader` widget) | Pure Rust, wgpu-based, Elm architecture, custom widgets render straight into wgpu | Styling and animations take more work to look premium |
+| Others to watch | Dioxus native (Blitz), Freya, Xilem | Young or immature for a large app today |
+
+**Spike protocol**: build the same small screen in the 2–3 strongest
+candidates (board with a few panels, 3D view with a 10k-vertex mesh updated
+every frame, inspector, light and dark themes). Compare visual quality (the
+maintainer's review), 3D frame time and latency, effort per screen, i18n and
+accessibility support, and cross-platform behavior. Record the result in the
+change log.
+
+Whatever wins, the front-end stays a thin client of `r3d-commands`: it renders
+state and emits JSON-serializable commands. That is also why a web front-end
+is realistic. The same command protocol already serves the CLI and the MCP
+server.
 
 ### 7.2 Rendering: our own wgpu pipelines in `r3d-render`
 
 Two renderers: the board renderer (instanced lines and curves, points, fills,
-text through egui on-screen and `glyphon` offscreen) and the 3D renderer
+text with `glyphon`) and the 3D renderer
 (avatar mesh, cloth mesh with per-vertex normals recomputed each frame, simple
 PBR-lite shading, seam lines, pins). Offscreen rendering uses the same
 pipelines and writes PNG with `image`. Headless GPU: wgpu works without a
 window on macOS and Windows, and on Linux CI uses lavapipe/llvmpipe (software
 Vulkan) so that render golden tests can still run.
+
+The offscreen renderer is needed whatever the GUI stack (agents need PNGs from
+the headless CLI). How the desktop app shows the views on screen depends on
+the outcome of 7.1. With a web front-end, the on-screen views could be drawn
+in the webview instead, and kept visually consistent with the offscreen ones.
 
 ### 7.3 Simulation: XPBD on CPU with rayon — current choice
 
@@ -289,12 +299,26 @@ boundary and shows them as non-blocking notifications. `catch_unwind` around
 the simulation step is a last resort: it resets the simulation and keeps the
 document. Clippy denies `unwrap`/`expect`/`panic` outside tests.
 
-### 7.7 Internationalisation — **Open**
+### 7.7 Internationalisation — current choice
 
-Default proposal: the UI is in English for v0.1, but every user-facing string
-goes through a small catalog (`fluent` or a `tr!("key")` macro), so that
-adding French later is translation work, not refactoring. Command names and
-schemas stay in English, because they are part of the agent API.
+English is the default UI language. Other languages come later, but the code
+must be **i18n-ready from day one**:
+
+- **No user-facing prose is built in the core crates.** Errors and messages
+  from `r3d-core` / `r3d-commands` are structured: a stable `code`
+  (`"entity_not_found"`) plus named `args` (`{"id": "panel:3"}`). The English
+  `Display` text is only a fallback for logs and the CLI. Front-ends translate
+  from `code` + `args`.
+- **Front-end strings** go through a message catalog keyed by stable ids
+  (Fluent `.ftl` files, `en` first). The format follows the GUI stack (7.1),
+  but the keys and the `code` + `args` contract do not change.
+- **Not translated**: command names, query names, JSON schemas and file
+  formats. They are part of the agent/scripting API and stay in English.
+- **Locale-aware formatting** for numbers and units in the UI (decimal
+  separator). Stored data stays locale-independent (mm, `.` decimals).
+- User data such as panel names is never translated. Default names created by
+  commands ("Panel 1") come from an `en` default and can later take a locale
+  parameter.
 
 ## 8. Testing strategy (summary)
 
@@ -312,4 +336,6 @@ schemas stay in English, because they are part of the agent API.
 
 | Date | Change | Why |
 |---|---|---|
-| 2026-11-14 | Initial choices: egui + wgpu, XPBD on CPU, folder projects, MakeHuman CC0 avatars, `r3d-render` crate added | Bootstrap discussion |
+| 2026-11-14 | Initial choices: XPBD on CPU, folder projects, MakeHuman CC0 avatars, `r3d-render` crate added | Bootstrap discussion |
+| 2026-11-14 | egui ruled out; GUI stack is open until the M3 spike | Not modern or polished enough for the "beautiful UI" goal |
+| 2026-11-14 | i18n-ready from M1: structured error codes + args, catalog-keyed UI strings | English default, other languages later without refactoring |

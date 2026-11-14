@@ -16,7 +16,7 @@ can be tested through MCP as soon as they exist.
 | M0 | Bootstrap | done | `cargo build && cargo test` green, planning docs |
 | M1 | Document + commands + CLI | 1.5–2 wk | CLI script builds panels, undo/redo, save/reopen |
 | M2 | Geometry, 2D export, headless MCP | 2 wk | An agent drafts a skirt pattern via MCP and exports a tiled PDF |
-| M3 | Desktop shell, design system, 2D editor | 3–4 wk | Draw and edit panels in a polished UI (**visual gate**) |
+| M3 | GUI spike, desktop shell, design system, 2D editor | 4–5 wk | Draw and edit panels in a polished UI (**visual gate**) |
 | M4 | Simulation v1 | 3 wk | A pinned panel drapes in real time in the 3D view |
 | M5 | Avatar, collisions, arrangement | 3 wk | Panels arranged around the avatar fall onto it |
 | M6 | Sewing + synced views | 3 wk | A skirt made from scratch, sewn and draped |
@@ -24,7 +24,7 @@ can be tested through MCP as soon as they exist.
 | M8 | 3D export, attached MCP | 2 wk | An agent edits the garment live in the open app |
 | M9 | Templates, guided flow, polish → **v0.1** | 3–4 wk | A first-time user makes a T-shirt in < 10 minutes |
 
-Total: roughly 6–7 months to v0.1.
+Total: roughly 6.5–7.5 months to v0.1.
 
 ---
 
@@ -51,15 +51,17 @@ Total: roughly 6–7 months to v0.1.
 - **Demo**: an agent session connected to `r3d mcp` drafts a skirt pattern and
   exports `exports/skirt.pdf`.
 
-## M3 — Desktop shell, design system, 2D editor
-- `ui_kit`: tokens, light/dark themes, fonts, icon set, core widgets, motion.
-- `r3d-render`: board renderer (on-screen via egui paint callback, offscreen
-  PNG) → MCP `render_board`.
+## M3 — GUI stack spike, desktop shell, design system, 2D editor
+- **Spike (≈1 week, first)**: the same small screen in the 2–3 strongest GUI
+  candidates (architecture §7.1). Pick the stack with the maintainer and
+  record it in the decision log.
+- Design system in the chosen stack: tokens, light/dark themes, fonts, icon
+  set, core widgets, motion; i18n message catalog (`en`).
+- `r3d-render`: offscreen board renderer → MCP `render_board`.
 - Editor: selection tool, rectangle/polygon/Bézier tools, snapping, inline
   dimensions with `Tab`, undo history panel, command palette, status bar hints.
 - **Visual gate**: screenshots of the start screen, editor and inspector in
-  both themes, reviewed before going further. This is where we decide whether
-  egui stays.
+  both themes, reviewed before going further.
 - **Demo**: draw a skirt by hand; an agent renders the board to PNG.
 
 ## M4 — Simulation v1
