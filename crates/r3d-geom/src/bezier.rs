@@ -75,6 +75,43 @@ impl CubicBez {
     pub fn arc_length(&self, tolerance: f64) -> f64 {
         arc_length_rec(self, tolerance.max(1e-9), 0)
     }
+
+    /// Parameter `t` whose arc length from `p0` is `length` (clamped to the
+    /// curve), found by bisection to within `tolerance` (mm).
+    pub fn param_at_length(&self, length: f64, tolerance: f64) -> f64 {
+        let total = self.arc_length(tolerance);
+        if length.is_nan() || length <= 0.0 {
+            return 0.0;
+        }
+        if length >= total {
+            return 1.0;
+        }
+        let (mut lo, mut hi) = (0.0, 1.0);
+        for _ in 0..60 {
+            let mid = 0.5 * (lo + hi);
+            let l = self.split(mid).0.arc_length(tolerance);
+            if (l - length).abs() <= tolerance {
+                return mid;
+            }
+            if l < length {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        0.5 * (lo + hi)
+    }
+
+    /// Unit tangent at `t` (falls back to the chord for degenerate ends).
+    pub fn tangent(&self, t: f64) -> DVec2 {
+        let mt = 1.0 - t;
+        let d = (self.p1 - self.p0) * (3.0 * mt * mt)
+            + (self.p2 - self.p1) * (6.0 * mt * t)
+            + (self.p3 - self.p2) * (3.0 * t * t);
+        d.try_normalize()
+            .or_else(|| (self.p3 - self.p0).try_normalize())
+            .unwrap_or(DVec2::X)
+    }
 }
 
 fn arc_length_rec(c: &CubicBez, tol: f64, depth: u32) -> f64 {
@@ -133,6 +170,29 @@ mod tests {
         let (a, b) = c.split(0.3);
         assert!(a.p3.distance(c.eval(0.3)) < 1e-12);
         assert!(b.eval(0.5).distance(c.eval(0.65)) < 1e-9);
+    }
+
+    #[test]
+    fn param_at_length_inverts_arc_length() {
+        let c = CubicBez::new(
+            DVec2::new(0.0, 0.0),
+            DVec2::new(0.0, 100.0),
+            DVec2::new(200.0, 100.0),
+            DVec2::new(200.0, 0.0),
+        );
+        let total = c.arc_length(1e-6);
+        for frac in [0.1, 0.25, 0.5, 0.9] {
+            let t = c.param_at_length(frac * total, 1e-6);
+            let l = c.split(t).0.arc_length(1e-6);
+            assert!((l - frac * total).abs() < 1e-4, "{frac}: {l}");
+        }
+        assert_eq!(c.param_at_length(-5.0, 1e-6), 0.0);
+        assert_eq!(c.param_at_length(total + 5.0, 1e-6), 1.0);
+    }
+
+    #[test]
+    fn tangent_of_straight_cubic_is_x() {
+        assert!((straight().tangent(0.5) - DVec2::X).length() < 1e-12);
     }
 
     #[test]

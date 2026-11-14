@@ -9,7 +9,9 @@
 
 pub mod bezier;
 pub mod polygon;
+pub mod transform;
 
 pub use bezier::CubicBez;
 pub use glam::DVec2;
 pub use polygon::Aabb;
+pub use transform::Mirror;

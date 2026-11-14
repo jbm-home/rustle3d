@@ -103,6 +103,55 @@ pub fn is_simple(pts: &[DVec2]) -> bool {
     true
 }
 
+/// Corners sharper than this miter ratio are beveled.
+const MITER_LIMIT: f64 = 4.0;
+
+/// Offset a **counter-clockwise** simple polygon outward by `distance` (mm),
+/// with miter joins (beveled when sharper than [`MITER_LIMIT`]). Used for
+/// seam allowances. Consecutive duplicate vertices are ignored.
+///
+/// Limitation: very tight concave corners relative to `distance` can make
+/// the result locally self-overlapping. That is acceptable for drawing seam
+/// allowances on garment panels, where radii are much larger than the
+/// allowance.
+pub fn offset_outward(pts: &[DVec2], distance: f64) -> Vec<DVec2> {
+    let mut ring: Vec<DVec2> = Vec::with_capacity(pts.len());
+    for p in pts {
+        if ring.last() != Some(p) {
+            ring.push(*p);
+        }
+    }
+    while ring.len() > 1 && ring.first() == ring.last() {
+        ring.pop();
+    }
+    let n = ring.len();
+    if n < 3 || distance == 0.0 {
+        return ring;
+    }
+    // Outward normal of a CCW edge is its right-hand normal.
+    let normal = |a: DVec2, b: DVec2| {
+        let d = (b - a).normalize_or_zero();
+        DVec2::new(d.y, -d.x)
+    };
+    let mut out = Vec::with_capacity(n);
+    for i in 0..n {
+        let prev = ring[(i + n - 1) % n];
+        let cur = ring[i];
+        let next = ring[(i + 1) % n];
+        let n1 = normal(prev, cur);
+        let n2 = normal(cur, next);
+        let bisector = n1 + n2;
+        let cos_half = bisector.length() * 0.5; // cos of half the turn angle
+        if cos_half > 1.0 / MITER_LIMIT {
+            out.push(cur + bisector.normalize_or_zero() * (distance / cos_half));
+        } else {
+            out.push(cur + n1 * distance);
+            out.push(cur + n2 * distance);
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -161,6 +210,22 @@ mod tests {
             })
         );
         assert_eq!(bounding_box(&[]), None);
+    }
+
+    #[test]
+    fn offset_square_grows_by_distance() {
+        let out = offset_outward(&square(), 10.0);
+        assert_eq!(out.len(), 4);
+        assert!((signed_area(&out) - 120.0 * 120.0).abs() < 1e-9);
+        assert!(out[0].distance(DVec2::new(-10.0, -10.0)) < 1e-9);
+    }
+
+    #[test]
+    fn offset_bevels_sharp_spikes() {
+        let spike = [DVec2::ZERO, DVec2::new(100.0, 0.0), DVec2::new(0.0, 5.0)];
+        let out = offset_outward(&spike, 10.0);
+        assert!(out.len() > 3);
+        assert!(out.iter().all(|p| p.length() < 150.0));
     }
 
     proptest! {
