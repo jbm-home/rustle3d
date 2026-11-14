@@ -1,0 +1,24 @@
+[
+  {"type": "project.rename", "name": "A-line skirt"},
+
+  {"type": "panel.create_polygon", "name": "Front",
+   "points": [[0, 0], [560, 0], [470, 600], [90, 600]]},
+  {"type": "edge.set_curve", "edge": "edge:9",
+   "curve": {"kind": "cubic", "c1": [350, 588], "c2": [210, 588]}},
+  {"type": "panel.set_seam_allowance", "panel": "panel:2", "mm": 10},
+  {"type": "internal_line.add", "panel": "panel:2",
+   "start": [280, 40], "segments": [{"kind": "line", "to": [280, 560]}]},
+
+  {"type": "panel.create_polygon", "name": "Back left",
+   "points": [[650, 0], [930, 0], [930, 600], [695, 600]]},
+  {"type": "panel.set_seam_allowance", "panel": "panel:12", "mm": 10},
+
+  {"type": "notch.add", "edge": "edge:8", "offset_mm": 420},
+  {"type": "notch.add", "edge": "edge:20", "offset_mm": 182},
+  {"type": "edge.split", "edge": "edge:7", "at_mm": 280},
+
+  {"type": "panel.mirror", "panel": "panel:12", "name": "Back right"},
+
+  {"type": "measure.contour_length", "from": "point:4", "to": "point:5"},
+  {"type": "project.summary"}
+]
