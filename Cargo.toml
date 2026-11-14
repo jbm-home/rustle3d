@@ -10,6 +10,7 @@ members = [
     "crates/r3d-mcp",
     "crates/r3d-cli",
     "crates/r3d-app",
+    "crates/r3d-ffi",
     "xtask",
 ]
 
@@ -48,6 +49,8 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std"] }
 
 [workspace.lints.rust]
 unsafe_code = "deny"
+# flutter_rust_bridge's code generator expands with this cfg.
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(frb_expand)"] }
 missing_debug_implementations = "warn"
 
 [workspace.lints.clippy]

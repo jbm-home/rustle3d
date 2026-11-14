@@ -1,0 +1,26 @@
+[package]
+# Underscore on purpose: cargokit (which builds this crate inside the Flutter
+# app) expects the library file to be named after the package.
+name = "r3d_ffi"
+description = "Bridge between the Flutter UI and the Rustle3D core (flutter_rust_bridge)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+r3d-core.workspace = true
+r3d-commands.workspace = true
+flutter_rust_bridge = "=2.13.0"
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

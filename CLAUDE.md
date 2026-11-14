@@ -101,6 +101,9 @@ cargo xtask gen-docs                         # regenerate docs/commands.md (a te
 UPDATE_GOLDEN=1 cargo test -p r3d-core       # regenerate current-version golden files
 ./demos/m2/demo.sh                           # latest milestone demo (one folder per milestone)
 cargo run -p r3d-cli -- mcp --project X.r3d  # MCP server over stdio for agents
+(cd app && flutter run -d macos)             # desktop app (Flutter UI + Rust core)
+(cd app && flutter_rust_bridge_codegen generate)  # after changing crates/r3d-ffi/src/api
+(cd app && flutter test integration_test -d macos)  # UI <-> Rust integration tests
 ```
 
 If `cargo` is not on `PATH`, run `source ~/.cargo/env` first.

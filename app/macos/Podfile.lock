@@ -1,0 +1,22 @@
+PODS:
+  - FlutterMacOS (1.0.0)
+  - r3d_ffi (0.0.1):
+    - FlutterMacOS
+
+DEPENDENCIES:
+  - FlutterMacOS (from `Flutter/ephemeral`)
+  - r3d_ffi (from `Flutter/ephemeral/.symlinks/plugins/r3d_ffi/macos`)
+
+EXTERNAL SOURCES:
+  FlutterMacOS:
+    :path: Flutter/ephemeral
+  r3d_ffi:
+    :path: Flutter/ephemeral/.symlinks/plugins/r3d_ffi/macos
+
+SPEC CHECKSUMS:
+  FlutterMacOS: c232990155153907050900a2e175c7773903ba4e
+  r3d_ffi: 5b7a5c95728467d42b7e1c70e94758a9480ebc58
+
+PODFILE CHECKSUM: 1e95c36afbfd1cb6423ceca4de7a8e1b256fb6ac
+
+COCOAPODS: 1.17.0
