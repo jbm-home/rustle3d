@@ -22,6 +22,7 @@ pub mod error;
 pub mod history;
 pub mod queries;
 pub mod registry;
+pub mod script;
 pub mod session;
 pub mod spec;
 pub mod step;
@@ -29,6 +30,7 @@ pub mod workspace;
 
 pub use error::{CommandError, Invalid};
 pub use registry::{Action, Command, Query};
+pub use script::{Script, ScriptError};
 pub use session::Session;
 pub use spec::{CommandOutput, CommandSpec, Info, QuerySpec};
 pub use step::Step;

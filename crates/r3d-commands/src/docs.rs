@@ -43,7 +43,11 @@ pub fn commands_markdown() -> String {
          - `{{\"type\": \"{UNDO}\"}}`: undo the last step.\n\
          - `{{\"type\": \"{REDO}\"}}`: redo the last undone step.\n\
          - `{{\"type\": \"{BATCH}\", \"commands\": [...]}}`: run commands atomically \
-         as one undo step; if one fails, none is applied.\n"
+         as one undo step; if one fails, none is applied.\n\n\
+         A string such as `\"$3.created[0]\"` refers to the result of an earlier step \
+         (step 3, 0-based, then the path `.created[0]`; `[n]` indexes arrays, `.name` \
+         reads fields). It must be the whole string; `$$` writes a literal `$`. \
+         References keep scripts independent of ID allocation.\n"
     );
     out.push_str("## Commands\n\nDocument edits. Every command can be undone.\n\n");
     section(&mut out, &Command::registry());

@@ -77,6 +77,11 @@ pub enum CommandError {
     },
     #[error("`{name}` writes files and needs a project folder")]
     NeedsProject { name: &'static str },
+    #[error("bad reference `{reference}`: {reason}")]
+    BadReference {
+        reference: String,
+        reason: &'static str,
+    },
     #[error("internal error: {detail}")]
     Internal { detail: String },
 }
@@ -128,6 +133,9 @@ impl Localizable for CommandError {
                 m
             }
             Self::NeedsProject { name } => Message::new("needs_project", text).arg("name", name),
+            Self::BadReference { reference, reason } => Message::new("bad_reference", text)
+                .arg("reference", reference)
+                .arg("reason", reason),
             Self::Internal { detail } => Message::new("internal", text).arg("detail", detail),
         }
     }

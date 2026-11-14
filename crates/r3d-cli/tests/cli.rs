@@ -242,3 +242,30 @@ fn mcp_over_stdio_lists_and_calls_tools() {
     let saved = std::fs::read_to_string(dir.join("project.json")).unwrap();
     assert!(saved.contains("panel:2"));
 }
+
+#[test]
+fn run_resolves_references_to_earlier_results() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("P.r3d");
+    r3d().arg("new").arg(&dir).assert().success();
+    let script = r#"[
+        {"type": "panel.create_rect", "width": 100, "height": 200},
+        {"type": "panel.mirror", "panel": "$0.created[0]", "name": "Copy"},
+        {"type": "panel.get", "panel": "$1.created[0]"},
+        {"type": "panel.rename", "panel": "$9.created[0]", "name": "x"}
+    ]"#;
+    let out = r3d()
+        .arg("run")
+        .arg(&dir)
+        .arg("-")
+        .write_stdin(script)
+        .assert()
+        .code(1)
+        .get_output()
+        .stderr
+        .clone();
+    let err = json_of(&out);
+    assert_eq!(err["error"]["code"], "bad_reference");
+    assert_eq!(err["error"]["args"]["step"], "3");
+    assert_eq!(err["error"]["args"]["reference"], "$9.created[0]");
+}

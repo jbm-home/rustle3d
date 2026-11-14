@@ -3,22 +3,22 @@
 
   {"type": "panel.create_polygon", "name": "Front",
    "points": [[0, 0], [560, 0], [470, 600], [90, 600]]},
-  {"type": "edge.set_curve", "edge": "edge:9",
+  {"type": "edge.set_curve", "edge": "$1.created[7]",
    "curve": {"kind": "cubic", "c1": [350, 588], "c2": [210, 588]}},
-  {"type": "panel.set_seam_allowance", "panel": "panel:2", "mm": 10},
-  {"type": "internal_line.add", "panel": "panel:2",
+  {"type": "panel.set_seam_allowance", "panel": "$1.created[0]", "mm": 10},
+  {"type": "internal_line.add", "panel": "$1.created[0]",
    "start": [280, 40], "segments": [{"kind": "line", "to": [280, 560]}]},
 
   {"type": "panel.create_polygon", "name": "Back left",
    "points": [[650, 0], [930, 0], [930, 600], [695, 600]]},
-  {"type": "panel.set_seam_allowance", "panel": "panel:12", "mm": 10},
+  {"type": "panel.set_seam_allowance", "panel": "$5.created[0]", "mm": 10},
 
-  {"type": "notch.add", "edge": "edge:8", "offset_mm": 420},
-  {"type": "notch.add", "edge": "edge:20", "offset_mm": 182},
-  {"type": "edge.split", "edge": "edge:7", "at_mm": 280},
+  {"type": "notch.add", "edge": "$1.created[6]", "offset_mm": 420},
+  {"type": "notch.add", "edge": "$5.created[8]", "offset_mm": 182},
+  {"type": "edge.split", "edge": "$1.created[5]", "at_mm": 280},
 
-  {"type": "panel.mirror", "panel": "panel:12", "name": "Back right"},
+  {"type": "panel.mirror", "panel": "$5.created[0]", "name": "Back right"},
 
-  {"type": "measure.contour_length", "from": "point:4", "to": "point:5"},
+  {"type": "measure.contour_length", "from": "$1.created[2]", "to": "$1.created[3]"},
   {"type": "project.summary"}
 ]

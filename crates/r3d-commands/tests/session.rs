@@ -206,9 +206,32 @@ fn command_and_query_names_are_distinct_and_well_formed() {
 }
 
 #[test]
-fn script_parsing_reports_the_failing_step() {
-    let err = Step::parse_script(r#"[{"type":"project.summary"},{"type":"nope"}]"#).unwrap_err();
-    assert!(matches!(err, CommandError::AtStep { index: 1, .. }));
-    assert!(Step::parse_script("{}").is_err());
-    assert!(Step::parse_script("[1]").is_err());
+fn scripts_report_the_failing_step_and_resolve_references() {
+    let mut s = Session::new(Project::new("t"));
+    let script =
+        r3d_commands::Script::parse(r#"[{"type":"project.summary"},{"type":"nope"}]"#).unwrap();
+    let err = script.run(|step| s.run_step(step)).unwrap_err();
+    assert_eq!(err.index, 1);
+    assert_eq!(err.message().code, "unknown_type");
+    assert_eq!(
+        err.message().args.get("step").map(String::as_str),
+        Some("1")
+    );
+
+    let script = r3d_commands::Script::parse(
+        r#"[
+            {"type": "panel.create_rect", "width": 100, "height": 200},
+            {"type": "panel.rename", "panel": "$0.created[0]", "name": "Front"},
+            {"type": "panel.get", "panel": "$0.created[0]"},
+            {"type": "point.move", "point": "$2.edges[1].start.id", "to": [120, 0]}
+        ]"#,
+    )
+    .unwrap();
+    let results = script.run(|step| s.run_step(step)).unwrap();
+    assert_eq!(results[2]["name"], "Front");
+    assert_eq!(s.project().panels().len(), 1);
+
+    assert!(r3d_commands::Script::parse("{}").is_err());
+    let script = r3d_commands::Script::parse("[1]").unwrap();
+    assert!(script.run(|step| s.run_step(step)).is_err());
 }

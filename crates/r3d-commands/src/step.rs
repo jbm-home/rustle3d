@@ -107,20 +107,4 @@ impl Step {
             _ => Err(CommandError::UnknownType { name }),
         }
     }
-
-    /// Parse a script: a JSON array of steps.
-    pub fn parse_script(text: &str) -> Result<Vec<Step>, CommandError> {
-        let value: Value = serde_json::from_str(text).map_err(|e| malformed("script", e))?;
-        let Value::Array(items) = value else {
-            return Err(CommandError::Malformed {
-                name: "script".into(),
-                detail: "expected a JSON array of steps".into(),
-            });
-        };
-        items
-            .into_iter()
-            .enumerate()
-            .map(|(i, v)| Step::from_value(v).map_err(|e| e.at(i)))
-            .collect()
-    }
 }

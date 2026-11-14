@@ -10,7 +10,8 @@ scripts, simulate, export and render.
 `r3d` binary (clap). Implemented: `new`, `run`, `query`, `schema` (M1),
 `export`, `mcp` (M2). The others arrive with their milestones. `run
 --dry-run` uses a bare session: actions such as exports are refused and
-nothing is written.
+nothing is written. Scripts can refer to earlier results
+(`"$3.created[0]"`), see `docs/commands.md`.
 - `r3d new <path>`: create an empty project folder (optionally `--template skirt`).
 - `r3d run <project> <script.json|->`: execute a JSON list of commands (same
   format as the MCP batch) and save. Use `--dry-run` to validate only.

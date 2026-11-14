@@ -19,6 +19,8 @@ A script (CLI `r3d run`) is a JSON array of steps. A step is a command, a query,
 - `{"type": "history.redo"}`: redo the last undone step.
 - `{"type": "batch", "commands": [...]}`: run commands atomically as one undo step; if one fails, none is applied.
 
+A string such as `"$3.created[0]"` refers to the result of an earlier step (step 3, 0-based, then the path `.created[0]`; `[n]` indexes arrays, `.name` reads fields). It must be the whole string; `$$` writes a literal `$`. References keep scripts independent of ID allocation.
+
 ## Commands
 
 Document edits. Every command can be undone.

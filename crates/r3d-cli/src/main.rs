@@ -11,7 +11,7 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use r3d_commands::step::parse_query;
-use r3d_commands::{Action, Command, CommandError, Info, Query, Session, Step, Workspace};
+use r3d_commands::{Action, Command, CommandError, Info, Query, Script, Session, Step, Workspace};
 use r3d_core::{Localizable, Message};
 use serde_json::{Value, json};
 
@@ -143,45 +143,30 @@ fn cmd_new(path: &Path, name: Option<String>) -> Result<(), Failure> {
     print_json(&json!({ "created": path.display().to_string(), "name": name }))
 }
 
-/// Attach the failing step index to an error.
-fn at_step(index: usize) -> impl Fn(Failure) -> Failure {
-    move |mut f| {
-        f.message
-            .args
-            .entry("step")
-            .or_insert_with(|| index.to_string());
-        f
-    }
+fn print_results(results: Vec<Value>, saved: bool) -> Result<(), Failure> {
+    let results: Vec<Value> = results
+        .into_iter()
+        .enumerate()
+        .map(|(i, result)| json!({ "step": i, "result": result }))
+        .collect();
+    print_json(&json!({ "results": results, "saved": saved }))
 }
 
 fn cmd_run(project: &Path, script: &Path, dry_run: bool) -> Result<(), Failure> {
-    let steps = Step::parse_script(&read_script(script)?)?;
+    let script = Script::parse(&read_script(script)?)?;
     let mut ws = Workspace::open(project)?;
-    let mut results = Vec::with_capacity(steps.len());
     if dry_run {
         // A bare session: actions are refused, nothing touches the disk.
         let mut session = Session::new(ws.session().project().clone());
-        for (i, step) in steps.iter().enumerate() {
-            let result = session
-                .run_step(step)
-                .map_err(Failure::from)
-                .map_err(at_step(i))?;
-            results.push(json!({ "step": i, "result": result }));
-        }
-        return print_json(&json!({ "results": results, "saved": false }));
+        let results = script.run(|step| session.run_step(step))?;
+        return print_results(results, false);
     }
-    for (i, step) in steps.iter().enumerate() {
-        let result = ws
-            .run_step(step)
-            .map_err(Failure::from)
-            .map_err(at_step(i))?;
-        results.push(json!({ "step": i, "result": result }));
-    }
+    let results = script.run(|step| ws.run_step(step))?;
     let save = ws.session().is_dirty();
     if save {
         ws.save()?;
     }
-    print_json(&json!({ "results": results, "saved": save }))
+    print_results(results, save)
 }
 
 fn cmd_query(project: &Path, query: &str) -> Result<(), Failure> {
