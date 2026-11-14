@@ -43,6 +43,12 @@ pub struct Drawing {
     pub bounds: Aabb,
 }
 
+/// Approximate width of `text` in a Helvetica-like font: ~0.5 em per
+/// glyph. Good enough to centre labels and keep them off nearby lines.
+pub fn approx_text_width(text: &str, size_mm: f64) -> f64 {
+    0.5 * size_mm * text.chars().count() as f64
+}
+
 /// Side of the calibration square printed with every pattern (mm).
 pub const TEST_SQUARE_MM: f64 = 100.0;
 const MARGIN_MM: f64 = 10.0;
@@ -122,8 +128,10 @@ pub fn pattern_drawing(project: &Project) -> Drawing {
                 .fold((f64::MAX, f64::MIN), |(lo, hi), t| (lo.min(t), hi.max(t)));
             let half = 0.3 * (hi - lo);
             push_arrow(&mut d, center - dir * half, center + dir * half);
+            // Beside the grainline, never across it.
+            let clearance = 0.5 * approx_text_width(&panel.name, LABEL_MM) + LABEL_MM;
             d.labels.push(Label {
-                pos: center + dir.perp() * (LABEL_MM * 1.5),
+                pos: center + dir.perp() * clearance,
                 text: panel.name.clone(),
                 size_mm: LABEL_MM,
             });

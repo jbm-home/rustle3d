@@ -4,7 +4,7 @@
 use pdf_writer::{Content, Finish, Name, Pdf, Rect, Ref, Str};
 use r3d_geom::DVec2;
 
-use crate::drawing::{Drawing, Stroke};
+use crate::drawing::{Drawing, Stroke, approx_text_width};
 
 const PT_PER_MM: f64 = 72.0 / 25.4;
 /// Unprintable border kept on every tiled page (mm).
@@ -136,8 +136,7 @@ fn draw(c: &mut Content, d: &Drawing) {
     c.set_fill_gray(0.0);
     for label in &d.labels {
         let bytes = win_ansi(&label.text);
-        // Helvetica averages ~0.5 em per glyph: good enough to centre.
-        let width = 0.5 * label.size_mm * bytes.len() as f64;
+        let width = approx_text_width(&label.text, label.size_mm);
         c.begin_text();
         c.set_font(FONT, label.size_mm as f32);
         c.next_line(
