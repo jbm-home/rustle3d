@@ -1,0 +1,99 @@
+{
+  "format": "rustle3d.project",
+  "schema_version": 1,
+  "project": {
+    "name": "Golden sample",
+    "display_unit": "mm",
+    "next_id": 11,
+    "garments": {
+      "garment:1": {
+        "name": "Garment 1"
+      }
+    },
+    "panels": {
+      "panel:2": {
+        "name": "Front",
+        "garment": "garment:1",
+        "contour": [
+          "edge:7",
+          "edge:8",
+          "edge:9",
+          "edge:10"
+        ],
+        "grain_angle_deg": 90.0
+      }
+    },
+    "points": {
+      "point:3": {
+        "panel": "panel:2",
+        "pos": [
+          0.0,
+          0.0
+        ]
+      },
+      "point:4": {
+        "panel": "panel:2",
+        "pos": [
+          400.0,
+          0.0
+        ]
+      },
+      "point:5": {
+        "panel": "panel:2",
+        "pos": [
+          380.0,
+          600.0
+        ]
+      },
+      "point:6": {
+        "panel": "panel:2",
+        "pos": [
+          20.0,
+          600.0
+        ]
+      }
+    },
+    "edges": {
+      "edge:7": {
+        "panel": "panel:2",
+        "start": "point:3",
+        "end": "point:4",
+        "curve": {
+          "kind": "line"
+        }
+      },
+      "edge:8": {
+        "panel": "panel:2",
+        "start": "point:4",
+        "end": "point:5",
+        "curve": {
+          "kind": "line"
+        }
+      },
+      "edge:9": {
+        "panel": "panel:2",
+        "start": "point:5",
+        "end": "point:6",
+        "curve": {
+          "kind": "cubic",
+          "c1": [
+            260.0,
+            615.0
+          ],
+          "c2": [
+            140.0,
+            615.0
+          ]
+        }
+      },
+      "edge:10": {
+        "panel": "panel:2",
+        "start": "point:6",
+        "end": "point:3",
+        "curve": {
+          "kind": "line"
+        }
+      }
+    }
+  }
+}
