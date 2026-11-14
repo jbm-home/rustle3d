@@ -7,8 +7,10 @@
 
 pub mod api;
 
-// Generated glue: raw FFI entry points, hence `unsafe`. Left as the
-// generator formats it, so regenerating never produces formatting diffs.
-#[allow(unsafe_code)]
+// Generated glue: raw FFI entry points (`unsafe`) and wire-format decoding
+// whose invariants the generator guarantees (`unwrap`). Our never-crash
+// rule applies to the code we write, not to this generated layer. Left as
+// the generator formats it, so regenerating never produces formatting diffs.
+#[allow(unsafe_code, clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 #[rustfmt::skip]
 mod frb_generated;
