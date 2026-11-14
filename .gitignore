@@ -1,0 +1,6 @@
+/target
+**/*.rs.bk
+.DS_Store
+# Local scratch projects
+/scratch/
+*.r3d/exports/

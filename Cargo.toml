@@ -1,0 +1,51 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/r3d-geom",
+    "crates/r3d-core",
+    "crates/r3d-sim",
+    "crates/r3d-io",
+    "crates/r3d-commands",
+    "crates/r3d-render",
+    "crates/r3d-mcp",
+    "crates/r3d-cli",
+    "crates/r3d-app",
+]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+repository = "https://github.com/jbm-home/rustle3d"
+publish = false
+
+[workspace.dependencies]
+r3d-geom = { path = "crates/r3d-geom" }
+r3d-core = { path = "crates/r3d-core" }
+r3d-sim = { path = "crates/r3d-sim" }
+r3d-io = { path = "crates/r3d-io" }
+r3d-commands = { path = "crates/r3d-commands" }
+r3d-render = { path = "crates/r3d-render" }
+r3d-mcp = { path = "crates/r3d-mcp" }
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+# Never-crash policy: no unwrap/expect/panic in non-test code (see CLAUDE.md).
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+print_stdout = "warn"
+
+[profile.dev.package."*"]
+# Dependencies (and later the solver) are unusably slow unoptimized.
+opt-level = 2
+
+[profile.release]
+lto = "thin"
