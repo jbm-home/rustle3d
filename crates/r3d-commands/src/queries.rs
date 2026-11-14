@@ -1,7 +1,10 @@
 //! Read-only queries. Lengths in mm and areas in mm², rounded to 0.001.
 
 use r3d_core::measure::EdgeGeometry;
-use r3d_core::{AnyId, DisplayUnit, EdgeId, GarmentId, PanelId, PointId, Project};
+use r3d_core::{
+    AnyId, DisplayUnit, EdgeId, GarmentId, InternalLineId, NotchId, PanelId, PathSegment, PointId,
+    Project,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -161,11 +164,49 @@ struct EdgeOut {
 }
 
 #[derive(Serialize)]
+struct MirrorOut {
+    source: PanelId,
+    axis_origin: Vec2,
+    axis_dir: Vec2,
+    offset: Vec2,
+}
+
+#[derive(Serialize)]
+struct NotchOut {
+    id: NotchId,
+    edge: EdgeId,
+    offset_mm: f64,
+    pos: Vec2,
+    /// The offset exceeds the edge length; the notch sits at the edge end.
+    clamped: bool,
+}
+
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum SegmentOut {
+    Line { to: Vec2 },
+    Cubic { c1: Vec2, c2: Vec2, to: Vec2 },
+}
+
+#[derive(Serialize)]
+struct InternalLineOut {
+    id: InternalLineId,
+    start: Vec2,
+    segments: Vec<SegmentOut>,
+}
+
+#[derive(Serialize)]
 struct PanelOut {
     #[serde(flatten)]
     summary: PanelSummary,
     grain_angle_deg: f64,
+    seam_allowance_mm: f64,
+    /// Present on linked mirror copies, which cannot be edited directly.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mirror_of: Option<MirrorOut>,
     edges: Vec<EdgeOut>,
+    notches: Vec<NotchOut>,
+    internal_lines: Vec<InternalLineOut>,
 }
 
 impl QuerySpec for PanelGet {
@@ -200,10 +241,55 @@ impl QuerySpec for PanelGet {
                 length_mm: r3(geom.length()),
             });
         }
+        let notches = p
+            .notches()
+            .iter()
+            .filter(|(_, n)| panel.contour.contains(&n.edge))
+            .filter_map(|(id, n)| {
+                let at = p.notch_placement(*id)?;
+                Some(NotchOut {
+                    id: *id,
+                    edge: n.edge,
+                    offset_mm: n.offset_mm,
+                    pos: r3v(at.pos),
+                    clamped: at.clamped,
+                })
+            })
+            .collect();
+        let internal_lines = p
+            .internal_lines()
+            .iter()
+            .filter(|(_, l)| l.panel == self.panel)
+            .map(|(id, l)| InternalLineOut {
+                id: *id,
+                start: r3v(l.start),
+                segments: l
+                    .segments
+                    .iter()
+                    .map(|s| match s {
+                        PathSegment::Line { to } => SegmentOut::Line { to: r3v(*to) },
+                        PathSegment::Cubic { c1, c2, to } => SegmentOut::Cubic {
+                            c1: r3v(*c1),
+                            c2: r3v(*c2),
+                            to: r3v(*to),
+                        },
+                    })
+                    .collect(),
+            })
+            .collect();
         to_value(&PanelOut {
             summary: summarize(p, self.panel)?,
             grain_angle_deg: panel.grain_angle_deg,
+            seam_allowance_mm: panel.seam_allowance_mm,
+            mirror_of: panel.mirror_of.as_ref().map(|l| MirrorOut {
+                source: l.source,
+                axis_origin: r3v(l.origin),
+                axis_dir: r3v(l.dir),
+                offset: r3v(l.offset),
+            }),
             edges,
+            notches,
+            internal_lines,
         })
     }
 }
@@ -228,5 +314,51 @@ impl QuerySpec for MeasureDistance {
         let a = p.point(self.a).ok_or_else(|| missing(self.a))?;
         let b = p.point(self.b).ok_or_else(|| missing(self.b))?;
         Ok(serde_json::json!({ "distance_mm": r3(a.pos.distance(b.pos)) }))
+    }
+}
+
+/// Length along a panel contour between two of its points.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct MeasureContourLength {
+    /// Start point.
+    pub from: PointId,
+    /// End point, on the same panel.
+    pub to: PointId,
+}
+
+impl Described for MeasureContourLength {
+    const SUMMARY: &'static str = "Length (mm) along a panel contour from one point to another, walking in contour order (counter-clockwise). Useful to compare seam lengths.";
+}
+
+impl QuerySpec for MeasureContourLength {
+    fn run(&self, p: &Project) -> Result<Value, CommandError> {
+        if self.from == self.to {
+            return Err(CommandError::invalid("to", Invalid::SamePoint));
+        }
+        let from = p.point(self.from).ok_or_else(|| missing(self.from))?;
+        let to = p.point(self.to).ok_or_else(|| missing(self.to))?;
+        if from.panel != to.panel {
+            return Err(CommandError::invalid("to", Invalid::OtherPanel));
+        }
+        let panel = p.panel(from.panel).ok_or_else(|| missing(from.panel))?;
+        let n = panel.contour.len();
+        let start = panel
+            .contour
+            .iter()
+            .position(|e| p.edge(*e).is_some_and(|e| e.start == self.from))
+            .ok_or_else(|| missing(self.from))?;
+        let mut length = 0.0;
+        let mut edges = Vec::new();
+        for k in 0..n {
+            let id = panel.contour[(start + k) % n];
+            let edge = p.edge(id).ok_or_else(|| missing(id))?;
+            length += p.edge_length(id).unwrap_or_default();
+            edges.push(id);
+            if edge.end == self.to {
+                break;
+            }
+        }
+        Ok(serde_json::json!({ "length_mm": r3(length), "edges": edges }))
     }
 }

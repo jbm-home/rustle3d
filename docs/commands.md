@@ -238,7 +238,7 @@ Rename a panel.
 
 ### `panel.translate`
 
-Move a whole panel on the board by a displacement in mm.
+Move a whole panel on the board by a displacement in mm. Works on linked mirror copies too (only the copy moves).
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -280,9 +280,186 @@ Move a whole panel on the board by a displacement in mm.
 
 </details>
 
+### `panel.set_grain`
+
+Set a panel's grainline (warp direction), in degrees from +X.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "PanelId": {
+      "description": "Identifier of a panel, e.g. `panel:1`.",
+      "pattern": "^panel:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Set the grainline direction.",
+  "properties": {
+    "angle_deg": {
+      "description": "Angle in degrees from the board's +X axis (90 = vertical).",
+      "format": "double",
+      "type": "number"
+    },
+    "panel": {
+      "$ref": "#/$defs/PanelId"
+    }
+  },
+  "required": [
+    "panel",
+    "angle_deg"
+  ],
+  "title": "PanelSetGrain",
+  "type": "object"
+}
+```
+
+</details>
+
+### `panel.set_seam_allowance`
+
+Set the seam allowance (mm, 0 = none) drawn around a panel when exporting.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "PanelId": {
+      "description": "Identifier of a panel, e.g. `panel:1`.",
+      "pattern": "^panel:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Set the seam allowance drawn around the panel on export.",
+  "properties": {
+    "mm": {
+      "description": "Width in mm (≥ 0; 0 = no allowance).",
+      "format": "double",
+      "type": "number"
+    },
+    "panel": {
+      "$ref": "#/$defs/PanelId"
+    }
+  },
+  "required": [
+    "panel",
+    "mm"
+  ],
+  "title": "PanelSetSeamAllowance",
+  "type": "object"
+}
+```
+
+</details>
+
+### `panel.mirror`
+
+Create a linked mirror copy of a panel (e.g. left/right pieces). The copy follows every later change of its source; move it with panel.translate, or make it independent with panel.unlink. Returns the copy, then its points, then its edges.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "PanelId": {
+      "description": "Identifier of a panel, e.g. `panel:1`.",
+      "pattern": "^panel:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Create a linked mirror copy of a panel.",
+  "properties": {
+    "axis_dir": {
+      "description": "Direction of the mirror axis. Defaults to vertical `[0, 1]`.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "axis_origin": {
+      "description": "A point on the mirror axis (mm). Defaults to a vertical axis placed\nso the copy sits to the right of the source with a 50 mm gap.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "name": {
+      "description": "Name of the copy. Defaults to \"<source name> (mirror)\".",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "panel": {
+      "$ref": "#/$defs/PanelId"
+    }
+  },
+  "required": [
+    "panel"
+  ],
+  "title": "PanelMirror",
+  "type": "object"
+}
+```
+
+</details>
+
+### `panel.unlink`
+
+Make a linked mirror copy independent: it keeps its current shape and can then be edited directly.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "PanelId": {
+      "description": "Identifier of a panel, e.g. `panel:1`.",
+      "pattern": "^panel:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Make a linked mirror copy independent.",
+  "properties": {
+    "panel": {
+      "$ref": "#/$defs/PanelId"
+    }
+  },
+  "required": [
+    "panel"
+  ],
+  "title": "PanelUnlink",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `panel.delete`
 
-Delete a panel with its points and edges. Destructive: requires "confirm": true.
+Delete a panel with its points, edges, notches and internal lines. Linked mirror copies of it become independent. Destructive: requires "confirm": true.
 
 **Destructive**: requires `"confirm": true`.
 
@@ -299,7 +476,7 @@ Delete a panel with its points and edges. Destructive: requires "confirm": true.
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "Delete a panel with its points and edges.",
+  "description": "Delete a panel with everything attached to it.",
   "properties": {
     "confirm": {
       "default": false,
@@ -358,6 +535,39 @@ Move a contour point to a new position in mm. Curve handles attached to the poin
     "to"
   ],
   "title": "PointMove",
+  "type": "object"
+}
+```
+
+</details>
+
+### `point.remove`
+
+Remove a contour point and join its two edges into one (a curve if either was curved, keeping the outer handles). The panel must keep at least 3 points.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "PointId": {
+      "description": "Identifier of a point, e.g. `point:1`.",
+      "pattern": "^point:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Remove a contour point, joining its two edges.",
+  "properties": {
+    "point": {
+      "$ref": "#/$defs/PointId"
+    }
+  },
+  "required": [
+    "point"
+  ],
+  "title": "PointRemove",
   "type": "object"
 }
 ```
@@ -448,6 +658,312 @@ Make an edge a straight line or a cubic Bézier curve (absolute control points i
     "curve"
   ],
   "title": "EdgeSetCurve",
+  "type": "object"
+}
+```
+
+</details>
+
+### `edge.split`
+
+Insert a point on an edge at a distance (mm) along it; the curve shape is kept. Returns the new point, then the new edge (the second half).
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "EdgeId": {
+      "description": "Identifier of a edge, e.g. `edge:1`.",
+      "pattern": "^edge:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Insert a point on an edge.",
+  "properties": {
+    "at_mm": {
+      "description": "Distance from the edge's start point, along the edge (mm), strictly\ninside the edge.",
+      "format": "double",
+      "type": "number"
+    },
+    "edge": {
+      "$ref": "#/$defs/EdgeId"
+    }
+  },
+  "required": [
+    "edge",
+    "at_mm"
+  ],
+  "title": "EdgeSplit",
+  "type": "object"
+}
+```
+
+</details>
+
+### `notch.add`
+
+Add a notch (alignment mark) on an edge, at a distance in mm from the edge's start point. Returns the notch.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "EdgeId": {
+      "description": "Identifier of a edge, e.g. `edge:1`.",
+      "pattern": "^edge:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Add a notch on an edge.",
+  "properties": {
+    "edge": {
+      "$ref": "#/$defs/EdgeId"
+    },
+    "offset_mm": {
+      "description": "Distance from the edge's start point along the edge (mm, ≥ 0).",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "edge",
+    "offset_mm"
+  ],
+  "title": "NotchAdd",
+  "type": "object"
+}
+```
+
+</details>
+
+### `notch.move`
+
+Move a notch along its edge to a new distance (mm) from the edge's start point.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "NotchId": {
+      "description": "Identifier of a notch, e.g. `notch:1`.",
+      "pattern": "^notch:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Move a notch along its edge.",
+  "properties": {
+    "notch": {
+      "$ref": "#/$defs/NotchId"
+    },
+    "offset_mm": {
+      "description": "New distance from the edge's start point (mm, ≥ 0).",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "notch",
+    "offset_mm"
+  ],
+  "title": "NotchMove",
+  "type": "object"
+}
+```
+
+</details>
+
+### `notch.remove`
+
+Remove a notch.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "NotchId": {
+      "description": "Identifier of a notch, e.g. `notch:1`.",
+      "pattern": "^notch:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Remove a notch.",
+  "properties": {
+    "notch": {
+      "$ref": "#/$defs/NotchId"
+    }
+  },
+  "required": [
+    "notch"
+  ],
+  "title": "NotchRemove",
+  "type": "object"
+}
+```
+
+</details>
+
+### `internal_line.add`
+
+Draw an internal line (an open path of straight and cubic segments, in mm) on a panel, e.g. a fold or placement line. Returns the line.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "PanelId": {
+      "description": "Identifier of a panel, e.g. `panel:1`.",
+      "pattern": "^panel:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "SegmentSpec": {
+      "description": "One segment of an internal line, starting where the previous one ended.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "line",
+              "type": "string"
+            },
+            "to": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "to"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "c1": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "c2": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "kind": {
+              "const": "cubic",
+              "type": "string"
+            },
+            "to": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "c1",
+            "c2",
+            "to"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Draw an open path inside a panel.",
+  "properties": {
+    "panel": {
+      "$ref": "#/$defs/PanelId"
+    },
+    "segments": {
+      "description": "At least one segment.",
+      "items": {
+        "$ref": "#/$defs/SegmentSpec"
+      },
+      "type": "array"
+    },
+    "start": {
+      "description": "Start point (mm).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+    }
+  },
+  "required": [
+    "panel",
+    "start",
+    "segments"
+  ],
+  "title": "InternalLineAdd",
+  "type": "object"
+}
+```
+
+</details>
+
+### `internal_line.remove`
+
+Remove an internal line.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "InternalLineId": {
+      "description": "Identifier of a line, e.g. `line:1`.",
+      "pattern": "^line:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Remove an internal line.",
+  "properties": {
+    "line": {
+      "$ref": "#/$defs/InternalLineId"
+    }
+  },
+  "required": [
+    "line"
+  ],
+  "title": "InternalLineRemove",
   "type": "object"
 }
 ```
@@ -558,6 +1074,45 @@ Straight-line distance between two points, in mm.
     "b"
   ],
   "title": "MeasureDistance",
+  "type": "object"
+}
+```
+
+</details>
+
+### `measure.contour_length`
+
+Length (mm) along a panel contour from one point to another, walking in contour order (counter-clockwise). Useful to compare seam lengths.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "PointId": {
+      "description": "Identifier of a point, e.g. `point:1`.",
+      "pattern": "^point:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Length along a panel contour between two of its points.",
+  "properties": {
+    "from": {
+      "$ref": "#/$defs/PointId",
+      "description": "Start point."
+    },
+    "to": {
+      "$ref": "#/$defs/PointId",
+      "description": "End point, on the same panel."
+    }
+  },
+  "required": [
+    "from",
+    "to"
+  ],
+  "title": "MeasureContourLength",
   "type": "object"
 }
 ```

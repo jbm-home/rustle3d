@@ -73,6 +73,28 @@ fn every_command_round_trips() {
         "curve": {"kind": "cubic", "c1": [300, 650], "c2": [120, 650]}}));
     h.round_trip(json!({"type": "point.move", "point": point, "to": [420, 0]}));
     h.round_trip(json!({"type": "panel.translate", "panel": panel, "delta": [100, -50]}));
+    h.round_trip(json!({"type": "panel.set_grain", "panel": panel, "angle_deg": 45}));
+    h.round_trip(json!({"type": "panel.set_seam_allowance", "panel": panel, "mm": 15}));
+
+    let split = h.round_trip(json!({"type": "edge.split", "edge": edge, "at_mm": 100}));
+    let new_point = split.created[0].to_string();
+    let notch = h.round_trip(json!({"type": "notch.add", "edge": edge, "offset_mm": 50}));
+    let notch = notch.created[0].to_string();
+    h.round_trip(json!({"type": "notch.move", "notch": notch, "offset_mm": 60}));
+    h.round_trip(json!({"type": "point.remove", "point": new_point}));
+    h.round_trip(json!({"type": "notch.remove", "notch": notch}));
+
+    let line = h.round_trip(json!({"type": "internal_line.add", "panel": panel,
+    "start": [200, 100], "segments": [
+        {"kind": "line", "to": [200, 300]},
+        {"kind": "cubic", "c1": [200, 400], "c2": [250, 450], "to": [300, 500]}
+    ]}));
+    let line = line.created[0].to_string();
+
+    let copy = h.round_trip(json!({"type": "panel.mirror", "panel": panel}));
+    let copy = copy.created[0].to_string();
+    h.round_trip(json!({"type": "panel.unlink", "panel": copy}));
+    h.round_trip(json!({"type": "internal_line.remove", "line": line}));
     h.round_trip(json!({"type": "edge.set_curve", "edge": edge, "curve": {"kind": "line"}}));
     h.round_trip(json!({"type": "panel.delete", "panel": panel, "confirm": true}));
 

@@ -45,11 +45,11 @@ impl History {
             return;
         }
         self.redo.clear();
-        if let (false, Some(key), Some(top)) = (self.sealed, &merge_key, self.undo.last_mut()) {
-            if top.merge_key.as_ref() == Some(key) {
-                top.changes.append(changes);
-                return;
-            }
+        if let (false, Some(key), Some(top)) = (self.sealed, &merge_key, self.undo.last_mut())
+            && top.merge_key.as_ref() == Some(key)
+        {
+            top.changes.append(changes);
+            return;
         }
         self.undo.push(Entry {
             label: label.to_owned(),

@@ -1,11 +1,10 @@
-use r3d_core::{AnyId, Edge, EdgeCurve, PanelId, Point, Transaction};
-use r3d_geom::DVec2;
-use r3d_geom::polygon;
+use r3d_core::{AnyId, Edge, EdgeCurve, MirrorLink, Panel, PanelId, Point, Transaction};
+use r3d_geom::{DVec2, polygon};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{Vec2, v};
-use crate::error::{CommandError, Invalid, finite, non_blank, positive};
+use super::{Vec2, editable_panel, get_panel, v};
+use crate::error::{CommandError, Invalid, finite, non_blank, non_negative, positive};
 use crate::spec::{CommandOutput, CommandSpec, Described};
 
 /// Default grainline: vertical on the board, the usual layout for garments.
@@ -80,11 +79,13 @@ fn create_panel(
         .collect();
     tx.put_panel(
         panel,
-        r3d_core::Panel {
+        Panel {
             name,
             garment,
             contour: edge_ids.clone(),
             grain_angle_deg,
+            seam_allowance_mm: 0.0,
+            mirror_of: None,
         },
     );
     let mut created: Vec<AnyId> = vec![panel.into()];
@@ -160,13 +161,6 @@ impl CommandSpec for PanelCreatePolygon {
     }
 }
 
-fn get_panel(tx: &Transaction<'_>, id: PanelId) -> Result<r3d_core::Panel, CommandError> {
-    tx.project()
-        .panel(id)
-        .cloned()
-        .ok_or_else(|| CommandError::not_found(id))
-}
-
 /// Rename a panel.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -183,7 +177,7 @@ impl Described for PanelRename {
 impl CommandSpec for PanelRename {
     fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
         non_blank("name", &self.name)?;
-        let mut p = get_panel(tx, self.panel)?;
+        let mut p = get_panel(tx.project(), self.panel)?;
         p.name = self.name.trim().to_owned();
         tx.put_panel(self.panel, p);
         Ok(CommandOutput::default())
@@ -200,14 +194,24 @@ pub struct PanelTranslate {
 }
 
 impl Described for PanelTranslate {
-    const SUMMARY: &'static str = "Move a whole panel on the board by a displacement in mm.";
+    const SUMMARY: &'static str = "Move a whole panel on the board by a displacement in mm. Works on linked mirror copies too (only the copy moves).";
 }
 
 impl CommandSpec for PanelTranslate {
     fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
         finite("delta", &self.delta)?;
         let d = v(self.delta);
-        let panel = get_panel(tx, self.panel)?;
+        let mut panel = get_panel(tx.project(), self.panel)?;
+        // A linked copy is placed by its link's offset; the sync pass then
+        // moves its geometry.
+        if let Some(link) = &panel.mirror_of {
+            panel.mirror_of = Some(MirrorLink {
+                offset: link.offset + d,
+                ..link.clone()
+            });
+            tx.put_panel(self.panel, panel);
+            return Ok(CommandOutput::default());
+        }
         for eid in &panel.contour {
             let edge = tx
                 .project()
@@ -239,6 +243,16 @@ impl CommandSpec for PanelTranslate {
                 );
             }
         }
+        let lines: Vec<_> = tx
+            .project()
+            .internal_lines()
+            .iter()
+            .filter(|(_, l)| l.panel == self.panel)
+            .map(|(id, l)| (*id, l.clone()))
+            .collect();
+        for (id, line) in lines {
+            tx.put_internal_line(id, super::internal_line::translated(&line, d));
+        }
         Ok(CommandOutput::default())
     }
 
@@ -247,7 +261,54 @@ impl CommandSpec for PanelTranslate {
     }
 }
 
-/// Delete a panel with its points and edges.
+/// Set the grainline direction.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PanelSetGrain {
+    pub panel: PanelId,
+    /// Angle in degrees from the board's +X axis (90 = vertical).
+    pub angle_deg: f64,
+}
+
+impl Described for PanelSetGrain {
+    const SUMMARY: &'static str = "Set a panel's grainline (warp direction), in degrees from +X.";
+}
+
+impl CommandSpec for PanelSetGrain {
+    fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        finite("angle_deg", &[self.angle_deg])?;
+        let mut p = editable_panel(tx, self.panel)?;
+        p.grain_angle_deg = self.angle_deg;
+        tx.put_panel(self.panel, p);
+        Ok(CommandOutput::default())
+    }
+}
+
+/// Set the seam allowance drawn around the panel on export.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PanelSetSeamAllowance {
+    pub panel: PanelId,
+    /// Width in mm (≥ 0; 0 = no allowance).
+    pub mm: f64,
+}
+
+impl Described for PanelSetSeamAllowance {
+    const SUMMARY: &'static str =
+        "Set the seam allowance (mm, 0 = none) drawn around a panel when exporting.";
+}
+
+impl CommandSpec for PanelSetSeamAllowance {
+    fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        non_negative("mm", self.mm)?;
+        let mut p = editable_panel(tx, self.panel)?;
+        p.seam_allowance_mm = self.mm;
+        tx.put_panel(self.panel, p);
+        Ok(CommandOutput::default())
+    }
+}
+
+/// Delete a panel with everything attached to it.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PanelDelete {
@@ -258,15 +319,48 @@ pub struct PanelDelete {
 }
 
 impl Described for PanelDelete {
-    const SUMMARY: &'static str =
-        "Delete a panel with its points and edges. Destructive: requires \"confirm\": true.";
+    const SUMMARY: &'static str = "Delete a panel with its points, edges, notches and internal lines. Linked mirror copies of it become independent. Destructive: requires \"confirm\": true.";
 }
 
 impl CommandSpec for PanelDelete {
     const DESTRUCTIVE: bool = true;
 
     fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
-        let panel = get_panel(tx, self.panel)?;
+        let panel = get_panel(tx.project(), self.panel)?;
+        let p = tx.project();
+        let notches: Vec<_> = p
+            .notches()
+            .iter()
+            .filter(|(_, n)| panel.contour.contains(&n.edge))
+            .map(|(id, _)| *id)
+            .collect();
+        let lines: Vec<_> = p
+            .internal_lines()
+            .iter()
+            .filter(|(_, l)| l.panel == self.panel)
+            .map(|(id, _)| *id)
+            .collect();
+        let copies: Vec<_> = p
+            .panels()
+            .iter()
+            .filter(|(_, c)| c.mirror_of.as_ref().is_some_and(|l| l.source == self.panel))
+            .map(|(id, c)| (*id, c.clone()))
+            .collect();
+        for id in notches {
+            tx.remove_notch(id);
+        }
+        for id in lines {
+            tx.remove_internal_line(id);
+        }
+        for (id, copy) in copies {
+            tx.put_panel(
+                id,
+                Panel {
+                    mirror_of: None,
+                    ..copy
+                },
+            );
+        }
         for eid in &panel.contour {
             if let Some(edge) = tx.remove_edge(*eid) {
                 tx.remove_point(edge.start);

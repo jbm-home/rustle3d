@@ -4,7 +4,7 @@
 use r3d_core::{AnyId, Localizable, Message};
 
 /// Why an argument is invalid.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, Copy, PartialEq, thiserror::Error)]
 pub enum Invalid {
     #[error("must be a finite number")]
     NotFinite,
@@ -18,6 +18,16 @@ pub enum Invalid {
     Empty,
     #[error("must refer to two different points")]
     SamePoint,
+    #[error("must not be negative")]
+    Negative,
+    #[error("must be a non-zero vector")]
+    ZeroVector,
+    #[error("must be strictly between 0 and the edge length ({0:.3} mm)")]
+    OutsideEdge(f64),
+    #[error("is not a linked mirror copy")]
+    NotLinked,
+    #[error("must be on the same panel")]
+    OtherPanel,
 }
 
 impl Invalid {
@@ -29,6 +39,11 @@ impl Invalid {
             Invalid::NotSimple => "invalid.not_simple",
             Invalid::Empty => "invalid.empty",
             Invalid::SamePoint => "invalid.same_point",
+            Invalid::Negative => "invalid.negative",
+            Invalid::ZeroVector => "invalid.zero_vector",
+            Invalid::OutsideEdge(_) => "invalid.outside_edge",
+            Invalid::NotLinked => "invalid.not_linked",
+            Invalid::OtherPanel => "invalid.other_panel",
         }
     }
 }
@@ -45,6 +60,8 @@ pub enum CommandError {
     },
     #[error("`{command}` is destructive: pass \"confirm\": true to run it")]
     ConfirmationRequired { command: &'static str },
+    #[error("{panel} is a linked mirror copy: edit its source, or unlink it first")]
+    LinkedMirror { panel: AnyId },
     #[error("nothing to undo")]
     NothingToUndo,
     #[error("nothing to redo")]
@@ -88,12 +105,14 @@ impl Localizable for CommandError {
                 let m = Message::new(reason.code(), text).arg("field", field);
                 match reason {
                     Invalid::TooFewPoints(n) => m.arg("min", n),
+                    Invalid::OutsideEdge(len) => m.arg("length_mm", format!("{len:.3}")),
                     _ => m,
                 }
             }
             Self::ConfirmationRequired { command } => {
                 Message::new("confirmation_required", text).arg("command", command)
             }
+            Self::LinkedMirror { panel } => Message::new("linked_mirror", text).arg("panel", panel),
             Self::NothingToUndo => Message::new("nothing_to_undo", text),
             Self::NothingToRedo => Message::new("nothing_to_redo", text),
             Self::UnknownType { name } => Message::new("unknown_type", text).arg("name", name),
@@ -117,6 +136,16 @@ pub(crate) fn finite(field: &'static str, values: &[f64]) -> Result<(), CommandE
         Ok(())
     } else {
         Err(CommandError::invalid(field, Invalid::NotFinite))
+    }
+}
+
+/// Check a finite, non-negative number.
+pub(crate) fn non_negative(field: &'static str, value: f64) -> Result<(), CommandError> {
+    finite(field, &[value])?;
+    if value >= 0.0 {
+        Ok(())
+    } else {
+        Err(CommandError::invalid(field, Invalid::Negative))
     }
 }
 

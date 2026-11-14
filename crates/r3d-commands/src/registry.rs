@@ -89,9 +89,20 @@ command_registry! {
     "panel.create_polygon" => PanelCreatePolygon,
     "panel.rename" => PanelRename,
     "panel.translate" => PanelTranslate,
+    "panel.set_grain" => PanelSetGrain,
+    "panel.set_seam_allowance" => PanelSetSeamAllowance,
+    "panel.mirror" => PanelMirror,
+    "panel.unlink" => PanelUnlink,
     "panel.delete" => PanelDelete,
     "point.move" => PointMove,
+    "point.remove" => PointRemove,
     "edge.set_curve" => EdgeSetCurve,
+    "edge.split" => EdgeSplit,
+    "notch.add" => NotchAdd,
+    "notch.move" => NotchMove,
+    "notch.remove" => NotchRemove,
+    "internal_line.add" => InternalLineAdd,
+    "internal_line.remove" => InternalLineRemove,
 }
 
 query_registry! {
@@ -99,4 +110,5 @@ query_registry! {
     "panel.list" => PanelList,
     "panel.get" => PanelGet,
     "measure.distance" => MeasureDistance,
+    "measure.contour_length" => MeasureContourLength,
 }

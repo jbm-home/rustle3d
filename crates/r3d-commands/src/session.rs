@@ -91,6 +91,8 @@ impl Session {
         for (i, cmd) in cmds.iter().enumerate() {
             outputs.push(cmd.apply(&mut tx).map_err(|e| wrap(i, e))?);
         }
+        // Linked mirror copies are derived data: refresh them once per step.
+        crate::commands::sync_mirrors(&mut tx)?;
         // Never commit a document that breaks an invariant: that would be a
         // bug in a command, and the transaction is rolled back on return.
         tx.project()

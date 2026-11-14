@@ -1,9 +1,10 @@
-use r3d_core::{Edge, EdgeCurve, EdgeId, Transaction};
+use r3d_core::measure::{EdgeGeometry, LENGTH_TOLERANCE_MM};
+use r3d_core::{Edge, EdgeCurve, EdgeId, Notch, Panel, Point, Transaction};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{Vec2, v};
-use crate::error::{CommandError, finite};
+use super::{Vec2, editable_edge_panel, v};
+use crate::error::{CommandError, Invalid, finite};
 use crate::spec::{CommandOutput, CommandSpec, Described};
 
 /// Shape to give an edge.
@@ -31,11 +32,7 @@ impl Described for EdgeSetCurve {
 
 impl CommandSpec for EdgeSetCurve {
     fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
-        let edge = tx
-            .project()
-            .edge(self.edge)
-            .cloned()
-            .ok_or_else(|| CommandError::not_found(self.edge))?;
+        let (edge, _) = editable_edge_panel(tx, self.edge)?;
         let curve = match &self.curve {
             CurveSpec::Line => EdgeCurve::Line,
             CurveSpec::Cubic { c1, c2 } => {
@@ -48,5 +45,103 @@ impl CommandSpec for EdgeSetCurve {
         };
         tx.put_edge(self.edge, Edge { curve, ..edge });
         Ok(CommandOutput::default())
+    }
+}
+
+/// Insert a point on an edge.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct EdgeSplit {
+    pub edge: EdgeId,
+    /// Distance from the edge's start point, along the edge (mm), strictly
+    /// inside the edge.
+    pub at_mm: f64,
+}
+
+impl Described for EdgeSplit {
+    const SUMMARY: &'static str = "Insert a point on an edge at a distance (mm) along it; the curve shape is kept. Returns the new point, then the new edge (the second half).";
+}
+
+impl CommandSpec for EdgeSplit {
+    fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        finite("at_mm", &[self.at_mm])?;
+        let (edge, panel) = editable_edge_panel(tx, self.edge)?;
+        let geom = tx
+            .project()
+            .edge_geometry(self.edge)
+            .ok_or_else(|| CommandError::not_found(self.edge))?;
+        let len = geom.length();
+        if !(self.at_mm > 0.0 && self.at_mm < len) {
+            return Err(CommandError::invalid("at_mm", Invalid::OutsideEdge(len)));
+        }
+        let (pos, first, second) = match geom {
+            EdgeGeometry::Line(a, b) => (
+                a.lerp(b, self.at_mm / len),
+                EdgeCurve::Line,
+                EdgeCurve::Line,
+            ),
+            EdgeGeometry::Cubic(c) => {
+                let (l, r) = c.split(c.param_at_length(self.at_mm, LENGTH_TOLERANCE_MM));
+                (
+                    l.p3,
+                    EdgeCurve::Cubic { c1: l.p1, c2: l.p2 },
+                    EdgeCurve::Cubic { c1: r.p1, c2: r.p2 },
+                )
+            }
+        };
+        let point = tx.new_point_id();
+        tx.put_point(
+            point,
+            Point {
+                panel: edge.panel,
+                pos,
+            },
+        );
+        let new_edge = tx.new_edge_id();
+        tx.put_edge(
+            new_edge,
+            Edge {
+                panel: edge.panel,
+                start: point,
+                end: edge.end,
+                curve: second,
+            },
+        );
+        tx.put_edge(
+            self.edge,
+            Edge {
+                end: point,
+                curve: first,
+                ..edge.clone()
+            },
+        );
+        let mut contour = panel.contour.clone();
+        let at = contour
+            .iter()
+            .position(|e| *e == self.edge)
+            .unwrap_or(contour.len());
+        contour.insert((at + 1).min(contour.len()), new_edge);
+        tx.put_panel(edge.panel, Panel { contour, ..panel });
+
+        // Notches past the split point move to the second half.
+        let moved: Vec<_> = tx
+            .project()
+            .notches()
+            .iter()
+            .filter(|(_, n)| n.edge == self.edge && n.offset_mm > self.at_mm)
+            .map(|(id, n)| (*id, n.offset_mm))
+            .collect();
+        for (id, offset) in moved {
+            tx.put_notch(
+                id,
+                Notch {
+                    edge: new_edge,
+                    offset_mm: offset - self.at_mm,
+                },
+            );
+        }
+        Ok(CommandOutput {
+            created: vec![point.into(), new_edge.into()],
+        })
     }
 }
