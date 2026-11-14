@@ -118,19 +118,33 @@ impl Workspace {
         if relative.is_empty() || !rel.components().all(|c| matches!(c, Component::Normal(_))) {
             return Err(outside());
         }
-        let path = self.dir.join(rel);
-        let parent = path.parent().ok_or_else(outside)?;
-        fs::create_dir_all(parent).map_err(|e| WorkspaceError::Write {
-            path: relative.to_owned(),
-            detail: e.to_string(),
-        })?;
         let canon = |p: &Path| {
             p.canonicalize().map_err(|e| WorkspaceError::Write {
                 path: relative.to_owned(),
                 detail: e.to_string(),
             })
         };
-        if !canon(parent)?.starts_with(canon(&self.dir)?) {
+        let root = canon(&self.dir)?;
+        let path = self.dir.join(rel);
+        let parent = path.parent().ok_or_else(outside)?;
+        // Check the deepest existing ancestor *before* creating anything, so
+        // a symlinked directory cannot make us create folders outside.
+        let mut existing = parent;
+        while fs::symlink_metadata(existing).is_err() {
+            existing = existing.parent().ok_or_else(outside)?;
+        }
+        if !canon(existing)?.starts_with(&root) {
+            return Err(outside());
+        }
+        fs::create_dir_all(parent).map_err(|e| WorkspaceError::Write {
+            path: relative.to_owned(),
+            detail: e.to_string(),
+        })?;
+        if !canon(parent)?.starts_with(&root) {
+            return Err(outside());
+        }
+        // Writing through a symlink would modify its target, wherever it is.
+        if fs::symlink_metadata(&path).is_ok_and(|m| m.file_type().is_symlink()) {
             return Err(outside());
         }
         Ok(path)
@@ -176,10 +190,28 @@ mod tests {
     fn symlinks_cannot_escape() {
         let tmp = tempfile::tempdir().unwrap();
         let ws = Workspace::create(&tmp.path().join("P.r3d"), "P").unwrap();
-        std::os::unix::fs::symlink(tmp.path(), ws.dir().join("escape")).unwrap();
+        let outside = tmp.path().join("outside");
+        std::fs::create_dir_all(&outside).unwrap();
+        std::os::unix::fs::symlink(&outside, ws.dir().join("escape")).unwrap();
         assert!(matches!(
             ws.confined("escape/x.svg"),
             Err(WorkspaceError::OutsideProject { .. })
         ));
+        // No folder may be created outside, even transiently.
+        assert!(matches!(
+            ws.confined("escape/new/dir/x.svg"),
+            Err(WorkspaceError::OutsideProject { .. })
+        ));
+        assert!(!outside.join("new").exists());
+
+        // A file symlink inside the project pointing outside is refused too.
+        let victim = outside.join("victim.txt");
+        std::fs::write(&victim, "keep").unwrap();
+        std::os::unix::fs::symlink(&victim, ws.dir().join("exports/link.svg")).unwrap();
+        assert!(matches!(
+            ws.write("exports/link.svg", b"overwritten"),
+            Err(WorkspaceError::OutsideProject { .. })
+        ));
+        assert_eq!(std::fs::read_to_string(&victim).unwrap(), "keep");
     }
 }
