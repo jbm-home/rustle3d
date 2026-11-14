@@ -18,6 +18,12 @@ the change log at the end. Sections marked **Open** are explicitly undecided.
    document, geometry, commands, simulation and file formats.
 4. **Open, versioned, readable data.** A project is a folder with a JSON
    document that humans, git and agents can read.
+5. **Fluid editing in both directions.** Editing the 2D pattern updates the
+   drape live, and editing the garment in 3D updates the pattern. The 2D
+   pattern stays the single source of truth (see 7.8).
+6. **One renderer, from interactive to photorealistic.** The same Rust wgpu
+   renderer draws the app's views, the agents' PNG renders and photorealistic
+   images, and exports game-ready assets (see 7.9).
 
 ## 2. Crates
 
@@ -256,47 +262,64 @@ Validation lives at the start of `apply` rather than in a separate
 
 ## 7. Key technical choices
 
-### 7.1 GUI stack — **Open** (to be decided by a spike at the start of M3)
+### 7.1 GUI stack — Flutter + native Rust renderer (to confirm by the M3 spike)
 
-A beautiful, modern UI with a very short learning curve is a top-level
-product goal (see [`ux.md`](ux.md)). **egui was ruled out** (2026-11-14)
-because its look is tool-like and its polish ceiling is too low for that goal.
+Requirements: a beautiful, accessible UI with a very short learning curve
+(see [`ux.md`](ux.md)), fluid 2D ↔ 3D editing, and photorealistic rendering.
+**egui was ruled out** (2026-11-14): its look is tool-like and its polish
+ceiling too low.
 
-Candidates to evaluate:
+**Current choice: Flutter for the UI, our Rust wgpu renderer for every
+view.** Flutter (Dart) draws the chrome: panels, inspector, menus,
+animations, onboarding. It has its own GPU renderer, so the UI looks the
+same on macOS, Windows and Linux, and it has mature accessibility, i18n and
+animation support. The 2D board and the 3D view are rendered by
+`r3d-render` (Rust, native wgpu with Metal/D3D12/Vulkan) into a GPU texture
+that Flutter composites without copying (shared IOSurface/Metal texture,
+D3D12 shared handle, Vulkan dma-buf). Pointer and keyboard events on these
+views go to Rust. Dart talks to the Rust core through `flutter_rust_bridge`,
+using the same JSON-serializable commands, queries and events as the CLI
+and MCP.
 
-| Candidate | Strengths | Concerns |
+Why this beats the alternatives considered (survey of 2026-11-14):
+
+| Option | Verdict |
+|---|---|
+| **Tauri 2 + web UI**, our renderer compiled to WASM in the webview | Highest UI polish, but the webview limits rendering to WebGL2 (WebGPU is not guaranteed in Linux webviews), which rules out path tracing and modern GPU features. Ruled out by the photorealism goal. |
+| **Slint** + wgpu texture import | Rust-only and good-looking, and it can show wgpu textures. Lower polish ceiling, and the wgpu API is still marked unstable. **Plan B** if the Flutter spike fails. |
+| GPUI (+ gpui-component) | Superb look, but no wgpu: embedding our renderer is a large project. Windows/Linux not mature. |
+| Makepad | Creative-tool oriented with built-in 3D, but sparse documentation and a small community. |
+| Iced, Dioxus native (Blitz), Xilem | Lower polish ceiling, or pre-alpha / experimental. |
+
+Costs we accept: a second language (Dart) for the UI layer only, the Flutter
+toolchain (and full Xcode on macOS), and our own small texture bridge if the
+existing `flutter_wgpu_texture` crate (young, pinned to an old wgpu) does not
+fit.
+
+**Spike protocol (start of M3)**: the same screen in Flutter + Rust, and in
+Slint if needed. It shows the board with a few panels, the 3D view with a
+10k-vertex mesh updated every frame, an inspector, and light and dark
+themes. Pass criteria:
+- zero-copy texture on macOS first (Windows and Linux before v0.1);
+- input latency under one frame;
+- 60 fps with UI animations running;
+- a selection made in one view is highlighted in the other;
+- the maintainer's visual review.
+
+Whatever wins, the UI stays a thin client of `r3d-commands`.
+
+### 7.2 Rendering: one wgpu renderer, three quality tiers (`r3d-render`)
+
+| Tier | Use | Technique |
 |---|---|---|
-| **Tauri 2 + web UI** (TypeScript, Svelte or React, CSS) | Highest polish ceiling, huge ecosystem (animation, a11y, i18n, design systems), easy to theme | Two languages; the 3D view has to be either rendered in the webview (WebGPU/WebGL fed with positions over IPC) or composited from native wgpu |
-| **Slint** (+ wgpu viewports) | Declarative, designer-friendly, good-looking, Rust-native, built-in translations | Smaller ecosystem; custom wgpu viewport integration must be proven |
-| **Iced** (+ `shader` widget) | Pure Rust, wgpu-based, Elm architecture, custom widgets render straight into wgpu | Styling and animations take more work to look premium |
-| Others to watch | Dioxus native (Blitz), Freya, Xilem | Young or immature for a large app today |
+| **Interactive** | Board and 3D view while editing, agent PNGs | Raster PBR with a cloth BRDF (sheen), soft studio lighting, shadow, MSAA. Fit maps and seam overlays. |
+| **Preview** | "Looks good" screenshots | Interactive tier plus screen-space AO and higher-resolution shadows, rendered offscreen at any size. |
+| **Photorealistic** | Marketing-quality images | Progressive GPU path tracer (wgpu compute; hardware ray queries where available, a BVH in compute otherwise), physically based fabric materials, HDRI lighting, denoising. Renders in the background and refines in the view. |
 
-**Spike protocol**: build the same small screen in the 2–3 strongest
-candidates (board with a few panels, 3D view with a 10k-vertex mesh updated
-every frame, inspector, light and dark themes). Compare visual quality (the
-maintainer's review), 3D frame time and latency, effort per screen, i18n and
-accessibility support, and cross-platform behavior. Record the result in the
-change log.
-
-Whatever wins, the front-end stays a thin client of `r3d-commands`: it renders
-state and emits JSON-serializable commands. That is also why a web front-end
-is realistic. The same command protocol already serves the CLI and the MCP
-server.
-
-### 7.2 Rendering: our own wgpu pipelines in `r3d-render`
-
-Two renderers: the board renderer (instanced lines and curves, points, fills,
-text with `glyphon`) and the 3D renderer
-(avatar mesh, cloth mesh with per-vertex normals recomputed each frame, simple
-PBR-lite shading, seam lines, pins). Offscreen rendering uses the same
-pipelines and writes PNG with `image`. Headless GPU: wgpu works without a
-window on macOS and Windows, and on Linux CI uses lavapipe/llvmpipe (software
-Vulkan) so that render golden tests can still run.
-
-The offscreen renderer is needed whatever the GUI stack (agents need PNGs from
-the headless CLI). How the desktop app shows the views on screen depends on
-the outcome of 7.1. With a web front-end, the on-screen views could be drawn
-in the webview instead, and kept visually consistent with the offscreen ones.
+The board renderer draws instanced lines and curves, points, fills, and text
+with `glyphon`. Every tier renders offscreen too, for the CLI and MCP.
+Headless GPU: wgpu works without a window on macOS and Windows, and Linux CI
+uses lavapipe/llvmpipe (software Vulkan) for render golden tests.
 
 ### 7.3 Simulation: XPBD on CPU with rayon — current choice
 
@@ -371,6 +394,42 @@ must be **i18n-ready from day one**:
   commands ("Panel 1") come from an `en` default and can later take a locale
   parameter.
 
+### 7.8 2D ↔ 3D editing (pattern = single source of truth)
+
+- **2D → 3D**: every pattern edit is a command. The sim bridge remeshes only
+  the changed panels, carries positions over by barycentric remapping, and
+  the drape keeps going: no reset, no jump.
+- **3D → 2D**: every simulated vertex keeps its **pattern coordinates**
+  (panel, triangle, barycentric position in the 2D rest shape). A 3D gesture
+  is therefore mapped back to the pattern and emitted as ordinary pattern
+  commands, then the cloth re-drapes. Planned 3D tools:
+  - *Length*: drag a hem or sleeve end, which moves the pattern edge.
+  - *Fit*: pinch to take in or let out, which moves the seam points on both
+    panels and keeps them the same length.
+  - *Draw on the garment*: lines drawn on the 3D surface become internal
+    lines (style lines, pocket placement) on the pattern.
+  - *Notches and points*: picking in 3D selects the pattern element under
+    the cursor.
+- Because 3D edits are ordinary commands, they are undoable, scriptable and
+  available to agents. There is no separate 3D-only state to keep in sync.
+- Picking: the 3D renderer writes an ID buffer (panel and triangle), and the
+  barycentric position comes from the hit point. The same IDs drive
+  cross-view highlighting.
+
+### 7.9 Export for other tools and game engines (`r3d-io`)
+
+- **glTF 2.0 / GLB** is the main interchange format, read by Unity, Unreal,
+  Godot and Blender. UVs come from the pattern (1 UV unit = 1 m of fabric,
+  so prints keep their scale). Materials use PBR with `KHR_materials_sheen`
+  (with `KHR_texture_transform`), one primitive per panel, and optionally the
+  avatar.
+- **Game-ready option** (after v0.1): decimated LODs, wrinkle detail baked
+  from the full simulation into normal maps, thickness or back faces, and,
+  with animated avatars, skinning weights transferred from the avatar
+  skeleton.
+- **OBJ** for simple tools. **OpenUSD** later (open, used by film and
+  visualisation pipelines). FBX is excluded: proprietary SDK.
+
 ## 8. Testing strategy (summary)
 
 | Layer | Tests |
@@ -391,5 +450,6 @@ must be **i18n-ready from day one**:
 | 2026-11-14 | egui ruled out; GUI stack is open until the M3 spike | Not modern or polished enough for the "beautiful UI" goal |
 | 2026-11-14 | M1: validation inside `apply` (no separate `validate`); `Transaction`/`ChangeSet` in `r3d-core`; IDs as prefixed strings; batch as a script step rather than a `Command` variant | Fewer code paths; keeps the document's fields private; clearer agent API |
 | 2026-11-14 | M2: own Bézier/offset code instead of `kurbo`; triangulation moved to M4 (only the solver needs it); `Workspace` + action registry for file writes; linked mirrors as derived data with offset; MCP tools use underscores and autosave in headless mode | Fewer dependencies and no code written ahead of its use; one place for disk access and path confinement |
+| 2026-11-14 | GUI: Flutter UI + native Rust wgpu renderer shown as a zero-copy texture (Slint as plan B); Tauri ruled out | New requirements: fluid 2D ↔ 3D editing, photorealistic rendering, game-engine export, which need a full native GPU renderer shared by the app, agents and offline renders |
 | 2026-11-14 | MSRV = current stable (1.100) | An application gains nothing from an old MSRV, which only made Cargo pick older dependencies |
 | 2026-11-14 | i18n-ready from M1: structured error codes + args, catalog-keyed UI strings | English default, other languages later without refactoring |

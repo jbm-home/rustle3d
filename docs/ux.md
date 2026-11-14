@@ -43,6 +43,10 @@ Every feature spec has a "UX" section that applies these principles.
   sleeve"). Each card is a scripted command sequence that can play as a demo,
   reusing the command layer.
 
+- **Edit where you look.** Pattern edits update the 3D drape live, and
+  adjustments made on the garment in 3D update the pattern. Both views are
+  always in sync; there is no "3D mode" to enter.
+
 ## 2. Efficiency (fast progression to expert speed)
 
 - Every tool has a one-key shortcut, shown in tooltips and in a cheat sheet

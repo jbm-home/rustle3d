@@ -15,16 +15,19 @@ can be tested through MCP as soon as they exist.
 |---|---|---|---|
 | M0 | Bootstrap | done | `cargo build && cargo test` green, planning docs |
 | M1 | Document + commands + CLI ✅ | 1.5–2 wk | CLI script builds panels, undo/redo, save/reopen |
-| M2 | Geometry, 2D export, headless MCP ✅ (in review) | 2 wk | An agent drafts a skirt pattern via MCP and exports a tiled PDF |
-| M3 | GUI spike, desktop shell, design system, 2D editor | 4–5 wk | Draw and edit panels in a polished UI (**visual gate**) |
+| M2 | Geometry, 2D export, headless MCP ✅ | 2 wk | An agent drafts a skirt pattern via MCP and exports a tiled PDF |
+| M3 | Flutter + Rust spike, design system, 2D editor | 4–5 wk | Draw and edit panels in a polished UI (**visual gate**) |
 | M4 | Simulation v1 | 3 wk | A pinned panel drapes in real time in the 3D view |
 | M5 | Avatar, collisions, arrangement | 3 wk | Panels arranged around the avatar fall onto it |
 | M6 | Sewing + synced views | 3 wk | A skirt made from scratch, sewn and draped |
 | M7 | Materials, self-collision, grab/pin | 2–3 wk | The same T-shirt in jersey vs denim; pull it with the mouse |
-| M8 | 3D export, attached MCP | 2 wk | An agent edits the garment live in the open app |
-| M9 | Templates, guided flow, polish → **v0.1** | 3–4 wk | A first-time user makes a T-shirt in < 10 minutes |
+| M8 | 3D → 2D editing tools | 3 wk | Lengthen a hem and take in a seam directly in 3D; the pattern follows |
+| M9 | glTF export, attached MCP | 2 wk | An agent edits the garment live in the open app; the result opens in a game engine |
+| M10 | Templates, guided flow, polish → **v0.1** | 3–4 wk | A first-time user makes a T-shirt in < 10 minutes |
+| M11 | Photorealistic rendering | 4–6 wk | A path-traced studio image of the draped garment |
+| M12 | Game-ready export | 3–4 wk | LODs + baked wrinkle normal maps, imported in Godot/Unity/Unreal |
 
-Total: roughly 6.5–7.5 months to v0.1.
+Total: roughly 7.5–8.5 months to v0.1, then M11–M12.
 
 ---
 
@@ -61,13 +64,17 @@ Total: roughly 6.5–7.5 months to v0.1.
 - Moved to M4: panel triangulation, needed only by the solver. Moved to M3:
   nearest point on a curve, needed only for UI snapping.
 
-## M3 — GUI stack spike, desktop shell, design system, 2D editor
-- **Spike (≈1 week, first)**: the same small screen in the 2–3 strongest GUI
-  candidates (architecture §7.1). Pick the stack with the maintainer and
-  record it in the decision log.
-- Design system in the chosen stack: tokens, light/dark themes, fonts, icon
-  set, core widgets, motion; i18n message catalog (`en`).
-- `r3d-render`: offscreen board renderer → MCP `render_board`.
+## M3 — Flutter + Rust spike, design system, 2D editor
+- **Spike (≈1 week, first)**: Flutter UI + Rust wgpu views shown as a
+  zero-copy texture (architecture §7.1), with Slint as plan B. Validate
+  against the pass criteria with the maintainer, then record the decision.
+- Repo layout: `app/` (Flutter, Dart) next to `crates/`; `r3d-ffi` bridges
+  Dart and Rust with `flutter_rust_bridge` over the command/query/event
+  protocol.
+- Design system in Flutter: tokens, light/dark themes, fonts, icon set,
+  core widgets, motion; i18n message catalog (`en`, ARB files).
+- `r3d-render`: board renderer (on-screen texture + offscreen PNG) → MCP
+  `render_board`.
 - Editor: selection tool, rectangle/polygon/Bézier tools, snapping, inline
   dimensions with `Tab`, undo history panel, command palette, status bar hints.
 - **Visual gate**: screenshots of the start screen, editor and inspector in
@@ -106,14 +113,23 @@ Total: roughly 6.5–7.5 months to v0.1.
 - Hit the performance targets in `docs/physics.md` §7.
 - **Demo**: T-shirt in jersey vs denim, pulled with the mouse.
 
-## M8 — 3D export, attached MCP
-- OBJ/glTF garment export with UVs; glTF validator in CI.
+## M8 — 3D → 2D editing tools
+- Pattern coordinates on every simulated vertex; ID-buffer picking.
+- Tools: lengthen/shorten by dragging an edge in 3D, pinch to take in or let
+  out a seam, draw style lines on the garment, select pattern elements in
+  3D. All of them emit ordinary pattern commands (architecture §7.8).
+- **Demo**: shorten a skirt and take in its waist in 3D; the pattern and its
+  PDF export follow.
+
+## M9 — glTF export, attached MCP
+- glTF 2.0/GLB garment export with pattern UVs and `KHR_materials_sheen`;
+  OBJ; glTF validator in CI; checked imports in Blender and Godot.
 - Attached mode: app-hosted MCP over a local socket, `r3d mcp --attach`,
   agent indicator, disconnect button.
 - **Demo**: the agent changes the skirt length while the user watches it
   re-drape live.
 
-## M9 — Templates, guided flow, polish → v0.1
+## M10 — Templates, guided flow, polish → v0.1
 - Parametric templates (skirts, T-shirt, dress, tote bag), guided flow step
   bar, Learn panel, first-launch tour.
 - Usability pass and the 10-minute test with first-time users.
@@ -122,9 +138,20 @@ Total: roughly 6.5–7.5 months to v0.1.
 
 ---
 
-## After v0.1 (architecture kept ready, not scheduled)
+## M11 — Photorealistic rendering
+- Progressive GPU path tracer in `r3d-render` (wgpu compute, hardware ray
+  queries when available), physically based fabric materials (sheen, fuzz,
+  thickness), HDRI studio lighting, denoising; renders in the background and
+  refines in the 3D view; `render_photo` for CLI/MCP.
+
+## M12 — Game-ready export
+- Decimated LODs, wrinkle detail baked into normal maps, back faces or
+  thickness; skinning to the avatar skeleton once avatars are animated;
+  presets for Godot, Unity and Unreal.
+
+## Later (architecture kept ready, not scheduled)
 Grading and sizes · DXF-AAMA/ASTM import/export · animated avatars · layers
 and multiple garments · trims (buttons, zippers) · textures and prints with
 UVs from the pattern · fit maps (stress/strain) · material calibration from
-measurements · GPU solver backend / Vertex Block Descent · offline
-high-quality mode · rendering · French UI translation.
+measurements · GPU solver backend / Vertex Block Descent · OpenUSD export ·
+French UI translation.
