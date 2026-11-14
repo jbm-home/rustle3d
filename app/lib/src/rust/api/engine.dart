@@ -7,18 +7,65 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `err`, `lock`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `fmt`, `from`
+// These functions are ignored because they are not marked as `pub`: `err`, `graphics`, `new`, `new`, `poisoned`, `selected`, `workspace`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `eq`, `fmt`, `fmt`, `from`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Engine>>
 abstract class Engine implements RustOpaqueInterface {
+  /// Attach a view rendering into a UI texture (`surface`: platform handle
+  /// from the UI side, an `IOSurfaceRef` pointer on macOS). Returns the
+  /// view id.
+  int attachView({
+    required ViewKind kind,
+    required BigInt surface,
+    required int width,
+    required int height,
+  });
+
+  /// A click at pixel (`x`, `y`) of a view. Updates the shared selection
+  /// and returns it (panel ids).
+  List<String> click({required int view, required double x, required double y});
+
+  /// Stop rendering into a view (its UI texture is about to go away).
+  void detachView({required int view});
+
+  /// A drag of (`dx`, `dy`) pixels: orbit the 3D camera, pan the board.
+  void drag({required int view, required double dx, required double dy});
+
+  /// Fit the board to the pattern again.
+  void fitBoard({required int view});
+
   /// Open the project folder at `path`, creating it if it does not exist.
   static Engine open({required String path}) =>
       RustLib.instance.api.crateApiEngineEngineOpen(path: path);
 
+  /// Render a view and wait until the GPU is done, so the UI never shows
+  /// a half-drawn frame. Returns the CPU + GPU time in milliseconds.
+  double renderView({required int view});
+
   /// Run one step (a JSON object, as in scripts and MCP) and return its
   /// JSON result. Changes are saved immediately.
   String run({required String stepJson});
+
+  /// Run a script (a JSON array of steps, with `"$N.path"` references to
+  /// earlier results) and return the JSON array of results. Used for
+  /// templates. The project is saved once at the end.
+  String runScript({required String scriptJson});
+
+  /// The shared selection (panel ids).
+  List<String> selection();
+
+  /// Use the dark or light canvas colours.
+  void setDark({required bool dark});
+
+  /// A scroll of `amount` (positive = zoom in) at pixel (`x`, `y`).
+  void zoom({
+    required int view,
+    required double x,
+    required double y,
+    required double amount,
+  });
 }
 
 /// A structured, translatable error (see `docs/architecture.md` §7.7).
@@ -45,4 +92,13 @@ class ApiError implements FrbException {
           code == other.code &&
           args == other.args &&
           text == other.text;
+}
+
+/// What a view shows.
+enum ViewKind {
+  /// The 2D pattern board.
+  board,
+
+  /// The 3D garment.
+  garment,
 }

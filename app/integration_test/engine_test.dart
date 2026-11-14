@@ -13,9 +13,15 @@ void main() {
   test('the Rust engine runs steps and reports structured errors', () {
     final dir = Directory.systemTemp.createTempSync('r3d').path;
     final engine = Engine.open(path: '$dir/P.r3d');
-    final out = jsonDecode(engine.run(
-      stepJson: jsonEncode({'type': 'panel.create_rect', 'width': 100, 'height': 200}),
-    ));
+    final out = jsonDecode(
+      engine.run(
+        stepJson: jsonEncode({
+          'type': 'panel.create_rect',
+          'width': 100,
+          'height': 200,
+        }),
+      ),
+    );
     expect(out['created'][0], 'panel:2');
     expect(
       () => engine.run(stepJson: '{"type":"panel.explode"}'),

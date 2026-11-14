@@ -1244,7 +1244,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a180dd8642fa45cdb7dd721cd4c11b1cadd4929ce112ebd8b9f5803cc79d536"
 dependencies = [
  "bitflags",
+ "block2",
  "dispatch2",
+ "libc",
  "objc2",
 ]
 
@@ -1284,8 +1286,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "180788110936d59bab6bd83b6060ffdfffb3b922ba1396b312ae795e1de9d81d"
 dependencies = [
  "bitflags",
+ "libc",
  "objc2",
  "objc2-core-foundation",
+ "objc2-foundation",
 ]
 
 [[package]]
@@ -1296,8 +1300,11 @@ checksum = "a0125f776a10d00af4152d74616409f0d4a2053a6f57fa5b7d6aa2854ac04794"
 dependencies = [
  "bitflags",
  "block2",
+ "dispatch2",
  "objc2",
+ "objc2-core-foundation",
  "objc2-foundation",
+ "objc2-io-surface",
 ]
 
 [[package]]
@@ -1644,10 +1651,17 @@ name = "r3d_ffi"
 version = "0.0.0"
 dependencies = [
  "flutter_rust_bridge",
+ "objc2",
+ "objc2-core-foundation",
+ "objc2-io-surface",
+ "objc2-metal",
  "r3d-commands",
  "r3d-core",
+ "r3d-geom",
+ "r3d-render",
  "serde_json",
  "tempfile",
+ "wgpu",
 ]
 
 [[package]]

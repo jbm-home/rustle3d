@@ -1,5 +1,5 @@
 name: rustle3d
-description: "A new Flutter project."
+description: "Rustle3D desktop app: Flutter UI over the Rust core."
 publish_to: 'none'
 version: 0.1.0+1
 
@@ -23,3 +23,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/demo_skirt.json

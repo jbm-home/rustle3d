@@ -1,32 +1,64 @@
-// Plumbing check for the M3 spike: Dart -> Rust engine -> project on disk.
-// Replaced by the real shell once the texture bridge is in place.
+// Rustle3D desktop app: a Flutter UI over the Rust core (crates/r3d-ffi).
 
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:rustle3d/src/rust/api/engine.dart';
-import 'package:rustle3d/src/rust/frb_generated.dart';
+
+import 'src/design/tokens.dart';
+import 'src/rust/api/engine.dart';
+import 'src/rust/frb_generated.dart';
+import 'src/shell.dart';
 
 Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   await RustLib.init();
-  final dir = '${Directory.systemTemp.path}/rustle3d-spike.r3d';
-  final engine = Engine.open(path: dir);
-  engine.run(stepJson: jsonEncode({'type': 'panel.create_rect', 'width': 400, 'height': 600}));
-  runApp(SpikeApp(engine: engine));
+  final engine = Engine.open(
+    path: '${Directory.systemTemp.path}/rustle3d-spike.r3d',
+  );
+  final summary = jsonDecode(
+    engine.run(stepJson: '{"type":"project.summary"}'),
+  );
+  if ((summary['counts']['panels'] as int) == 0) {
+    engine.runScript(
+      scriptJson: await rootBundle.loadString('assets/demo_skirt.json'),
+    );
+  }
+  runApp(Rustle3dApp(engine: engine));
 }
 
-class SpikeApp extends StatelessWidget {
-  const SpikeApp({super.key, required this.engine});
+class Rustle3dApp extends StatefulWidget {
+  const Rustle3dApp({super.key, required this.engine});
 
   final Engine engine;
 
   @override
+  State<Rustle3dApp> createState() => _Rustle3dAppState();
+}
+
+class _Rustle3dAppState extends State<Rustle3dApp> {
+  bool _dark = false;
+
+  void _toggleTheme() {
+    setState(() => _dark = !_dark);
+    widget.engine.setDark(dark: _dark);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final panels = jsonDecode(engine.run(stepJson: '{"type":"panel.list"}')) as List<dynamic>;
-    return MaterialApp(
-      home: Scaffold(
-        body: Center(child: Text('Rustle3D engine: ${panels.length} panel(s)')),
+    final palette = _dark ? Palette.dark : Palette.light;
+    return Tokens(
+      palette: palette,
+      child: MaterialApp(
+        title: 'Rustle3D',
+        debugShowCheckedModeBanner: false,
+        theme: buildTheme(palette, _dark ? Brightness.dark : Brightness.light),
+        home: Shell(
+          engine: widget.engine,
+          dark: _dark,
+          onToggleTheme: _toggleTheme,
+        ),
       ),
     );
   }

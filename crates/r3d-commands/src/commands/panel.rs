@@ -282,6 +282,10 @@ impl CommandSpec for PanelSetGrain {
         tx.put_panel(self.panel, p);
         Ok(CommandOutput::default())
     }
+
+    fn merge_key(&self) -> Option<String> {
+        Some(format!("panel.set_grain:{}", self.panel))
+    }
 }
 
 /// Set the seam allowance drawn around the panel on export.
@@ -305,6 +309,10 @@ impl CommandSpec for PanelSetSeamAllowance {
         p.seam_allowance_mm = self.mm;
         tx.put_panel(self.panel, p);
         Ok(CommandOutput::default())
+    }
+
+    fn merge_key(&self) -> Option<String> {
+        Some(format!("panel.set_seam_allowance:{}", self.panel))
     }
 }
 

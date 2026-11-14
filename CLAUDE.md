@@ -90,6 +90,7 @@ If a request would break one of these rules, stop and say so.
 ## 3. Commands
 
 ```sh
+./scripts/check.sh                           # run before EVERY commit (fmt, clippy, tests, docs, flutter analyze)
 cargo build                                  # whole workspace
 cargo test                                   # all tests
 cargo test -p r3d-core                       # one crate

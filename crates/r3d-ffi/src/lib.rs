@@ -6,11 +6,19 @@
 //! `flutter_rust_bridge_codegen generate` (run in `app/`) from [`api`].
 
 pub mod api;
+mod surface;
 
 // Generated glue: raw FFI entry points (`unsafe`) and wire-format decoding
 // whose invariants the generator guarantees (`unwrap`). Our never-crash
 // rule applies to the code we write, not to this generated layer. Left as
 // the generator formats it, so regenerating never produces formatting diffs.
-#[allow(unsafe_code, clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#[allow(
+    unsafe_code,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::unimplemented,
+    clippy::todo
+)]
 #[rustfmt::skip]
 mod frb_generated;

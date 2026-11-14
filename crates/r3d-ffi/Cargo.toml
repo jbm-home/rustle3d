@@ -16,8 +16,18 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 [dependencies]
 r3d-core.workspace = true
 r3d-commands.workspace = true
+r3d-geom.workspace = true
+r3d-render.workspace = true
 flutter_rust_bridge = "=2.13.0"
 serde_json.workspace = true
+wgpu.workspace = true
+
+# Zero-copy texture sharing with the Flutter compositor (IOSurface).
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-core-foundation = "0.3"
+objc2-io-surface = { version = "0.3", features = ["IOSurfaceRef", "IOSurfaceTypes", "objc2-core-foundation"] }
+objc2-metal = { version = "0.3", features = ["objc2-io-surface"] }
 
 [dev-dependencies]
 tempfile.workspace = true
