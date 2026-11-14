@@ -14,7 +14,7 @@ can be tested through MCP as soon as they exist.
 | # | Milestone | Estimate | Demo |
 |---|---|---|---|
 | M0 | Bootstrap | done | `cargo build && cargo test` green, planning docs |
-| M1 | Document + commands + CLI | 1.5–2 wk | CLI script builds panels, undo/redo, save/reopen |
+| M1 | Document + commands + CLI ✅ (in review) | 1.5–2 wk | CLI script builds panels, undo/redo, save/reopen |
 | M2 | Geometry, 2D export, headless MCP | 2 wk | An agent drafts a skirt pattern via MCP and exports a tiled PDF |
 | M3 | GUI spike, desktop shell, design system, 2D editor | 4–5 wk | Draw and edit panels in a polished UI (**visual gate**) |
 | M4 | Simulation v1 | 3 wk | A pinned panel drapes in real time in the 3D view |
@@ -37,7 +37,10 @@ Total: roughly 6.5–7.5 months to v0.1.
   `panel.rename`), first queries.
 - `r3d-cli`: `new`, `run`, `query`, `schema`.
 - `xtask gen-docs` → `docs/commands.md`.
-- **Demo**: `r3d new demo.r3d && r3d run demo.r3d m1-demo.json && r3d query demo.r3d '{"type":"project.summary"}'`.
+- **Demo**: `./demos/m1/demo.sh` (A-line skirt pattern built by a script,
+  with undo/redo, an atomic batch, queries and a structured error).
+- Delivered: 9 commands, 4 queries, steps (`history.undo`, `history.redo`,
+  `batch`), integrity checks, golden files, `cargo xtask gen-docs`.
 
 ## M2 — Geometry, 2D export, headless MCP
 - `r3d-geom`: cubic Bézier (length, split, nearest point), symmetry, offset

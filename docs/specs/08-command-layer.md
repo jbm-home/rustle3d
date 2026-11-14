@@ -15,8 +15,12 @@ do anything the UI can do, through the same typed commands.
 - **Batch**: a list of commands executed atomically, forming one undo step.
 - **Queries**: read-only operations with schemas (summary, lists, geometry,
   measurements, simulation state).
-- **Destructive commands** are flagged and need explicit confirmation from
-  non-UI front-ends.
+- **Destructive commands** are flagged and need `"confirm": true` from every
+  front-end (the UI sets it after its own confirmation dialog).
+- **Integrity** is checked after every command; a command that would break
+  an invariant is rolled back and reported as an `internal` error.
+- **Errors** are structured for translation: stable `code`, named `args`,
+  English `text` fallback.
 - `docs/commands.md` is generated from the registry.
 
 ## UX

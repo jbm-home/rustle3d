@@ -7,7 +7,8 @@ As a developer, tester or agent, I drive Rustle3D without a window: run
 scripts, simulate, export and render.
 
 ## Behavior
-`r3d` binary (clap):
+`r3d` binary (clap). Implemented in M1: `new`, `run`, `query`, `schema`.
+The others arrive with their milestones.
 - `r3d new <path>`: create an empty project folder (optionally `--template skirt`).
 - `r3d run <project> <script.json|->`: execute a JSON list of commands (same
   format as the MCP batch) and save. Use `--dry-run` to validate only.

@@ -21,7 +21,8 @@ the app, and I can read or version the file with ordinary tools.
 - An unsaved-changes dot in the title. Closing with unsaved changes asks
   Save / Don't save / Cancel.
 - Opening a project from an older version is silent. A backup of the original
-  file is kept as `project.v{N}.json.bak`.
+  file is kept as `project.v{N}.json.bak` (to implement together with the
+  first real migration, schema v2).
 
 ## Acceptance criteria
 - Golden-file tests: each schema version's sample loads and migrates to the

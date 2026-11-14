@@ -73,15 +73,16 @@ Changes to the split suggested in the brief:
 - **The session lives in `r3d-commands`**, not in a separate engine crate. It
   owns the document, the undo history and the simulation thread handle. A
   separate crate can be split out later if it grows too big.
-- An `xtask` crate will be added in M1 to generate `docs/commands.md` and the
-  JSON schemas, and to run the golden-file updater.
+- An `xtask` crate holds developer tasks: `cargo xtask gen-docs`
+  regenerates `docs/commands.md` from the registry.
 
 ## 3. Document model (`r3d-core`)
 
 ```
-Project
- ├─ meta: schema_version, name, units (display only), created/modified
- ├─ panels: IdMap<PanelId, Panel>
+Project                                        (✓ = implemented in M1)
+ ├─ name, display_unit, next_id                ✓
+ ├─ garments: IdMap<GarmentId, Garment>        ✓
+ ├─ panels: IdMap<PanelId, Panel>              ✓ (name, garment, contour, grain angle)
  │    Panel { name, contour: Vec<EdgeId>, internal_lines, notches,
  │            symmetry: Option<SymmetryLink>, material: MaterialId,
  │            grain_angle, particle_spacing, placement: Placement3d }
@@ -94,15 +95,29 @@ Project
  └─ drape:   Option<DrapeSnapshot>             (last saved simulated positions)
 ```
 
-- **IDs** are typed newtypes (`PanelId(u64)`, …) allocated from a monotonic
-  counter stored in the document. This makes them deterministic, which golden
-  tests need, and they are never reused after deletion.
+- **IDs** are typed newtypes (`PanelId(u64)`, …) allocated from one monotonic
+  counter per document, shared by every entity kind. They serialize as
+  self-describing strings (`"panel:3"`), so an agent cannot pass a point where
+  a panel is expected. Allocation is deterministic, which golden tests need.
+  Undo restores the counter together with the entities, so IDs are only
+  reused when the entities that held them no longer exist anywhere,
+  including in the redo stack.
+- **Fields are private.** The model is read through accessors and modified
+  only through `r3d_core::Transaction` (see §4).
+- **Integrity** (`Project::check_integrity`): closed contours, no dangling
+  references, finite coordinates, a coherent ID counter. It is checked when a
+  file is loaded (a corrupted file is refused, never half-loaded) and after
+  every command (a buggy command is rolled back instead of corrupting the
+  document).
 - **Entity maps** (`IdMap` = ordered `BTreeMap`) give stable iteration order
   and therefore stable JSON.
-- **Serialization**: `serde` JSON with a top-level `schema_version: u32`.
-  Loading runs `migrate_vN_to_vN+1` functions on the raw `serde_json::Value`
-  until it reaches the current version, then deserializes into the typed
-  model. Golden files for each version live in `crates/r3d-core/tests/golden/`.
+- **Serialization**: `{"format": "rustle3d.project", "schema_version": N,
+  "project": {...}}`. Loading runs `MIGRATIONS[v-1]` (version `v` to `v+1`)
+  on the raw `serde_json::Value` until it reaches the current version, then
+  deserializes into the typed model and checks integrity. A compile-time
+  assertion requires one migration per older version. Golden files for each
+  version live in `crates/r3d-core/tests/golden/v{N}/` and are never edited.
+  Saving is atomic (temporary file, then rename).
 - **Units**: 2D in millimetres, `f64`. Display units (mm/cm/in) are only a UI
   preference.
 - **Future-ready**: the grading/sizes, layers, trims and textures in the
@@ -127,34 +142,44 @@ folder.
 ## 4. Command layer (`r3d-commands`)
 
 ```rust
-pub enum Command {            // serde-tagged: {"type": "panel.create_rect", ...}
-    PanelCreateRect(PanelCreateRect),
-    PointMove(PointMove),
-    SeamAdd(SeamAdd),
-    MaterialAssign(MaterialAssign),
-    SimStart(SimStart),
-    ExportGltf(ExportGltf),
+// registry.rs: the single list of operations. One line per command; the
+// macro generates the serde-tagged `Command` enum, `Named::NAME` and the
+// `Command::registry()` used by docs, CLI and MCP.
+command_registry! {
+    "panel.create_rect" => PanelCreateRect,
+    "point.move" => PointMove,
     // ...
 }
 
-pub trait CommandSpec: Serialize + DeserializeOwned + JsonSchema {
-    const NAME: &'static str;          // "panel.create_rect"
-    const SUMMARY: &'static str;       // one line, used in docs and MCP tool description
-    const DESTRUCTIVE: bool = false;   // needs `confirm: true` from MCP/CLI
-    fn validate(&self, doc: &Project) -> Result<(), CommandError>;
+pub trait CommandSpec: Named + Described + Serialize + DeserializeOwned + JsonSchema {
+    const DESTRUCTIVE: bool = false;   // needs `confirm: true`
+    /// Validate, then mutate through the transaction. An error drops the
+    /// transaction, which rolls back any partial change.
     fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError>;
+    fn merge_key(&self) -> Option<String> { None }   // e.g. "point.move:point:3"
+    fn confirmed(&self) -> bool { false }
 }
 ```
+
+Validation lives at the start of `apply` rather than in a separate
+`validate` step. One code path means validation cannot drift from what
+`apply` assumes, and the transaction makes early returns safe.
 
 - **Undo by recorded changes, not by hand-written inverses.** Commands mutate
   the document only through a `Transaction`, which records each entity change
   as `(id, before: Option<T>, after: Option<T>)`. Undo and redo replay these
   diffs, so a command author cannot write a wrong inverse, and batches and
-  transactions come for free. The history is a list of `ChangeSet`s with a
-  label and an optional merge key, so that dragging a point records one
-  undo step and not 300.
-- **Batch**: `Command::Batch(Vec<Command>)` runs atomically. If any command
-  fails, the whole batch rolls back and becomes one undo step.
+  transactions come for free. `Transaction` and `ChangeSet` live in
+  `r3d-core`, next to the private fields they modify. The history
+  (`r3d-commands`) is a list of `ChangeSet`s with a label and an optional
+  merge key. Merged change sets are compacted per entity (first `before`,
+  last `after`), so dragging a point for 300 frames is one small undo step.
+  `Session::seal_history` ends a merge run (e.g. on mouse release).
+- **Steps**: scripts and agents send *steps*. A step is a command, a query,
+  `history.undo`, `history.redo`, or `batch` (`{"type": "batch",
+  "commands": [...]}`), which runs atomically as one undo step. If any command
+  in a batch fails, nothing is applied and the error carries the index of the
+  failing command.
 - **Queries** (`ProjectSummary`, `ListPanels`, `GetPanelGeometry`,
   `Measure`, `SimState`, …) are a separate `Query` enum. They are read-only
   and have their own schemas, and they are also exposed through the CLI and
@@ -166,10 +191,11 @@ pub trait CommandSpec: Serialize + DeserializeOwned + JsonSchema {
   `sim.pin`, `sim.step` …) control the simulation thread. They are not
   undoable document edits. `drape.save` copies the current simulated state
   into the document, and that is undoable.
-- **Session** = `Project` + `History` + `SimHandle` + project folder path.
-  It exposes `execute(Command)`, `query(Query)`, `undo()`, `redo()`, and an
-  event stream (`DocumentChanged`, `SelectionChanged`, `SimFrame`) that the
-  front-ends subscribe to.
+- **Session** = `Project` + `History` + dirty flag (M1). It will gain the
+  `SimHandle` (M4) and an event stream (`DocumentChanged`,
+  `SelectionChanged`, `SimFrame`) for front-ends. It exposes `execute`,
+  `execute_batch`, `query`, `undo`, `redo` and `run_step`. Persistence stays
+  outside, in `r3d_core::project_dir`.
 - **Selection** is session state, not document state. It is not saved and not
   undoable. It is shared by the 2D and 3D views, which keeps them in sync, and
   agents can read and set it.
@@ -338,4 +364,5 @@ must be **i18n-ready from day one**:
 |---|---|---|
 | 2026-11-14 | Initial choices: XPBD on CPU, folder projects, MakeHuman CC0 avatars, `r3d-render` crate added | Bootstrap discussion |
 | 2026-11-14 | egui ruled out; GUI stack is open until the M3 spike | Not modern or polished enough for the "beautiful UI" goal |
+| 2026-11-14 | M1: validation inside `apply` (no separate `validate`); `Transaction`/`ChangeSet` in `r3d-core`; IDs as prefixed strings; batch as a script step rather than a `Command` variant | Fewer code paths; keeps the document's fields private; clearer agent API |
 | 2026-11-14 | i18n-ready from M1: structured error codes + args, catalog-keyed UI strings | English default, other languages later without refactoring |

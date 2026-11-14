@@ -51,8 +51,15 @@ If a request would break one of these rules, stop and say so.
 - `cargo fmt --all` and `cargo clippy --all-targets -- -D warnings` must pass.
 - **Never-crash policy**: no `unwrap()`, `expect()`, `panic!`, `todo!`,
   `unimplemented!` or unchecked indexing that can fail on user data in
-  non-test code. These lints are denied in `Cargo.toml`. Use error types
-  built with `thiserror` per crate; the app reports errors, it never aborts.
+  non-test code. These lints are denied in `Cargo.toml` (integration test
+  files opt out with a crate-level `#![allow]`). Use error types built with
+  `thiserror` per crate; the app reports errors, it never aborts.
+- **Clean code**: no dead code, no unused API "for later", no workaround
+  stacked on a previous fix. When a fix shows the design was wrong, fix the
+  design. If an approach keeps failing, step back and change approach
+  instead of insisting.
+- **i18n**: no user-facing prose in core crates. Errors implement
+  `r3d_core::Localizable` (stable `code` + `args` + English fallback).
 - No `unsafe` (denied workspace-wide). Discuss before lifting it for one module.
 - **All business logic goes through `r3d-commands`.** The UI, CLI and MCP
   never mutate the document directly; they build commands. If you need a new
@@ -90,6 +97,9 @@ cargo clippy --all-targets -- -D warnings    # lints, as in CI
 cargo fmt --all                              # format
 cargo run -p r3d-app                         # desktop app (binary: rustle3d)
 cargo run -p r3d-cli -- --help               # headless CLI (binary: r3d)
+cargo xtask gen-docs                         # regenerate docs/commands.md (a test checks it)
+UPDATE_GOLDEN=1 cargo test -p r3d-core       # regenerate current-version golden files
+./demos/m1/demo.sh                           # milestone demo (one folder per milestone)
 ```
 
 If `cargo` is not on `PATH`, run `source ~/.cargo/env` first.
