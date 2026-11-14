@@ -11,11 +11,21 @@ that they can later be sewn and draped.
   free contour with cubic Bézier segments (click = corner, drag = smooth).
 - **Edit**: select and move points/edges/panels; convert an edge between line
   and curve; edit Bézier handles; insert/delete points; split an edge.
-- **Symmetry**: mirror a panel or half-panel along an axis. A linked mirror
-  copy updates live with the original (can be unlinked).
-- **Notches** on edges (position by distance from a point) and **internal
-  lines** (open polylines/curves inside a panel, usable later as fold or
-  seam lines).
+- **Symmetry**: a linked mirror copy of a panel (`panel.mirror`) follows
+  every change of its source, including notches, internal lines, grainline
+  and seam allowance. It cannot be edited directly, but it can be moved
+  (`panel.translate`) or made independent (`panel.unlink`). Deleting the
+  source unlinks its copies. *Later*: "cut on fold" (one panel symmetric
+  about an edge).
+- **Points**: insert a point on an edge at a distance along it
+  (`edge.split`, shape kept), or remove a point and join its edges
+  (`point.remove`, at least 3 points remain).
+- **Notches** on edges, positioned in mm from the edge's start point. If
+  the edge gets shorter, the notch sits at its end and `panel.get` reports
+  it as `clamped`. They move with splits and point removals. **Internal
+  lines**: open paths of straight and cubic segments inside a panel, usable
+  later as fold or seam lines.
+- **Seam allowance** per panel (mm), drawn as the cutting line on export.
 - **Grainline** per panel (an angle) that sets the warp direction for the
   simulation.
 - **Grid and snapping**: grid (adjustable), snap to points, edges, midpoints,

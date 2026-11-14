@@ -48,13 +48,13 @@ the change log at the end. Sections marked **Open** are explicitly undecided.
 
 | Crate | Depends on | Must not depend on |
 |---|---|---|
-| `r3d-geom` | `glam`, `spade` (CDT), `kurbo`? (see 7.4) | anything r3d, GUI, GPU |
+| `r3d-geom` | `glam` (later `spade` for triangulation, M4) | anything r3d, GUI, GPU |
 | `r3d-core` | `r3d-geom`, `serde`, `serde_json`, `schemars` | sim, GUI, GPU |
 | `r3d-sim` | `r3d-geom`, `glam`, `rayon` | core, GUI, GPU (for the CPU backend) |
-| `r3d-io` | `r3d-core`, `r3d-geom`, `gltf`, `tobj`, PDF writer | sim, GUI, GPU |
-| `r3d-commands` | core, geom, sim, io | GUI, GPU |
+| `r3d-io` | `r3d-core`, `r3d-geom`, `pdf-writer` (later `gltf`, `tobj`) | sim, GUI, GPU; no file I/O (returns bytes) |
+| `r3d-commands` | core, geom, io (sim from M4) | GUI, GPU |
 | `r3d-render` | core, geom, `wgpu`, `image` | commands, GUI toolkit |
-| `r3d-mcp` | commands, render, `rmcp`, `tokio` | GUI toolkit |
+| `r3d-mcp` | commands (render from M3), `rmcp`, `tokio` | GUI toolkit |
 | `r3d-cli` | commands, render, mcp, `clap` | GUI toolkit |
 | `r3d-app` | commands, render, mcp, GUI toolkit (open, see 7.1) | |
 
@@ -187,6 +187,21 @@ Validation lives at the start of `apply` rather than in a separate
 - **Schemas**: `schemars` derives the JSON schema of every command and query.
   The `xtask` generates `docs/commands.md`, and `r3d-mcp` builds its tool list
   from the same registry at startup, so there is a single source of truth.
+- **Actions** (`export.svg`, `export.pdf`, …) are a third registry next to
+  commands and queries: operations that write files and are not undoable.
+  They run on a `Workspace`, never on a bare `Session`.
+- **Workspace** = `Session` + project folder. It owns saving (atomic, with a
+  `project.vN.json.bak` backup on the first save after a migration) and every
+  file write, confined to the project folder: relative paths only, no `..`,
+  and symlinks are resolved so they cannot point outside. The CLI and the MCP
+  server work on a `Workspace`.
+- **Linked mirror copies** are derived data. After every step, the session
+  recomputes each copy from its source (reflection across an axis, then an
+  offset). It reuses the copy's entity IDs while the source topology is
+  unchanged, and writes only values that differ, so an unrelated edit
+  records no change on the copies. A copy cannot be edited directly
+  (`linked_mirror` error); `panel.translate` moves it through its offset,
+  and `panel.unlink` makes it independent.
 - **Simulation commands** (`sim.start`, `sim.pause`, `sim.reset`,
   `sim.pin`, `sim.step` …) control the simulation thread. They are not
   undoable document edits. `drape.save` copies the current simulated state
@@ -292,10 +307,12 @@ the callers.
 ### 7.4 Geometry
 
 - `glam` for vectors, `f64` (`DVec2`) in 2D and `f32` (`Vec3`) in the simulation.
-- Our own small Bézier module (cubic segments, arc-length tables, splitting,
-  nearest point). `kurbo` (MIT/Apache) is a candidate for offsets and
-  booleans. We will decide in M2 after a prototype. **Open**
-- Constrained Delaunay triangulation with `spade` (MIT/Apache), with interior
+- Our own small Bézier module (evaluation, splitting, arc length,
+  parameter at length, tangent) and polygon helpers (area, simplicity,
+  outward miter offset for seam allowances). This was enough for M2, so
+  `kurbo` was not needed. We will revisit if booleans or robust offsets of
+  tight curves become necessary.
+- **M4**: constrained Delaunay triangulation with `spade` (MIT/Apache), with interior
   Steiner points on a jittered or hexagonal grid at the panel's
   `particle_spacing`, and boundary resampling that keeps seam vertices on
   both edges in matching count.
@@ -308,10 +325,18 @@ the callers.
   runtime directory, or a Windows named pipe), and `r3d mcp --attach` is a thin
   stdio↔socket relay. The agent configuration is therefore always
   "run `r3d mcp`", and the only difference is the `--attach` flag.
-- Tools are generated from the command and query registry: one tool per
-  command (`panel_create_rect`, …), plus `batch`, `undo`, `redo` and query
-  tools, plus `render_board` and `render_3d` (which return PNG image
-  content).
+- Tools are generated from the command, query and action registries: one
+  tool per operation, with the dots turned into underscores
+  (`panel.create_rect` → `panel_create_rect`, as MCP clients require
+  `[a-zA-Z0-9_-]`) and the same JSON schema. `history_undo`,
+  `history_redo` and `batch` complete the set. `render_board` and
+  `render_3d` (PNG image content) come with `r3d-render` in M3/M4.
+- Tool failures are returned as tool results with `isError` and the
+  structured error (`code`, `args`, `text`), never as protocol errors, so
+  the agent can read them and correct itself. Results are compact JSON.
+- **Headless mode (M2)**: `r3d mcp --project <dir>` creates the folder if
+  needed and saves after every successful change. Concurrent calls are
+  serialized by a lock on the workspace.
 - **Safety**: paths are resolved and canonicalized against the project folder,
   and anything outside it is refused. Destructive commands (`DESTRUCTIVE =
   true`: delete panel, overwrite file, new project discarding changes) need
@@ -365,4 +390,6 @@ must be **i18n-ready from day one**:
 | 2026-11-14 | Initial choices: XPBD on CPU, folder projects, MakeHuman CC0 avatars, `r3d-render` crate added | Bootstrap discussion |
 | 2026-11-14 | egui ruled out; GUI stack is open until the M3 spike | Not modern or polished enough for the "beautiful UI" goal |
 | 2026-11-14 | M1: validation inside `apply` (no separate `validate`); `Transaction`/`ChangeSet` in `r3d-core`; IDs as prefixed strings; batch as a script step rather than a `Command` variant | Fewer code paths; keeps the document's fields private; clearer agent API |
+| 2026-11-14 | M2: own Bézier/offset code instead of `kurbo`; triangulation moved to M4 (only the solver needs it); `Workspace` + action registry for file writes; linked mirrors as derived data with offset; MCP tools use underscores and autosave in headless mode | Fewer dependencies and no code written ahead of its use; one place for disk access and path confinement |
+| 2026-11-14 | MSRV = current stable (1.100) | An application gains nothing from an old MSRV, which only made Cargo pick older dependencies |
 | 2026-11-14 | i18n-ready from M1: structured error codes + args, catalog-keyed UI strings | English default, other languages later without refactoring |

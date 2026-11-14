@@ -99,7 +99,8 @@ cargo run -p r3d-app                         # desktop app (binary: rustle3d)
 cargo run -p r3d-cli -- --help               # headless CLI (binary: r3d)
 cargo xtask gen-docs                         # regenerate docs/commands.md (a test checks it)
 UPDATE_GOLDEN=1 cargo test -p r3d-core       # regenerate current-version golden files
-./demos/m1/demo.sh                           # milestone demo (one folder per milestone)
+./demos/m2/demo.sh                           # latest milestone demo (one folder per milestone)
+cargo run -p r3d-cli -- mcp --project X.r3d  # MCP server over stdio for agents
 ```
 
 If `cargo` is not on `PATH`, run `source ~/.cargo/env` first.

@@ -20,7 +20,12 @@ patterns to use in other tools or to print and cut.
   - PDF at 1:1 scale, either as one large page (plotter) or **tiled** to
     A4/Letter with overlap margins, alignment marks, page grid labels and a
     100 mm test square on the first page.
-  - Optional seam allowance (constant width per panel) drawn as an outer line.
+  - Optional seam allowance (constant width per panel): the cutting line is
+    the sewing line offset outward, and the sewing line is drawn dashed.
+  - Notches are 6 mm ticks cut inward from the cutting line.
+  - Panel names are drawn beside the grainline. PDF text uses the built-in
+    Helvetica (Latin-1); other characters print as `?` until we embed a
+    font.
 - All export paths stay inside the project folder (`exports/` by default)
   unless the user chooses a location in a save dialog.
 

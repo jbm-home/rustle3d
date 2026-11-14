@@ -15,8 +15,12 @@ and look at the result, either headless or live in the user's open app.
   `undo` and `redo`.
 - **Visual feedback**: `render_board` and `render_3d` return PNG images
   (size, camera preset or explicit camera, optional highlight of ids).
+- **Naming**: tool names are the operation names with underscores
+  (`panel_create_rect`). Errors are tool results with `isError` and the
+  structured error (`code`, `args`, `text`).
 - **Modes**:
-  - Headless: `r3d mcp [--project path]` over stdio.
+  - Headless (M2): `r3d mcp --project <dir>` over stdio; creates the
+    project if missing and saves after every successful change.
   - Attached: `r3d mcp --attach` relays to the running desktop app over a
     local socket. Changes appear live in the UI and are undoable there.
 - **Safety**: file paths are confined to the project folder; destructive

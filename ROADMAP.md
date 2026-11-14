@@ -14,8 +14,8 @@ can be tested through MCP as soon as they exist.
 | # | Milestone | Estimate | Demo |
 |---|---|---|---|
 | M0 | Bootstrap | done | `cargo build && cargo test` green, planning docs |
-| M1 | Document + commands + CLI ✅ (in review) | 1.5–2 wk | CLI script builds panels, undo/redo, save/reopen |
-| M2 | Geometry, 2D export, headless MCP | 2 wk | An agent drafts a skirt pattern via MCP and exports a tiled PDF |
+| M1 | Document + commands + CLI ✅ | 1.5–2 wk | CLI script builds panels, undo/redo, save/reopen |
+| M2 | Geometry, 2D export, headless MCP ✅ (in review) | 2 wk | An agent drafts a skirt pattern via MCP and exports a tiled PDF |
 | M3 | GUI spike, desktop shell, design system, 2D editor | 4–5 wk | Draw and edit panels in a polished UI (**visual gate**) |
 | M4 | Simulation v1 | 3 wk | A pinned panel drapes in real time in the 3D view |
 | M5 | Avatar, collisions, arrangement | 3 wk | Panels arranged around the avatar fall onto it |
@@ -43,16 +43,23 @@ Total: roughly 6.5–7.5 months to v0.1.
   `batch`), integrity checks, golden files, `cargo xtask gen-docs`.
 
 ## M2 — Geometry, 2D export, headless MCP
-- `r3d-geom`: cubic Bézier (length, split, nearest point), symmetry, offset
-  for seam allowance, constrained triangulation at a given spacing (prototype
-  `kurbo` vs our own).
-- Commands: curves, mirror (linked), notches, internal lines, grainline,
-  measure queries.
-- `r3d-io`: SVG and tiled PDF export with the 100 mm test square.
-- `r3d-mcp`: stdio server generated from the registry (read and write tools,
-  batch, undo/redo, path confinement).
-- **Demo**: an agent session connected to `r3d mcp` drafts a skirt pattern and
-  exports `exports/skirt.pdf`.
+- `r3d-geom`: cubic Bézier (split, length, parameter at length, tangent),
+  mirror transform, outward offset for seam allowances.
+- Schema v2 (first real migration): notches, internal lines, seam
+  allowance, linked mirror copies.
+- Commands: `edge.split`, `point.remove`, `notch.*`, `internal_line.*`,
+  `panel.set_grain`, `panel.set_seam_allowance`, `panel.mirror`,
+  `panel.unlink`; query `measure.contour_length`.
+- `r3d-io`: SVG and tiled PDF (A4/Letter/single page) with the 100 mm test
+  square, from one shared drawing.
+- `Workspace` + action registry (`export.svg`, `export.pdf`) with confined
+  file writes; CLI `export` and `mcp`.
+- `r3d-mcp`: stdio server generated from the registries, autosave,
+  structured tool errors.
+- **Demo**: `./demos/m2/demo.sh` (script-built A-line skirt, an MCP session,
+  exports).
+- Moved to M4: panel triangulation, needed only by the solver. Moved to M3:
+  nearest point on a curve, needed only for UI snapping.
 
 ## M3 — GUI stack spike, desktop shell, design system, 2D editor
 - **Spike (≈1 week, first)**: the same small screen in the 2–3 strongest GUI
@@ -68,6 +75,8 @@ Total: roughly 6.5–7.5 months to v0.1.
 - **Demo**: draw a skirt by hand; an agent renders the board to PNG.
 
 ## M4 — Simulation v1
+- `r3d-geom`: constrained triangulation of panels at a target particle
+  spacing, with matching vertex counts along future seams (moved from M2).
 - `r3d-sim`: `Solver` trait, XPBD small steps, strain-based stretch/shear,
   quadratic bending, pins, gravity, ground plane, graph coloring + rayon,
   deterministic mode, `criterion` benchmarks.
