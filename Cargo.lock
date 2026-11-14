@@ -281,6 +281,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
+name = "pdf-writer"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5e456864a7a304047bff84977dc6fb162bd956475d40ba50b2dcecaada7f753"
+dependencies = [
+ "bitflags",
+ "itoa",
+ "memchr",
+ "ryu",
+]
+
+[[package]]
 name = "ppv-lite86"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -393,9 +405,11 @@ version = "0.0.0"
 dependencies = [
  "r3d-core",
  "r3d-geom",
+ "r3d-io",
  "schemars",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror",
 ]
 
@@ -423,6 +437,11 @@ dependencies = [
 [[package]]
 name = "r3d-io"
 version = "0.0.0"
+dependencies = [
+ "pdf-writer",
+ "r3d-core",
+ "r3d-geom",
+]
 
 [[package]]
 name = "r3d-mcp"
@@ -530,6 +549,12 @@ dependencies = [
  "tempfile",
  "wait-timeout",
 ]
+
+[[package]]
+name = "ryu"
+version = "1.0.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 
 [[package]]
 name = "schemars"

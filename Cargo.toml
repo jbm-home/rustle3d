@@ -25,10 +25,12 @@ publish = false
 r3d-geom = { path = "crates/r3d-geom" }
 r3d-core = { path = "crates/r3d-core" }
 r3d-commands = { path = "crates/r3d-commands" }
+r3d-io = { path = "crates/r3d-io" }
 
 assert_cmd = "2"
 clap = { version = "4", features = ["derive"] }
 glam = { version = "0.34", features = ["serde"] }
+pdf-writer = "0.15"
 proptest = "1"
 schemars = "1"
 serde = { version = "1", features = ["derive"] }
