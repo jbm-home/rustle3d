@@ -1,0 +1,102 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // test code
+
+use r3d_commands::{Action, Command, Query, Workspace};
+use r3d_mcp::Server;
+use serde_json::{Map, Value, json};
+
+fn server() -> (tempfile::TempDir, Server) {
+    let tmp = tempfile::tempdir().unwrap();
+    let ws = Workspace::create(&tmp.path().join("P.r3d"), "P").unwrap();
+    (tmp, Server::new(ws))
+}
+
+/// Call a tool; returns (is_error, parsed JSON body).
+fn call(s: &Server, name: &str, args: Value) -> (bool, Value) {
+    let args: Option<Map<String, Value>> = match args {
+        Value::Object(m) => Some(m),
+        _ => None,
+    };
+    let result = serde_json::to_value(s.call(name, args)).unwrap();
+    let text = result["content"][0]["text"].as_str().unwrap();
+    (
+        result["isError"] == true,
+        serde_json::from_str(text).unwrap(),
+    )
+}
+
+#[test]
+fn tools_mirror_the_registries() {
+    let (_tmp, s) = server();
+    let names = s.tool_names();
+    let expected =
+        Command::registry().len() + Query::registry().len() + Action::registry().len() + 3;
+    assert_eq!(names.len(), expected);
+    for n in &names {
+        assert!(
+            n.chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-'),
+            "{n}"
+        );
+    }
+    assert!(names.contains(&"panel_create_rect".to_owned()));
+    assert!(names.contains(&"export_pdf".to_owned()));
+}
+
+#[test]
+fn edits_are_saved_and_undoable() {
+    let (tmp, s) = server();
+    let (err, out) = call(
+        &s,
+        "panel_create_rect",
+        json!({"width": 400, "height": 600}),
+    );
+    assert!(!err, "{out}");
+    assert_eq!(out["created"][0], "panel:2");
+    let saved = std::fs::read_to_string(tmp.path().join("P.r3d/project.json")).unwrap();
+    assert!(saved.contains("panel:2"));
+
+    let (_, summary) = call(&s, "project_summary", json!({}));
+    assert_eq!(summary["counts"]["panels"], 1);
+
+    let (err, _) = call(&s, "history_undo", Value::Null);
+    assert!(!err);
+    let saved = std::fs::read_to_string(tmp.path().join("P.r3d/project.json")).unwrap();
+    assert!(!saved.contains("panel:2"));
+}
+
+#[test]
+fn errors_are_readable_results() {
+    let (_tmp, s) = server();
+    call(&s, "panel_create_rect", json!({"width": 10, "height": 10}));
+    let (err, body) = call(&s, "panel_delete", json!({"panel": "panel:2"}));
+    assert!(err);
+    assert_eq!(body["error"]["code"], "confirmation_required");
+    let (err, body) = call(&s, "nope", json!({}));
+    assert!(err);
+    assert_eq!(body["error"]["code"], "unknown_type");
+    let (err, body) = call(&s, "export_svg", json!({"path": "/etc/x.svg"}));
+    assert!(err);
+    assert_eq!(body["error"]["code"], "outside_project");
+}
+
+#[test]
+fn batch_and_export() {
+    let (tmp, s) = server();
+    let (err, out) = call(
+        &s,
+        "batch",
+        json!({"commands": [
+            {"type": "panel.create_rect", "name": "Front", "width": 400, "height": 600},
+            {"type": "panel.set_seam_allowance", "panel": "panel:2", "mm": 10}
+        ]}),
+    );
+    assert!(!err, "{out}");
+    let (err, out) = call(&s, "export_pdf", json!({"paper": "a4"}));
+    assert!(!err, "{out}");
+    assert!(
+        tmp.path()
+            .join("P.r3d")
+            .join(out["path"].as_str().unwrap())
+            .is_file()
+    );
+}
