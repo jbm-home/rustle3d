@@ -1,0 +1,26 @@
+[
+  {"type": "project.rename", "name": "A-line skirt"},
+  {"type": "project.set_display_unit", "unit": "cm"},
+
+  {"type": "panel.create_polygon", "name": "Front",
+   "points": [[0, 0], [560, 0], [470, 600], [90, 600]]},
+  {"type": "panel.create_polygon", "name": "Back",
+   "points": [[700, 0], [1260, 0], [1170, 600], [790, 600]]},
+
+  {"type": "edge.set_curve", "edge": "edge:9",
+   "curve": {"kind": "cubic", "c1": [350, 588], "c2": [210, 588]}},
+
+  {"type": "point.move", "point": "point:4", "to": [600, 0]},
+  {"type": "history.undo"},
+  {"type": "history.redo"},
+  {"type": "history.undo"},
+
+  {"type": "batch", "commands": [
+    {"type": "panel.rename", "panel": "panel:11", "name": "Back skirt"},
+    {"type": "panel.translate", "panel": "panel:11", "delta": [50, 0]}
+  ]},
+
+  {"type": "panel.get", "panel": "panel:2"},
+  {"type": "measure.distance", "a": "point:3", "b": "point:4"},
+  {"type": "project.summary"}
+]

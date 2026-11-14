@@ -13,6 +13,14 @@ name = "r3d"
 path = "src/main.rs"
 
 [dependencies]
+r3d-core.workspace = true
+r3d-commands.workspace = true
+clap.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+assert_cmd.workspace = true
+tempfile.workspace = true
 
 [lints]
 workspace = true
