@@ -9,6 +9,12 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
+r3d-core.workspace = true
+r3d-geom.workspace = true
+schemars.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
 
 [lints]
 workspace = true
