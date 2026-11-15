@@ -11,7 +11,7 @@ pub struct OrbitCamera {
     /// Vertical angle (radians, clamped to avoid flipping).
     pub pitch: f32,
     pub distance: f32,
-    /// Vertical field of view (radians).
+    /// Field of view along the shorter side of the view (radians).
     pub fov_y: f32,
 }
 
@@ -42,8 +42,19 @@ impl OrbitCamera {
     pub fn view_proj(&self, aspect: f32) -> Mat4 {
         // wgpu uses the DirectX clip-space convention (z in 0..1, y up).
         let view = view::look_at_mat4(self.eye(), self.target, Vec3::Y);
-        let proj = directx::perspective(self.fov_y, aspect.max(1e-3), 0.05, 50.0);
+        let aspect = aspect.max(1e-3);
+        let proj = directx::perspective(self.vertical_fov(aspect), aspect, 0.05, 50.0);
         proj * view
+    }
+
+    /// `fov_y` is the field of view along the *shorter* side, so the subject
+    /// stays framed in tall, narrow views as well as wide ones.
+    fn vertical_fov(&self, aspect: f32) -> f32 {
+        if aspect >= 1.0 {
+            self.fov_y
+        } else {
+            2.0 * ((self.fov_y / 2.0).tan() / aspect).atan()
+        }
     }
 
     /// Rotate by a pointer drag (in pixels).
@@ -55,5 +66,20 @@ impl OrbitCamera {
     /// Zoom by a scroll amount (positive = closer).
     pub fn zoom(&mut self, amount: f32) {
         self.distance = (self.distance * (1.0 - amount * 0.1)).clamp(0.3, 20.0);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn narrow_views_widen_the_vertical_fov() {
+        let c = OrbitCamera::default();
+        assert_eq!(c.vertical_fov(1.5), c.fov_y);
+        // Horizontal FOV of a half-width view equals fov_y.
+        let v = c.vertical_fov(0.5);
+        let horizontal = 2.0 * ((v / 2.0).tan() * 0.5).atan();
+        assert!((horizontal - c.fov_y).abs() < 1e-5);
     }
 }

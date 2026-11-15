@@ -7,9 +7,9 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `err`, `graphics`, `new`, `new`, `poisoned`, `selected`, `workspace`
+// These functions are ignored because they are not marked as `pub`: `err`, `graphics`, `new`, `new`, `poisoned`, `rgba`, `selected`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `eq`, `fmt`, `fmt`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `from`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Engine>>
 abstract class Engine implements RustOpaqueInterface {
@@ -53,11 +53,16 @@ abstract class Engine implements RustOpaqueInterface {
   /// templates. The project is saved once at the end.
   String runScript({required String scriptJson});
 
+  /// Replace the shared selection with these panel ids; unknown ids are
+  /// ignored. Returns the resulting selection.
+  List<String> select({required List<String> panels});
+
   /// The shared selection (panel ids).
   List<String> selection();
 
-  /// Use the dark or light canvas colours.
-  void setDark({required bool dark});
+  /// Set the canvas colours from the UI design system, so the board and
+  /// the 3D view match the app theme.
+  void setCanvas({required CanvasColors colors});
 
   /// A scroll of `amount` (positive = zoom in) at pixel (`x`, `y`).
   void zoom({
@@ -92,6 +97,68 @@ class ApiError implements FrbException {
           code == other.code &&
           args == other.args &&
           text == other.text;
+}
+
+/// Canvas colours as `0xAARRGGBB` (Flutter's `Color.toARGB32()`).
+class CanvasColors {
+  final int boardBackground;
+  final int gridMinor;
+  final int gridMajor;
+  final int panelLine;
+  final int selection;
+  final int skyTop;
+  final int skyBottom;
+  final int ground;
+  final int cloth;
+  final int clothSheen;
+
+  /// Piece fills, cycled; exactly `PIECE_COLORS` (8) entries.
+  final Uint32List pieces;
+
+  const CanvasColors({
+    required this.boardBackground,
+    required this.gridMinor,
+    required this.gridMajor,
+    required this.panelLine,
+    required this.selection,
+    required this.skyTop,
+    required this.skyBottom,
+    required this.ground,
+    required this.cloth,
+    required this.clothSheen,
+    required this.pieces,
+  });
+
+  @override
+  int get hashCode =>
+      boardBackground.hashCode ^
+      gridMinor.hashCode ^
+      gridMajor.hashCode ^
+      panelLine.hashCode ^
+      selection.hashCode ^
+      skyTop.hashCode ^
+      skyBottom.hashCode ^
+      ground.hashCode ^
+      cloth.hashCode ^
+      clothSheen.hashCode ^
+      pieces.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CanvasColors &&
+          runtimeType == other.runtimeType &&
+          boardBackground == other.boardBackground &&
+          gridMinor == other.gridMinor &&
+          gridMajor == other.gridMajor &&
+          panelLine == other.panelLine &&
+          selection == other.selection &&
+          skyTop == other.skyTop &&
+          skyBottom == other.skyBottom &&
+          ground == other.ground &&
+          cloth == other.cloth &&
+          clothSheen == other.clothSheen &&
+          pieces == other.pieces;
 }
 
 /// What a view shows.

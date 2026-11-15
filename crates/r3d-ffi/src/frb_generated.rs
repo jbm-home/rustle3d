@@ -40,7 +40,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 2059477404;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -90236513;
 
 // Section: executor
 
@@ -472,6 +472,53 @@ fn wire__crate__api__engine__Engine_run_script_impl(
         },
     )
 }
+fn wire__crate__api__engine__Engine_select_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "Engine_select",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Engine>,
+            >>::sse_decode(&mut deserializer);
+            let api_panels = <Vec<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, crate::api::engine::ApiError>((move || {
+                let mut api_that_guard = None;
+                let decode_indices_ =
+                    flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                        flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                            &api_that, 0, false,
+                        ),
+                    ]);
+                for i in decode_indices_ {
+                    match i {
+                        0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                        _ => unreachable!(),
+                    }
+                }
+                let api_that_guard = api_that_guard.unwrap();
+                let output_ok = crate::api::engine::Engine::select(&*api_that_guard, api_panels)?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
 fn wire__crate__api__engine__Engine_selection_impl(
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -518,14 +565,14 @@ fn wire__crate__api__engine__Engine_selection_impl(
         },
     )
 }
-fn wire__crate__api__engine__Engine_set_dark_impl(
+fn wire__crate__api__engine__Engine_set_canvas_impl(
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
     data_len_: i32,
 ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
     FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
         flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "Engine_set_dark",
+            debug_name: "Engine_set_canvas",
             port: None,
             mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
         },
@@ -542,7 +589,7 @@ fn wire__crate__api__engine__Engine_set_dark_impl(
             let api_that = <RustOpaqueMoi<
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Engine>,
             >>::sse_decode(&mut deserializer);
-            let api_dark = <bool>::sse_decode(&mut deserializer);
+            let api_colors = <crate::api::engine::CanvasColors>::sse_decode(&mut deserializer);
             deserializer.end();
             transform_result_sse::<_, crate::api::engine::ApiError>((move || {
                 let mut api_that_guard = None;
@@ -559,7 +606,8 @@ fn wire__crate__api__engine__Engine_set_dark_impl(
                     }
                 }
                 let api_that_guard = api_that_guard.unwrap();
-                let output_ok = crate::api::engine::Engine::set_dark(&*api_that_guard, api_dark)?;
+                let output_ok =
+                    crate::api::engine::Engine::set_canvas(&*api_that_guard, api_colors)?;
                 std::result::Result::Ok(output_ok)
             })())
         },
@@ -678,10 +726,33 @@ impl SseDecode for crate::api::engine::ApiError {
     }
 }
 
-impl SseDecode for bool {
+impl SseDecode for crate::api::engine::CanvasColors {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        deserializer.cursor.read_u8().unwrap() != 0
+        let mut var_boardBackground = <u32>::sse_decode(deserializer);
+        let mut var_gridMinor = <u32>::sse_decode(deserializer);
+        let mut var_gridMajor = <u32>::sse_decode(deserializer);
+        let mut var_panelLine = <u32>::sse_decode(deserializer);
+        let mut var_selection = <u32>::sse_decode(deserializer);
+        let mut var_skyTop = <u32>::sse_decode(deserializer);
+        let mut var_skyBottom = <u32>::sse_decode(deserializer);
+        let mut var_ground = <u32>::sse_decode(deserializer);
+        let mut var_cloth = <u32>::sse_decode(deserializer);
+        let mut var_clothSheen = <u32>::sse_decode(deserializer);
+        let mut var_pieces = <Vec<u32>>::sse_decode(deserializer);
+        return crate::api::engine::CanvasColors {
+            board_background: var_boardBackground,
+            grid_minor: var_gridMinor,
+            grid_major: var_gridMajor,
+            panel_line: var_panelLine,
+            selection: var_selection,
+            sky_top: var_skyTop,
+            sky_bottom: var_skyBottom,
+            ground: var_ground,
+            cloth: var_cloth,
+            cloth_sheen: var_clothSheen,
+            pieces: var_pieces,
+        };
     }
 }
 
@@ -706,6 +777,18 @@ impl SseDecode for Vec<String> {
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
             ans_.push(<String>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<u32> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<u32>::sse_decode(deserializer));
         }
         return ans_;
     }
@@ -789,6 +872,13 @@ impl SseDecode for crate::api::engine::ViewKind {
     }
 }
 
+impl SseDecode for bool {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        deserializer.cursor.read_u8().unwrap() != 0
+    }
+}
+
 fn pde_ffi_dispatcher_primary_impl(
     func_id: i32,
     port: flutter_rust_bridge::for_generated::MessagePort,
@@ -819,9 +909,10 @@ fn pde_ffi_dispatcher_sync_impl(
         7 => wire__crate__api__engine__Engine_render_view_impl(ptr, rust_vec_len, data_len),
         8 => wire__crate__api__engine__Engine_run_impl(ptr, rust_vec_len, data_len),
         9 => wire__crate__api__engine__Engine_run_script_impl(ptr, rust_vec_len, data_len),
-        10 => wire__crate__api__engine__Engine_selection_impl(ptr, rust_vec_len, data_len),
-        11 => wire__crate__api__engine__Engine_set_dark_impl(ptr, rust_vec_len, data_len),
-        12 => wire__crate__api__engine__Engine_zoom_impl(ptr, rust_vec_len, data_len),
+        10 => wire__crate__api__engine__Engine_select_impl(ptr, rust_vec_len, data_len),
+        11 => wire__crate__api__engine__Engine_selection_impl(ptr, rust_vec_len, data_len),
+        12 => wire__crate__api__engine__Engine_set_canvas_impl(ptr, rust_vec_len, data_len),
+        13 => wire__crate__api__engine__Engine_zoom_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -859,6 +950,36 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::engine::ApiError>
     for crate::api::engine::ApiError
 {
     fn into_into_dart(self) -> crate::api::engine::ApiError {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::engine::CanvasColors {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.board_background.into_into_dart().into_dart(),
+            self.grid_minor.into_into_dart().into_dart(),
+            self.grid_major.into_into_dart().into_dart(),
+            self.panel_line.into_into_dart().into_dart(),
+            self.selection.into_into_dart().into_dart(),
+            self.sky_top.into_into_dart().into_dart(),
+            self.sky_bottom.into_into_dart().into_dart(),
+            self.ground.into_into_dart().into_dart(),
+            self.cloth.into_into_dart().into_dart(),
+            self.cloth_sheen.into_into_dart().into_dart(),
+            self.pieces.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::engine::CanvasColors
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::engine::CanvasColors>
+    for crate::api::engine::CanvasColors
+{
+    fn into_into_dart(self) -> crate::api::engine::CanvasColors {
         self
     }
 }
@@ -920,10 +1041,20 @@ impl SseEncode for crate::api::engine::ApiError {
     }
 }
 
-impl SseEncode for bool {
+impl SseEncode for crate::api::engine::CanvasColors {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        serializer.cursor.write_u8(self as _).unwrap();
+        <u32>::sse_encode(self.board_background, serializer);
+        <u32>::sse_encode(self.grid_minor, serializer);
+        <u32>::sse_encode(self.grid_major, serializer);
+        <u32>::sse_encode(self.panel_line, serializer);
+        <u32>::sse_encode(self.selection, serializer);
+        <u32>::sse_encode(self.sky_top, serializer);
+        <u32>::sse_encode(self.sky_bottom, serializer);
+        <u32>::sse_encode(self.ground, serializer);
+        <u32>::sse_encode(self.cloth, serializer);
+        <u32>::sse_encode(self.cloth_sheen, serializer);
+        <Vec<u32>>::sse_encode(self.pieces, serializer);
     }
 }
 
@@ -947,6 +1078,16 @@ impl SseEncode for Vec<String> {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <String>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<u32> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <u32>::sse_encode(item, serializer);
         }
     }
 }
@@ -1028,6 +1169,13 @@ impl SseEncode for crate::api::engine::ViewKind {
             },
             serializer,
         );
+    }
+}
+
+impl SseEncode for bool {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        serializer.cursor.write_u8(self as _).unwrap();
     }
 }
 

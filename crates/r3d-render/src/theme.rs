@@ -4,12 +4,17 @@
 /// sRGB colour, `[r, g, b, a]` in 0..1.
 pub type Rgba = [f32; 4];
 
+/// Number of colours used to tell pattern pieces apart.
+pub const PIECE_COLORS: usize = 8;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Theme {
     pub board_background: Rgba,
     pub grid_minor: Rgba,
     pub grid_major: Rgba,
-    pub panel_fill: Rgba,
+    /// Fill colours of pattern pieces, cycled in project order; a mirror
+    /// copy uses its source's colour so pairs read at a glance.
+    pub pieces: [Rgba; PIECE_COLORS],
     pub panel_line: Rgba,
     pub selection: Rgba,
     pub sky_top: Rgba,
@@ -33,7 +38,7 @@ impl Theme {
         board_background: hex(0xF7F6F3),
         grid_minor: hex(0xECEAE5),
         grid_major: hex(0xDCD9D2),
-        panel_fill: hex(0xFFFFFF),
+        pieces: [hex(0xFFFFFF); PIECE_COLORS],
         panel_line: hex(0x2B2A28),
         selection: hex(0x5B5BD6),
         sky_top: hex(0xF4F3F0),
@@ -47,7 +52,7 @@ impl Theme {
         board_background: hex(0x18181B),
         grid_minor: hex(0x202024),
         grid_major: hex(0x2C2C31),
-        panel_fill: hex(0x232328),
+        pieces: [hex(0x232328); PIECE_COLORS],
         panel_line: hex(0xE6E4E0),
         selection: hex(0x8B8BF5),
         sky_top: hex(0x2A2A30),

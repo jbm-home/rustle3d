@@ -9,7 +9,7 @@ use wgpu::util::DeviceExt;
 
 use crate::gpu::Gpu;
 use crate::targets::Attachments;
-use crate::theme::{Rgba, Theme};
+use crate::theme::{PIECE_COLORS, Rgba, Theme};
 use crate::{MSAA_SAMPLES, Target};
 
 const NOTCH_MM: f64 = 6.0;
@@ -20,6 +20,8 @@ const MAJOR_GRID_MM: f64 = 100.0;
 #[derive(Debug, Clone, PartialEq)]
 pub struct BoardPanel {
     pub id: PanelId,
+    /// Index into [`Theme::pieces`].
+    pub color: usize,
     /// Flattened contour, counter-clockwise.
     pub outline: Vec<DVec2>,
     pub triangles: Vec<[usize; 3]>,
@@ -37,6 +39,11 @@ pub struct BoardScene {
 
 impl BoardScene {
     pub fn from_project(project: &Project, selected: &[PanelId]) -> Self {
+        let order: Vec<PanelId> = project.panels().keys().copied().collect();
+        let color_of = |id: PanelId, panel: &r3d_core::Panel| {
+            let owner = panel.mirror_of.as_ref().map_or(id, |l| l.source);
+            order.iter().position(|p| *p == owner).unwrap_or_default() % PIECE_COLORS
+        };
         let panels = project
             .panels()
             .iter()
@@ -57,6 +64,7 @@ impl BoardScene {
                     .collect();
                 Some(BoardPanel {
                     id: *id,
+                    color: color_of(*id, panel),
                     triangles: polygon::triangulate(&outline),
                     outline,
                     internal_lines,
@@ -313,10 +321,11 @@ impl BoardRenderer {
 
         for panel in &scene.panels {
             let selected = scene.selected.contains(&panel.id);
+            let base = theme.pieces[panel.color % PIECE_COLORS];
             let fill = if selected {
-                mix(theme.panel_fill, theme.selection, 0.10)
+                mix(base, theme.selection, 0.18)
             } else {
-                theme.panel_fill
+                base
             };
             for t in &panel.triangles {
                 batch.tri(

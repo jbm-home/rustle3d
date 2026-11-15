@@ -8,13 +8,32 @@ class MainFlutterWindow: NSWindow {
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
-    let windowFrame = self.frame
     self.contentViewController = flutterViewController
-    self.setFrame(windowFrame, display: true)
+    // Open large and centred: the pattern and the 3D view need room.
+    if let screen = NSScreen.main?.visibleFrame {
+      let size = NSSize(
+        width: min(1600, screen.width * 0.9), height: min(1000, screen.height * 0.9))
+      let origin = NSPoint(
+        x: screen.midX - size.width / 2, y: screen.midY - size.height / 2)
+      self.setFrame(NSRect(origin: origin, size: size), display: true)
+    }
     self.titlebarAppearsTransparent = true
     self.titleVisibility = .hidden
     self.styleMask.insert(.fullSizeContentView)
     self.minSize = NSSize(width: 960, height: 640)
+    // Always open at the size above, not at the last session's frame.
+    self.isRestorable = false
+
+    #if DEBUG
+      // Lets tooling capture just this window (`screencapture -l <id>`)
+      // instead of the whole screen.
+      DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+        guard let number = self?.windowNumber else { return }
+        let file = URL(fileURLWithPath: NSTemporaryDirectory())
+          .appendingPathComponent("rustle3d-window-id")
+        try? String(number).write(to: file, atomically: true, encoding: .utf8)
+      }
+    #endif
 
     RegisterGeneratedPlugins(registry: flutterViewController)
     sharedTextures = SharedTextureBridge(

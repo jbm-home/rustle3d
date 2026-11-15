@@ -16,11 +16,15 @@ class Shell extends StatefulWidget {
     required this.engine,
     required this.dark,
     required this.onToggleTheme,
+    required this.styleName,
+    required this.onCycleStyle,
   });
 
   final Engine engine;
   final bool dark;
   final VoidCallback onToggleTheme;
+  final String styleName;
+  final VoidCallback onCycleStyle;
 
   @override
   State<Shell> createState() => _ShellState();
@@ -163,6 +167,8 @@ class _ShellState extends State<Shell> {
                 onToggleTheme: widget.onToggleTheme,
                 onUndo: _undo,
                 onRedo: _redo,
+                styleName: widget.styleName,
+                onCycleStyle: widget.onCycleStyle,
               ),
               Expanded(
                 child: Padding(
@@ -207,7 +213,7 @@ class _ShellState extends State<Shell> {
                       ),
                       const SizedBox(width: Space.m),
                       SizedBox(
-                        width: 288,
+                        width: 264,
                         child: _Inspector(
                           selection: _selection,
                           panel: _panel,
@@ -246,6 +252,8 @@ class _TopBar extends StatelessWidget {
     required this.onToggleTheme,
     required this.onUndo,
     required this.onRedo,
+    required this.styleName,
+    required this.onCycleStyle,
   });
 
   final String projectName;
@@ -253,6 +261,8 @@ class _TopBar extends StatelessWidget {
   final VoidCallback onToggleTheme;
   final VoidCallback onUndo;
   final VoidCallback onRedo;
+  final String styleName;
+  final VoidCallback onCycleStyle;
 
   @override
   Widget build(BuildContext context) {
@@ -280,9 +290,9 @@ class _TopBar extends StatelessWidget {
                 ),
               ),
               alignment: Alignment.center,
-              child: const Text(
+              child: Text(
                 'R',
-                style: TextStyle(
+                style: ts(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
                   fontSize: 14,
@@ -292,10 +302,11 @@ class _TopBar extends StatelessWidget {
             const SizedBox(width: Space.m),
             Text(
               projectName,
-              style: TextStyle(
-                fontSize: 14,
+              style: ts(
+                fontSize: 17,
                 fontWeight: FontWeight.w600,
                 color: p.text,
+                fontFamily: Tokens.styleOf(context).displayFont,
               ),
             ),
             const SizedBox(width: Space.xl),
@@ -312,6 +323,13 @@ class _TopBar extends StatelessWidget {
                 ),
             ],
             const Spacer(),
+            // Temporary: compare the candidate visual directions.
+            TextButton.icon(
+              onPressed: onCycleStyle,
+              icon: const Icon(Icons.palette_outlined, size: 16),
+              label: Text('Style: $styleName'),
+            ),
+            const SizedBox(width: Space.s),
             _IconAction(
               icon: Icons.undo_rounded,
               tip: 'Undo  ⌘Z',
@@ -370,7 +388,7 @@ class _StepChip extends StatelessWidget {
             ),
             child: Text(
               '$index',
-              style: TextStyle(
+              style: ts(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
                 color: active ? Colors.white : p.textMuted,
@@ -380,7 +398,7 @@ class _StepChip extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             label,
-            style: TextStyle(
+            style: ts(
               fontSize: 13,
               fontWeight: active ? FontWeight.w600 : FontWeight.w500,
               color: active ? p.accent : p.textMuted,
@@ -413,7 +431,7 @@ class _IconAction extends StatelessWidget {
         icon: Icon(icon, size: 19, color: p.textMuted),
         style: IconButton.styleFrom(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(Radii.small),
+            borderRadius: BorderRadius.circular(Tokens.radius(context, 0.5)),
           ),
         ),
       ),
@@ -457,7 +475,7 @@ class _ToolRail extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: Space.s),
       decoration: BoxDecoration(
         color: p.surface,
-        borderRadius: BorderRadius.circular(Radii.large),
+        borderRadius: BorderRadius.circular(Tokens.radius(context)),
         border: Border.all(color: p.border),
       ),
       child: Column(
@@ -470,11 +488,11 @@ class _ToolRail extends StatelessWidget {
                   children: [
                     TextSpan(
                       text: '$name  ',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                      style: ts(fontWeight: FontWeight.w600),
                     ),
                     TextSpan(
                       text: key,
-                      style: TextStyle(color: p.surface.withValues(alpha: 0.6)),
+                      style: ts(color: p.surface.withValues(alpha: 0.6)),
                     ),
                     TextSpan(text: '\n$hint'),
                   ],
@@ -530,7 +548,7 @@ class _RailButtonState extends State<_RailButton> {
           height: 38,
           decoration: BoxDecoration(
             color: bg,
-            borderRadius: BorderRadius.circular(Radii.medium),
+            borderRadius: BorderRadius.circular(Tokens.radius(context, 0.75)),
           ),
           child: Icon(
             widget.icon,
@@ -560,7 +578,7 @@ class _ViewCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: p.surface,
-        borderRadius: BorderRadius.circular(Radii.large),
+        borderRadius: BorderRadius.circular(Tokens.radius(context)),
         border: Border.all(color: p.border),
         boxShadow: [
           BoxShadow(
@@ -591,7 +609,7 @@ class _ViewCard extends StatelessWidget {
                   const SizedBox(width: 6),
                   Text(
                     title,
-                    style: TextStyle(
+                    style: ts(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: p.textMuted,
@@ -628,7 +646,7 @@ class _Inspector extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: p.surface,
-        borderRadius: BorderRadius.circular(Radii.large),
+        borderRadius: BorderRadius.circular(Tokens.radius(context)),
         border: Border.all(color: p.border),
       ),
       padding: const EdgeInsets.all(Space.l),
@@ -665,10 +683,11 @@ class _EmptyInspector extends StatelessWidget {
       children: [
         Text(
           'Inspector',
-          style: TextStyle(
-            fontSize: 15,
+          style: ts(
+            fontSize: 19,
             fontWeight: FontWeight.w600,
             color: p.text,
+            fontFamily: Tokens.styleOf(context).displayFont,
           ),
         ),
         const SizedBox(height: Space.xl),
@@ -687,11 +706,7 @@ class _EmptyInspector extends StatelessWidget {
         Center(
           child: Text(
             'Select a panel',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: p.text,
-            ),
+            style: ts(fontSize: 14, fontWeight: FontWeight.w600, color: p.text),
           ),
         ),
         const SizedBox(height: Space.xs),
@@ -699,7 +714,7 @@ class _EmptyInspector extends StatelessWidget {
           child: Text(
             'Click a piece on the pattern or the garment\nto adjust it here. $count pieces in this project.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12.5, height: 1.45, color: p.textMuted),
+            style: ts(fontSize: 12.5, height: 1.45, color: p.textMuted),
           ),
         ),
       ],
@@ -720,16 +735,12 @@ class _MultiInspector extends StatelessWidget {
       children: [
         Text(
           'Whole garment',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: p.text,
-          ),
+          style: ts(fontSize: 15, fontWeight: FontWeight.w600, color: p.text),
         ),
         const SizedBox(height: Space.s),
         Text(
           '$count pieces selected. Click one piece on the pattern to edit it.',
-          style: TextStyle(fontSize: 12.5, height: 1.45, color: p.textMuted),
+          style: ts(fontSize: 12.5, height: 1.45, color: p.textMuted),
         ),
       ],
     );
@@ -758,14 +769,15 @@ class _PanelInspector extends StatelessWidget {
     final grain = (panel['grain_angle_deg'] as num).toDouble();
     return ListView(
       children: [
-        Text('Piece', style: TextStyle(fontSize: 12, color: p.textMuted)),
+        Text('Piece', style: ts(fontSize: 12, color: p.textMuted)),
         const SizedBox(height: Space.xs),
         Text(
           panel['name'] as String,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
+          style: ts(
+            fontSize: 24,
+            fontWeight: FontWeight.w600,
             color: p.text,
+            fontFamily: Tokens.styleOf(context).displayFont,
           ),
         ),
         if (linked) ...[
@@ -864,20 +876,20 @@ class _Stat extends StatelessWidget {
       padding: const EdgeInsets.all(Space.m),
       decoration: BoxDecoration(
         color: p.surfaceMuted,
-        borderRadius: BorderRadius.circular(Radii.medium),
+        borderRadius: BorderRadius.circular(Tokens.radius(context, 0.75)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(fontSize: 11.5, color: p.textMuted)),
+          Text(label, style: ts(fontSize: 11.5, color: p.textMuted)),
           const SizedBox(height: 2),
           Text(
             value,
-            style: TextStyle(
+            style: ts(
               fontSize: 15,
               fontWeight: FontWeight.w600,
               color: p.text,
-              fontFeatures: const [FontFeature.tabularFigures()],
+              tabular: true,
             ),
           ),
         ],
@@ -915,7 +927,7 @@ class _SliderRow extends StatelessWidget {
           children: [
             Text(
               label,
-              style: TextStyle(
+              style: ts(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
                 color: p.text,
@@ -924,11 +936,7 @@ class _SliderRow extends StatelessWidget {
             const Spacer(),
             Text(
               '${value.toStringAsFixed(0)} $unit',
-              style: TextStyle(
-                fontSize: 13,
-                color: p.textMuted,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
+              style: ts(fontSize: 13, color: p.textMuted, tabular: true),
             ),
           ],
         ),
@@ -963,14 +971,14 @@ class _Badge extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(Space.m, Space.xs, Space.xs, Space.xs),
       decoration: BoxDecoration(
         color: p.accentSoft,
-        borderRadius: BorderRadius.circular(Radii.small),
+        borderRadius: BorderRadius.circular(Tokens.radius(context, 0.5)),
       ),
       child: Row(
         children: [
           Icon(icon, size: 14, color: p.accent),
           const SizedBox(width: 6),
           Expanded(
-            child: Text(text, style: TextStyle(fontSize: 12, color: p.accent)),
+            child: Text(text, style: ts(fontSize: 12, color: p.accent)),
           ),
           TextButton(onPressed: onAction, child: Text(action)),
         ],
@@ -988,7 +996,7 @@ class _StatusBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
-    final style = TextStyle(fontSize: 12, color: p.textMuted);
+    final style = ts(fontSize: 12, color: p.textMuted);
     return SizedBox(
       height: 34,
       child: Padding(

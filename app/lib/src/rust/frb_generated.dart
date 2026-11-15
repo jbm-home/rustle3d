@@ -67,7 +67,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 2059477404;
+  int get rustContentHash => -90236513;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -125,9 +125,17 @@ abstract class RustLibApi extends BaseApi {
     required String scriptJson,
   });
 
+  List<String> crateApiEngineEngineSelect({
+    required Engine that,
+    required List<String> panels,
+  });
+
   List<String> crateApiEngineEngineSelection({required Engine that});
 
-  void crateApiEngineEngineSetDark({required Engine that, required bool dark});
+  void crateApiEngineEngineSetCanvas({
+    required Engine that,
+    required CanvasColors colors,
+  });
 
   void crateApiEngineEngineZoom({
     required Engine that,
@@ -449,6 +457,38 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  List<String> crateApiEngineEngineSelect({
+    required Engine that,
+    required List<String> panels,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEngine(
+            that,
+            serializer,
+          );
+          sse_encode_list_String(panels, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_String,
+          decodeErrorData: sse_decode_api_error,
+        ),
+        constMeta: kCrateApiEngineEngineSelectConstMeta,
+        argValues: [that, panels],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEngineEngineSelectConstMeta => const TaskConstMeta(
+    debugName: "Engine_select",
+    argNames: ["that", "panels"],
+  );
+
+  @override
   List<String> crateApiEngineEngineSelection({required Engine that}) {
     return handler.executeSync(
       SyncTask(
@@ -458,7 +498,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that,
             serializer,
           );
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_list_String,
@@ -475,7 +515,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "Engine_selection", argNames: ["that"]);
 
   @override
-  void crateApiEngineEngineSetDark({required Engine that, required bool dark}) {
+  void crateApiEngineEngineSetCanvas({
+    required Engine that,
+    required CanvasColors colors,
+  }) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -484,24 +527,24 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that,
             serializer,
           );
-          sse_encode_bool(dark, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11)!;
+          sse_encode_box_autoadd_canvas_colors(colors, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: sse_decode_api_error,
         ),
-        constMeta: kCrateApiEngineEngineSetDarkConstMeta,
-        argValues: [that, dark],
+        constMeta: kCrateApiEngineEngineSetCanvasConstMeta,
+        argValues: [that, colors],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiEngineEngineSetDarkConstMeta =>
+  TaskConstMeta get kCrateApiEngineEngineSetCanvasConstMeta =>
       const TaskConstMeta(
-        debugName: "Engine_set_dark",
-        argNames: ["that", "dark"],
+        debugName: "Engine_set_canvas",
+        argNames: ["that", "colors"],
       );
 
   @override
@@ -524,7 +567,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_f_64(x, serializer);
           sse_encode_f_64(y, serializer);
           sse_encode_f_64(amount, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 13)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -606,9 +649,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  bool dco_decode_bool(dynamic raw) {
+  CanvasColors dco_decode_box_autoadd_canvas_colors(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
-    return raw as bool;
+    return dco_decode_canvas_colors(raw);
+  }
+
+  @protected
+  CanvasColors dco_decode_canvas_colors(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 11)
+      throw Exception('unexpected arr length: expect 11 but see ${arr.length}');
+    return CanvasColors(
+      boardBackground: dco_decode_u_32(arr[0]),
+      gridMinor: dco_decode_u_32(arr[1]),
+      gridMajor: dco_decode_u_32(arr[2]),
+      panelLine: dco_decode_u_32(arr[3]),
+      selection: dco_decode_u_32(arr[4]),
+      skyTop: dco_decode_u_32(arr[5]),
+      skyBottom: dco_decode_u_32(arr[6]),
+      ground: dco_decode_u_32(arr[7]),
+      cloth: dco_decode_u_32(arr[8]),
+      clothSheen: dco_decode_u_32(arr[9]),
+      pieces: dco_decode_list_prim_u_32_strict(arr[10]),
+    );
   }
 
   @protected
@@ -627,6 +691,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   List<String> dco_decode_list_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_String).toList();
+  }
+
+  @protected
+  Uint32List dco_decode_list_prim_u_32_strict(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as Uint32List;
   }
 
   @protected
@@ -749,9 +819,40 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  bool sse_decode_bool(SseDeserializer deserializer) {
+  CanvasColors sse_decode_box_autoadd_canvas_colors(
+    SseDeserializer deserializer,
+  ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-    return deserializer.buffer.getUint8() != 0;
+    return (sse_decode_canvas_colors(deserializer));
+  }
+
+  @protected
+  CanvasColors sse_decode_canvas_colors(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_boardBackground = sse_decode_u_32(deserializer);
+    var var_gridMinor = sse_decode_u_32(deserializer);
+    var var_gridMajor = sse_decode_u_32(deserializer);
+    var var_panelLine = sse_decode_u_32(deserializer);
+    var var_selection = sse_decode_u_32(deserializer);
+    var var_skyTop = sse_decode_u_32(deserializer);
+    var var_skyBottom = sse_decode_u_32(deserializer);
+    var var_ground = sse_decode_u_32(deserializer);
+    var var_cloth = sse_decode_u_32(deserializer);
+    var var_clothSheen = sse_decode_u_32(deserializer);
+    var var_pieces = sse_decode_list_prim_u_32_strict(deserializer);
+    return CanvasColors(
+      boardBackground: var_boardBackground,
+      gridMinor: var_gridMinor,
+      gridMajor: var_gridMajor,
+      panelLine: var_panelLine,
+      selection: var_selection,
+      skyTop: var_skyTop,
+      skyBottom: var_skyBottom,
+      ground: var_ground,
+      cloth: var_cloth,
+      clothSheen: var_clothSheen,
+      pieces: var_pieces,
+    );
   }
 
   @protected
@@ -776,6 +877,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       ans_.add(sse_decode_String(deserializer));
     }
     return ans_;
+  }
+
+  @protected
+  Uint32List sse_decode_list_prim_u_32_strict(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var len_ = sse_decode_i_32(deserializer);
+    return deserializer.buffer.getUint32List(len_);
   }
 
   @protected
@@ -846,6 +954,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  bool sse_decode_bool(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getUint8() != 0;
+  }
+
+  @protected
   void
   sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEngine(
     Engine self,
@@ -911,9 +1025,28 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_bool(bool self, SseSerializer serializer) {
+  void sse_encode_box_autoadd_canvas_colors(
+    CanvasColors self,
+    SseSerializer serializer,
+  ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-    serializer.buffer.putUint8(self ? 1 : 0);
+    sse_encode_canvas_colors(self, serializer);
+  }
+
+  @protected
+  void sse_encode_canvas_colors(CanvasColors self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_32(self.boardBackground, serializer);
+    sse_encode_u_32(self.gridMinor, serializer);
+    sse_encode_u_32(self.gridMajor, serializer);
+    sse_encode_u_32(self.panelLine, serializer);
+    sse_encode_u_32(self.selection, serializer);
+    sse_encode_u_32(self.skyTop, serializer);
+    sse_encode_u_32(self.skyBottom, serializer);
+    sse_encode_u_32(self.ground, serializer);
+    sse_encode_u_32(self.cloth, serializer);
+    sse_encode_u_32(self.clothSheen, serializer);
+    sse_encode_list_prim_u_32_strict(self.pieces, serializer);
   }
 
   @protected
@@ -935,6 +1068,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     for (final item in self) {
       sse_encode_String(item, serializer);
     }
+  }
+
+  @protected
+  void sse_encode_list_prim_u_32_strict(
+    Uint32List self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    serializer.buffer.putUint32List(self);
   }
 
   @protected
@@ -1002,6 +1145,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_view_kind(ViewKind self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_bool(bool self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putUint8(self ? 1 : 0);
   }
 }
 
@@ -1086,13 +1235,19 @@ class EngineImpl extends RustOpaque implements Engine {
   String runScript({required String scriptJson}) => RustLib.instance.api
       .crateApiEngineEngineRunScript(that: this, scriptJson: scriptJson);
 
+  /// Replace the shared selection with these panel ids; unknown ids are
+  /// ignored. Returns the resulting selection.
+  List<String> select({required List<String> panels}) => RustLib.instance.api
+      .crateApiEngineEngineSelect(that: this, panels: panels);
+
   /// The shared selection (panel ids).
   List<String> selection() =>
       RustLib.instance.api.crateApiEngineEngineSelection(that: this);
 
-  /// Use the dark or light canvas colours.
-  void setDark({required bool dark}) =>
-      RustLib.instance.api.crateApiEngineEngineSetDark(that: this, dark: dark);
+  /// Set the canvas colours from the UI design system, so the board and
+  /// the 3D view match the app theme.
+  void setCanvas({required CanvasColors colors}) => RustLib.instance.api
+      .crateApiEngineEngineSetCanvas(that: this, colors: colors);
 
   /// A scroll of `amount` (positive = zoom in) at pixel (`x`, `y`).
   void zoom({

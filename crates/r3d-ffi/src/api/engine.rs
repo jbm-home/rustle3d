@@ -11,6 +11,7 @@ use flutter_rust_bridge::frb;
 use r3d_commands::{Script, Step, Workspace};
 use r3d_core::{Localizable, Message, PanelId};
 use r3d_render::board::BoardView;
+use r3d_render::theme::PIECE_COLORS;
 use r3d_render::{
     BoardRenderer, BoardScene, ClothMesh, Gpu, OrbitCamera, Target, Theme, ViewRenderer3d,
 };
@@ -50,6 +51,52 @@ fn err(e: impl Localizable) -> ApiError {
     e.message().into()
 }
 
+/// Canvas colours as `0xAARRGGBB` (Flutter's `Color.toARGB32()`).
+#[derive(Debug, Clone)]
+pub struct CanvasColors {
+    pub board_background: u32,
+    pub grid_minor: u32,
+    pub grid_major: u32,
+    pub panel_line: u32,
+    pub selection: u32,
+    pub sky_top: u32,
+    pub sky_bottom: u32,
+    pub ground: u32,
+    pub cloth: u32,
+    pub cloth_sheen: u32,
+    /// Piece fills, cycled; exactly `PIECE_COLORS` (8) entries.
+    pub pieces: Vec<u32>,
+}
+
+fn rgba(argb: u32) -> [f32; 4] {
+    let c = |shift: u32| ((argb >> shift) & 0xff) as f32 / 255.0;
+    [c(16), c(8), c(0), c(24)]
+}
+
+impl CanvasColors {
+    fn to_theme(&self) -> Result<Theme, ApiError> {
+        let pieces: [u32; PIECE_COLORS] = self.pieces.clone().try_into().map_err(|_| {
+            ApiError::new(
+                "invalid.piece_colors",
+                format!("expected {PIECE_COLORS} piece colours"),
+            )
+        })?;
+        Ok(Theme {
+            board_background: rgba(self.board_background),
+            grid_minor: rgba(self.grid_minor),
+            grid_major: rgba(self.grid_major),
+            pieces: pieces.map(rgba),
+            panel_line: rgba(self.panel_line),
+            selection: rgba(self.selection),
+            sky_top: rgba(self.sky_top),
+            sky_bottom: rgba(self.sky_bottom),
+            ground: rgba(self.ground),
+            cloth: rgba(self.cloth),
+            cloth_sheen: rgba(self.cloth_sheen),
+        })
+    }
+}
+
 /// What a view shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ViewKind {
@@ -77,7 +124,7 @@ struct Graphics {
     views: HashMap<u32, View>,
     next_view: u32,
     camera: OrbitCamera,
-    dark: bool,
+    theme: Theme,
     started: Instant,
 }
 
@@ -92,7 +139,7 @@ impl Graphics {
             views: HashMap::new(),
             next_view: 1,
             camera: OrbitCamera::default(),
-            dark: false,
+            theme: Theme::LIGHT,
             started: Instant::now(),
         })
     }
@@ -223,11 +270,17 @@ impl Engine {
         Ok(())
     }
 
-    /// Use the dark or light canvas colours.
+    /// Set the canvas colours from the UI design system, so the board and
+    /// the 3D view match the app theme.
     #[frb(sync)]
-    pub fn set_dark(&self, dark: bool) -> Result<(), ApiError> {
-        if let Some(g) = self.graphics()?.as_mut() {
-            g.dark = dark;
+    pub fn set_canvas(&self, colors: CanvasColors) -> Result<(), ApiError> {
+        let theme = colors.to_theme()?;
+        let mut slot = self.graphics()?;
+        if slot.is_none() {
+            *slot = Some(Graphics::new()?);
+        }
+        if let Some(g) = slot.as_mut() {
+            g.theme = theme;
         }
         Ok(())
     }
@@ -244,7 +297,7 @@ impl Engine {
         let g = slot
             .as_mut()
             .ok_or_else(|| ApiError::new("no_view", "no view attached"))?;
-        let mut theme = if g.dark { Theme::DARK } else { Theme::LIGHT };
+        let mut theme = g.theme;
         let v = g
             .views
             .get(&view)
@@ -373,6 +426,21 @@ impl Engine {
             v.board_view = None;
         }
         Ok(())
+    }
+
+    /// Replace the shared selection with these panel ids; unknown ids are
+    /// ignored. Returns the resulting selection.
+    #[frb(sync)]
+    pub fn select(&self, panels: Vec<String>) -> Result<Vec<String>, ApiError> {
+        let ws = self.workspace()?;
+        let project = ws.session().project();
+        let mut selected = self.selected()?;
+        *selected = panels
+            .iter()
+            .filter_map(|p| p.parse::<PanelId>().ok())
+            .filter(|id| project.panel(*id).is_some())
+            .collect();
+        Ok(selected.iter().map(ToString::to_string).collect())
     }
 
     /// The shared selection (panel ids).
