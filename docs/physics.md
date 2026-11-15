@@ -160,11 +160,19 @@ Placed panels start wrapped around the body's vertical axis
 (`r3d_commands::drape`): the panel's centre at its placement angle, its top
 at the placement height, horizontal pattern distances kept as arc lengths.
 At each height the radius is the larger of
-- the widest body section between the panel's top and that height
-  (girth / 2π: a garment starts outside everything above it), plus the
-  placement offset;
+- how far out the body reaches at that angle, anywhere between the panel's
+  top and that height (a garment starts outside everything above it), plus
+  the placement offset. The reach is tabulated per 1 cm of height and 10°
+  of angle from the body's vertices (arms, farther than 0.3 m from the
+  axis, left out), gaps filled over ±2 cm / ±30° and smoothed; an earlier
+  girth / 2π circle let the hips show through at the sides;
 - the garment's own circumference there (the widths of all placed panels
   side by side) / 2π, so the panels start just touching.
+
+Arc lengths along the pattern are kept at the chosen radius (the angle and
+the radius are settled by two fixed-point steps), so the start pose is not
+stretched: an inconsistent first version stretched the panels at the hips
+and the hem bunched up 7 cm when they relaxed.
 
 An earlier fixed flare (radius growing 0.35 m per metre) started an A-line
 hem at 2.5 m around for 1.56 m of cloth: the seams pulled it in and the hem
@@ -188,10 +196,6 @@ buckled inward. With the garment's own width it hangs as an A-line.
 
 ### Known issues
 
-- **Start pose at the hips.** Panels start at girth / 2π (the equivalent
-  circle), but the body is wider than deep at the hips: before simulating,
-  the body shows through at the sides. The drape pushes the cloth out
-  (the SDF sees 2 cm deep). Use the body's radial extent per angle.
 
 - **Real time with little headroom.** The three-piece skirt (1 700
   particles, 30 substeps) steps in about 14 ms per 16.7 ms frame on an

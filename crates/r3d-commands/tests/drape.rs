@@ -134,21 +134,38 @@ fn edits_carry_the_drape_over_without_a_jump() {
         })
         .unwrap();
     assert!(pos(&new, waist_new).distance(draped[waist_old]) < 0.005);
-    // The new hem (rest y < 0) continues the drape below the old hem.
-    let old_hem = front_old
+    // The added fabric (rest y < 0) starts next to the drape (no jump)...
+    let added: Vec<usize> = front_new
         .particles
         .clone()
-        .map(|i| draped[i].y)
-        .fold(f32::MAX, f32::min);
-    let new_hem = front_new
-        .particles
-        .clone()
-        .map(|i| pos(&new, i).y)
-        .fold(f32::MAX, f32::min);
-    assert!(
-        new_hem < old_hem - 0.03 && new_hem > old_hem - 0.08,
-        "{old_hem} -> {new_hem}"
-    );
+        .filter(|i| rest(&new, *i).y < -0.049)
+        .collect();
+    assert!(!added.is_empty());
+    for i in &added {
+        let gap = front_old
+            .particles
+            .clone()
+            .map(|j| draped[j].distance(pos(&new, *i)))
+            .fold(f32::MAX, f32::min);
+        assert!(gap < 0.08, "jump of {gap} m");
+    }
+    // ...and once it has hung for a second, the longer skirt is lower than
+    // the same drape without the change.
+    let lowest = |s: &Solver, piece: &r3d_commands::drape::Piece| {
+        piece
+            .particles
+            .clone()
+            .map(|i| s.positions()[i].y)
+            .fold(f32::MAX, f32::min)
+    };
+    let mut longer = Solver::new(new.scene.clone());
+    longer.continue_at(solver.time());
+    for _ in 0..60 {
+        solver.step(1.0 / 60.0);
+        longer.step(1.0 / 60.0);
+    }
+    let (before, after) = (lowest(&solver, front_old), lowest(&longer, front_new));
+    assert!(after < before - 0.02, "{before} -> {after}");
 }
 
 #[test]

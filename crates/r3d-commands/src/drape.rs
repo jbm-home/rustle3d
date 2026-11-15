@@ -17,7 +17,6 @@ use std::time::Instant;
 
 use glam::{Vec2, Vec3};
 use r3d_avatar::fit::{fit, fitted_positions};
-use r3d_avatar::measure::girth_at;
 use r3d_core::{EdgeId, Fabric, PanelId, PinId, Project};
 use r3d_geom::DVec2;
 use r3d_geom::mesh::mesh_polygon;
@@ -63,29 +62,75 @@ pub struct Piece {
 pub struct Form {
     pub positions: Vec<Vec3>,
     pub triangles: Vec<[u32; 3]>,
-    /// Equivalent radius (girth / 2π, m) every `PROFILE_STEP` from the floor.
-    profile: Vec<f32>,
+    /// The body's distance from its vertical axis (m), every
+    /// `PROFILE_STEP` from the floor and every 360° / `ANGLE_BINS` around
+    /// (angle 0 = front, as placements count), arms left out.
+    radial: Vec<[f32; ANGLE_BINS]>,
     collider: StaticMesh,
 }
 
 /// Height step of the body profile (m).
 const PROFILE_STEP: f32 = 0.01;
+/// Angular bins of the body profile.
+const ANGLE_BINS: usize = 36;
+/// Body points farther from the axis than this are arms (in the A pose the
+/// hands hang at hip height, about 0.4 m out), not part of what a skirt or
+/// a top wraps.
+const ARM_REACH_M: f32 = 0.3;
+
+fn angle_bin(theta: f32) -> usize {
+    let t = theta.rem_euclid(std::f32::consts::TAU) / std::f32::consts::TAU;
+    ((t * ANGLE_BINS as f32) as usize).min(ANGLE_BINS - 1)
+}
 
 impl Form {
     pub fn new(positions: Vec<Vec3>, triangles: Vec<[u32; 3]>) -> Self {
         let height = positions.iter().map(|p| p.y).fold(0.0, f32::max);
         let steps = (height / PROFILE_STEP).ceil() as usize;
-        let profile = (0..=steps)
+        let mut radial = vec![[0.0f32; ANGLE_BINS]; steps + 1];
+        for p in &positions {
+            let r = Vec2::new(p.x, p.z).length();
+            let k = (p.y / PROFILE_STEP).round().max(0.0) as usize;
+            if r < ARM_REACH_M
+                && let Some(row) = radial.get_mut(k)
+            {
+                let bin = &mut row[angle_bin(p.x.atan2(p.z))];
+                *bin = bin.max(r);
+            }
+        }
+        // Few vertices fall in each 1 cm × 10° cell: fill the gaps (max over
+        // ±2 cm and ±30°), then smooth the steps (twice the mean of
+        // neighbours), so the start pose is a smooth surface.
+        let rows = radial.len();
+        let at = |r: &[[f32; ANGLE_BINS]], k: usize, b: usize, dk: usize, db: usize| {
+            let k = (k + dk).saturating_sub(2).min(rows.saturating_sub(1));
+            r.get(k)
+                .map_or(0.0, |row| row[(b + ANGLE_BINS + db - 3) % ANGLE_BINS])
+        };
+        let mut smooth: Vec<[f32; ANGLE_BINS]> = (0..rows)
             .map(|k| {
-                girth_at(&positions, &triangles, k as f32 * PROFILE_STEP, 0.0)
-                    .map_or(0.0, |cm| cm / 100.0 / std::f32::consts::TAU)
+                std::array::from_fn(|b| {
+                    (0..5)
+                        .flat_map(|dk| (0..7).map(move |db| (dk, db)))
+                        .map(|(dk, db)| at(&radial, k, b, dk, db))
+                        .fold(0.0, f32::max)
+                })
             })
             .collect();
+        for _ in 0..2 {
+            for row in &mut smooth {
+                let r = *row;
+                *row = std::array::from_fn(|b| {
+                    (r[(b + ANGLE_BINS - 1) % ANGLE_BINS] + r[b] + r[(b + 1) % ANGLE_BINS]) / 3.0
+                });
+            }
+        }
+        let radial = smooth;
         let collider = StaticMesh::new(positions.clone(), triangles.clone(), BODY_VOXEL);
         Self {
             positions,
             triangles,
-            profile,
+            radial,
             collider,
         }
     }
@@ -101,14 +146,21 @@ impl Form {
     }
 }
 
-/// The widest body section between heights `top` and `top - below` (m):
-/// a garment hangs outside everything above it.
-fn body_radius(profile: &[f32], top: f32, below: f32) -> f32 {
-    let last = profile.len().saturating_sub(1);
+/// How far out the body reaches at angle `theta`, anywhere between heights
+/// `top` and `top - below` (m): a garment hangs outside everything above
+/// it.
+fn body_radius(form: Option<&Form>, top: f32, below: f32, theta: f32) -> f32 {
+    let Some(form) = form else {
+        return DEFAULT_BODY_RADIUS_M;
+    };
+    let last = form.radial.len().saturating_sub(1);
     let index = |y: f32| ((y / PROFILE_STEP).round().max(0.0) as usize).min(last);
-    profile
+    let bin = angle_bin(theta);
+    form.radial
         .get(index(top - below)..=index(top))
-        .map_or(0.0, |s| s.iter().copied().fold(0.0, f32::max))
+        .map_or(0.0, |rows| {
+            rows.iter().map(|row| row[bin]).fold(0.0, f32::max)
+        })
 }
 
 /// Horizontal span of a closed polygon at height `y` (same units).
@@ -192,8 +244,6 @@ pub fn build(
         .default_garment()
         .and_then(|g| project.garments().get(&g));
     let fabric = fabric_preset(garment.map(|g| g.fabric).unwrap_or_default()).params();
-    let default_profile = [DEFAULT_BODY_RADIUS_M];
-    let profile = form.map_or(&default_profile[..], |f| &f.profile[..]);
 
     let mut scene = SimScene {
         fabrics: vec![fabric],
@@ -269,10 +319,16 @@ pub fn build(
         for v in &mesh.vertices {
             let below = ((l.top - v.y) / 1000.0) as f32;
             let y = top_y - below;
-            let r = (body_radius(profile, top_y, below) + gap)
-                .max(around(y) / std::f32::consts::TAU)
-                .max(1e-3);
-            let theta = angle0 + ((v.x - centre) / 1000.0) as f32 / r;
+            // Arc lengths are kept (no stretch in the start pose), so the
+            // angle depends on the radius and the radius on the body's
+            // reach at that angle: a couple of fixed-point steps settle it.
+            let own = (around(y) / std::f32::consts::TAU).max(1e-3);
+            let arc = ((v.x - centre) / 1000.0) as f32;
+            let mut r = own;
+            for _ in 0..2 {
+                r = (body_radius(form, top_y, below, angle0 + arc / r) + gap).max(own);
+            }
+            let theta = angle0 + arc / r;
             scene.particles.push(Particle {
                 position: Vec3::new(r * theta.sin(), y, r * theta.cos()),
                 rest: Vec2::new((v.x / 1000.0) as f32, (v.y / 1000.0) as f32),
