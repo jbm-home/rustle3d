@@ -26,12 +26,6 @@ flutter:
   assets:
     - assets/demo_skirt.json
   fonts:
-    - family: Fraunces
-      fonts:
-        - asset: assets/fonts/Fraunces.ttf
-    - family: PlusJakartaSans
-      fonts:
-        - asset: assets/fonts/PlusJakartaSans.ttf
     - family: Manrope
       fonts:
         - asset: assets/fonts/Manrope.ttf

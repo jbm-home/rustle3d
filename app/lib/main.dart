@@ -25,8 +25,8 @@ Future<void> main() async {
       scriptJson: await rootBundle.loadString('assets/demo_skirt.json'),
     );
   }
-  // Review aids while choosing a visual direction (removed afterwards):
-  // --dart-define=R3D_STYLE=Studio|Soft, R3D_DARK=true, R3D_SELECT=panel:2.
+  // Review aids for screenshots:
+  // --dart-define=R3D_DARK=true, R3D_SELECT=panel:2 (scripts/app-screenshot.sh).
   const select = String.fromEnvironment('R3D_SELECT');
   if (select.isNotEmpty) engine.select(panels: [select]);
   runApp(Rustle3dApp(engine: engine));
@@ -42,10 +42,6 @@ class Rustle3dApp extends StatefulWidget {
 }
 
 class _Rustle3dAppState extends State<Rustle3dApp> {
-  AppStyle _style = AppStyle.all.firstWhere(
-    (s) => s.name == const String.fromEnvironment('R3D_STYLE'),
-    orElse: () => AppStyle.atelier,
-  );
   bool _dark = const bool.fromEnvironment('R3D_DARK');
 
   @override
@@ -54,36 +50,27 @@ class _Rustle3dAppState extends State<Rustle3dApp> {
     _applyCanvas();
   }
 
-  void _applyCanvas() =>
-      widget.engine.setCanvas(colors: _style.palette(_dark).toCanvas());
+  void _applyCanvas() => widget.engine.setCanvas(
+    colors: (_dark ? Palette.dark : Palette.light).toCanvas(),
+  );
 
   void _toggleTheme() {
     setState(() => _dark = !_dark);
     _applyCanvas();
   }
 
-  // Temporary while choosing a visual direction.
-  void _cycleStyle() {
-    final all = AppStyle.all;
-    setState(() => _style = all[(all.indexOf(_style) + 1) % all.length]);
-    _applyCanvas();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Tokens(
-      style: _style,
       dark: _dark,
       child: MaterialApp(
         title: 'Rustle3D',
         debugShowCheckedModeBanner: false,
-        theme: buildTheme(_style, _dark),
+        theme: buildTheme(_dark),
         home: Shell(
           engine: widget.engine,
           dark: _dark,
           onToggleTheme: _toggleTheme,
-          styleName: _style.name,
-          onCycleStyle: _cycleStyle,
         ),
       ),
     );

@@ -16,15 +16,11 @@ class Shell extends StatefulWidget {
     required this.engine,
     required this.dark,
     required this.onToggleTheme,
-    required this.styleName,
-    required this.onCycleStyle,
   });
 
   final Engine engine;
   final bool dark;
   final VoidCallback onToggleTheme;
-  final String styleName;
-  final VoidCallback onCycleStyle;
 
   @override
   State<Shell> createState() => _ShellState();
@@ -167,8 +163,6 @@ class _ShellState extends State<Shell> {
                 onToggleTheme: widget.onToggleTheme,
                 onUndo: _undo,
                 onRedo: _redo,
-                styleName: widget.styleName,
-                onCycleStyle: widget.onCycleStyle,
               ),
               Expanded(
                 child: Padding(
@@ -252,8 +246,6 @@ class _TopBar extends StatelessWidget {
     required this.onToggleTheme,
     required this.onUndo,
     required this.onRedo,
-    required this.styleName,
-    required this.onCycleStyle,
   });
 
   final String projectName;
@@ -261,8 +253,6 @@ class _TopBar extends StatelessWidget {
   final VoidCallback onToggleTheme;
   final VoidCallback onUndo;
   final VoidCallback onRedo;
-  final String styleName;
-  final VoidCallback onCycleStyle;
 
   @override
   Widget build(BuildContext context) {
@@ -306,7 +296,6 @@ class _TopBar extends StatelessWidget {
                 fontSize: 17,
                 fontWeight: FontWeight.w600,
                 color: p.text,
-                fontFamily: Tokens.styleOf(context).displayFont,
               ),
             ),
             const SizedBox(width: Space.xl),
@@ -323,13 +312,6 @@ class _TopBar extends StatelessWidget {
                 ),
             ],
             const Spacer(),
-            // Temporary: compare the candidate visual directions.
-            TextButton.icon(
-              onPressed: onCycleStyle,
-              icon: const Icon(Icons.palette_outlined, size: 16),
-              label: Text('Style: $styleName'),
-            ),
-            const SizedBox(width: Space.s),
             _IconAction(
               icon: Icons.undo_rounded,
               tip: 'Undo  ⌘Z',
@@ -683,12 +665,7 @@ class _EmptyInspector extends StatelessWidget {
       children: [
         Text(
           'Inspector',
-          style: ts(
-            fontSize: 19,
-            fontWeight: FontWeight.w600,
-            color: p.text,
-            fontFamily: Tokens.styleOf(context).displayFont,
-          ),
+          style: ts(fontSize: 19, fontWeight: FontWeight.w600, color: p.text),
         ),
         const SizedBox(height: Space.xl),
         Center(
@@ -773,12 +750,7 @@ class _PanelInspector extends StatelessWidget {
         const SizedBox(height: Space.xs),
         Text(
           panel['name'] as String,
-          style: ts(
-            fontSize: 24,
-            fontWeight: FontWeight.w600,
-            color: p.text,
-            fontFamily: Tokens.styleOf(context).displayFont,
-          ),
+          style: ts(fontSize: 24, fontWeight: FontWeight.w600, color: p.text),
         ),
         if (linked) ...[
           const SizedBox(height: Space.s),

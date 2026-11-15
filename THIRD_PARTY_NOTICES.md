@@ -28,9 +28,8 @@ placeholder to be replaced by our own icon before any release.
 
 ### Fonts — `app/assets/fonts/`
 
-Fraunces, Plus Jakarta Sans and Manrope, from the Google Fonts repository
-(https://github.com/google/fonts), under the SIL Open Font License 1.1
-(full texts next to the fonts: `OFL-*.txt`).
+Manrope, from the Google Fonts repository (https://github.com/google/fonts),
+under the SIL Open Font License 1.1 (full text: `OFL-manrope.txt`).
 
 _None yet._ Default avatars derived from MakeHuman (CC0) will be listed here
 and in `assets/avatars/README.md` when they are added (milestone M5).
