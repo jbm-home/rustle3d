@@ -11,6 +11,9 @@ publish.workspace = true
 [dependencies]
 r3d-core.workspace = true
 r3d-commands.workspace = true
+r3d-render.workspace = true
+base64.workspace = true
+glam.workspace = true
 rmcp.workspace = true
 thiserror.workspace = true
 serde_json.workspace = true

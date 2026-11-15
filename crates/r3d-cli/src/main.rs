@@ -9,12 +9,11 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-mod render;
-
 use clap::{Parser, Subcommand, ValueEnum};
 use r3d_commands::step::parse_query;
 use r3d_commands::{Action, Command, CommandError, Info, Query, Script, Session, Step, Workspace};
 use r3d_core::{Localizable, Message};
+use r3d_mcp::render;
 use serde_json::{Value, json};
 
 #[derive(Parser)]
@@ -39,6 +38,15 @@ enum PaperArg {
     A4,
     Letter,
     Single,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum ViewArg {
+    /// The 2D pattern.
+    Board,
+    /// The garment on the avatar (the cached drape if it is up to date).
+    #[value(name = "3d")]
+    Garment,
 }
 
 #[derive(Subcommand)]
@@ -93,7 +101,7 @@ enum Cmd {
     Render {
         project: PathBuf,
         #[arg(long, value_enum)]
-        view: render::View,
+        view: ViewArg,
         /// Output PNG file.
         #[arg(long)]
         out: PathBuf,
@@ -240,20 +248,20 @@ fn parse_size(s: &str) -> Result<(u32, u32), String> {
     let parse = |v: &str| {
         v.parse::<u32>()
             .ok()
-            .filter(|n| (16..=8192).contains(n))
-            .ok_or("sizes must be 16 to 8192 pixels")
+            .filter(|n| render::SIZE_RANGE.contains(n))
+            .ok_or("sizes must be 16 to 4096 pixels")
     };
     Ok((parse(w)?, parse(h)?))
 }
 
-fn cmd_render(
-    project: &Path,
-    view: render::View,
-    out: &Path,
-    size: (u32, u32),
-) -> Result<(), Failure> {
+fn cmd_render(project: &Path, view: ViewArg, out: &Path, size: (u32, u32)) -> Result<(), Failure> {
     let ws = Workspace::open(project)?;
-    let (png, mut info) = render::render(&ws, view, size.0, size.1)?;
+    let view = match view {
+        ViewArg::Board => render::View::Board,
+        ViewArg::Garment => render::View::Garment,
+    };
+    let gpu = render::headless_gpu()?;
+    let (png, mut info) = render::render(&gpu, &ws, view, size.0, size.1)?;
     std::fs::write(out, &png).map_err(|e| Failure {
         message: Message::new(
             "write_failed",

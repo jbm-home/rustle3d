@@ -353,7 +353,8 @@ the callers.
   (`panel.create_rect` → `panel_create_rect`, as MCP clients require
   `[a-zA-Z0-9_-]`) and the same JSON schema. `history_undo`,
   `history_redo` and `batch` complete the set. `render_board` and
-  `render_3d` (PNG image content) come with `r3d-render` in M3/M4.
+  `render_3d` return PNG image content (module `r3d_mcp::render`, shared
+  with `r3d render`).
 - Tool failures are returned as tool results with `isError` and the
   structured error (`code`, `args`, `text`), never as protocol errors, so
   the agent can read them and correct itself. Results are compact JSON.

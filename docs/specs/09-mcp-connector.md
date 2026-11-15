@@ -14,7 +14,10 @@ and look at the result, either headless or live in the user's open app.
 - **Write tools**: one per command, plus `batch` (one undoable transaction),
   `undo` and `redo`.
 - **Visual feedback**: `render_board` and `render_3d` return PNG images
-  (size, camera preset or explicit camera, optional highlight of ids).
+  (`width`, `height`; implemented in M4). `render_3d` shows the last
+  `simulate` result if the document has not changed since, otherwise the
+  starting positions, and says which. Camera presets and highlighting of
+  ids come later.
 - **Naming**: tool names are the operation names with underscores
   (`panel_create_rect`). Errors are tool results with `isError` and the
   structured error (`code`, `args`, `text`).

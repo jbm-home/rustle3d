@@ -29,7 +29,7 @@ fn tools_mirror_the_registries() {
     let (_tmp, s) = server();
     let names = s.tool_names();
     let expected =
-        Command::registry().len() + Query::registry().len() + Action::registry().len() + 3;
+        Command::registry().len() + Query::registry().len() + Action::registry().len() + 5;
     assert_eq!(names.len(), expected);
     for n in &names {
         assert!(
@@ -99,4 +99,51 @@ fn batch_and_export() {
             .join(out["path"].as_str().unwrap())
             .is_file()
     );
+}
+
+#[test]
+fn agents_simulate_and_look_at_the_garment() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut ws = Workspace::create(&tmp.path().join("P.r3d"), "P").unwrap();
+    let body = r#"[{"type": "avatar.set", "body": {"masculinity": 0, "height_cm": 168,
+        "bust_cm": 90, "waist_cm": 73, "hips_cm": 98}}]"#;
+    for script in [body, r3d_commands::templates::get("a-line-skirt").unwrap()] {
+        let script = r3d_commands::Script::parse(script).unwrap();
+        script.run(|step| ws.run_step(step)).unwrap();
+    }
+    let s = Server::new(ws);
+
+    let (err, report) = call(&s, "simulate", json!({ "frames": 30 }));
+    assert!(!err, "{report}");
+    assert_eq!(report["pieces"], 3);
+
+    let result = serde_json::to_value(s.call(
+        "render_3d",
+        Some(Map::from_iter([
+            ("width".into(), json!(320)),
+            ("height".into(), json!(240)),
+        ])),
+    ))
+    .unwrap();
+    if result["isError"] == true {
+        // Machines without any GPU adapter cannot render.
+        let text = result["content"][0]["text"].as_str().unwrap();
+        let body: Value = serde_json::from_str(text).unwrap();
+        assert_eq!(body["error"]["code"], "gpu");
+        return;
+    }
+    assert_eq!(result["content"][0]["type"], "image");
+    assert_eq!(result["content"][0]["mimeType"], "image/png");
+    assert!(
+        result["content"][0]["data"]
+            .as_str()
+            .unwrap()
+            .starts_with("iVBORw0KGgo")
+    );
+    let info: Value = serde_json::from_str(result["content"][1]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(info["drape"], "simulated");
+
+    let (err, body) = call(&s, "render_board", json!({ "width": 8 }));
+    assert!(err);
+    assert_eq!(body["error"]["code"], "invalid.range");
 }

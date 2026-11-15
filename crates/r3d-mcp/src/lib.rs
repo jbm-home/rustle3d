@@ -4,7 +4,8 @@
 //! command, query and action registries (one source of truth with the CLI
 //! and `docs/commands.md`): `panel.create_rect` becomes the tool
 //! `panel_create_rect`, with the same JSON schema. `history_undo`,
-//! `history_redo` and `batch` complete the set.
+//! `history_redo` and `batch` complete the set, and `render_board` /
+//! `render_3d` return PNG images so the agent can look at its work.
 //!
 //! M2 serves one project folder over stdio (headless), saving it after
 //! every successful change. Attached mode (the desktop app hosting the same
@@ -13,8 +14,15 @@
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
-use r3d_commands::{Action, Command, Info, Query, Step, Workspace, WorkspaceError, step};
+pub mod render;
+
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD;
+use r3d_commands::{
+    Action, Command, CommandError, Info, Query, Step, Workspace, WorkspaceError, step,
+};
 use r3d_core::{Localizable, Message};
+use r3d_render::Gpu;
 use rmcp::model::{
     CallToolRequestParams, CallToolResponse, CallToolResult, ContentBlock, Implementation,
     ListToolsResult, PaginatedRequestParams, ServerCapabilities, ServerConfig, Tool,
@@ -29,6 +37,8 @@ Use project_summary and panel_get to inspect, the panel_*/point_*/edge_*/notch_*
 batch to apply several commands atomically, history_undo/history_redo to step back. \
 Every successful change is saved to the project folder. \
 export_pdf / export_svg write 1:1 patterns under exports/ (paths stay inside the project). \
+To dress the avatar: avatar_set, panel_place each panel around the body, seam_add, garment_set_fabric, \
+then simulate (headless drape, cached) and render_3d to see the result; render_board shows the pattern. \
 Errors carry a stable `code`, `args` and an English `text`.";
 
 /// Errors starting or running the server.
@@ -48,12 +58,15 @@ enum Target {
     Undo,
     Redo,
     Batch,
+    Render(render::View),
 }
 
 /// The MCP server over one project folder.
 #[derive(Clone)]
 pub struct Server {
     ws: Arc<Mutex<Workspace>>,
+    /// Created on the first render.
+    gpu: Arc<Mutex<Option<Gpu>>>,
     tools: Arc<Vec<Tool>>,
     targets: Arc<BTreeMap<String, Target>>,
 }
@@ -140,6 +153,31 @@ fn catalog() -> (Vec<Tool>, BTreeMap<String, Target>) {
         })),
         Target::Batch,
     );
+    let size_schema = || {
+        object(json!({
+            "type": "object",
+            "properties": {
+                "width": { "type": "integer", "minimum": 16, "maximum": 4096, "default": 1024 },
+                "height": { "type": "integer", "minimum": 16, "maximum": 4096, "default": 768 }
+            },
+            "additionalProperties": false
+        }))
+    };
+    add(
+        "render_board".into(),
+        "Render the 2D pattern (all panels, fitted to the image) as a PNG image.".into(),
+        size_schema(),
+        Target::Render(render::View::Board),
+    );
+    add(
+        "render_3d".into(),
+        "Render the garment on the avatar as a PNG image: the last `simulate` result if the \
+         project has not changed since, otherwise the panels where the simulation starts. The \
+         text result says which (`drape`: simulated or start)."
+            .into(),
+        size_schema(),
+        Target::Render(render::View::Garment),
+    );
     (tools, targets)
 }
 
@@ -153,6 +191,7 @@ impl Server {
         let (tools, targets) = catalog();
         Self {
             ws: Arc::new(Mutex::new(ws)),
+            gpu: Arc::new(Mutex::new(None)),
             tools: Arc::new(tools),
             targets: Arc::new(targets),
         }
@@ -166,7 +205,26 @@ impl Server {
     /// Execute a tool call; tool errors are returned as structured results
     /// the agent can read, never as protocol errors.
     pub fn call(&self, name: &str, arguments: Option<Map<String, Value>>) -> CallToolResult {
-        match self.try_call(name, arguments) {
+        let args = arguments.unwrap_or_default();
+        let type_name = match self.targets.get(name) {
+            None => {
+                return error_result(&CommandError::UnknownType { name: name.into() }.message());
+            }
+            Some(Target::Render(view)) => {
+                return match self.render(*view, &args) {
+                    Ok((png, info)) => CallToolResult::success(vec![
+                        ContentBlock::image(STANDARD.encode(png), "image/png"),
+                        ContentBlock::text(info.to_string()),
+                    ]),
+                    Err(e) => error_result(&e.message()),
+                };
+            }
+            Some(Target::Op(op)) => *op,
+            Some(Target::Undo) => step::UNDO,
+            Some(Target::Redo) => step::REDO,
+            Some(Target::Batch) => step::BATCH,
+        };
+        match self.run_step(type_name, args) {
             Ok(value) => {
                 let body = serde_json::to_string(&value).unwrap_or_default();
                 CallToolResult::success(vec![ContentBlock::text(body)])
@@ -175,21 +233,53 @@ impl Server {
         }
     }
 
-    fn try_call(
+    fn render(
         &self,
-        name: &str,
-        arguments: Option<Map<String, Value>>,
-    ) -> Result<Value, WorkspaceError> {
-        let target = self.targets.get(name).cloned().ok_or_else(|| {
-            WorkspaceError::Command(r3d_commands::CommandError::UnknownType { name: name.into() })
-        })?;
-        let mut args = arguments.unwrap_or_default();
-        let type_name = match target {
-            Target::Op(op) => op,
-            Target::Undo => step::UNDO,
-            Target::Redo => step::REDO,
-            Target::Batch => step::BATCH,
+        view: render::View,
+        args: &Map<String, Value>,
+    ) -> Result<(Vec<u8>, Value), render::RenderError> {
+        let size = |key: &str, default: u32| -> Result<u32, render::RenderError> {
+            match args.get(key) {
+                None => Ok(default),
+                Some(v) => v
+                    .as_u64()
+                    .and_then(|n| u32::try_from(n).ok())
+                    .ok_or_else(|| CommandError::Malformed {
+                        name: key.into(),
+                        detail: "expected a whole number of pixels".into(),
+                    })
+                    .map_err(Into::into),
+            }
         };
+        if let Some(key) = args.keys().find(|k| *k != "width" && *k != "height") {
+            return Err(CommandError::Malformed {
+                name: key.clone(),
+                detail: "unknown parameter (expected width, height)".into(),
+            }
+            .into());
+        }
+        let (width, height) = (size("width", 1024)?, size("height", 768)?);
+        let internal = |detail: &str| CommandError::Internal {
+            detail: detail.into(),
+        };
+        let mut gpu = self.gpu.lock().map_err(|_| internal("GPU lock poisoned"))?;
+        if gpu.is_none() {
+            *gpu = Some(render::headless_gpu()?);
+        }
+        let gpu = gpu.as_ref().ok_or_else(|| internal("no GPU"))?;
+        let ws = self
+            .ws
+            .lock()
+            .map_err(|_| internal("workspace lock poisoned"))?;
+        render::render(gpu, &ws, view, width, height)
+    }
+
+    /// Run the step `type_name` with `args`, saving after a change.
+    fn run_step(
+        &self,
+        type_name: &str,
+        mut args: Map<String, Value>,
+    ) -> Result<Value, WorkspaceError> {
         args.insert("type".into(), Value::from(type_name));
         let step = Step::from_value(Value::Object(args))?;
         let mut ws = self.ws.lock().map_err(|_| {

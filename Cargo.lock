@@ -1639,11 +1639,9 @@ version = "0.0.0"
 dependencies = [
  "assert_cmd",
  "clap",
- "glam",
  "r3d-commands",
  "r3d-core",
  "r3d-mcp",
- "r3d-render",
  "serde_json",
  "tempfile",
 ]
@@ -1700,8 +1698,11 @@ dependencies = [
 name = "r3d-mcp"
 version = "0.0.0"
 dependencies = [
+ "base64",
+ "glam",
  "r3d-commands",
  "r3d-core",
+ "r3d-render",
  "rmcp",
  "serde_json",
  "tempfile",
