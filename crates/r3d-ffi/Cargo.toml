@@ -19,6 +19,8 @@ r3d-core.workspace = true
 r3d-commands.workspace = true
 r3d-geom.workspace = true
 r3d-render.workspace = true
+r3d-sim.workspace = true
+glam.workspace = true
 flutter_rust_bridge = "=2.13.0"
 serde_json.workspace = true
 wgpu.workspace = true

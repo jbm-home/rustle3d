@@ -6,7 +6,9 @@ use crate::camera::OrbitCamera;
 use crate::gpu::Gpu;
 use crate::mesh::Mesh;
 use crate::targets::{Attachments, DEPTH_FORMAT};
-use crate::theme::{Rgba, Theme};
+use r3d_core::Fabric;
+
+use crate::theme::{Rgba, Theme, hex, parse_hex};
 use crate::{MSAA_SAMPLES, Target};
 
 #[repr(C)]
@@ -30,12 +32,33 @@ pub struct Material {
 }
 
 impl Material {
-    /// Fabric, from the theme's cloth colours.
-    pub fn cloth(theme: &Theme) -> Self {
+    /// A fabric's usual look, or `color` (`#RRGGBB`) when given. The sheen
+    /// is the fibres' colour at grazing angles: strong for silk, a soft halo
+    /// for wool, faint for denim.
+    pub fn fabric(fabric: Fabric, color: Option<&str>) -> Self {
+        let (usual, sheen_amount) = match fabric {
+            Fabric::Cotton => (0xE4DCCD, 0.6),
+            Fabric::Denim => (0x3E5677, 0.3),
+            Fabric::Jersey => (0x9A5A6A, 0.5),
+            Fabric::Silk => (0xC9A46C, 1.6),
+            Fabric::Wool => (0x5F5B58, 0.9),
+        };
+        let base = color.and_then(parse_hex).unwrap_or_else(|| hex(usual));
+        let lighter = |c: f32| c + (1.0 - c) * 0.6;
         Self {
-            base: theme.cloth,
-            sheen: theme.cloth_sheen,
-            sheen_amount: 1.0,
+            base,
+            sheen: [lighter(base[0]), lighter(base[1]), lighter(base[2]), 1.0],
+            sheen_amount,
+        }
+    }
+
+    /// The same material, tinted toward `tint` (selection highlight).
+    pub fn tinted(self, tint: Rgba, amount: f32) -> Self {
+        let mix = |a: Rgba| -> Rgba { std::array::from_fn(|i| a[i] + (tint[i] - a[i]) * amount) };
+        Self {
+            base: mix(self.base),
+            sheen: mix(self.sheen),
+            ..self
         }
     }
 

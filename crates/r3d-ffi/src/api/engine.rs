@@ -12,9 +12,13 @@ use std::path::PathBuf;
 
 use r3d_avatar::fit::{fit, fitted_positions};
 use r3d_avatar::presets::{BodyPreset, PresetLibrary};
+use r3d_commands::drape::{self, BodyMesh};
 use r3d_commands::queries::body_model;
-use r3d_commands::{Script, Step, Workspace};
-use r3d_core::{Body, Localizable, Message, PanelId};
+use r3d_commands::{Script, Step, Workspace, templates};
+use r3d_sim::Solver;
+
+use crate::sim::SimThread;
+use r3d_core::{Body, Fabric, Localizable, Message, PanelId};
 use r3d_render::board::BoardView;
 use r3d_render::theme::PIECE_COLORS;
 use r3d_render::{
@@ -68,8 +72,6 @@ pub struct CanvasColors {
     pub sky_top: u32,
     pub sky_bottom: u32,
     pub ground: u32,
-    pub cloth: u32,
-    pub cloth_sheen: u32,
     pub avatar: u32,
     /// Piece fills, cycled; exactly `PIECE_COLORS` (8) entries.
     pub pieces: Vec<u32>,
@@ -98,8 +100,6 @@ impl CanvasColors {
             sky_top: rgba(self.sky_top),
             sky_bottom: rgba(self.sky_bottom),
             ground: rgba(self.ground),
-            cloth: rgba(self.cloth),
-            cloth_sheen: rgba(self.cloth_sheen),
             avatar: rgba(self.avatar),
         })
     }
@@ -133,7 +133,6 @@ struct Graphics {
     next_view: u32,
     camera: OrbitCamera,
     theme: Theme,
-    started: Instant,
     /// The fitted avatar mesh, for the body it was fitted to.
     avatar: Option<(Body, Mesh)>,
 }
@@ -150,7 +149,6 @@ impl Graphics {
             next_view: 1,
             camera: OrbitCamera::default(),
             theme: Theme::LIGHT,
-            started: Instant::now(),
             avatar: None,
         })
     }
@@ -169,6 +167,41 @@ fn avatar_mesh(body: &Body) -> Result<Mesh, ApiError> {
     Ok(mesh)
 }
 
+/// Where each piece's particles sit in the simulation, to draw one mesh per
+/// piece (own material, selection tint).
+struct ClothPart {
+    panel: PanelId,
+    /// First particle of the piece (pieces are contiguous).
+    start: usize,
+    count: usize,
+    /// Triangles, in indices local to the piece.
+    indices: Vec<u32>,
+}
+
+/// A fabric choice for the UI.
+#[derive(Debug, Clone)]
+pub struct FabricSwatch {
+    /// The value `garment.set_fabric` takes (`cotton`, `denim`…).
+    pub id: String,
+    /// Default colour, ARGB.
+    pub argb: u32,
+}
+
+/// State of the cloth simulation, for the UI.
+#[derive(Debug, Clone)]
+pub struct SimStatus {
+    /// A garment is loaded (placed around the body).
+    pub loaded: bool,
+    pub running: bool,
+    /// Simulated time (s).
+    pub time_s: f64,
+    /// Wall time of the last solver step (ms).
+    pub step_ms: f64,
+    pub particles: u32,
+    /// Largest opening of a seam (mm).
+    pub max_seam_gap_mm: f64,
+}
+
 /// A project opened by the UI.
 #[frb(opaque)]
 pub struct Engine {
@@ -178,6 +211,10 @@ pub struct Engine {
     selection: Mutex<Vec<PanelId>>,
     /// Folder of the user's libraries (body presets…), set by the UI.
     library_dir: Mutex<Option<PathBuf>>,
+    /// The simulation thread, started on first use.
+    sim: Mutex<Option<SimThread>>,
+    /// How to draw the loaded simulation.
+    cloth: Mutex<Vec<ClothPart>>,
 }
 
 fn poisoned() -> ApiError {
@@ -203,6 +240,8 @@ impl Engine {
             graphics: Mutex::new(None),
             selection: Mutex::new(Vec::new()),
             library_dir: Mutex::new(None),
+            sim: Mutex::new(None),
+            cloth: Mutex::new(Vec::new()),
         })
     }
 
@@ -216,6 +255,100 @@ impl Engine {
 
     fn selected(&self) -> Result<MutexGuard<'_, Vec<PanelId>>, ApiError> {
         self.selection.lock().map_err(|_| poisoned())
+    }
+
+    /// The simulation thread, started if needed.
+    fn sim(&self) -> Result<MutexGuard<'_, Option<SimThread>>, ApiError> {
+        let mut slot = self.sim.lock().map_err(|_| poisoned())?;
+        if slot.is_none() {
+            *slot = Some(SimThread::spawn().map_err(|e| ApiError::new("internal", e.to_string()))?);
+        }
+        Ok(slot)
+    }
+
+    /// Rebuild the simulation from the document: placed pieces around the
+    /// body, paused. This is also how edits reach the simulation.
+    #[frb(sync)]
+    pub fn reset_simulation(&self) -> Result<SimStatus, ApiError> {
+        let ws = self.workspace()?;
+        let project = ws.session().project();
+        let model = body_model().map_err(err)?;
+        let body = project
+            .avatar()
+            .map(|a| fitted_positions(model, &fit(model, &a.body)));
+        let drape = drape::build(
+            project,
+            body.as_deref().map(|positions| BodyMesh {
+                positions,
+                triangles: model.triangles(),
+            }),
+            drape::DEFAULT_SPACING_MM,
+        )
+        .map_err(err)?;
+        drop(ws);
+        let mut parts: Vec<ClothPart> = Vec::new();
+        for (i, panel) in drape.particle_panels.iter().enumerate() {
+            match parts.last_mut() {
+                Some(p) if p.panel == *panel => p.count += 1,
+                _ => parts.push(ClothPart {
+                    panel: *panel,
+                    start: i,
+                    count: 1,
+                    indices: Vec::new(),
+                }),
+            }
+        }
+        for t in &drape.scene.triangles {
+            let first = t.vertices[0] as usize;
+            if let Some(p) = parts
+                .iter_mut()
+                .find(|p| (p.start..p.start + p.count).contains(&first))
+            {
+                p.indices
+                    .extend(t.vertices.iter().map(|v| *v - p.start as u32));
+            }
+        }
+        let sim = self.sim()?;
+        let thread = sim.as_ref().ok_or_else(poisoned)?;
+        if parts.is_empty() {
+            thread.clear();
+        } else {
+            thread.load(Solver::new(drape.scene));
+        }
+        *self.cloth.lock().map_err(|_| poisoned())? = parts;
+        drop(sim);
+        self.simulation_status()
+    }
+
+    /// Run or pause the simulation. Running with nothing loaded loads the
+    /// garment first.
+    #[frb(sync)]
+    pub fn run_simulation(&self, running: bool) -> Result<SimStatus, ApiError> {
+        if running && !self.simulation_status()?.loaded {
+            self.reset_simulation()?;
+        }
+        if let Some(thread) = self.sim()?.as_ref() {
+            thread.set_running(running);
+        }
+        self.simulation_status()
+    }
+
+    /// The latest simulation state.
+    #[frb(sync)]
+    pub fn simulation_status(&self) -> Result<SimStatus, ApiError> {
+        let p = self
+            .sim()?
+            .as_ref()
+            .map(SimThread::latest)
+            .unwrap_or_default();
+        Ok(SimStatus {
+            loaded: p.loaded,
+            running: p.running,
+            time_s: p.time.into(),
+            step_ms: p.step_ms,
+            particles: p.positions.len() as u32,
+            max_seam_gap_mm: f64::from(p.max_seam_gap) * 1000.0,
+        })
     }
 
     /// Run one step (a JSON object, as in scripts and MCP) and return its
@@ -251,6 +384,44 @@ impl Engine {
             ws.save().map_err(err)?;
         }
         Ok(serde_json::Value::Array(results).to_string())
+    }
+
+    /// The fabrics the UI offers, with the colour each one renders with by
+    /// default (ARGB), so swatches match the 3D view.
+    #[frb(sync)]
+    pub fn fabrics() -> Vec<FabricSwatch> {
+        [
+            Fabric::Cotton,
+            Fabric::Denim,
+            Fabric::Jersey,
+            Fabric::Silk,
+            Fabric::Wool,
+        ]
+        .into_iter()
+        .map(|f| {
+            let [r, g, b, _] = Material::fabric(f, None).base;
+            let byte = |c: f32| (c.clamp(0.0, 1.0) * 255.0).round() as u32;
+            FabricSwatch {
+                id: serde_json::to_value(f)
+                    .ok()
+                    .and_then(|v| v.as_str().map(str::to_owned))
+                    .unwrap_or_default(),
+                argb: 0xFF00_0000 | byte(r) << 16 | byte(g) << 8 | byte(b),
+            }
+        })
+        .collect()
+    }
+
+    /// Run a built-in template (a starting project, see
+    /// `r3d_commands::templates`) and return its results like `run_script`.
+    #[frb(sync)]
+    pub fn run_template(&self, name: String) -> Result<String, ApiError> {
+        let script = templates::get(&name).ok_or_else(|| ApiError {
+            code: "not_found".into(),
+            args: HashMap::from([("id".into(), name.clone())]),
+            text: format!("no template called {name}"),
+        })?;
+        self.run_script(script.to_owned())
     }
 
     /// Attach a view rendering into a UI texture (`surface`: platform handle
@@ -324,7 +495,7 @@ impl Engine {
         let g = slot
             .as_mut()
             .ok_or_else(|| ApiError::new("no_view", "no view attached"))?;
-        let mut theme = g.theme;
+        let theme = g.theme;
         let v = g
             .views
             .get(&view)
@@ -343,11 +514,6 @@ impl Engine {
                 g.board.render(&g.gpu, target, &scene, &board_view, &theme);
             }
             ViewKind::Garment => {
-                // Until the solver exists (M4), a demo garment stands in and
-                // the selection tints it, to exercise cross-view highlighting.
-                if !selected.is_empty() {
-                    theme.cloth = theme.selection;
-                }
                 let body = project.avatar().map(|a| a.body);
                 if body != g.avatar.as_ref().map(|(b, _)| *b) {
                     g.avatar = match body {
@@ -355,18 +521,52 @@ impl Engine {
                         None => None,
                     };
                 }
-                let skirt = Mesh::demo_skirt(100, 100, g.started.elapsed().as_secs_f32());
-                let mut draws = Vec::with_capacity(2);
+                let garment = project
+                    .default_garment()
+                    .and_then(|id| project.garments().get(&id));
+                let fabric = Material::fabric(
+                    garment.map(|g| g.fabric).unwrap_or_default(),
+                    garment.and_then(|g| g.color.as_deref()),
+                );
+                let published = self
+                    .sim
+                    .lock()
+                    .map_err(|_| poisoned())?
+                    .as_ref()
+                    .map(SimThread::latest)
+                    .unwrap_or_default();
+                let cloth = self.cloth.lock().map_err(|_| poisoned())?;
+                let pieces: Vec<(PanelId, Mesh)> = cloth
+                    .iter()
+                    .filter_map(|part| {
+                        let positions = published
+                            .positions
+                            .get(part.start..part.start + part.count)?;
+                        let mut mesh = Mesh {
+                            positions: positions.to_vec(),
+                            normals: Vec::new(),
+                            indices: part.indices.clone(),
+                        };
+                        mesh.recompute_normals();
+                        Some((part.panel, mesh))
+                    })
+                    .collect();
+                drop(cloth);
+                let mut draws = Vec::with_capacity(pieces.len() + 1);
                 if let Some((_, avatar)) = &g.avatar {
                     draws.push(Draw {
                         mesh: avatar,
                         material: Material::mannequin(&theme),
                     });
                 }
-                draws.push(Draw {
-                    mesh: &skirt,
-                    material: Material::cloth(&theme),
-                });
+                for (panel, mesh) in &pieces {
+                    let material = if selected.contains(panel) {
+                        fabric.tinted(theme.selection, 0.45)
+                    } else {
+                        fabric
+                    };
+                    draws.push(Draw { mesh, material });
+                }
                 g.garment.render(&g.gpu, target, &g.camera, &draws, &theme);
             }
         }

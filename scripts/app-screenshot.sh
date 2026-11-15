@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Capture the desktop app window (debug build) to a PNG, for visual review.
-#   scripts/app-screenshot.sh out.png [--dart-define=K=V ...]
+#   [R3D_SHOT_DELAY=seconds] scripts/app-screenshot.sh out.png [--dart-define=K=V ...]
 # Starts from a fresh demo project and captures only the Rustle3D window.
 # Needs the terminal to have the macOS "Screen Recording" permission.
 set -euo pipefail
@@ -16,7 +16,7 @@ for _ in $(seq 1 40); do
   [ -s "$sandbox_tmp/rustle3d-window-id" ] && break
   sleep 0.25
 done
-sleep 1.5 # let the first frames render
+sleep "${R3D_SHOT_DELAY:-1.5}" # let the first frames render (or the cloth drape)
 screencapture -x -o -l "$(cat "$sandbox_tmp/rustle3d-window-id")" "$out"
 pkill -f "rustle3d.app/Contents/MacOS/rustle3d" || true
 echo "$out"

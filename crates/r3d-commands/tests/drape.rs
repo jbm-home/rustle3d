@@ -4,17 +4,21 @@
 use r3d_avatar::fit::{fit, fitted_positions};
 use r3d_commands::drape::{BodyMesh, DEFAULT_SPACING_MM, build};
 use r3d_commands::queries::body_model;
-use r3d_commands::{Script, Session};
+use r3d_commands::{Script, Session, Step, templates};
 use r3d_core::Project;
 use r3d_sim::Solver;
 
 #[test]
-fn demo_skirt_closes_and_stays_on_the_body() {
+fn skirt_template_closes_and_stays_on_the_body() {
     let mut s = Session::new(Project::new("t"));
-    let script = Script::parse(include_str!("../../../demos/m4/skirt.json")).unwrap();
+    let body = serde_json::json!({"type": "avatar.set", "preset": "Women M",
+        "body": {"masculinity": 0, "height_cm": 168, "bust_cm": 90, "waist_cm": 73, "hips_cm": 98}});
+    s.run_step(&Step::from_value(body).unwrap()).unwrap();
+    let script = Script::parse(templates::get("a-line-skirt").unwrap()).unwrap();
     let results = script.run(|step| s.run_step(step)).unwrap();
-    let seams = results.last().unwrap();
-    assert_eq!(seams.as_array().unwrap().len(), 3);
+    let seams = results.last().unwrap().as_array().unwrap();
+    assert_eq!(seams.len(), 3);
+    assert!(seams.iter().all(|s| s["mismatch_mm"] == 0.0), "{seams:?}");
 
     let project = s.project();
     let body = project.avatar().unwrap().body;
@@ -60,10 +64,8 @@ fn demo_skirt_closes_and_stays_on_the_body() {
     let high = p.iter().map(|v| v.y).fold(f32::MIN, f32::max);
     eprintln!("{per_frame:?}/frame, stats {stats:?}, y {low:.3}..{high:.3}");
     assert!(stats.max_seam_gap < 0.005, "seams open: {stats:?}");
-    // Placed at the waist (1.10 m) and fitted to it, it hangs above the
-    // hips (widest at 0.82 m). It still creeps down a few centimetres: the
-    // membrane is not fully converged at 15 substeps (docs/physics.md §5,
-    // known issues).
-    assert!(high > 0.95, "skirt slid down: top at {high}");
+    // Placed at the waist (1.10 m) and fitted to it (74 cm for a 73 cm
+    // waist), it stays there instead of sliding down to the hips.
+    assert!(high > 1.05, "skirt slid down: top at {high}");
     assert!(low > 0.2, "skirt collapsed: hem at {low}");
 }

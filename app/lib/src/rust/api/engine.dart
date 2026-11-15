@@ -7,9 +7,9 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `avatar_mesh`, `err`, `graphics`, `library`, `new`, `new`, `poisoned`, `presets_file`, `rgba`, `selected`, `to_theme`, `workspace`
-// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `from`
+// These functions are ignored because they are not marked as `pub`: `avatar_mesh`, `err`, `graphics`, `library`, `new`, `new`, `poisoned`, `presets_file`, `rgba`, `selected`, `sim`, `to_theme`, `workspace`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `ClothPart`, `Graphics`, `View`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Engine>>
 abstract class Engine implements RustOpaqueInterface {
@@ -40,6 +40,11 @@ abstract class Engine implements RustOpaqueInterface {
   /// A drag of (`dx`, `dy`) pixels: orbit the 3D camera, pan the board.
   void drag({required int view, required double dx, required double dy});
 
+  /// The fabrics the UI offers, with the colour each one renders with by
+  /// default (ARGB), so swatches match the 3D view.
+  static List<FabricSwatch> fabrics() =>
+      RustLib.instance.api.crateApiEngineEngineFabrics();
+
   /// Fit the board to the pattern again.
   void fitBoard({required int view});
 
@@ -51,6 +56,10 @@ abstract class Engine implements RustOpaqueInterface {
   /// a half-drawn frame. Returns the CPU + GPU time in milliseconds.
   double renderView({required int view});
 
+  /// Rebuild the simulation from the document: placed pieces around the
+  /// body, paused. This is also how edits reach the simulation.
+  SimStatus resetSimulation();
+
   /// Run one step (a JSON object, as in scripts and MCP) and return its
   /// JSON result. Changes are saved immediately.
   String run({required String stepJson});
@@ -59,6 +68,14 @@ abstract class Engine implements RustOpaqueInterface {
   /// earlier results) and return the JSON array of results. Used for
   /// templates. The project is saved once at the end.
   String runScript({required String scriptJson});
+
+  /// Run or pause the simulation. Running with nothing loaded loads the
+  /// garment first.
+  SimStatus runSimulation({required bool running});
+
+  /// Run a built-in template (a starting project, see
+  /// `r3d_commands::templates`) and return its results like `run_script`.
+  String runTemplate({required String name});
 
   /// Save (or replace) one of the user's body presets. `body_json` is a
   /// `Body` object as in the `avatar.set` command.
@@ -77,6 +94,9 @@ abstract class Engine implements RustOpaqueInterface {
 
   /// Where the user's libraries (body presets…) are stored.
   void setLibraryDir({required String path});
+
+  /// The latest simulation state.
+  SimStatus simulationStatus();
 
   /// A scroll of `amount` (positive = zoom in) at pixel (`x`, `y`).
   void zoom({
@@ -123,8 +143,6 @@ class CanvasColors {
   final int skyTop;
   final int skyBottom;
   final int ground;
-  final int cloth;
-  final int clothSheen;
   final int avatar;
 
   /// Piece fills, cycled; exactly `PIECE_COLORS` (8) entries.
@@ -139,8 +157,6 @@ class CanvasColors {
     required this.skyTop,
     required this.skyBottom,
     required this.ground,
-    required this.cloth,
-    required this.clothSheen,
     required this.avatar,
     required this.pieces,
   });
@@ -155,8 +171,6 @@ class CanvasColors {
       skyTop.hashCode ^
       skyBottom.hashCode ^
       ground.hashCode ^
-      cloth.hashCode ^
-      clothSheen.hashCode ^
       avatar.hashCode ^
       pieces.hashCode;
 
@@ -173,10 +187,77 @@ class CanvasColors {
           skyTop == other.skyTop &&
           skyBottom == other.skyBottom &&
           ground == other.ground &&
-          cloth == other.cloth &&
-          clothSheen == other.clothSheen &&
           avatar == other.avatar &&
           pieces == other.pieces;
+}
+
+/// A fabric choice for the UI.
+class FabricSwatch {
+  /// The value `garment.set_fabric` takes (`cotton`, `denim`…).
+  final String id;
+
+  /// Default colour, ARGB.
+  final int argb;
+
+  const FabricSwatch({required this.id, required this.argb});
+
+  @override
+  int get hashCode => id.hashCode ^ argb.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FabricSwatch &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          argb == other.argb;
+}
+
+/// State of the cloth simulation, for the UI.
+class SimStatus {
+  /// A garment is loaded (placed around the body).
+  final bool loaded;
+  final bool running;
+
+  /// Simulated time (s).
+  final double timeS;
+
+  /// Wall time of the last solver step (ms).
+  final double stepMs;
+  final int particles;
+
+  /// Largest opening of a seam (mm).
+  final double maxSeamGapMm;
+
+  const SimStatus({
+    required this.loaded,
+    required this.running,
+    required this.timeS,
+    required this.stepMs,
+    required this.particles,
+    required this.maxSeamGapMm,
+  });
+
+  @override
+  int get hashCode =>
+      loaded.hashCode ^
+      running.hashCode ^
+      timeS.hashCode ^
+      stepMs.hashCode ^
+      particles.hashCode ^
+      maxSeamGapMm.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SimStatus &&
+          runtimeType == other.runtimeType &&
+          loaded == other.loaded &&
+          running == other.running &&
+          timeS == other.timeS &&
+          stepMs == other.stepMs &&
+          particles == other.particles &&
+          maxSeamGapMm == other.maxSeamGapMm;
 }
 
 /// What a view shows.

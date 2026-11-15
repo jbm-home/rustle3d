@@ -4,8 +4,9 @@
 
 use r3d_avatar::fit::{fit, fitted_positions};
 use r3d_avatar::model::BodyModel;
-use r3d_commands::{Script, Session};
-use r3d_core::Project;
+use r3d_commands::drape::{self, BodyMesh};
+use r3d_commands::{Script, Session, templates};
+use r3d_core::{Fabric, Project};
 use r3d_render::board::BoardView;
 use r3d_render::offscreen::{PNG_FORMAT, render_png};
 use r3d_render::{
@@ -91,7 +92,23 @@ fn view3d_renders_the_avatar_and_the_cloth() {
         indices: model.triangles().iter().flatten().copied().collect(),
     };
     avatar.recompute_normals();
-    let skirt = Mesh::demo_skirt(100, 100, 1.0);
+    // The skirt template where the simulation starts it, around the body.
+    let mut session = Session::new(Project::new("t"));
+    let script = Script::parse(templates::get("a-line-skirt").unwrap()).unwrap();
+    script.run(|step| session.run_step(step)).unwrap();
+    let body_mesh = BodyMesh {
+        positions: &avatar.positions,
+        triangles: model.triangles(),
+    };
+    let scene = drape::build(session.project(), Some(body_mesh), 25.0)
+        .unwrap()
+        .scene;
+    let mut skirt = Mesh {
+        positions: scene.particles.iter().map(|p| p.position).collect(),
+        normals: Vec::new(),
+        indices: scene.triangles.iter().flat_map(|t| t.vertices).collect(),
+    };
+    skirt.recompute_normals();
     let camera = OrbitCamera::default();
     let (w, h) = (900, 900);
     let mut renderer = ViewRenderer3d::new(&gpu, PNG_FORMAT);
@@ -106,7 +123,7 @@ fn view3d_renders_the_avatar_and_the_cloth() {
             },
             Draw {
                 mesh: &skirt,
-                material: Material::cloth(&theme),
+                material: Material::fabric(Fabric::Denim, None),
             },
         ];
         let png = render_png(&gpu, w, h, |view_tex| {

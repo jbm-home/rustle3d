@@ -118,8 +118,9 @@ measurement-based calibration on the roadmap.
 
 ## 4. Time integration
 
-- Fixed frame `dt = 1/60 s`, **N substeps** (default 15, adaptive 10–30) with
-  1 iteration each [3].
+- Fixed frame `dt = 1/60 s`, **N substeps** (30) with 1 iteration each [3].
+  Fewer substeps leave the membrane unconverged on garment-sized meshes: at
+  15, a skirt fitted at the waist slowly creeps down to the hips.
 - Per substep: predict positions (gravity, external forces) → solve
   constraints in fixed color order → update velocities → apply friction and
   damping.
@@ -169,15 +170,13 @@ that flared pieces do not overlap before the seams close.
 
 ### Known issues
 
-- **Convergence vs. cost.** At 15 substeps (1 iteration each) the membrane
-  is not fully converged on garment-sized meshes: a skirt fitted at the
-  waist creeps a few centimetres down under its own weight. At 30 substeps
-  it holds (22 ms/frame single-threaded for 2 000 particles), but the cost
-  doubles and the free edge of a sheet hung by two corners keeps a small
-  flutter for several seconds. This is slow settling, not an instability:
-  with damping set to 0, kinetic + gravitational energy decreases steadily
-  at 15 and 60 substeps alike. To decide with the parallel solver (rayon)
-  and the performance targets of §7.
+- **Not yet real time for a whole garment.** At 30 substeps a step of the
+  three-piece skirt (1 700 particles) takes about 20 ms on one core, so the
+  simulation runs slightly slower than real time (late frames drop
+  simulated time). Next: rayon with graph colouring (§6). With damping set
+  to 0, kinetic + gravitational energy decreases steadily (checked at 15
+  and 60 substeps): the solver is stable; a sheet hung by two corners just
+  needs about ten seconds to come to rest.
 
 ## 6. Parallelism and determinism
 

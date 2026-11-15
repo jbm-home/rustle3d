@@ -86,8 +86,9 @@ Total: roughly 7.5–8.5 months to v0.1, then M11–M12.
 Status (2026-11-15): meshing, solver (membrane, dihedral bending, seams,
 pins, avatar and ground contacts, friction), reference scenes and the sim
 bridge are done; schema v4 brings seams, placements and fabrics (M5/M6
-items pulled forward). Next: the simulation in the app, then rayon and
-the substep count (physics §5, known issues), and the CLI.
+items pulled forward). The app simulates on its own thread (Simulate /
+Pause / Restart, fabric swatches). Next: rayon for real time (physics §5,
+known issues), and the CLI `simulate`.
 - `r3d-geom`: constrained triangulation of panels at a target particle
   spacing, with matching vertex counts along future seams (moved from M2).
 - `r3d-sim`: `Solver` trait, XPBD small steps, strain-based stretch/shear,

@@ -38,6 +38,7 @@ class _ShellState extends State<Shell> {
   double _garmentMs = 0;
   int _frames = 0;
   double _fps = 0;
+  SimStatus? _sim;
   final _clock = Stopwatch()..start();
 
   @override
@@ -85,10 +86,43 @@ class _ShellState extends State<Shell> {
     _frames++;
     final elapsed = _clock.elapsedMilliseconds;
     if (elapsed >= 500) {
-      setState(() => _fps = _frames * 1000 / elapsed);
+      setState(() {
+        _fps = _frames * 1000 / elapsed;
+        _sim = _guard(widget.engine.simulationStatus);
+      });
       _frames = 0;
       _clock.reset();
     }
+  }
+
+  T? _guard<T>(T Function() call) {
+    try {
+      return call();
+    } on ApiError catch (e) {
+      _toast(e.text);
+      return null;
+    }
+  }
+
+  void _setRunning(bool running) => setState(
+    () => _sim = _guard(() => widget.engine.runSimulation(running: running)),
+  );
+
+  /// Rebuild the simulation from the pattern, keeping it running if it was.
+  void _restart() {
+    final wasRunning = _sim?.running ?? false;
+    setState(() {
+      _sim = _guard(widget.engine.resetSimulation);
+      if (wasRunning) {
+        _sim = _guard(() => widget.engine.runSimulation(running: true));
+      }
+    });
+  }
+
+  void _setFabric(String fabric) {
+    _run({'type': 'garment.set_fabric', 'fabric': fabric});
+    _refresh();
+    _restart();
   }
 
   void _addRectangle() {
@@ -143,6 +177,13 @@ class _ShellState extends State<Shell> {
     }
   }
 
+  String _simStats() {
+    final s = _sim;
+    if (s == null || !s.loaded) return '';
+    return 'Cloth ${s.particles} points · step ${s.stepMs.toStringAsFixed(1)} ms · '
+        '${s.timeS.toStringAsFixed(1)} s · ';
+  }
+
   @override
   Widget build(BuildContext context) {
     return CallbackShortcuts(
@@ -152,6 +193,8 @@ class _ShellState extends State<Shell> {
             _redo,
         const SingleActivator(LogicalKeyboardKey.keyR): _addRectangle,
         const SingleActivator(LogicalKeyboardKey.backspace): _deleteSelected,
+        const SingleActivator(LogicalKeyboardKey.space): () =>
+            _setRunning(!(_sim?.running ?? false)),
       },
       child: Focus(
         autofocus: true,
@@ -199,6 +242,11 @@ class _ShellState extends State<Shell> {
                         child: _ViewCard(
                           title: '3D',
                           icon: Icons.view_in_ar_outlined,
+                          trailing: _SimControls(
+                            status: _sim,
+                            onRun: _setRunning,
+                            onRestart: _restart,
+                          ),
                           child: RustView(
                             engine: widget.engine,
                             kind: ViewKind.garment,
@@ -214,6 +262,7 @@ class _ShellState extends State<Shell> {
                           selection: _selection,
                           panel: _panel,
                           summary: _summary,
+                          onFabric: _setFabric,
                           run: (step) {
                             _run(step);
                             _refresh();
@@ -230,7 +279,7 @@ class _ShellState extends State<Shell> {
                     ? 'Click a panel to select it · drag to pan · scroll to zoom · R adds a rectangle'
                     : 'Adjust the selection in the inspector · ⌫ deletes · ⌘Z undoes',
                 stats:
-                    'Rust render · pattern ${_boardMs.toStringAsFixed(1)} ms · '
+                    '${_simStats()}Rust render · pattern ${_boardMs.toStringAsFixed(1)} ms · '
                     '3D ${_garmentMs.toStringAsFixed(1)} ms · ${_fps.toStringAsFixed(0)} fps',
               ),
             ],
@@ -558,11 +607,13 @@ class _ViewCard extends StatelessWidget {
     required this.title,
     required this.icon,
     required this.child,
+    this.trailing,
   });
 
   final String title;
   final IconData icon;
   final Widget child;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -611,6 +662,8 @@ class _ViewCard extends StatelessWidget {
               ),
             ),
           ),
+          if (trailing != null)
+            Positioned(right: Space.m, top: Space.m, child: trailing!),
         ],
       ),
     );
@@ -622,6 +675,7 @@ class _Inspector extends StatelessWidget {
     required this.selection,
     required this.panel,
     required this.summary,
+    required this.onFabric,
     required this.run,
     required this.onDelete,
   });
@@ -629,6 +683,7 @@ class _Inspector extends StatelessWidget {
   final List<String> selection;
   final Map<String, dynamic>? panel;
   final Map<String, dynamic> summary;
+  final ValueChanged<String> onFabric;
   final ValueChanged<Map<String, Object?>> run;
   final VoidCallback onDelete;
 
@@ -647,7 +702,7 @@ class _Inspector extends StatelessWidget {
         child: KeyedSubtree(
           key: ValueKey(selection.join(',')),
           child: switch (selection.length) {
-            0 => _EmptyInspector(summary: summary),
+            0 => _EmptyInspector(summary: summary, onFabric: onFabric),
             1 when panel != null => _PanelInspector(
               panel: panel!,
               run: run,
@@ -662,9 +717,10 @@ class _Inspector extends StatelessWidget {
 }
 
 class _EmptyInspector extends StatelessWidget {
-  const _EmptyInspector({required this.summary});
+  const _EmptyInspector({required this.summary, required this.onFabric});
 
   final Map<String, dynamic> summary;
+  final ValueChanged<String> onFabric;
 
   @override
   Widget build(BuildContext context) {
@@ -703,6 +759,17 @@ class _EmptyInspector extends StatelessWidget {
             textAlign: TextAlign.center,
             style: ts(fontSize: 12.5, height: 1.45, color: p.textMuted),
           ),
+        ),
+        const SizedBox(height: Space.xl),
+        Divider(color: p.border, height: 1),
+        const SizedBox(height: Space.l),
+        _FabricPicker(
+          current:
+              ((summary['garments'] as List<dynamic>?)?.firstOrNull
+                      as Map<String, dynamic>?)?['fabric']
+                  as String? ??
+              'cotton',
+          onPick: onFabric,
         ),
       ],
     );
@@ -999,6 +1066,131 @@ class _StatusBar extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Simulate / pause and restart, over the 3D view.
+class _SimControls extends StatelessWidget {
+  const _SimControls({
+    required this.status,
+    required this.onRun,
+    required this.onRestart,
+  });
+
+  final SimStatus? status;
+  final ValueChanged<bool> onRun;
+  final VoidCallback onRestart;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final running = status?.running ?? false;
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: p.surface.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: p.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Tooltip(
+            message: running ? 'Pause  Space' : 'Drape the garment  Space',
+            child: FilledButton.icon(
+              onPressed: () => onRun(!running),
+              style: FilledButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+              ),
+              icon: Icon(
+                running ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                size: 18,
+              ),
+              label: Text(running ? 'Pause' : 'Simulate'),
+            ),
+          ),
+          const SizedBox(width: 2),
+          _IconAction(
+            icon: Icons.restart_alt_rounded,
+            tip: 'Start again from the pattern',
+            onTap: onRestart,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The garment's fabric, as swatches in the colour it renders with.
+class _FabricPicker extends StatelessWidget {
+  const _FabricPicker({required this.current, required this.onPick});
+
+  final String current;
+  final ValueChanged<String> onPick;
+
+  static const _blurbs = {
+    'cotton': 'Crisp and breathable',
+    'denim': 'Heavy, holds its shape',
+    'jersey': 'Stretchy knit',
+    'silk': 'Light and fluid',
+    'wool': 'Soft, with body',
+  };
+
+  static String _label(String id) => id[0].toUpperCase() + id.substring(1);
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final swatches = Engine.fabrics();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Fabric',
+          style: ts(fontSize: 14, fontWeight: FontWeight.w600, color: p.text),
+        ),
+        const SizedBox(height: Space.xs),
+        Text(
+          '${_label(current)} · ${_blurbs[current] ?? ''}',
+          style: ts(fontSize: 12.5, color: p.textMuted),
+        ),
+        const SizedBox(height: Space.m),
+        Wrap(
+          spacing: Space.s,
+          runSpacing: Space.s,
+          children: [
+            for (final f in swatches)
+              Tooltip(
+                message: _label(f.id),
+                child: InkWell(
+                  onTap: () => onPick(f.id),
+                  customBorder: const CircleBorder(),
+                  child: AnimatedContainer(
+                    duration: Motion.fast,
+                    width: 34,
+                    height: 34,
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: f.id == current ? p.accent : p.border,
+                        width: f.id == current ? 2 : 1,
+                      ),
+                    ),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(f.argb),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
     );
   }
 }

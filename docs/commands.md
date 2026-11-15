@@ -1340,7 +1340,7 @@ Read-only. Lengths in mm, areas in mm², rounded to 0.001.
 
 ### `project.summary`
 
-Project name, display unit, entity counts and a summary of every panel.
+Project name, display unit, the garments (fabric, colour), entity counts and a summary of every panel.
 
 <details><summary>Parameters (JSON schema)</summary>
 

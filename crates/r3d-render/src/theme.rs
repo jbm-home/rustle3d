@@ -20,13 +20,17 @@ pub struct Theme {
     pub sky_top: Rgba,
     pub sky_bottom: Rgba,
     pub ground: Rgba,
-    pub cloth: Rgba,
-    pub cloth_sheen: Rgba,
     /// The avatar (a neutral dress-form tone).
     pub avatar: Rgba,
 }
 
-const fn hex(rgb: u32) -> Rgba {
+/// `#RRGGBB` as a colour.
+pub(crate) fn parse_hex(s: &str) -> Option<Rgba> {
+    let digits = s.strip_prefix('#').filter(|d| d.len() == 6)?;
+    u32::from_str_radix(digits, 16).ok().map(hex)
+}
+
+pub(crate) const fn hex(rgb: u32) -> Rgba {
     [
         ((rgb >> 16) & 0xff) as f32 / 255.0,
         ((rgb >> 8) & 0xff) as f32 / 255.0,
@@ -46,8 +50,6 @@ impl Theme {
         sky_top: hex(0xF4F3F0),
         sky_bottom: hex(0xDEDBD4),
         ground: hex(0xE7E4DE),
-        cloth: hex(0x8A9BB8),
-        cloth_sheen: hex(0xE8ECF5),
         avatar: hex(0xD9DCE3),
     };
 
@@ -61,8 +63,18 @@ impl Theme {
         sky_top: hex(0x2A2A30),
         sky_bottom: hex(0x141417),
         ground: hex(0x1E1E22),
-        cloth: hex(0x7C8DAD),
-        cloth_sheen: hex(0xC9D2E6),
         avatar: hex(0x6B7080),
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_hex_colours() {
+        assert_eq!(parse_hex("#FF0000"), Some([1.0, 0.0, 0.0, 1.0]));
+        assert_eq!(parse_hex("FF0000"), None);
+        assert_eq!(parse_hex("#GG0000"), None);
+    }
 }

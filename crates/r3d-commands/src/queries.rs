@@ -69,8 +69,7 @@ fn summarize(p: &Project, id: PanelId) -> Result<PanelSummary, CommandError> {
 pub struct ProjectSummary {}
 
 impl Described for ProjectSummary {
-    const SUMMARY: &'static str =
-        "Project name, display unit, entity counts and a summary of every panel.";
+    const SUMMARY: &'static str = "Project name, display unit, the garments (fabric, colour), entity counts and a summary of every panel.";
 }
 
 #[derive(Serialize)]
@@ -85,6 +84,7 @@ struct Counts {
 struct SummaryOut {
     name: String,
     display_unit: DisplayUnit,
+    garments: Vec<Value>,
     counts: Counts,
     panels: Vec<PanelSummary>,
 }
@@ -99,6 +99,15 @@ impl QuerySpec for ProjectSummary {
         to_value(&SummaryOut {
             name: p.name().to_owned(),
             display_unit: p.display_unit(),
+            garments: p
+                .garments()
+                .iter()
+                .map(|(id, g)| {
+                    serde_json::json!({
+                        "id": id, "name": g.name, "fabric": g.fabric, "color": g.color,
+                    })
+                })
+                .collect(),
             counts: Counts {
                 garments: p.garments().len(),
                 panels: p.panels().len(),

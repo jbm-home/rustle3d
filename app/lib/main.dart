@@ -3,7 +3,6 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -22,9 +21,7 @@ Future<void> main() async {
     engine.run(stepJson: '{"type":"project.summary"}'),
   );
   if ((summary['counts']['panels'] as int) == 0) {
-    engine.runScript(
-      scriptJson: await rootBundle.loadString('assets/demo_skirt.json'),
-    );
+    engine.runTemplate(name: 'a-line-skirt');
   }
   engine.setLibraryDir(path: (await getApplicationSupportDirectory()).path);
   // Every project starts with a body to dress: a standard size.
@@ -39,10 +36,16 @@ Future<void> main() async {
       }),
     );
   }
+  // Show the garment placed around the body, ready to simulate.
+  engine.resetSimulation();
   // Review aids for screenshots:
-  // --dart-define=R3D_DARK=true, R3D_SELECT=panel:2 (scripts/app-screenshot.sh).
+  // --dart-define=R3D_DARK=true, R3D_SELECT=panel:2, R3D_SIMULATE=true
+  // (scripts/app-screenshot.sh).
   const select = String.fromEnvironment('R3D_SELECT');
   if (select.isNotEmpty) engine.select(panels: [select]);
+  if (const bool.fromEnvironment('R3D_SIMULATE')) {
+    engine.runSimulation(running: true);
+  }
   runApp(Rustle3dApp(engine: engine));
 }
 

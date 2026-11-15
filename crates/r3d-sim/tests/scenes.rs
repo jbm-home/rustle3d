@@ -64,23 +64,27 @@ fn hanging_cloth_sags_and_settles() {
     let mut scene = sheet(0.5, 0.5, n, Vec2::Y, |r| Vec3::new(r.x, 1.5, r.y));
     scene.particles[n * (n - 1)].pinned = true;
     scene.particles[n * n - 1].pinned = true;
-    // A sheet hung by two corners is a slow pendulum: energy decays
-    // steadily (no numerical gain) but takes several seconds.
-    let mut s = run(scene, 8.0);
+    // A sheet hung by two corners is a slow pendulum: it takes about ten
+    // seconds to come to rest (energy decreases steadily).
+    let mut s = run(scene, 12.0);
     assert!(min_y(&s) < 1.5 - 0.3, "did not sag: {}", min_y(&s));
-    // Settled: half a second later the shape has barely changed (the free
-    // bottom edge may still sway a little).
+    // Settled: over the next second the shape barely changes.
     let before = s.positions().to_vec();
-    for _ in 0..30 {
+    for _ in 0..60 {
         s.step(1.0 / 60.0);
     }
-    let moved = s
+    let moved: Vec<f32> = s
         .positions()
         .iter()
         .zip(&before)
         .map(|(a, b)| a.distance(*b))
-        .fold(0.0, f32::max);
-    assert!(moved < 0.02, "still moving: {moved} m in 0.5 s");
+        .collect();
+    let mean = moved.iter().sum::<f32>() / moved.len() as f32;
+    let max = moved.iter().copied().fold(0.0, f32::max);
+    assert!(
+        mean < 0.005 && max < 0.02,
+        "still moving: mean {mean} m, max {max} m in 1 s"
+    );
     // The pins did not move.
     assert_eq!(s.positions()[n * n - 1].y, 1.5);
 }

@@ -6,6 +6,7 @@
 //! `flutter_rust_bridge_codegen generate` (run in `app/`) from [`api`].
 
 pub mod api;
+mod sim;
 mod surface;
 
 // Generated glue: raw FFI entry points (`unsafe`) and wire-format decoding

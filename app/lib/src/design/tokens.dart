@@ -29,8 +29,6 @@ class Palette {
     required this.skyTop,
     required this.skyBottom,
     required this.ground,
-    required this.cloth,
-    required this.clothSheen,
     required this.avatar,
     required this.pieces,
   });
@@ -54,8 +52,6 @@ class Palette {
   final Color skyTop;
   final Color skyBottom;
   final Color ground;
-  final Color cloth;
-  final Color clothSheen;
   final Color avatar;
 
   /// Eight piece colours, cycled in project order.
@@ -70,8 +66,6 @@ class Palette {
     skyTop: skyTop.toARGB32(),
     skyBottom: skyBottom.toARGB32(),
     ground: ground.toARGB32(),
-    cloth: cloth.toARGB32(),
-    clothSheen: clothSheen.toARGB32(),
     avatar: avatar.toARGB32(),
     pieces: Uint32List.fromList([for (final c in pieces) c.toARGB32()]),
   );
@@ -94,8 +88,6 @@ class Palette {
     skyTop: Color(0xFFF3F4F7),
     skyBottom: Color(0xFFD5D9E1),
     ground: Color(0xFFE2E5EB),
-    cloth: Color(0xFF5E6B8A),
-    clothSheen: Color(0xFFE3E8F5),
     avatar: Color(0xFFD9DCE3),
     pieces: [
       Color(0xFFE4DDFF),
@@ -127,8 +119,6 @@ class Palette {
     skyTop: Color(0xFF1B1E27),
     skyBottom: Color(0xFF07080B),
     ground: Color(0xFF12141A),
-    cloth: Color(0xFF7D89A8),
-    clothSheen: Color(0xFFD7DCEF),
     avatar: Color(0xFF6B7080),
     pieces: [
       Color(0xFF2E2655),

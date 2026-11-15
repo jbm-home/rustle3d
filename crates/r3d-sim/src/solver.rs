@@ -20,7 +20,7 @@ use crate::collide::StaticMesh;
 use crate::scene::SimScene;
 
 /// Substeps per frame.
-pub const SUBSTEPS: u32 = 15;
+pub const SUBSTEPS: u32 = 30;
 /// Time over which seams pull together (s).
 pub const SEWING_TIME: f32 = 0.6;
 const GRAVITY: Vec3 = Vec3::new(0.0, -9.81, 0.0);

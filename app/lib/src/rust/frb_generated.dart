@@ -67,7 +67,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 481905683;
+  int get rustContentHash => -665559706;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -113,6 +113,8 @@ abstract class RustLibApi extends BaseApi {
     required double dy,
   });
 
+  List<FabricSwatch> crateApiEngineEngineFabrics();
+
   void crateApiEngineEngineFitBoard({required Engine that, required int view});
 
   Engine crateApiEngineEngineOpen({required String path});
@@ -122,6 +124,8 @@ abstract class RustLibApi extends BaseApi {
     required int view,
   });
 
+  SimStatus crateApiEngineEngineResetSimulation({required Engine that});
+
   String crateApiEngineEngineRun({
     required Engine that,
     required String stepJson,
@@ -130,6 +134,16 @@ abstract class RustLibApi extends BaseApi {
   String crateApiEngineEngineRunScript({
     required Engine that,
     required String scriptJson,
+  });
+
+  SimStatus crateApiEngineEngineRunSimulation({
+    required Engine that,
+    required bool running,
+  });
+
+  String crateApiEngineEngineRunTemplate({
+    required Engine that,
+    required String name,
   });
 
   void crateApiEngineEngineSaveBodyPreset({
@@ -154,6 +168,8 @@ abstract class RustLibApi extends BaseApi {
     required Engine that,
     required String path,
   });
+
+  SimStatus crateApiEngineEngineSimulationStatus({required Engine that});
 
   void crateApiEngineEngineZoom({
     required Engine that,
@@ -382,6 +398,28 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  List<FabricSwatch> crateApiEngineEngineFabrics() {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 7)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_fabric_swatch,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiEngineEngineFabricsConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEngineEngineFabricsConstMeta =>
+      const TaskConstMeta(debugName: "Engine_fabrics", argNames: []);
+
+  @override
   void crateApiEngineEngineFitBoard({required Engine that, required int view}) {
     return handler.executeSync(
       SyncTask(
@@ -392,7 +430,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_u_32(view, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 7)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -418,7 +456,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(path, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9)!;
         },
         codec: SseCodec(
           decodeSuccessData:
@@ -449,7 +487,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_u_32(view, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_f_64,
@@ -469,6 +507,35 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  SimStatus crateApiEngineEngineResetSimulation({required Engine that}) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEngine(
+            that,
+            serializer,
+          );
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_sim_status,
+          decodeErrorData: sse_decode_api_error,
+        ),
+        constMeta: kCrateApiEngineEngineResetSimulationConstMeta,
+        argValues: [that],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEngineEngineResetSimulationConstMeta =>
+      const TaskConstMeta(
+        debugName: "Engine_reset_simulation",
+        argNames: ["that"],
+      );
+
+  @override
   String crateApiEngineEngineRun({
     required Engine that,
     required String stepJson,
@@ -482,7 +549,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(stepJson, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -514,7 +581,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(scriptJson, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 13)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -534,6 +601,72 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  SimStatus crateApiEngineEngineRunSimulation({
+    required Engine that,
+    required bool running,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEngine(
+            that,
+            serializer,
+          );
+          sse_encode_bool(running, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_sim_status,
+          decodeErrorData: sse_decode_api_error,
+        ),
+        constMeta: kCrateApiEngineEngineRunSimulationConstMeta,
+        argValues: [that, running],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEngineEngineRunSimulationConstMeta =>
+      const TaskConstMeta(
+        debugName: "Engine_run_simulation",
+        argNames: ["that", "running"],
+      );
+
+  @override
+  String crateApiEngineEngineRunTemplate({
+    required Engine that,
+    required String name,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEngine(
+            that,
+            serializer,
+          );
+          sse_encode_String(name, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 15)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_api_error,
+        ),
+        constMeta: kCrateApiEngineEngineRunTemplateConstMeta,
+        argValues: [that, name],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEngineEngineRunTemplateConstMeta =>
+      const TaskConstMeta(
+        debugName: "Engine_run_template",
+        argNames: ["that", "name"],
+      );
+
+  @override
   void crateApiEngineEngineSaveBodyPreset({
     required Engine that,
     required String name,
@@ -549,7 +682,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
           sse_encode_String(name, serializer);
           sse_encode_String(bodyJson, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -582,7 +715,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_list_String(panels, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 13)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 17)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_list_String,
@@ -610,7 +743,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that,
             serializer,
           );
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 18)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_list_String,
@@ -640,7 +773,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_box_autoadd_canvas_colors(colors, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 15)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 19)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -673,7 +806,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(path, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 20)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -690,6 +823,35 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(
         debugName: "Engine_set_library_dir",
         argNames: ["that", "path"],
+      );
+
+  @override
+  SimStatus crateApiEngineEngineSimulationStatus({required Engine that}) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEngine(
+            that,
+            serializer,
+          );
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 21)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_sim_status,
+          decodeErrorData: sse_decode_api_error,
+        ),
+        constMeta: kCrateApiEngineEngineSimulationStatusConstMeta,
+        argValues: [that],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEngineEngineSimulationStatusConstMeta =>
+      const TaskConstMeta(
+        debugName: "Engine_simulation_status",
+        argNames: ["that"],
       );
 
   @override
@@ -712,7 +874,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_f_64(x, serializer);
           sse_encode_f_64(y, serializer);
           sse_encode_f_64(amount, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 17)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 22)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -794,6 +956,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  bool dco_decode_bool(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as bool;
+  }
+
+  @protected
   CanvasColors dco_decode_box_autoadd_canvas_colors(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_canvas_colors(raw);
@@ -803,8 +971,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   CanvasColors dco_decode_canvas_colors(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 12)
-      throw Exception('unexpected arr length: expect 12 but see ${arr.length}');
+    if (arr.length != 10)
+      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
     return CanvasColors(
       boardBackground: dco_decode_u_32(arr[0]),
       gridMinor: dco_decode_u_32(arr[1]),
@@ -814,10 +982,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       skyTop: dco_decode_u_32(arr[5]),
       skyBottom: dco_decode_u_32(arr[6]),
       ground: dco_decode_u_32(arr[7]),
-      cloth: dco_decode_u_32(arr[8]),
-      clothSheen: dco_decode_u_32(arr[9]),
-      avatar: dco_decode_u_32(arr[10]),
-      pieces: dco_decode_list_prim_u_32_strict(arr[11]),
+      avatar: dco_decode_u_32(arr[8]),
+      pieces: dco_decode_list_prim_u_32_strict(arr[9]),
     );
   }
 
@@ -825,6 +991,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   double dco_decode_f_64(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as double;
+  }
+
+  @protected
+  FabricSwatch dco_decode_fabric_swatch(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return FabricSwatch(
+      id: dco_decode_String(arr[0]),
+      argb: dco_decode_u_32(arr[1]),
+    );
   }
 
   @protected
@@ -837,6 +1015,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   List<String> dco_decode_list_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_String).toList();
+  }
+
+  @protected
+  List<FabricSwatch> dco_decode_list_fabric_swatch(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_fabric_swatch).toList();
   }
 
   @protected
@@ -865,6 +1049,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       throw Exception('Expected 2 elements, got ${arr.length}');
     }
     return (dco_decode_String(arr[0]), dco_decode_String(arr[1]));
+  }
+
+  @protected
+  SimStatus dco_decode_sim_status(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return SimStatus(
+      loaded: dco_decode_bool(arr[0]),
+      running: dco_decode_bool(arr[1]),
+      timeS: dco_decode_f_64(arr[2]),
+      stepMs: dco_decode_f_64(arr[3]),
+      particles: dco_decode_u_32(arr[4]),
+      maxSeamGapMm: dco_decode_f_64(arr[5]),
+    );
   }
 
   @protected
@@ -965,6 +1165,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  bool sse_decode_bool(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getUint8() != 0;
+  }
+
+  @protected
   CanvasColors sse_decode_box_autoadd_canvas_colors(
     SseDeserializer deserializer,
   ) {
@@ -983,8 +1189,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_skyTop = sse_decode_u_32(deserializer);
     var var_skyBottom = sse_decode_u_32(deserializer);
     var var_ground = sse_decode_u_32(deserializer);
-    var var_cloth = sse_decode_u_32(deserializer);
-    var var_clothSheen = sse_decode_u_32(deserializer);
     var var_avatar = sse_decode_u_32(deserializer);
     var var_pieces = sse_decode_list_prim_u_32_strict(deserializer);
     return CanvasColors(
@@ -996,8 +1200,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       skyTop: var_skyTop,
       skyBottom: var_skyBottom,
       ground: var_ground,
-      cloth: var_cloth,
-      clothSheen: var_clothSheen,
       avatar: var_avatar,
       pieces: var_pieces,
     );
@@ -1007,6 +1209,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   double sse_decode_f_64(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getFloat64();
+  }
+
+  @protected
+  FabricSwatch sse_decode_fabric_swatch(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_argb = sse_decode_u_32(deserializer);
+    return FabricSwatch(id: var_id, argb: var_argb);
   }
 
   @protected
@@ -1023,6 +1233,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <String>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_String(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<FabricSwatch> sse_decode_list_fabric_swatch(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <FabricSwatch>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_fabric_swatch(deserializer));
     }
     return ans_;
   }
@@ -1066,6 +1290,25 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  SimStatus sse_decode_sim_status(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_loaded = sse_decode_bool(deserializer);
+    var var_running = sse_decode_bool(deserializer);
+    var var_timeS = sse_decode_f_64(deserializer);
+    var var_stepMs = sse_decode_f_64(deserializer);
+    var var_particles = sse_decode_u_32(deserializer);
+    var var_maxSeamGapMm = sse_decode_f_64(deserializer);
+    return SimStatus(
+      loaded: var_loaded,
+      running: var_running,
+      timeS: var_timeS,
+      stepMs: var_stepMs,
+      particles: var_particles,
+      maxSeamGapMm: var_maxSeamGapMm,
+    );
+  }
+
+  @protected
   int sse_decode_u_32(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getUint32();
@@ -1099,12 +1342,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
     return ViewKind.values[inner];
-  }
-
-  @protected
-  bool sse_decode_bool(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return deserializer.buffer.getUint8() != 0;
   }
 
   @protected
@@ -1173,6 +1410,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_bool(bool self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putUint8(self ? 1 : 0);
+  }
+
+  @protected
   void sse_encode_box_autoadd_canvas_colors(
     CanvasColors self,
     SseSerializer serializer,
@@ -1192,8 +1435,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_u_32(self.skyTop, serializer);
     sse_encode_u_32(self.skyBottom, serializer);
     sse_encode_u_32(self.ground, serializer);
-    sse_encode_u_32(self.cloth, serializer);
-    sse_encode_u_32(self.clothSheen, serializer);
     sse_encode_u_32(self.avatar, serializer);
     sse_encode_list_prim_u_32_strict(self.pieces, serializer);
   }
@@ -1202,6 +1443,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_f_64(double self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putFloat64(self);
+  }
+
+  @protected
+  void sse_encode_fabric_swatch(FabricSwatch self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_u_32(self.argb, serializer);
   }
 
   @protected
@@ -1216,6 +1464,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_String(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_fabric_swatch(
+    List<FabricSwatch> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_fabric_swatch(item, serializer);
     }
   }
 
@@ -1262,6 +1522,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_sim_status(SimStatus self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self.loaded, serializer);
+    sse_encode_bool(self.running, serializer);
+    sse_encode_f_64(self.timeS, serializer);
+    sse_encode_f_64(self.stepMs, serializer);
+    sse_encode_u_32(self.particles, serializer);
+    sse_encode_f_64(self.maxSeamGapMm, serializer);
+  }
+
+  @protected
   void sse_encode_u_32(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putUint32(self);
@@ -1294,12 +1565,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_view_kind(ViewKind self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
-  }
-
-  @protected
-  void sse_encode_bool(bool self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    serializer.buffer.putUint8(self ? 1 : 0);
   }
 }
 
@@ -1382,6 +1647,11 @@ class EngineImpl extends RustOpaque implements Engine {
   double renderView({required int view}) => RustLib.instance.api
       .crateApiEngineEngineRenderView(that: this, view: view);
 
+  /// Rebuild the simulation from the document: placed pieces around the
+  /// body, paused. This is also how edits reach the simulation.
+  SimStatus resetSimulation() =>
+      RustLib.instance.api.crateApiEngineEngineResetSimulation(that: this);
+
   /// Run one step (a JSON object, as in scripts and MCP) and return its
   /// JSON result. Changes are saved immediately.
   String run({required String stepJson}) => RustLib.instance.api
@@ -1392,6 +1662,16 @@ class EngineImpl extends RustOpaque implements Engine {
   /// templates. The project is saved once at the end.
   String runScript({required String scriptJson}) => RustLib.instance.api
       .crateApiEngineEngineRunScript(that: this, scriptJson: scriptJson);
+
+  /// Run or pause the simulation. Running with nothing loaded loads the
+  /// garment first.
+  SimStatus runSimulation({required bool running}) => RustLib.instance.api
+      .crateApiEngineEngineRunSimulation(that: this, running: running);
+
+  /// Run a built-in template (a starting project, see
+  /// `r3d_commands::templates`) and return its results like `run_script`.
+  String runTemplate({required String name}) => RustLib.instance.api
+      .crateApiEngineEngineRunTemplate(that: this, name: name);
 
   /// Save (or replace) one of the user's body presets. `body_json` is a
   /// `Body` object as in the `avatar.set` command.
@@ -1419,6 +1699,10 @@ class EngineImpl extends RustOpaque implements Engine {
   /// Where the user's libraries (body presets…) are stored.
   void setLibraryDir({required String path}) => RustLib.instance.api
       .crateApiEngineEngineSetLibraryDir(that: this, path: path);
+
+  /// The latest simulation state.
+  SimStatus simulationStatus() =>
+      RustLib.instance.api.crateApiEngineEngineSimulationStatus(that: this);
 
   /// A scroll of `amount` (positive = zoom in) at pixel (`x`, `y`).
   void zoom({

@@ -1706,6 +1706,7 @@ name = "r3d_ffi"
 version = "0.0.0"
 dependencies = [
  "flutter_rust_bridge",
+ "glam",
  "objc2",
  "objc2-core-foundation",
  "objc2-io-surface",
@@ -1715,6 +1716,7 @@ dependencies = [
  "r3d-core",
  "r3d-geom",
  "r3d-render",
+ "r3d-sim",
  "serde_json",
  "tempfile",
  "wgpu",
