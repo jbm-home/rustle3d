@@ -142,6 +142,7 @@ command_registry! {
     "seam.add" => SeamAdd,
     "seam.remove" => SeamRemove,
     "seam.flip" => SeamFlip,
+    "edge.lengthen" => EdgeLengthen,
     "pin.add" => PinAdd,
     "pin.remove" => PinRemove,
     "garment.set_fabric" => GarmentSetFabric,

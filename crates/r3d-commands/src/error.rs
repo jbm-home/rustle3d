@@ -32,6 +32,8 @@ pub enum Invalid {
     Range(f64, f64),
     #[error("has an invalid format")]
     Format,
+    #[error("would turn a panel inside out")]
+    Inverted,
 }
 
 impl Invalid {
@@ -50,6 +52,7 @@ impl Invalid {
             Invalid::OtherPanel => "invalid.other_panel",
             Invalid::Range(..) => "invalid.range",
             Invalid::Format => "invalid.format",
+            Invalid::Inverted => "invalid.inverted",
         }
     }
 }

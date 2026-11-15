@@ -1233,6 +1233,46 @@ Reverse how a seam matches its two edges (fixes a twisted seam).
 
 </details>
 
+### `edge.lengthen`
+
+Lengthen (mm > 0) or shorten (mm < 0) the garment at an open edge such as a hem: the edge moves along its panel's grain, and so do the edges it continues into across seams (the whole hemline), so sewn sides stay matched. Linked mirror copies follow their source.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "EdgeId": {
+      "description": "Identifier of a edge, e.g. `edge:1`.",
+      "pattern": "^edge:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Move an open edge, and the line it continues across seams, along the\ngrain.",
+  "properties": {
+    "edge": {
+      "$ref": "#/$defs/EdgeId",
+      "description": "An open (unsewn) edge: a hem, a sleeve end, a neckline."
+    },
+    "mm": {
+      "description": "How far to move it (mm): positive makes the garment longer.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "edge",
+    "mm"
+  ],
+  "title": "EdgeLengthen",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `pin.add`
 
 Pin the cloth: the panel's cloth within 3 cm of `at` (pattern mm) is held still at `position` (3D metres) during the simulation. Returns the pin.
