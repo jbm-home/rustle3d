@@ -92,7 +92,8 @@ simulates in real time (≈ 14 ms per frame). The CLI simulates and renders
 headless (`r3d simulate`, `r3d render --view board|3d`), and the
 `simulate` action is available to scripts and MCP. Agents can `simulate` and
 look at the result with `render_3d` / `render_board` (PNG). The avatar
-collides through a narrow-band SDF. Next: self-collision and grab (M7).
+collides through a narrow-band SDF. Self-collision (particle repulsion) is in. Next:
+calibrate the fabric presets, then grab and pin (M7).
 - `r3d-geom`: constrained triangulation of panels at a target particle
   spacing, with matching vertex counts along future seams (moved from M2).
 - `r3d-sim`: `Solver` trait, XPBD small steps, strain-based stretch/shear,

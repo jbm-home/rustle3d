@@ -11,6 +11,7 @@
 pub mod collide;
 pub mod fabric;
 pub mod scene;
+mod selfcollide;
 pub mod solver;
 
 pub use fabric::{FabricParams, FabricPreset};

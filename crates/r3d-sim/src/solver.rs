@@ -10,7 +10,8 @@
 //!   discrete shells (Grinspun et al. 2003);
 //! - seams: zero-length distances whose compliance ramps down while the
 //!   garment closes;
-//! - contacts with the body and the ground, with friction.
+//! - contacts with the body and the ground, with friction;
+//! - self-collision between distant parts of the cloth (`selfcollide`).
 
 use std::collections::HashMap;
 
@@ -19,6 +20,7 @@ use rayon::prelude::*;
 
 use crate::collide::StaticMesh;
 use crate::scene::SimScene;
+use crate::selfcollide::SelfCollision;
 
 /// Substeps per frame.
 pub const SUBSTEPS: u32 = 30;
@@ -70,6 +72,7 @@ pub struct Solver {
     hinges: Vec<Hinge>,
     seams: Vec<[u32; 2]>,
     collider: Option<StaticMesh>,
+    self_collision: SelfCollision,
     ground: bool,
     time: f32,
     stats: StepStats,
@@ -94,8 +97,18 @@ impl Solver {
         let mut thickness = vec![0.001f32; n];
         let mut friction = vec![0.3f32; n];
         let mut damping = vec![0.1f32; n];
-        let mut membranes = Vec::with_capacity(scene.triangles.len());
-        let mut rest_area = Vec::with_capacity(scene.triangles.len());
+        // Triangles and seams on particles that do not exist are dropped,
+        // so particles can be indexed freely afterwards.
+        let valid = |v: &[u32]| v.iter().all(|i| (*i as usize) < n);
+        let triangles: Vec<_> = scene
+            .triangles
+            .iter()
+            .filter(|t| valid(&t.vertices))
+            .copied()
+            .collect();
+        let seams: Vec<[u32; 2]> = scene.seams.iter().filter(|s| valid(*s)).copied().collect();
+        let mut membranes = Vec::with_capacity(triangles.len());
+        let mut rest_area = Vec::with_capacity(triangles.len());
         let rest = |i: u32| {
             scene
                 .particles
@@ -103,7 +116,7 @@ impl Solver {
                 .map_or(Vec2::ZERO, |p| p.rest)
         };
 
-        for t in &scene.triangles {
+        for t in &triangles {
             let Some(fabric) = scene.fabrics.get(t.fabric as usize) else {
                 rest_area.push(0.0);
                 continue;
@@ -145,14 +158,14 @@ impl Solver {
         // Interior edges → hinges.
         let mut edges: HashMap<(u32, u32), (usize, u32, u32, u32)> = HashMap::new();
         let mut hinges = Vec::new();
-        for (ti, t) in scene.triangles.iter().enumerate() {
+        for (ti, t) in triangles.iter().enumerate() {
             let v = t.vertices;
             for k in 0..3 {
                 let (a, b, opp) = (v[k], v[(k + 1) % 3], v[(k + 2) % 3]);
                 let key = if a < b { (a, b) } else { (b, a) };
                 if let Some((tj, a0, b0, opp0)) = edges.remove(&key) {
                     let (Some(fabric_a), Some(fabric_b)) = (
-                        scene.fabrics.get(scene.triangles[tj].fabric as usize),
+                        scene.fabrics.get(triangles[tj].fabric as usize),
                         scene.fabrics.get(t.fabric as usize),
                     ) else {
                         continue;
@@ -190,7 +203,12 @@ impl Solver {
             damping,
             membranes,
             hinges,
-            seams: scene.seams,
+            self_collision: SelfCollision::new(
+                &scene.particles.iter().map(|p| p.rest).collect::<Vec<_>>(),
+                &triangles.iter().map(|t| t.vertices).collect::<Vec<_>>(),
+                &seams,
+            ),
+            seams,
             collider: scene.collider,
             ground: scene.ground,
             time: 0.0,
@@ -213,6 +231,7 @@ impl Solver {
     /// Advance by `frame_dt` seconds.
     pub fn step(&mut self, frame_dt: f32) {
         let h = frame_dt / SUBSTEPS as f32;
+        self.self_collision.refresh(&self.x, &self.w);
         for _ in 0..SUBSTEPS {
             self.substep(h);
             self.time += h;
@@ -261,6 +280,7 @@ impl Solver {
                 );
             }
         }
+        self.self_collision.solve(&mut self.x, &self.w);
         self.collide();
         for i in 0..self.x.len() {
             self.v[i] = (self.x[i] - self.prev[i]) / h;

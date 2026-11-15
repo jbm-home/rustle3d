@@ -234,3 +234,33 @@ fn results_do_not_depend_on_the_thread_count() {
     let many = run(make(), 0.5);
     assert_eq!(one.positions(), many.positions());
 }
+
+#[test]
+fn stacked_sheets_do_not_pass_through_each_other() {
+    let n = 15;
+    let lower = sheet(0.3, 0.3, n, Vec2::Y, |r| Vec3::new(r.x, 0.1, r.y));
+    let upper = sheet(0.3, 0.3, n, Vec2::Y, |r| {
+        Vec3::new(r.x + 0.02, 0.15, r.y + 0.02)
+    });
+    let offset = lower.particles.len() as u32;
+    let mut scene = lower;
+    scene.particles.extend(upper.particles);
+    scene
+        .triangles
+        .extend(upper.triangles.into_iter().map(|t| Triangle {
+            vertices: t.vertices.map(|v| v + offset),
+            ..t
+        }));
+    scene.ground = true;
+    let s = run(scene, 2.0);
+    let (low, high) = s.positions().split_at(offset as usize);
+    let top_of_lower = low.iter().map(|p| p.y).fold(f32::MIN, f32::max);
+    let bottom_of_upper = high.iter().map(|p| p.y).fold(f32::MAX, f32::min);
+    // Without self-collision both end flat on the ground at the same
+    // height. With it the upper sheet stays above: its particles (17 mm
+    // apart) nest in the gaps of the lower grid, about 8 mm higher.
+    assert!(
+        bottom_of_upper > top_of_lower + 0.005,
+        "upper {bottom_of_upper} vs lower {top_of_lower}"
+    );
+}

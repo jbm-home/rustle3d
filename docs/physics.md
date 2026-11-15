@@ -166,20 +166,33 @@ that flared pieces do not overlap before the seams close.
 
 ### Self-collision
 
-- **MVP**: particle–particle repulsion with a uniform **spatial hash** [8]
-  rebuilt every substep (or every few substeps), radius = `h`, skipping
-  pairs that are close in rest topology.
-- **Later**: vertex–triangle and edge–edge continuous collision [6], and
-  untangling for already-intersecting states.
+- **Current** (`selfcollide`): particle–particle repulsion [7]. Each
+  particle is a sphere of radius 0.4 × the median rest edge length (≈ 10 mm
+  at 25 mm spacing), so one layer cannot slip between another's particles.
+  Pairs closer than 4 radii *along the cloth* (bounded Dijkstra over mesh
+  edges and seams, at build time) never collide: they touch because the
+  cloth folds, and repelling them would stiffen ordinary folds. Candidate
+  pairs come from a spatial hash [8] once per frame (with a 1 cm margin
+  for motion) and are resolved every substep, sorted for determinism.
+- Consequences: layers stay apart by up to one particle diameter (less
+  where particles nest in each other's gaps, ≈ 8 mm on a regular grid), so
+  folds look slightly puffy; it costs ≈ 1 ms per frame on the skirt.
+- **Later**: vertex–triangle and edge–edge continuous collision [6] for
+  thin layers, and untangling for already-intersecting states.
 
 ### Known issues
 
 - **Real time with little headroom.** The three-piece skirt (1 700
-  particles, 30 substeps) steps in about 13 ms per 16.7 ms frame on an
+  particles, 30 substeps) steps in about 14 ms per 16.7 ms frame on an
   Apple M-series laptop, most of it the serial constraint solve. Next
-  speed-up: fewer substeps once convergence improves. With damping set to 0, kinetic + gravitational
-  energy decreases steadily: the solver is stable; a sheet hung by two
-  corners needs about ten seconds to come to rest.
+  speed-up: fewer substeps once convergence improves. With damping set to
+  0, kinetic + gravitational energy decreases steadily: the solver is
+  stable; a sheet hung by two corners needs about ten seconds to come to
+  rest.
+- **Fabric presets are not calibrated.** The A-line hem gathers inward
+  instead of flaring: the presets' bending values (§3) are first
+  estimates. Calibrate them against simple physical tests (cantilever
+  bending length, drape coefficient) before judging garment shapes.
 
 ## 6. Parallelism and determinism
 
