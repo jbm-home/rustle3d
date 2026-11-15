@@ -14,7 +14,8 @@ the avatar in real time, and I can pull on it to check how it hangs.
 - **Grab** (implemented): click and drag cloth in 3D to pull it (soft
   constraint on the cloth within 3 cm of the picked point, offsets kept),
   and release to let go. A click without moving only selects the piece
-  under the cursor; grabbing a paused simulation runs it. **Pin** (implemented): ⌥-click (Alt-click) pins the cloth
+  under the cursor; grabbing a paused simulation runs it.
+- **Pin** (implemented): ⌥-click (Alt-click) pins the cloth
   under the cursor where it is. Pins are document entities (`pin.add`,
   `pin.remove`, `pin.list`; saved, undoable, available to agents): the
   cloth within 3 cm of the point on the pattern is held at the pin's 3D
