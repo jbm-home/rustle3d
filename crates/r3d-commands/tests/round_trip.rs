@@ -89,6 +89,7 @@ fn every_command_round_trips() {
     let seam = seam.created[0].to_string();
     h.round_trip(json!({"type": "seam.flip", "seam": seam}));
     h.round_trip(json!({"type": "seam.take_in", "seam": seam, "mm": 6}));
+    h.round_trip(json!({"type": "garment.arrange"}));
     h.round_trip(json!({"type": "seam.remove", "seam": seam}));
     h.round_trip(json!({"type": "edge.lengthen", "edge": poly_edge, "mm": 12}));
     let pin = h.round_trip(json!({"type": "pin.add", "panel": panel,

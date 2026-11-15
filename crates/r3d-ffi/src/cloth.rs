@@ -76,6 +76,10 @@ pub(crate) struct Hit {
 pub(crate) const EDGE_PICK_PX: f64 = 10.0;
 pub(crate) const EDGE_PICK_MM: f64 = 20.0;
 
+/// Points of a line drawn on the garment are kept this far apart on the
+/// pattern (mm).
+pub(crate) const STROKE_STEP_MM: f64 = 8.0;
+
 /// Where a ray meets the cloth.
 pub(crate) struct ClothHit {
     pub panel: PanelId,

@@ -11,9 +11,12 @@ use crate::spec::{CommandOutput, CommandSpec, Described};
 #[serde(deny_unknown_fields)]
 pub struct SeamSideSpec {
     pub edge: EdgeId,
-    /// Walk this edge from its end point instead of its start.
-    #[serde(default)]
-    pub reversed: bool,
+    /// Walk this edge from its end point instead of its start. Omitted:
+    /// `false` for side `a`; for side `b`, the direction that walks both
+    /// sides the same way on the pattern (what sewing two panels laid side
+    /// by side needs).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reversed: Option<bool>,
 }
 
 /// Sew two edges together.
@@ -25,7 +28,7 @@ pub struct SeamAdd {
 }
 
 impl Described for SeamAdd {
-    const SUMMARY: &'static str = "Sew two whole edges together. Points are matched along the edges, start to start unless a side is reversed (use seam.flip if the seam looks twisted). An edge can be in one seam only. Returns the seam.";
+    const SUMMARY: &'static str = "Sew two whole edges together. Points are matched along the edges, start to start unless a side is reversed; leave b.reversed out to have it chosen (both sides walked the same way on the pattern), and use seam.flip if the seam looks twisted. An edge can be in one seam only. Returns the seam.";
 }
 
 impl CommandSpec for SeamAdd {
@@ -39,17 +42,31 @@ impl CommandSpec for SeamAdd {
         if self.a.edge == self.b.edge {
             return Err(CommandError::invalid("b", Invalid::SamePoint));
         }
+        let a_reversed = self.a.reversed.unwrap_or(false);
+        let b_reversed = match self.b.reversed {
+            Some(r) => r,
+            None => {
+                let p = tx.project();
+                let chord = |e: EdgeId| -> Option<r3d_geom::DVec2> {
+                    let edge = p.edge(e)?;
+                    Some(p.point(edge.end)?.pos - p.point(edge.start)?.pos)
+                };
+                let walked_a =
+                    chord(self.a.edge).unwrap_or_default() * if a_reversed { -1.0 } else { 1.0 };
+                chord(self.b.edge).unwrap_or_default().dot(walked_a) < 0.0
+            }
+        };
         let id = tx.new_seam_id();
         tx.put_seam(
             id,
             Seam {
                 a: SeamSide {
                     edge: self.a.edge,
-                    reversed: self.a.reversed,
+                    reversed: a_reversed,
                 },
                 b: SeamSide {
                     edge: self.b.edge,
-                    reversed: self.b.reversed,
+                    reversed: b_reversed,
                 },
             },
         );

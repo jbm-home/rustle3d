@@ -1114,7 +1114,7 @@ Remove an internal line.
 
 ### `seam.add`
 
-Sew two whole edges together. Points are matched along the edges, start to start unless a side is reversed (use seam.flip if the seam looks twisted). An edge can be in one seam only. Returns the seam.
+Sew two whole edges together. Points are matched along the edges, start to start unless a side is reversed; leave b.reversed out to have it chosen (both sides walked the same way on the pattern), and use seam.flip if the seam looks twisted. An edge can be in one seam only. Returns the seam.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -1134,9 +1134,11 @@ Sew two whole edges together. Points are matched along the edges, start to start
           "$ref": "#/$defs/EdgeId"
         },
         "reversed": {
-          "default": false,
-          "description": "Walk this edge from its end point instead of its start.",
-          "type": "boolean"
+          "description": "Walk this edge from its end point instead of its start. Omitted:\n`false` for side `a`; for side `b`, the direction that walks both\nsides the same way on the pattern (what sewing two panels laid side\nby side needs).",
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "required": [
@@ -1466,6 +1468,34 @@ Choose what the garment is made of: cotton, denim, jersey, silk or wool. Sets ho
     "fabric"
   ],
   "title": "GarmentSetFabric",
+  "type": "object"
+}
+```
+
+</details>
+
+### `garment.arrange`
+
+Place every panel around the body for the simulation, evenly spaced in the order the seams join them (a panel's right side continues into the next panel), tops at the avatar's waist unless top_cm is given. Re-run it after adding panels or seams.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Place every panel around the body.",
+  "properties": {
+    "top_cm": {
+      "description": "Height of the panels' tops (cm). Default: the avatar's waist.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "title": "GarmentArrange",
   "type": "object"
 }
 ```

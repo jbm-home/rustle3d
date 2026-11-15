@@ -67,7 +67,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 1577956414;
+  int get rustContentHash => -244393470;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -196,6 +196,22 @@ abstract class RustLibApi extends BaseApi {
   });
 
   SimStatus crateApiEngineEngineSimulationStatus({required Engine that});
+
+  String? crateApiEngineEngineStrokeEnd({required Engine that});
+
+  bool crateApiEngineEngineStrokeStart({
+    required Engine that,
+    required int view,
+    required double x,
+    required double y,
+  });
+
+  void crateApiEngineEngineStrokeTo({
+    required Engine that,
+    required int view,
+    required double x,
+    required double y,
+  });
 
   void crateApiEngineEngineUnpin({required Engine that, required String pin});
 
@@ -1048,6 +1064,106 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  String? crateApiEngineEngineStrokeEnd({required Engine that}) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEngine(
+            that,
+            serializer,
+          );
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 27)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_opt_String,
+          decodeErrorData: sse_decode_api_error,
+        ),
+        constMeta: kCrateApiEngineEngineStrokeEndConstMeta,
+        argValues: [that],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEngineEngineStrokeEndConstMeta =>
+      const TaskConstMeta(debugName: "Engine_stroke_end", argNames: ["that"]);
+
+  @override
+  bool crateApiEngineEngineStrokeStart({
+    required Engine that,
+    required int view,
+    required double x,
+    required double y,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEngine(
+            that,
+            serializer,
+          );
+          sse_encode_u_32(view, serializer);
+          sse_encode_f_64(x, serializer);
+          sse_encode_f_64(y, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 28)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_bool,
+          decodeErrorData: sse_decode_api_error,
+        ),
+        constMeta: kCrateApiEngineEngineStrokeStartConstMeta,
+        argValues: [that, view, x, y],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEngineEngineStrokeStartConstMeta =>
+      const TaskConstMeta(
+        debugName: "Engine_stroke_start",
+        argNames: ["that", "view", "x", "y"],
+      );
+
+  @override
+  void crateApiEngineEngineStrokeTo({
+    required Engine that,
+    required int view,
+    required double x,
+    required double y,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEngine(
+            that,
+            serializer,
+          );
+          sse_encode_u_32(view, serializer);
+          sse_encode_f_64(x, serializer);
+          sse_encode_f_64(y, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 29)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_api_error,
+        ),
+        constMeta: kCrateApiEngineEngineStrokeToConstMeta,
+        argValues: [that, view, x, y],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEngineEngineStrokeToConstMeta =>
+      const TaskConstMeta(
+        debugName: "Engine_stroke_to",
+        argNames: ["that", "view", "x", "y"],
+      );
+
+  @override
   void crateApiEngineEngineUnpin({required Engine that, required String pin}) {
     return handler.executeSync(
       SyncTask(
@@ -1058,7 +1174,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(pin, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 27)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -1094,7 +1210,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_f_64(x, serializer);
           sse_encode_f_64(y, serializer);
           sse_encode_f_64(amount, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 28)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 31)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -2091,6 +2207,32 @@ class EngineImpl extends RustOpaque implements Engine {
   /// The latest simulation state.
   SimStatus simulationStatus() =>
       RustLib.instance.api.crateApiEngineEngineSimulationStatus(that: this);
+
+  /// Finish the line: it becomes an internal line on the pattern
+  /// (`internal_line.add`; a style line, a pocket placement…). Returns the
+  /// new line's id, or `None` when the stroke was too short.
+  String? strokeEnd() =>
+      RustLib.instance.api.crateApiEngineEngineStrokeEnd(that: this);
+
+  /// Start drawing on the garment at (`x`, `y`) of a 3D view. Returns
+  /// whether the pointer is on the cloth.
+  bool strokeStart({required int view, required double x, required double y}) =>
+      RustLib.instance.api.crateApiEngineEngineStrokeStart(
+        that: this,
+        view: view,
+        x: x,
+        y: y,
+      );
+
+  /// Continue the line to (`x`, `y`): points on other pieces, or off the
+  /// cloth, are skipped.
+  void strokeTo({required int view, required double x, required double y}) =>
+      RustLib.instance.api.crateApiEngineEngineStrokeTo(
+        that: this,
+        view: view,
+        x: x,
+        y: y,
+      );
 
   /// Remove a pin (`pin.remove`); the cloth there moves again.
   void unpin({required String pin}) =>

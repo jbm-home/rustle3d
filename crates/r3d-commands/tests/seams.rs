@@ -106,3 +106,34 @@ fn colors_and_fabrics_are_validated() {
     let g = s.project().garments().values().next().unwrap();
     assert_eq!(g.fabric, r3d_core::Fabric::Silk);
 }
+
+#[test]
+fn seam_direction_is_chosen_when_left_out() {
+    let (mut s, a, b) = two_panels();
+    // Right side of A (going up) to left side of B (going down): reversed.
+    let out = run(
+        &mut s,
+        json!({"type": "seam.add", "a": {"edge": a[1]}, "b": {"edge": b[3]}}),
+    )
+    .unwrap();
+    let id: r3d_core::SeamId = out["created"][0].as_str().unwrap().parse().unwrap();
+    assert!(s.project().seams()[&id].b.reversed);
+}
+
+#[test]
+fn arrange_places_panels_around_in_seam_order() {
+    let mut s = Session::new(Project::new("t"));
+    let script =
+        r3d_commands::Script::parse(r3d_commands::templates::get("a-line-skirt").unwrap()).unwrap();
+    let results = script.run(|step| s.run_step(step)).unwrap();
+    let place = |s: &Session, k: usize| {
+        let id: r3d_core::PanelId = results[k]["created"][0].as_str().unwrap().parse().unwrap();
+        s.project().panel(id).unwrap().placement.unwrap()
+    };
+    let template = [2, 5, 10].map(|k| place(&s, k).angle_deg);
+    run(&mut s, json!({"type": "garment.arrange"})).unwrap();
+    // Same arrangement as the template's hand-written one: front, then the
+    // back sewn to its right side, then the mirrored back.
+    assert_eq!([2, 5, 10].map(|k| place(&s, k).angle_deg), template);
+    assert!((place(&s, 2).top_cm - 110.0).abs() < 1e-9);
+}

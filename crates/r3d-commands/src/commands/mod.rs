@@ -1,5 +1,6 @@
 //! Command implementations, grouped by entity.
 
+mod arrange;
 mod avatar;
 mod edge;
 mod garment;
@@ -14,6 +15,7 @@ mod project;
 mod seam;
 mod take_in;
 
+pub use arrange::*;
 pub use avatar::*;
 pub use edge::*;
 pub use garment::*;

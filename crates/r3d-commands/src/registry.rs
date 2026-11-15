@@ -147,6 +147,7 @@ command_registry! {
     "pin.add" => PinAdd,
     "pin.remove" => PinRemove,
     "garment.set_fabric" => GarmentSetFabric,
+    "garment.arrange" => GarmentArrange,
     "garment.set_color" => GarmentSetColor,
 }
 

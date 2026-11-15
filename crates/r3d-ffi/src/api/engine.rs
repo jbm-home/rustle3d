@@ -16,8 +16,8 @@ use r3d_commands::{Script, Step, Workspace, templates};
 use r3d_sim::Solver;
 
 use crate::cloth::{
-    Adjust, ClothHit, EDGE_PICK_MM, EDGE_PICK_PX, Held, Hit, PICK_PX, RESYNC_EVERY, SEAM_END, Sync,
-    Tool, ray_triangle,
+    Adjust, ClothHit, EDGE_PICK_MM, EDGE_PICK_PX, Held, Hit, PICK_PX, RESYNC_EVERY, SEAM_END,
+    STROKE_STEP_MM, Sync, Tool, ray_triangle,
 };
 use crate::sim::SimThread;
 use r3d_core::{Body, EdgeId, Fabric, Localizable, Message, PanelId};
@@ -210,6 +210,8 @@ pub struct Engine {
     sync: Mutex<Sync>,
     /// The cloth under the pointer since it went down, if any.
     held: Mutex<Option<Held>>,
+    /// A line being drawn on the garment: its panel and pattern points (mm).
+    stroke: Mutex<Option<(PanelId, Vec<r3d_geom::DVec2>)>>,
 }
 
 fn poisoned() -> ApiError {
@@ -241,6 +243,7 @@ impl Engine {
             form: Mutex::new(None),
             sync: Mutex::new(Sync::default()),
             held: Mutex::new(None),
+            stroke: Mutex::new(None),
         })
     }
 
@@ -657,6 +660,73 @@ impl Engine {
         *selected = panel.into_iter().collect();
         *self.selected_edge.lock().map_err(|_| poisoned())? = edge;
         Ok(selected.iter().map(ToString::to_string).collect())
+    }
+
+    /// Start drawing on the garment at (`x`, `y`) of a 3D view. Returns
+    /// whether the pointer is on the cloth.
+    #[frb(sync)]
+    pub fn stroke_start(&self, view: u32, x: f64, y: f64) -> Result<bool, ApiError> {
+        let slot = self.graphics()?;
+        let Some(v) = slot.as_ref().and_then(|g| g.views.get(&view)) else {
+            return Ok(false);
+        };
+        let hit = self.cloth_hit(v, &slot, x, y)?;
+        let started = hit.is_some();
+        *self.stroke.lock().map_err(|_| poisoned())? = hit.map(|h| (h.panel, vec![h.at]));
+        Ok(started)
+    }
+
+    /// Continue the line to (`x`, `y`): points on other pieces, or off the
+    /// cloth, are skipped.
+    #[frb(sync)]
+    pub fn stroke_to(&self, view: u32, x: f64, y: f64) -> Result<(), ApiError> {
+        let slot = self.graphics()?;
+        let Some(v) = slot.as_ref().and_then(|g| g.views.get(&view)) else {
+            return Ok(());
+        };
+        let hit = self.cloth_hit(v, &slot, x, y)?;
+        drop(slot);
+        if let Some(hit) = hit {
+            self.extend_stroke(hit)?;
+        }
+        Ok(())
+    }
+
+    fn extend_stroke(&self, hit: ClothHit) -> Result<(), ApiError> {
+        let mut stroke = self.stroke.lock().map_err(|_| poisoned())?;
+        if let Some((panel, points)) = stroke.as_mut()
+            && hit.panel == *panel
+            && points
+                .last()
+                .is_none_or(|p| p.distance(hit.at) >= STROKE_STEP_MM)
+        {
+            points.push(hit.at);
+        }
+        Ok(())
+    }
+
+    /// Finish the line: it becomes an internal line on the pattern
+    /// (`internal_line.add`; a style line, a pocket placement…). Returns the
+    /// new line's id, or `None` when the stroke was too short.
+    #[frb(sync)]
+    pub fn stroke_end(&self) -> Result<Option<String>, ApiError> {
+        let Some((panel, points)) = self.stroke.lock().map_err(|_| poisoned())?.take() else {
+            return Ok(None);
+        };
+        let (Some(start), true) = (points.first(), points.len() >= 2) else {
+            return Ok(None);
+        };
+        let segments: Vec<_> = points[1..]
+            .iter()
+            .map(|p| serde_json::json!({ "kind": "line", "to": [p.x, p.y] }))
+            .collect();
+        let step = serde_json::json!({
+            "type": "internal_line.add", "panel": panel,
+            "start": [start.x, start.y], "segments": segments,
+        });
+        let out: serde_json::Value = serde_json::from_str(&self.run(step.to_string())?)
+            .map_err(|e| ApiError::new("internal", e.to_string()))?;
+        Ok(out["created"][0].as_str().map(str::to_owned))
     }
 
     /// The edge picked within the selection (by a click near a border, in

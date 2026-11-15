@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `adjust_by`, `cloth_hit`, `edited`, `err`, `form`, `graphics`, `library`, `new`, `new`, `pick_cloth`, `poisoned`, `presets_file`, `rebuild`, `resync_if_due`, `rgba`, `selected`, `sim`, `to_theme`, `workspace`
+// These functions are ignored because they are not marked as `pub`: `adjust_by`, `cloth_hit`, `edited`, `err`, `extend_stroke`, `form`, `graphics`, `library`, `new`, `new`, `pick_cloth`, `poisoned`, `presets_file`, `rebuild`, `resync_if_due`, `rgba`, `selected`, `sim`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
@@ -137,6 +137,19 @@ abstract class Engine implements RustOpaqueInterface {
 
   /// The latest simulation state.
   SimStatus simulationStatus();
+
+  /// Finish the line: it becomes an internal line on the pattern
+  /// (`internal_line.add`; a style line, a pocket placement…). Returns the
+  /// new line's id, or `None` when the stroke was too short.
+  String? strokeEnd();
+
+  /// Start drawing on the garment at (`x`, `y`) of a 3D view. Returns
+  /// whether the pointer is on the cloth.
+  bool strokeStart({required int view, required double x, required double y});
+
+  /// Continue the line to (`x`, `y`): points on other pieces, or off the
+  /// cloth, are skipped.
+  void strokeTo({required int view, required double x, required double y});
 
   /// Remove a pin (`pin.remove`); the cloth there moves again.
   void unpin({required String pin});
