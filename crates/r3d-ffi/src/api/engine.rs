@@ -15,9 +15,9 @@ use r3d_commands::drape::{self, Drape, Form};
 use r3d_commands::{Script, Step, Workspace, templates};
 use r3d_sim::Solver;
 
-use crate::cloth::{Held, Hit, PICK_PX, RESYNC_EVERY, Sync};
+use crate::cloth::{Held, Hit, PICK_PX, RESYNC_EVERY, Sync, Tool};
 use crate::sim::SimThread;
-use r3d_core::{Body, Fabric, Localizable, Message, PanelId};
+use r3d_core::{Body, EdgeId, Fabric, Localizable, Message, PanelId};
 use r3d_render::board::BoardView;
 use r3d_render::theme::PIECE_COLORS;
 use r3d_render::{
@@ -625,7 +625,7 @@ impl Engine {
             }
             // The piece under the cursor, if any.
             ViewKind::Garment => {
-                let hit = self.pick_cloth(v, &slot, x, y)?;
+                let hit = self.pick_cloth(v, &slot, x, y, &|_| true)?;
                 selected.extend(hit.and_then(|h| h.panel));
             }
         }
@@ -640,6 +640,7 @@ impl Engine {
         graphics: &Option<Graphics>,
         x: f64,
         y: f64,
+        only: &dyn Fn(usize) -> bool,
     ) -> Result<Option<Hit>, ApiError> {
         let Some(g) = graphics.as_ref() else {
             return Ok(None);
@@ -655,6 +656,7 @@ impl Engine {
         let best = positions
             .iter()
             .enumerate()
+            .filter(|(i, _)| only(*i))
             .filter_map(|(i, p)| {
                 let (pixel, depth) = g.camera.project(*p, v.width, v.height)?;
                 (pixel.distance(cursor) < PICK_PX).then_some((i, *p, depth))
@@ -679,10 +681,27 @@ impl Engine {
     }
 
     /// Pointer down at (`x`, `y`): in the 3D view, on the cloth, get ready
-    /// to pull it. Returns whether the pointer is on the cloth (then moves
+    /// to drag it. With `lengthen` (⇧ held) the drag moves the open edge
+    /// under the cursor (a hem) in the pattern; otherwise it pulls the
+    /// cloth. Returns whether there is something to drag (then moves
     /// should call `pull`); otherwise drags orbit as usual.
     #[frb(sync)]
-    pub fn press(&self, view: u32, x: f64, y: f64) -> Result<bool, ApiError> {
+    pub fn press(&self, view: u32, x: f64, y: f64, lengthen: bool) -> Result<bool, ApiError> {
+        // Particles on open (unsewn) edges, for the Length tool.
+        let open: HashMap<usize, EdgeId> = if lengthen {
+            let ws = self.workspace()?;
+            let project = ws.session().project();
+            self.cloth
+                .lock()
+                .map_err(|_| poisoned())?
+                .iter()
+                .flat_map(|d| &d.edges)
+                .filter(|(e, _)| project.seam_of(**e).is_none())
+                .flat_map(|(e, particles)| particles.iter().map(move |i| (*i, *e)))
+                .collect()
+        } else {
+            HashMap::new()
+        };
         let slot = self.graphics()?;
         let Some(v) = slot.as_ref().and_then(|g| g.views.get(&view)) else {
             return Ok(false);
@@ -690,24 +709,39 @@ impl Engine {
         if v.kind != ViewKind::Garment {
             return Ok(false);
         }
-        let Some(hit) = self.pick_cloth(v, &slot, x, y)? else {
+        let only = |i: usize| !lengthen || open.contains_key(&i);
+        let Some(hit) = self.pick_cloth(v, &slot, x, y, &only)? else {
             return Ok(false);
+        };
+        drop(slot);
+        let tool = match open.get(&hit.particle) {
+            Some(edge) => {
+                // Show the panel being changed in both views.
+                *self.selected()? = hit.panel.into_iter().collect();
+                Tool::Length {
+                    edge: *edge,
+                    applied: 0.0,
+                }
+            }
+            None => Tool::Pull { pulling: false },
         };
         *self.held.lock().map_err(|_| poisoned())? = Some(Held {
             particle: hit.particle,
             anchor: hit.position,
-            pulling: false,
+            tool,
         });
         Ok(true)
     }
 
-    /// Pointer moved to (`x`, `y`) after `press` on the cloth: pull it
-    /// there, on the plane facing the camera through the grabbed point. The
-    /// simulation runs while the cloth is held.
+    /// Pointer moved to (`x`, `y`) after `press`: pull the cloth there (on
+    /// the plane facing the camera through the grabbed point; the
+    /// simulation runs while it is held), or, with the Length tool, move
+    /// the edge by the vertical distance dragged (down = longer). Returns
+    /// the length change so far (mm) for the Length tool.
     #[frb(sync)]
-    pub fn pull(&self, view: u32, x: f64, y: f64) -> Result<(), ApiError> {
+    pub fn pull(&self, view: u32, x: f64, y: f64) -> Result<Option<f64>, ApiError> {
         let Some(held) = *self.held.lock().map_err(|_| poisoned())? else {
-            return Ok(());
+            return Ok(None);
         };
         let anchor = held.anchor;
         let slot = self.graphics()?;
@@ -715,26 +749,49 @@ impl Engine {
             slot.as_ref(),
             slot.as_ref().and_then(|g| g.views.get(&view)),
         ) else {
-            return Ok(());
+            return Ok(None);
         };
         let (origin, dir) = g.camera.ray(x as f32, y as f32, v.width, v.height);
         let normal = g.camera.forward();
         let facing = dir.dot(normal);
         if facing.abs() < 1e-6 {
-            return Ok(());
+            return Ok(None);
         }
         let target = origin + dir * ((anchor - origin).dot(normal) / facing);
         drop(slot);
-        if let Some(thread) = self.sim()?.as_ref() {
-            if !held.pulling {
-                thread.grab(held.particle);
+        let tool = match held.tool {
+            Tool::Pull { pulling } => {
+                if let Some(thread) = self.sim()?.as_ref() {
+                    if !pulling {
+                        thread.grab(held.particle);
+                    }
+                    thread.grab_to(target);
+                }
+                Tool::Pull { pulling: true }
             }
-            thread.grab_to(target);
-        }
+            Tool::Length { edge, applied } => {
+                let total = (f64::from(anchor.y - target.y) * 1000.0).round();
+                let mut now = applied;
+                if total != applied {
+                    let step = serde_json::json!({
+                        "type": "edge.lengthen", "edge": edge, "mm": total - applied,
+                    });
+                    // Past a limit (a hem crossing the waist) the edge
+                    // simply stops following.
+                    if self.run(step.to_string()).is_ok() {
+                        now = total;
+                    }
+                }
+                Tool::Length { edge, applied: now }
+            }
+        };
         if let Some(h) = self.held.lock().map_err(|_| poisoned())?.as_mut() {
-            h.pulling = true;
+            h.tool = tool;
         }
-        Ok(())
+        Ok(match tool {
+            Tool::Length { applied, .. } => Some(applied),
+            Tool::Pull { .. } => None,
+        })
     }
 
     /// ⌥-click at (`x`, `y`) in the 3D view: pin the cloth there, where it
@@ -747,7 +804,7 @@ impl Engine {
         let Some(v) = slot.as_ref().and_then(|g| g.views.get(&view)) else {
             return Ok(None);
         };
-        let Some(hit) = self.pick_cloth(v, &slot, x, y)? else {
+        let Some(hit) = self.pick_cloth(v, &slot, x, y, &|_| true)? else {
             return Ok(None);
         };
         drop(slot);
@@ -790,7 +847,7 @@ impl Engine {
             .lock()
             .map_err(|_| poisoned())?
             .take()
-            .is_some_and(|h| h.pulling);
+            .is_some_and(|h| matches!(h.tool, Tool::Pull { pulling: true }));
         // (No let-chain: the bridge macro parses this function as Rust 2021.)
         if was_pulling {
             if let Some(thread) = self.sim()?.as_ref() {

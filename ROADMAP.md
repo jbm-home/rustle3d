@@ -128,7 +128,8 @@ Moved to later milestones:
 
 Status (2026-11-15): live re-simulation is in: pattern, fabric and pin
 edits reach the running drape within 100 ms, positions carried over
-(`drape::carry_over`), no restart. Next: the 3D Length tool.
+(`drape::carry_over`), no restart. The Length tool is in: ⇧-drag a hem in 3D (`edge.lengthen`, the
+whole hemline moves along the grain). Next: Fit (take in / let out a seam).
 - From M4–M7: live re-simulation after pattern edits (positions carried
   over, so editing in 2D updates the drape without a restart); sewing and
   arranging in the UI (seam tool with mismatch badges and direction

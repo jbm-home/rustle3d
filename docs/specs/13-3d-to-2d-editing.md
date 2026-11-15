@@ -12,8 +12,12 @@ point to move.
   to pattern coordinates (panel, position in the 2D rest shape) and turned
   into ordinary pattern commands. The cloth then re-drapes.
 - Tools:
-  - **Length**: drag a hem, sleeve end or neckline in 3D; the matching
-    pattern edge moves along the grain.
+  - **Length** (implemented): ⇧-drag a hem, sleeve end or neckline in 3D
+    (any open edge); dragging down lengthens. The command `edge.lengthen`
+    moves the edge along its panel's grain and continues across seams, so
+    the whole hemline moves and seam sides stay matched; the drag is one
+    undo step, a label shows the change next to the cursor, the panel is
+    selected in both views and the drape follows live.
   - **Fit**: pinch across a seam to take in, or spread to let out. Both
     sides of the seam move equally, so their lengths stay matched.
   - **Draw on garment**: a line drawn on the 3D surface becomes an internal

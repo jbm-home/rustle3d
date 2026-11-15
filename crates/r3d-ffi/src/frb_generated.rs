@@ -529,6 +529,7 @@ fn wire__crate__api__engine__Engine_press_impl(
             let api_view = <u32>::sse_decode(&mut deserializer);
             let api_x = <f64>::sse_decode(&mut deserializer);
             let api_y = <f64>::sse_decode(&mut deserializer);
+            let api_lengthen = <bool>::sse_decode(&mut deserializer);
             deserializer.end();
             transform_result_sse::<_, crate::api::engine::ApiError>((move || {
                 let mut api_that_guard = None;
@@ -545,8 +546,13 @@ fn wire__crate__api__engine__Engine_press_impl(
                     }
                 }
                 let api_that_guard = api_that_guard.unwrap();
-                let output_ok =
-                    crate::api::engine::Engine::press(&*api_that_guard, api_view, api_x, api_y)?;
+                let output_ok = crate::api::engine::Engine::press(
+                    &*api_that_guard,
+                    api_view,
+                    api_x,
+                    api_y,
+                    api_lengthen,
+                )?;
                 std::result::Result::Ok(output_ok)
             })())
         },
@@ -1512,6 +1518,17 @@ impl SseDecode for Option<String> {
     }
 }
 
+impl SseDecode for Option<f64> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<f64>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for (String, String) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1905,6 +1922,16 @@ impl SseEncode for Option<String> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <String>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<f64> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <f64>::sse_encode(value, serializer);
         }
     }
 }

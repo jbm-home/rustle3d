@@ -59,14 +59,23 @@ abstract class Engine implements RustOpaqueInterface {
   String? pinAt({required int view, required double x, required double y});
 
   /// Pointer down at (`x`, `y`): in the 3D view, on the cloth, get ready
-  /// to pull it. Returns whether the pointer is on the cloth (then moves
+  /// to drag it. With `lengthen` (⇧ held) the drag moves the open edge
+  /// under the cursor (a hem) in the pattern; otherwise it pulls the
+  /// cloth. Returns whether there is something to drag (then moves
   /// should call `pull`); otherwise drags orbit as usual.
-  bool press({required int view, required double x, required double y});
+  bool press({
+    required int view,
+    required double x,
+    required double y,
+    required bool lengthen,
+  });
 
-  /// Pointer moved to (`x`, `y`) after `press` on the cloth: pull it
-  /// there, on the plane facing the camera through the grabbed point. The
-  /// simulation runs while the cloth is held.
-  void pull({required int view, required double x, required double y});
+  /// Pointer moved to (`x`, `y`) after `press`: pull the cloth there (on
+  /// the plane facing the camera through the grabbed point; the
+  /// simulation runs while it is held), or, with the Length tool, move
+  /// the edge by the vertical distance dragged (down = longer). Returns
+  /// the length change so far (mm) for the Length tool.
+  double? pull({required int view, required double x, required double y});
 
   /// Pointer up: let go of the cloth.
   void release();

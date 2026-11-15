@@ -7,6 +7,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../design/tokens.dart';
 import '../rust/api/engine.dart';
 
 const _channel = MethodChannel('dev.rustle3d/texture');
@@ -51,6 +52,11 @@ class _RustViewState extends State<RustView>
   /// The pointer holds the cloth (3D view): moves pull it instead of
   /// orbiting.
   bool _holding = false;
+
+  /// While lengthening a hem in 3D: the change so far (mm) and where to
+  /// show it.
+  double? _lengthMm;
+  Offset _labelAt = Offset.zero;
 
   @override
   void initState() {
@@ -149,6 +155,8 @@ class _RustViewState extends State<RustView>
                   view: view,
                   x: e.localPosition.dx * _ratio,
                   y: e.localPosition.dy * _ratio,
+                  // ⇧-drag on a hem lengthens the garment.
+                  lengthen: HardwareKeyboard.instance.isShiftPressed,
                 );
           },
           onPointerMove: (e) {
@@ -156,11 +164,17 @@ class _RustViewState extends State<RustView>
             if (view == null) return;
             if ((e.localPosition - _downAt).distance > 3) _dragged = true;
             if (_holding) {
-              widget.engine.pull(
+              final mm = widget.engine.pull(
                 view: view,
                 x: e.localPosition.dx * _ratio,
                 y: e.localPosition.dy * _ratio,
               );
+              if (mm != null) {
+                setState(() {
+                  _lengthMm = mm;
+                  _labelAt = e.localPosition;
+                });
+              }
               return;
             }
             widget.engine.drag(
@@ -173,6 +187,11 @@ class _RustViewState extends State<RustView>
             if (_holding) {
               _holding = false;
               widget.engine.release();
+              if (_lengthMm != null) {
+                setState(() => _lengthMm = null);
+                // The pattern changed: let the shell refresh.
+                widget.onSelection?.call(widget.engine.selection());
+              }
             }
             final view = _viewId;
             if (view == null || _dragged) return;
@@ -193,15 +212,57 @@ class _RustViewState extends State<RustView>
               amount: -e.scrollDelta.dy / 120,
             );
           },
-          child: AnimatedOpacity(
-            opacity: texture == null ? 0 : 1,
-            duration: const Duration(milliseconds: 220),
-            child: texture == null
-                ? const SizedBox.expand()
-                : Texture(textureId: texture),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: AnimatedOpacity(
+                  opacity: texture == null ? 0 : 1,
+                  duration: const Duration(milliseconds: 220),
+                  child: texture == null
+                      ? const SizedBox.expand()
+                      : Texture(textureId: texture),
+                ),
+              ),
+              if (_lengthMm case final mm?)
+                Positioned(
+                  left: _labelAt.dx + 14,
+                  top: _labelAt.dy - 30,
+                  child: _LengthLabel(mm: mm),
+                ),
+            ],
           ),
         );
       },
+    );
+  }
+}
+
+/// "+30 mm" next to the cursor while lengthening in 3D.
+class _LengthLabel extends StatelessWidget {
+  const _LengthLabel({required this.mm});
+
+  final double mm;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final sign = mm > 0 ? '+' : (mm < 0 ? '−' : '');
+    return IgnorePointer(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: p.text.withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          '${mm > 0 ? 'Longer' : 'Shorter'} $sign${mm.abs().toStringAsFixed(0)} mm',
+          style: ts(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: p.surface,
+          ),
+        ),
+      ),
     );
   }
 }

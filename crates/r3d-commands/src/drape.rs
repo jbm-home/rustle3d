@@ -43,6 +43,8 @@ pub struct Drape {
     pub pieces: Vec<Piece>,
     /// The particles each pin holds.
     pub pins: Vec<(PinId, Vec<usize>)>,
+    /// The particles along each simulated contour edge, start to end.
+    pub edges: BTreeMap<EdgeId, Vec<usize>>,
 }
 
 /// The particles and triangles of one panel, to draw it on its own.
@@ -334,10 +336,15 @@ pub fn build(
         }
         pins.push((*id, held));
     }
+    let edges = edge_vertices
+        .into_iter()
+        .map(|(e, v)| (e, v.into_iter().map(|i| i as usize).collect()))
+        .collect();
     Ok(Drape {
         scene,
         pieces,
         pins,
+        edges,
     })
 }
 

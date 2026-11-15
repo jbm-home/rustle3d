@@ -78,5 +78,36 @@ void main() {
 
     engine.unpin(pin: pins.first['id'] as String);
     expect(jsonDecode(engine.run(stepJson: '{"type":"pin.list"}')), isEmpty);
+
+    // ⇧-drag down on the hem lengthens the skirt in the pattern, as one
+    // undoable step. The hem is somewhere below the centre of the view.
+    double frontBottom() {
+      final summary = jsonDecode(
+        engine.run(stepJson: '{"type":"project.summary"}'),
+      );
+      final front = (summary['panels'] as List).firstWhere(
+        (p) => p['name'] == 'Front',
+      );
+      return (front['bbox']['min'][1] as num).toDouble();
+    }
+
+    final before = frontBottom();
+    for (var dy = 60.0; dy < 260 && frontBottom() == before; dy += 8) {
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      final drag = await tester.startGesture(
+        centre + Offset(0, dy),
+        kind: PointerDeviceKind.mouse,
+      );
+      for (var i = 0; i < 8; i++) {
+        await drag.moveBy(const Offset(0, 5));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await drag.up();
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.pump();
+    }
+    expect(frontBottom(), lessThan(before - 20));
+    engine.run(stepJson: '{"type":"history.undo"}');
+    expect(frontBottom(), before);
   });
 }
