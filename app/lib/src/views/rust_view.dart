@@ -44,6 +44,10 @@ class _RustViewState extends State<RustView>
   Offset _downAt = Offset.zero;
   bool _dragged = false;
 
+  /// The pointer holds the cloth (3D view): moves pull it instead of
+  /// orbiting.
+  bool _holding = false;
+
   @override
   void initState() {
     super.initState();
@@ -121,11 +125,27 @@ class _RustViewState extends State<RustView>
           onPointerDown: (e) {
             _downAt = e.localPosition;
             _dragged = false;
+            final view = _viewId;
+            _holding =
+                view != null &&
+                widget.engine.press(
+                  view: view,
+                  x: e.localPosition.dx * _ratio,
+                  y: e.localPosition.dy * _ratio,
+                );
           },
           onPointerMove: (e) {
             final view = _viewId;
             if (view == null) return;
             if ((e.localPosition - _downAt).distance > 3) _dragged = true;
+            if (_holding) {
+              widget.engine.pull(
+                view: view,
+                x: e.localPosition.dx * _ratio,
+                y: e.localPosition.dy * _ratio,
+              );
+              return;
+            }
             widget.engine.drag(
               view: view,
               dx: e.delta.dx * _ratio,
@@ -133,6 +153,10 @@ class _RustViewState extends State<RustView>
             );
           },
           onPointerUp: (e) {
+            if (_holding) {
+              _holding = false;
+              widget.engine.release();
+            }
             final view = _viewId;
             if (view == null || _dragged) return;
             final selection = widget.engine.click(

@@ -18,6 +18,11 @@ enum Control {
     /// Replace the solver (paused) with this one.
     Load(Box<Solver>),
     Run(bool),
+    /// Hold the cloth around a particle (and run).
+    Grab(usize),
+    /// Move the held cloth's target.
+    GrabTo(Vec3),
+    Release,
     Clear,
     Stop,
 }
@@ -57,16 +62,52 @@ impl SimThread {
         })
     }
 
+    /// Update the published state right away, so callers see the effect
+    /// of a control before the thread gets to it.
+    fn publish_now(&self, update: impl FnOnce(&mut Published)) {
+        update(
+            &mut self
+                .published
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner),
+        );
+    }
+
     /// Load a new solver, paused, replacing the current one.
     pub fn load(&self, solver: Solver) {
+        let positions = solver.positions().to_vec();
+        self.publish_now(|p| {
+            *p = Published {
+                positions,
+                loaded: true,
+                ..Published::default()
+            }
+        });
         let _ = self.tx.send(Control::Load(Box::new(solver)));
     }
 
     pub fn set_running(&self, running: bool) {
+        self.publish_now(|p| p.running = running && p.loaded);
         let _ = self.tx.send(Control::Run(running));
     }
 
+    /// Hold the cloth around `particle` and run the simulation, so it
+    /// responds.
+    pub fn grab(&self, particle: usize) {
+        self.publish_now(|p| p.running = p.loaded);
+        let _ = self.tx.send(Control::Grab(particle));
+    }
+
+    pub fn grab_to(&self, target: Vec3) {
+        let _ = self.tx.send(Control::GrabTo(target));
+    }
+
+    pub fn release(&self) {
+        let _ = self.tx.send(Control::Release);
+    }
+
     pub fn clear(&self) {
+        self.publish_now(|p| *p = Published::default());
         let _ = self.tx.send(Control::Clear);
     }
 
@@ -133,6 +174,25 @@ fn run(rx: &Receiver<Control>, out: &Mutex<Published>) {
             Some(Control::Run(r)) => {
                 running = r;
                 next = Instant::now();
+            }
+            Some(Control::Grab(i)) => {
+                if let Some(s) = solver.as_mut() {
+                    s.grab(i);
+                    if !running {
+                        running = true;
+                        next = Instant::now();
+                    }
+                }
+            }
+            Some(Control::GrabTo(target)) => {
+                if let Some(s) = solver.as_mut() {
+                    s.move_grab(target);
+                }
+            }
+            Some(Control::Release) => {
+                if let Some(s) = solver.as_mut() {
+                    s.release();
+                }
             }
             Some(Control::Clear) => {
                 solver = None;

@@ -276,7 +276,7 @@ class _ShellState extends State<Shell> {
               ),
               _StatusBar(
                 hint: _selection.isEmpty
-                    ? 'Click a panel to select it · drag to pan · scroll to zoom · R adds a rectangle'
+                    ? 'Click a piece to select it · drag the 3D cloth to pull it · scroll to zoom · R adds a rectangle'
                     : 'Adjust the selection in the inspector · ⌫ deletes · ⌘Z undoes',
                 stats:
                     '${_simStats()}Rust render · pattern ${_boardMs.toStringAsFixed(1)} ms · '

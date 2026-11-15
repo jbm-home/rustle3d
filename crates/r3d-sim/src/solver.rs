@@ -11,7 +11,9 @@
 //! - seams: zero-length distances whose compliance ramps down while the
 //!   garment closes;
 //! - contacts with the body and the ground, with friction;
-//! - self-collision between distant parts of the cloth (`selfcollide`).
+//! - self-collision between distant parts of the cloth (`selfcollide`);
+//! - grab: the user pulls a patch of cloth towards a moving target with a
+//!   soft zero-length constraint per particle (offsets kept).
 
 use std::collections::HashMap;
 
@@ -32,6 +34,18 @@ const GRAVITY: Vec3 = Vec3::new(0.0, -9.81, 0.0);
 /// surface, and so are the avatar's: without this margin the body pokes
 /// through between cloth vertices.
 const SKIN: f32 = 0.0025;
+/// Particles within this distance of the grabbed one move with it (m).
+pub const GRAB_RADIUS: f32 = 0.03;
+/// Compliance of the grab (m/N): firm, but the cloth can still resist.
+const GRAB_COMPLIANCE: f32 = 1e-4;
+
+/// A patch of cloth held by the user.
+#[derive(Debug, Clone)]
+struct Grab {
+    /// Particles and their offsets from the target.
+    particles: Vec<(usize, Vec3)>,
+    target: Vec3,
+}
 
 struct Membrane {
     v: [u32; 3],
@@ -73,6 +87,7 @@ pub struct Solver {
     seams: Vec<[u32; 2]>,
     collider: Option<StaticMesh>,
     self_collision: SelfCollision,
+    grab: Option<Grab>,
     ground: bool,
     time: f32,
     stats: StepStats,
@@ -209,6 +224,7 @@ impl Solver {
                 &seams,
             ),
             seams,
+            grab: None,
             collider: scene.collider,
             ground: scene.ground,
             time: 0.0,
@@ -226,6 +242,37 @@ impl Solver {
 
     pub fn stats(&self) -> StepStats {
         self.stats
+    }
+
+    /// Hold the cloth around particle `index` (and its neighbours within
+    /// [`GRAB_RADIUS`]) where it is now; [`Solver::move_grab`] then pulls
+    /// it. Pinned particles are not held.
+    pub fn grab(&mut self, index: usize) {
+        let Some(&center) = self.x.get(index) else {
+            return;
+        };
+        let particles = self
+            .x
+            .iter()
+            .enumerate()
+            .filter(|(i, p)| self.w[*i] > 0.0 && p.distance(center) < GRAB_RADIUS)
+            .map(|(i, p)| (i, *p - center))
+            .collect();
+        self.grab = Some(Grab {
+            particles,
+            target: center,
+        });
+    }
+
+    /// Move the held patch's target (its grabbed particle) to `target`.
+    pub fn move_grab(&mut self, target: Vec3) {
+        if let Some(g) = &mut self.grab {
+            g.target = target;
+        }
+    }
+
+    pub fn release(&mut self) {
+        self.grab = None;
     }
 
     /// Advance by `frame_dt` seconds.
@@ -281,6 +328,15 @@ impl Solver {
             }
         }
         self.self_collision.solve(&mut self.x, &self.w);
+        if let Some(g) = &self.grab {
+            let alpha = GRAB_COMPLIANCE / h2;
+            for (i, offset) in &g.particles {
+                let w = self.w[*i];
+                // XPBD on |x − goal| = 0 with a single moving particle.
+                let pull = (g.target + *offset - self.x[*i]) * (w / (w + alpha));
+                self.x[*i] += pull;
+            }
+        }
         self.collide();
         for i in 0..self.x.len() {
             self.v[i] = (self.x[i] - self.prev[i]) / h;

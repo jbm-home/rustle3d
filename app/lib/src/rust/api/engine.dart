@@ -7,9 +7,9 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `avatar_mesh`, `err`, `graphics`, `library`, `new`, `new`, `poisoned`, `presets_file`, `rgba`, `selected`, `sim`, `to_theme`, `workspace`
-// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `ClothPart`, `Graphics`, `View`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
+// These functions are ignored because they are not marked as `pub`: `avatar_mesh`, `err`, `graphics`, `library`, `new`, `new`, `pick_cloth`, `poisoned`, `presets_file`, `rgba`, `selected`, `sim`, `to_theme`, `workspace`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `Held`, `Hit`, `View`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Engine>>
 abstract class Engine implements RustOpaqueInterface {
@@ -51,6 +51,19 @@ abstract class Engine implements RustOpaqueInterface {
   /// Open the project folder at `path`, creating it if it does not exist.
   static Engine open({required String path}) =>
       RustLib.instance.api.crateApiEngineEngineOpen(path: path);
+
+  /// Pointer down at (`x`, `y`): in the 3D view, on the cloth, get ready
+  /// to pull it. Returns whether the pointer is on the cloth (then moves
+  /// should call `pull`); otherwise drags orbit as usual.
+  bool press({required int view, required double x, required double y});
+
+  /// Pointer moved to (`x`, `y`) after `press` on the cloth: pull it
+  /// there, on the plane facing the camera through the grabbed point. The
+  /// simulation runs while the cloth is held.
+  void pull({required int view, required double x, required double y});
+
+  /// Pointer up: let go of the cloth.
+  void release();
 
   /// Render a view and wait until the GPU is done, so the UI never shows
   /// a half-drawn frame. Returns the CPU + GPU time in milliseconds.

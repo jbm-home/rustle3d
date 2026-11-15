@@ -264,3 +264,29 @@ fn stacked_sheets_do_not_pass_through_each_other() {
         "upper {bottom_of_upper} vs lower {top_of_lower}"
     );
 }
+
+#[test]
+fn grabbed_cloth_follows_the_hand_and_falls_when_released() {
+    let n = 15;
+    let mut scene = sheet(0.3, 0.3, n, Vec2::Y, |r| Vec3::new(r.x, 0.0, r.y));
+    scene.ground = true;
+    let mut s = run(scene, 0.5);
+    let corner = n * n - 1;
+    let start = s.positions()[corner];
+    s.grab(corner);
+    let hand = start + Vec3::new(0.0, 0.3, 0.0);
+    s.move_grab(hand);
+    for _ in 0..60 {
+        s.step(1.0 / 60.0);
+    }
+    let held = s.positions()[corner];
+    assert!(
+        held.distance(hand) < 0.03,
+        "corner at {held}, hand at {hand}"
+    );
+    s.release();
+    for _ in 0..60 {
+        s.step(1.0 / 60.0);
+    }
+    assert!(s.positions()[corner].y < 0.05, "did not fall back");
+}

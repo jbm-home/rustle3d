@@ -176,6 +176,26 @@ pub struct FabricSwatch {
     pub argb: u32,
 }
 
+/// Pick radius on the cloth (physical pixels).
+const PICK_PX: f32 = 24.0;
+
+/// Cloth under a pressed pointer. The grab starts on the first move, so a
+/// simple click only selects.
+#[derive(Clone, Copy)]
+struct Held {
+    particle: usize,
+    /// Where it was when pressed: the pulling plane goes through it.
+    anchor: glam::Vec3,
+    pulling: bool,
+}
+
+/// A cloth particle under the cursor.
+struct Hit {
+    particle: usize,
+    position: glam::Vec3,
+    panel: Option<PanelId>,
+}
+
 /// State of the cloth simulation, for the UI.
 #[derive(Debug, Clone)]
 pub struct SimStatus {
@@ -204,6 +224,8 @@ pub struct Engine {
     sim: Mutex<Option<SimThread>>,
     /// How to draw the loaded simulation.
     cloth: Mutex<Vec<Piece>>,
+    /// The cloth under the pointer since it went down, if any.
+    held: Mutex<Option<Held>>,
 }
 
 fn poisoned() -> ApiError {
@@ -231,6 +253,7 @@ impl Engine {
             library_dir: Mutex::new(None),
             sim: Mutex::new(None),
             cloth: Mutex::new(Vec::new()),
+            held: Mutex::new(None),
         })
     }
 
@@ -554,11 +577,135 @@ impl Engine {
                 let p = board_view.to_board(x, y, v.width, v.height);
                 selected.extend(scene.panel_at(p));
             }
-            // Picking on the real garment comes with the solver (M8 tools);
-            // for now a click selects the whole garment.
-            ViewKind::Garment => selected.extend(project.panels().keys().copied()),
+            // The piece under the cursor, if any.
+            ViewKind::Garment => {
+                let hit = self.pick_cloth(v, &slot, x, y)?;
+                selected.extend(hit.and_then(|h| h.panel));
+            }
         }
         Ok(selected.iter().map(ToString::to_string).collect())
+    }
+
+    /// The cloth particle under pixel (`x`, `y`) of a 3D view: the front
+    /// one within `PICK_PX` pixels.
+    fn pick_cloth(
+        &self,
+        v: &View,
+        graphics: &Option<Graphics>,
+        x: f64,
+        y: f64,
+    ) -> Result<Option<Hit>, ApiError> {
+        let Some(g) = graphics.as_ref() else {
+            return Ok(None);
+        };
+        let positions = self
+            .sim
+            .lock()
+            .map_err(|_| poisoned())?
+            .as_ref()
+            .map(|t| t.latest().positions)
+            .unwrap_or_default();
+        let cursor = glam::Vec2::new(x as f32, y as f32);
+        let best = positions
+            .iter()
+            .enumerate()
+            .filter_map(|(i, p)| {
+                let (pixel, depth) = g.camera.project(*p, v.width, v.height)?;
+                (pixel.distance(cursor) < PICK_PX).then_some((i, *p, depth))
+            })
+            .min_by(|a, b| a.2.total_cmp(&b.2));
+        let Some((particle, position, _)) = best else {
+            return Ok(None);
+        };
+        let panel = self
+            .cloth
+            .lock()
+            .map_err(|_| poisoned())?
+            .iter()
+            .find(|piece| piece.particles.contains(&particle))
+            .map(|piece| piece.panel);
+        Ok(Some(Hit {
+            particle,
+            position,
+            panel,
+        }))
+    }
+
+    /// Pointer down at (`x`, `y`): in the 3D view, on the cloth, get ready
+    /// to pull it. Returns whether the pointer is on the cloth (then moves
+    /// should call `pull`); otherwise drags orbit as usual.
+    #[frb(sync)]
+    pub fn press(&self, view: u32, x: f64, y: f64) -> Result<bool, ApiError> {
+        let slot = self.graphics()?;
+        let Some(v) = slot.as_ref().and_then(|g| g.views.get(&view)) else {
+            return Ok(false);
+        };
+        if v.kind != ViewKind::Garment {
+            return Ok(false);
+        }
+        let Some(hit) = self.pick_cloth(v, &slot, x, y)? else {
+            return Ok(false);
+        };
+        *self.held.lock().map_err(|_| poisoned())? = Some(Held {
+            particle: hit.particle,
+            anchor: hit.position,
+            pulling: false,
+        });
+        Ok(true)
+    }
+
+    /// Pointer moved to (`x`, `y`) after `press` on the cloth: pull it
+    /// there, on the plane facing the camera through the grabbed point. The
+    /// simulation runs while the cloth is held.
+    #[frb(sync)]
+    pub fn pull(&self, view: u32, x: f64, y: f64) -> Result<(), ApiError> {
+        let Some(held) = *self.held.lock().map_err(|_| poisoned())? else {
+            return Ok(());
+        };
+        let anchor = held.anchor;
+        let slot = self.graphics()?;
+        let (Some(g), Some(v)) = (
+            slot.as_ref(),
+            slot.as_ref().and_then(|g| g.views.get(&view)),
+        ) else {
+            return Ok(());
+        };
+        let (origin, dir) = g.camera.ray(x as f32, y as f32, v.width, v.height);
+        let normal = g.camera.forward();
+        let facing = dir.dot(normal);
+        if facing.abs() < 1e-6 {
+            return Ok(());
+        }
+        let target = origin + dir * ((anchor - origin).dot(normal) / facing);
+        drop(slot);
+        if let Some(thread) = self.sim()?.as_ref() {
+            if !held.pulling {
+                thread.grab(held.particle);
+            }
+            thread.grab_to(target);
+        }
+        if let Some(h) = self.held.lock().map_err(|_| poisoned())?.as_mut() {
+            h.pulling = true;
+        }
+        Ok(())
+    }
+
+    /// Pointer up: let go of the cloth.
+    #[frb(sync)]
+    pub fn release(&self) -> Result<(), ApiError> {
+        let was_pulling = self
+            .held
+            .lock()
+            .map_err(|_| poisoned())?
+            .take()
+            .is_some_and(|h| h.pulling);
+        // (No let-chain: the bridge macro parses this function as Rust 2021.)
+        if was_pulling {
+            if let Some(thread) = self.sim()?.as_ref() {
+                thread.release();
+            }
+        }
+        Ok(())
     }
 
     /// A drag of (`dx`, `dy`) pixels: orbit the 3D camera, pan the board.

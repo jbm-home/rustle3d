@@ -1,7 +1,7 @@
 //! Orbit camera for the 3D view (metres, Y up).
 
 use glam::camera::rh::{proj::directx, view};
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Vec2, Vec3};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OrbitCamera {
@@ -64,6 +64,39 @@ impl OrbitCamera {
         self.pitch = (self.pitch + dy * 0.008).clamp(-1.4, 1.4);
     }
 
+    /// Where `p` appears in a `width × height` view: pixel position (x
+    /// right, y down) and depth along the viewing direction (m). `None`
+    /// behind the camera.
+    pub fn project(&self, p: Vec3, width: u32, height: u32) -> Option<(Vec2, f32)> {
+        let (w, h) = (width.max(1) as f32, height.max(1) as f32);
+        let clip = self.view_proj(w / h) * p.extend(1.0);
+        if clip.w <= 1e-6 {
+            return None;
+        }
+        let ndc = clip.truncate() / clip.w;
+        let pixel = Vec2::new((ndc.x + 1.0) / 2.0 * w, (1.0 - ndc.y) / 2.0 * h);
+        Some((pixel, (p - self.eye()).dot(self.forward())))
+    }
+
+    /// The ray through pixel (`x`, `y`): origin (the eye) and unit
+    /// direction.
+    pub fn ray(&self, x: f32, y: f32, width: u32, height: u32) -> (Vec3, Vec3) {
+        let (w, h) = (width.max(1) as f32, height.max(1) as f32);
+        let ndc = Vec2::new(2.0 * x / w - 1.0, 1.0 - 2.0 * y / h);
+        let inverse = self.view_proj(w / h).inverse();
+        let near = inverse.project_point3(ndc.extend(0.0));
+        let far = inverse.project_point3(ndc.extend(1.0));
+        let eye = self.eye();
+        (eye, (far - near).try_normalize().unwrap_or(self.forward()))
+    }
+
+    /// Unit viewing direction.
+    pub fn forward(&self) -> Vec3 {
+        (self.target - self.eye())
+            .try_normalize()
+            .unwrap_or(Vec3::NEG_Z)
+    }
+
     /// Zoom by a scroll amount (positive = closer).
     pub fn zoom(&mut self, amount: f32) {
         self.distance = (self.distance * (1.0 - amount * 0.1)).clamp(0.3, 20.0);
@@ -73,6 +106,22 @@ impl OrbitCamera {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rays_go_through_projected_points() {
+        let c = OrbitCamera::default();
+        let p = Vec3::new(0.1, 1.2, -0.05);
+        for (w, h) in [(800, 600), (300, 900)] {
+            let (pixel, depth) = c.project(p, w, h).unwrap();
+            let (origin, dir) = c.ray(pixel.x, pixel.y, w, h);
+            let along = (p - origin).dot(dir);
+            assert!((origin + dir * along - p).length() < 1e-4);
+            assert!((depth - (p - c.eye()).dot(c.forward())).abs() < 1e-6);
+        }
+        // The target is in the middle of the view.
+        let (centre, _) = c.project(c.target, 800, 600).unwrap();
+        assert!((centre - Vec2::new(400.0, 300.0)).length() < 1e-2);
+    }
 
     #[test]
     fn narrow_views_widen_the_vertical_fov() {

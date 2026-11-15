@@ -11,8 +11,10 @@ the avatar in real time, and I can pull on it to check how it hangs.
   collision with friction, basic self-collision.
 - Controls: **Simulate** (start/resume), **Pause**, **Reset** (back to the
   arranged positions), **Step** (one frame, also for the CLI).
-- **Grab**: click and drag cloth in 3D to pull it (soft constraint), and
-  release to let go. **Pin**: Alt+click pins a vertex region in place; pins
+- **Grab** (implemented): click and drag cloth in 3D to pull it (soft
+  constraint on the cloth within 3 cm of the picked point, offsets kept),
+  and release to let go. A click without moving only selects the piece
+  under the cursor; grabbing a paused simulation runs it. **Pin**: Alt+click pins a vertex region in place; pins
   are listed and removable.
 - Pattern or material edits while the simulation runs update it live (the
   panel is remeshed, positions carry over).
