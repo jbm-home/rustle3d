@@ -60,7 +60,8 @@ fn first_save_after_migration_keeps_a_backup() {
         v1
     );
     let saved = std::fs::read_to_string(dir.join("project.json")).unwrap();
-    assert!(saved.contains("\"schema_version\": 2"));
+    let current = format!("\"schema_version\": {}", r3d_core::file::SCHEMA_VERSION);
+    assert!(saved.contains(&current));
     // A second open is current: no new backup needed.
     assert!(Workspace::open(&dir).is_ok());
 }
