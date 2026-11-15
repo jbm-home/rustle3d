@@ -8,6 +8,7 @@
 //! Units: millimetres, `f64`. See `docs/architecture.md`.
 
 pub mod bezier;
+pub mod mesh;
 pub mod polygon;
 pub mod transform;
 
