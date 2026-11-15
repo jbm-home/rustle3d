@@ -1,0 +1,22 @@
+[
+  {"type": "project.rename", "name": "A-line skirt"},
+  {"type": "avatar.set", "preset": "Women M",
+   "body": {"masculinity": 0, "height_cm": 168, "bust_cm": 90, "waist_cm": 73, "hips_cm": 98}},
+  {"type": "garment.set_fabric", "fabric": "cotton"},
+
+  {"type": "panel.create_polygon", "name": "Front",
+   "points": [[0, 0], [780, 0], [575, 600], [205, 600]]},
+  {"type": "panel.create_polygon", "name": "Back left",
+   "points": [[900, 0], [1290, 0], [1290, 600], [1105, 600]]},
+  {"type": "panel.mirror", "panel": "$4.created[0]", "name": "Back right"},
+
+  {"type": "panel.place", "panel": "$3.created[0]", "angle_deg": 0, "top_cm": 110},
+  {"type": "panel.place", "panel": "$4.created[0]", "angle_deg": 120, "top_cm": 110},
+  {"type": "panel.place", "panel": "$5.created[0]", "angle_deg": 240, "top_cm": 110},
+
+  {"type": "seam.add", "a": {"edge": "$3.created[6]"}, "b": {"edge": "$4.created[8]", "reversed": true}},
+  {"type": "seam.add", "a": {"edge": "$3.created[8]"}, "b": {"edge": "$5.created[5]", "reversed": true}},
+  {"type": "seam.add", "a": {"edge": "$4.created[6]"}, "b": {"edge": "$5.created[7]", "reversed": true}},
+
+  {"type": "seam.list"}
+]

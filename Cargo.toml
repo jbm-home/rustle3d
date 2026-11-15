@@ -29,6 +29,7 @@ r3d-avatar = { path = "crates/r3d-avatar" }
 r3d-core = { path = "crates/r3d-core" }
 r3d-commands = { path = "crates/r3d-commands" }
 r3d-io = { path = "crates/r3d-io" }
+r3d-sim = { path = "crates/r3d-sim" }
 r3d-render = { path = "crates/r3d-render" }
 r3d-mcp = { path = "crates/r3d-mcp" }
 

@@ -142,6 +142,22 @@ measurement-based calibration on the roadmap.
   tunneling. Velocity clamping per substep is a safety net.
 - Later (animated avatars): a BVH over the moving mesh with continuous
   vertex–triangle tests [6].
+- **Current implementation** (until the SDF lands): closest point on the
+  avatar's triangles through a uniform grid (`collide::StaticMesh`). The
+  search radius is thickness + 5 mm + the distance the particle moved in
+  the substep: a particle outside at the start of the substep cannot be
+  deeper than that, so fast motion (seams pulling a tight waist in) does
+  not tunnel through the body.
+
+### Starting positions
+
+Placed panels start wrapped around the body's vertical axis
+(`r3d_commands::drape`): the panel's centre at its placement angle, its top
+at the placement height, horizontal pattern distances kept as arc lengths.
+The radius at each height is the widest body section between the panel's
+top and that height (girth / 2π, so a garment starts outside everything
+above it), plus the placement offset, plus a flare of 0.35 m per metre so
+that flared pieces do not overlap before the seams close.
 
 ### Self-collision
 
@@ -150,6 +166,19 @@ measurement-based calibration on the roadmap.
   pairs that are close in rest topology.
 - **Later**: vertex–triangle and edge–edge continuous collision [6], and
   untangling for already-intersecting states.
+
+### Known issues
+
+- **Energy gain without damping.** A free, perturbed sheet with damping set
+  to 0 gains kinetic energy over time (relative kinetic energy × 50 over
+  5 s), whichever constraints are enabled (stretch only, shear + bending,
+  membrane without bending). The numerical damping of 15 substeps hides it;
+  at 30–60 substeps it shows as a sustained flutter of free edges. Suspects:
+  the integration/velocity update or f32 round-off with near-rigid
+  constraints. Until it is fixed we stay at 15 substeps, where the membrane
+  is not fully converged: a fitted skirt creeps a few centimetres down from
+  the waist (at 30 substeps it holds). Fixing this is the next solver task;
+  the probe becomes an energy regression test.
 
 ## 6. Parallelism and determinism
 

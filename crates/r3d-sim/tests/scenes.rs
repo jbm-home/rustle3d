@@ -189,11 +189,12 @@ fn jersey_stretches_more_along_the_weft() {
         }
         min_y(&run(scene, 2.0))
     };
-    let along_warp = hang(Vec2::Y); // warp vertical
-    let along_weft = hang(Vec2::X); // weft vertical
+    // The hem rests at y = 1.0: how far below it is the stretch.
+    let along_warp = 1.0 - hang(Vec2::Y); // warp vertical
+    let along_weft = 1.0 - hang(Vec2::X); // weft vertical
     assert!(
-        along_weft < along_warp - 0.001,
-        "weft {along_weft} vs warp {along_warp}"
+        along_warp > 0.0 && along_weft > 1.5 * along_warp,
+        "weft {along_weft} m vs warp {along_warp} m"
     );
 }
 

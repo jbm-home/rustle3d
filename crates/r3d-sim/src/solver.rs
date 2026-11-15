@@ -271,8 +271,12 @@ impl Solver {
             }
             let thickness = self.thickness[i];
             let mut contact_normal = None;
+            // A particle outside at the start of the substep can only be as
+            // deep as it moved: search that far, so fast motion (seams
+            // closing a tight waist) cannot tunnel through the body.
+            let reach = thickness + CONTACT_MARGIN + self.x[i].distance(self.prev[i]);
             if let Some(body) = &self.collider
-                && let Some(c) = body.closest(self.x[i], thickness + CONTACT_MARGIN)
+                && let Some(c) = body.closest(self.x[i], reach)
                 && (self.x[i] - c.point).dot(c.normal) < thickness
             {
                 self.x[i] = c.point + c.normal * thickness;

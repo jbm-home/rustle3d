@@ -1619,10 +1619,12 @@ dependencies = [
 name = "r3d-commands"
 version = "0.0.0"
 dependencies = [
+ "glam",
  "r3d-avatar",
  "r3d-core",
  "r3d-geom",
  "r3d-io",
+ "r3d-sim",
  "schemars",
  "serde",
  "serde_json",

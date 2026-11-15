@@ -18,6 +18,7 @@
 pub mod actions;
 pub mod commands;
 pub mod docs;
+pub mod drape;
 pub mod error;
 pub mod history;
 pub mod queries;
