@@ -82,6 +82,32 @@ impl Project {
     }
 
     /// Closed polyline approximating the panel contour (closing edge implicit).
+    /// An edge as a polyline from its start to its end (mm).
+    pub fn edge_polyline(&self, id: EdgeId) -> Option<Vec<DVec2>> {
+        let edge = self.edge(id)?;
+        let mut out = vec![self.point(edge.start)?.pos];
+        self.edge_geometry(id)?.flatten_into(&mut out);
+        Some(out)
+    }
+
+    /// The contour edge of `panel` nearest to the pattern point `p`, if it
+    /// is within `max_mm`.
+    pub fn edge_near(&self, panel: PanelId, p: DVec2, max_mm: f64) -> Option<EdgeId> {
+        self.panel(panel)?
+            .contour
+            .iter()
+            .filter_map(|e| {
+                let line = self.edge_polyline(*e)?;
+                let d = line
+                    .windows(2)
+                    .map(|w| distance_to_segment(p, w[0], w[1]))
+                    .fold(f64::MAX, f64::min);
+                (d <= max_mm).then_some((d, *e))
+            })
+            .min_by(|a, b| a.0.total_cmp(&b.0))
+            .map(|(_, e)| e)
+    }
+
     pub fn panel_outline(&self, id: PanelId) -> Option<Vec<DVec2>> {
         let panel = self.panel(id)?;
         let mut out = Vec::new();
@@ -145,4 +171,14 @@ impl Project {
     pub fn panel_is_simple(&self, id: PanelId) -> Option<bool> {
         self.panel_outline(id).map(|o| polygon::is_simple(&o))
     }
+}
+
+fn distance_to_segment(p: DVec2, a: DVec2, b: DVec2) -> f64 {
+    let ab = b - a;
+    let t = if ab.length_squared() > 0.0 {
+        ((p - a).dot(ab) / ab.length_squared()).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    p.distance(a + ab * t)
 }

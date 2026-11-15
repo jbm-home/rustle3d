@@ -26,8 +26,12 @@ point to move.
     seam stays matched.
   - **Draw on garment**: a line drawn on the 3D surface becomes an internal
     line on the pattern (style line, pocket placement).
-  - **Pick**: clicking the 3D garment selects the panel, edge, point or
-    notch under the cursor in both views.
+  - **Pick** (implemented for panels and edges): clicking the 3D garment
+    selects the panel under the cursor (exact ray / triangle hit, mapped to
+    the pattern) and the edge when the hit is within 20 mm of one; the edge
+    is highlighted on the board and described in the inspector (length,
+    seam partner, flip / unpick). Clicking near an edge on the board does
+    the same. Points and notches: later.
 - Every 3D edit is undoable, appears in the history with its own label
   ("Shorten hem 30 mm") and is available to agents as commands.
 

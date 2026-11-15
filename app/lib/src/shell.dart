@@ -32,6 +32,8 @@ class _ShellState extends State<Shell> {
   List<String> _selection = const [];
   Map<String, dynamic>? _panel;
   List<dynamic> _pins = const [];
+  List<dynamic> _seams = const [];
+  String? _edge;
   String _tool = 'select';
 
   // Performance readouts, smoothed and refreshed twice a second.
@@ -76,6 +78,8 @@ class _ShellState extends State<Shell> {
                 as Map<String, dynamic>?
           : null;
       _pins = (_run({'type': 'pin.list'}) as List<dynamic>?) ?? const [];
+      _seams = (_run({'type': 'seam.list'}) as List<dynamic>?) ?? const [];
+      _edge = _guard<String?>(widget.engine.selectedEdge);
     });
   }
 
@@ -269,6 +273,8 @@ class _ShellState extends State<Shell> {
                           selection: _selection,
                           panel: _panel,
                           summary: _summary,
+                          edge: _edge,
+                          seams: _seams,
                           onFabric: _setFabric,
                           pins: _pins,
                           onUnpin: (pin) {
@@ -687,6 +693,8 @@ class _Inspector extends StatelessWidget {
     required this.selection,
     required this.panel,
     required this.summary,
+    required this.edge,
+    required this.seams,
     required this.onFabric,
     required this.pins,
     required this.onUnpin,
@@ -697,6 +705,8 @@ class _Inspector extends StatelessWidget {
   final List<String> selection;
   final Map<String, dynamic>? panel;
   final Map<String, dynamic> summary;
+  final String? edge;
+  final List<dynamic> seams;
   final ValueChanged<String> onFabric;
   final List<dynamic> pins;
   final ValueChanged<String> onUnpin;
@@ -726,6 +736,8 @@ class _Inspector extends StatelessWidget {
             ),
             1 when panel != null => _PanelInspector(
               panel: panel!,
+              edge: edge,
+              seams: seams,
               run: run,
               onDelete: onDelete,
             ),
@@ -886,11 +898,15 @@ class _MultiInspector extends StatelessWidget {
 class _PanelInspector extends StatelessWidget {
   const _PanelInspector({
     required this.panel,
+    required this.edge,
+    required this.seams,
     required this.run,
     required this.onDelete,
   });
 
   final Map<String, dynamic> panel;
+  final String? edge;
+  final List<dynamic> seams;
   final ValueChanged<Map<String, Object?>> run;
   final VoidCallback onDelete;
 
@@ -919,6 +935,14 @@ class _PanelInspector extends StatelessWidget {
             action: 'Unlink',
             onAction: () => run({'type': 'panel.unlink', 'panel': id}),
           ),
+        ],
+        if ((panel['edges'] as List).firstWhere(
+              (e) => e['id'] == edge,
+              orElse: () => null,
+            )
+            case final Map<String, dynamic> e) ...[
+          const SizedBox(height: Space.m),
+          _EdgeCard(edge: e, seams: seams, run: run),
         ],
         const SizedBox(height: Space.l),
         Row(
@@ -1273,6 +1297,79 @@ class _FabricPicker extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// The edge picked in either view: its length and its seam.
+class _EdgeCard extends StatelessWidget {
+  const _EdgeCard({required this.edge, required this.seams, required this.run});
+
+  final Map<String, dynamic> edge;
+  final List<dynamic> seams;
+  final ValueChanged<Map<String, Object?>> run;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final id = edge['id'] as String;
+    final length = (edge['length_mm'] as num) / 10;
+    final seam = seams.firstWhere(
+      (s) => s['a']['edge'] == id || s['b']['edge'] == id,
+      orElse: () => null,
+    );
+    final other = seam == null
+        ? null
+        : (seam['a']['edge'] == id ? seam['b'] : seam['a']);
+    return Container(
+      padding: const EdgeInsets.all(Space.m),
+      decoration: BoxDecoration(
+        color: p.accentSoft,
+        borderRadius: BorderRadius.circular(Tokens.radius(context)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.timeline_rounded, size: 16, color: p.accent),
+              const SizedBox(width: Space.s),
+              Text(
+                'Edge · ${length.toStringAsFixed(1)} cm',
+                style: ts(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                  color: p.text,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: Space.xs),
+          Text(
+            other == null
+                ? 'Open edge (a hem or an opening). ⇧-drag it in 3D to lengthen.'
+                : 'Sewn to ${other['panel_name'] ?? other['panel']} · '
+                      '${(seam['mismatch_mm'] as num).toStringAsFixed(1)} mm difference. '
+                      '⇧-drag it in 3D to take in.',
+            style: ts(fontSize: 12.5, height: 1.45, color: p.textMuted),
+          ),
+          if (seam != null)
+            Row(
+              children: [
+                TextButton(
+                  onPressed: () =>
+                      run({'type': 'seam.flip', 'seam': seam['id']}),
+                  child: const Text('Flip seam'),
+                ),
+                TextButton(
+                  onPressed: () =>
+                      run({'type': 'seam.remove', 'seam': seam['id']}),
+                  child: const Text('Unpick'),
+                ),
+              ],
+            ),
+        ],
+      ),
     );
   }
 }

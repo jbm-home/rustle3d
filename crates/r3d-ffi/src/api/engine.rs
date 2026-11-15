@@ -15,9 +15,12 @@ use r3d_commands::drape::{self, Drape, Form};
 use r3d_commands::{Script, Step, Workspace, templates};
 use r3d_sim::Solver;
 
-use crate::cloth::{Adjust, Held, Hit, PICK_PX, RESYNC_EVERY, SEAM_END, Sync, Tool};
+use crate::cloth::{
+    Adjust, ClothHit, EDGE_PICK_MM, EDGE_PICK_PX, Held, Hit, PICK_PX, RESYNC_EVERY, SEAM_END, Sync,
+    Tool, ray_triangle,
+};
 use crate::sim::SimThread;
-use r3d_core::{Body, Fabric, Localizable, Message, PanelId};
+use r3d_core::{Body, EdgeId, Fabric, Localizable, Message, PanelId};
 use r3d_render::board::BoardView;
 use r3d_render::theme::PIECE_COLORS;
 use r3d_render::{
@@ -193,6 +196,8 @@ pub struct Engine {
     graphics: Mutex<Option<Graphics>>,
     /// Selection shared by every view (not saved, not undoable).
     selection: Mutex<Vec<PanelId>>,
+    /// The edge picked within the selection, if any.
+    selected_edge: Mutex<Option<EdgeId>>,
     /// Folder of the user's libraries (body presets…), set by the UI.
     library_dir: Mutex<Option<PathBuf>>,
     /// The simulation thread, started on first use.
@@ -229,6 +234,7 @@ impl Engine {
             ws: Mutex::new(ws),
             graphics: Mutex::new(None),
             selection: Mutex::new(Vec::new()),
+            selected_edge: Mutex::new(None),
             library_dir: Mutex::new(None),
             sim: Mutex::new(None),
             cloth: Mutex::new(None),
@@ -395,6 +401,10 @@ impl Engine {
         // Forget selected panels that no longer exist (e.g. after undo).
         let project = ws.session().project();
         self.selected()?.retain(|id| project.panel(*id).is_some());
+        let mut edge = self.selected_edge.lock().map_err(|_| poisoned())?;
+        if edge.is_some_and(|e| project.edge(e).is_none()) {
+            *edge = None;
+        }
         Ok(result.to_string())
     }
 
@@ -535,7 +545,8 @@ impl Engine {
         };
         match v.kind {
             ViewKind::Board => {
-                let scene = BoardScene::from_project(project, &selected);
+                let edge = *self.selected_edge.lock().map_err(|_| poisoned())?;
+                let scene = BoardScene::from_project(project, &selected).with_selected_edge(edge);
                 let board_view = v
                     .board_view
                     .unwrap_or_else(|| BoardView::fit(scene.bounds(), v.width, v.height));
@@ -621,24 +632,105 @@ impl Engine {
             .as_ref()
             .and_then(|g| g.views.get(&view))
             .ok_or_else(|| ApiError::new("no_view", format!("unknown view {view}")))?;
-        let mut selected = self.selected()?;
-        selected.clear();
-        match v.kind {
+        // The piece under the cursor, and its edge when close to one.
+        let (panel, edge) = match v.kind {
             ViewKind::Board => {
                 let scene = BoardScene::from_project(project, &[]);
                 let board_view = v
                     .board_view
                     .unwrap_or_else(|| BoardView::fit(scene.bounds(), v.width, v.height));
                 let p = board_view.to_board(x, y, v.width, v.height);
-                selected.extend(scene.panel_at(p));
+                match scene.edge_at(p, EDGE_PICK_PX * board_view.mm_per_px) {
+                    Some(e) => (Some(e.panel), Some(e.id)),
+                    None => (scene.panel_at(p), None),
+                }
             }
-            // The piece under the cursor, if any.
-            ViewKind::Garment => {
-                let hit = self.pick_cloth(v, &slot, x, y, &|_| true)?;
-                selected.extend(hit.and_then(|h| h.panel));
+            ViewKind::Garment => match self.cloth_hit(v, &slot, x, y)? {
+                Some(hit) => (
+                    Some(hit.panel),
+                    project.edge_near(hit.panel, hit.at, EDGE_PICK_MM),
+                ),
+                None => (None, None),
+            },
+        };
+        let mut selected = self.selected()?;
+        *selected = panel.into_iter().collect();
+        *self.selected_edge.lock().map_err(|_| poisoned())? = edge;
+        Ok(selected.iter().map(ToString::to_string).collect())
+    }
+
+    /// The edge picked within the selection (by a click near a border, in
+    /// either view), if any.
+    #[frb(sync)]
+    pub fn selected_edge(&self) -> Result<Option<String>, ApiError> {
+        Ok(self
+            .selected_edge
+            .lock()
+            .map_err(|_| poisoned())?
+            .map(|e| e.to_string()))
+    }
+
+    /// Where the ray through pixel (`x`, `y`) of a 3D view first meets the
+    /// cloth: the panel and the point on its pattern (mm), interpolated in
+    /// the hit triangle (Möller & Trumbore 1997).
+    fn cloth_hit(
+        &self,
+        v: &View,
+        graphics: &Option<Graphics>,
+        x: f64,
+        y: f64,
+    ) -> Result<Option<ClothHit>, ApiError> {
+        let Some(g) = graphics.as_ref() else {
+            return Ok(None);
+        };
+        let positions = self
+            .sim
+            .lock()
+            .map_err(|_| poisoned())?
+            .as_ref()
+            .map(|t| t.latest().positions)
+            .unwrap_or_default();
+        let (origin, dir) = g.camera.ray(x as f32, y as f32, v.width, v.height);
+        let cloth = self.cloth.lock().map_err(|_| poisoned())?;
+        let Some(drape) = cloth.as_ref() else {
+            return Ok(None);
+        };
+        let mut best: Option<(f32, ClothHit)> = None;
+        for piece in &drape.pieces {
+            for t in piece.indices.as_chunks::<3>().0 {
+                let idx = t.map(|i| piece.particles.start + i as usize);
+                let (Some(a), Some(b), Some(c)) = (
+                    positions.get(idx[0]),
+                    positions.get(idx[1]),
+                    positions.get(idx[2]),
+                ) else {
+                    continue;
+                };
+                let Some((dist, u, w)) = ray_triangle(origin, dir, *a, *b, *c) else {
+                    continue;
+                };
+                if best.as_ref().is_some_and(|(d, _)| *d <= dist) {
+                    continue;
+                }
+                let rest = |i: usize| {
+                    drape
+                        .scene
+                        .particles
+                        .get(i)
+                        .map(|p| p.rest)
+                        .unwrap_or_default()
+                };
+                let at = rest(idx[0]) * (1.0 - u - w) + rest(idx[1]) * u + rest(idx[2]) * w;
+                best = Some((
+                    dist,
+                    ClothHit {
+                        panel: piece.panel,
+                        at: r3d_geom::DVec2::new(f64::from(at.x), f64::from(at.y)) * 1000.0,
+                    },
+                ));
             }
         }
-        Ok(selected.iter().map(ToString::to_string).collect())
+        Ok(best.map(|(_, hit)| hit))
     }
 
     /// The cloth particle under pixel (`x`, `y`) of a 3D view: the front
@@ -985,6 +1077,7 @@ impl Engine {
     pub fn select(&self, panels: Vec<String>) -> Result<Vec<String>, ApiError> {
         let ws = self.workspace()?;
         let project = ws.session().project();
+        *self.selected_edge.lock().map_err(|_| poisoned())? = None;
         let mut selected = self.selected()?;
         *selected = panels
             .iter()

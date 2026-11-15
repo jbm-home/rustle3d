@@ -70,3 +70,62 @@ pub(crate) struct Hit {
     pub position: glam::Vec3,
     pub panel: Option<PanelId>,
 }
+
+/// A click near a contour edge selects it: on the board (physical pixels)
+/// and on the garment (mm on the pattern).
+pub(crate) const EDGE_PICK_PX: f64 = 10.0;
+pub(crate) const EDGE_PICK_MM: f64 = 20.0;
+
+/// Where a ray meets the cloth.
+pub(crate) struct ClothHit {
+    pub panel: PanelId,
+    /// The point on the panel's pattern (mm).
+    pub at: r3d_geom::DVec2,
+}
+
+/// Ray / triangle intersection (Möller & Trumbore, "Fast, minimum storage
+/// ray-triangle intersection", 1997): distance along the ray and the
+/// barycentric weights of `b` and `c`. Both faces count.
+pub(crate) fn ray_triangle(
+    origin: glam::Vec3,
+    dir: glam::Vec3,
+    a: glam::Vec3,
+    b: glam::Vec3,
+    c: glam::Vec3,
+) -> Option<(f32, f32, f32)> {
+    let (e1, e2) = (b - a, c - a);
+    let p = dir.cross(e2);
+    let det = e1.dot(p);
+    if det.abs() < 1e-12 {
+        return None;
+    }
+    let inv = 1.0 / det;
+    let s = origin - a;
+    let u = s.dot(p) * inv;
+    if !(0.0..=1.0).contains(&u) {
+        return None;
+    }
+    let q = s.cross(e1);
+    let w = dir.dot(q) * inv;
+    if w < 0.0 || u + w > 1.0 {
+        return None;
+    }
+    let t = e2.dot(q) * inv;
+    (t > 0.0).then_some((t, u, w))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use glam::Vec3;
+
+    #[test]
+    fn rays_hit_triangles_with_barycentric_weights() {
+        let (a, b, c) = (Vec3::ZERO, Vec3::X, Vec3::Y);
+        let hit = ray_triangle(Vec3::new(0.25, 0.5, 1.0), -Vec3::Z, a, b, c);
+        let (t, u, w) = hit.unwrap_or_default();
+        assert!((t - 1.0).abs() < 1e-6 && (u - 0.25).abs() < 1e-6 && (w - 0.5).abs() < 1e-6);
+        assert!(ray_triangle(Vec3::new(0.8, 0.8, 1.0), -Vec3::Z, a, b, c).is_none());
+        assert!(ray_triangle(Vec3::new(0.2, 0.2, 1.0), Vec3::Z, a, b, c).is_none());
+    }
+}

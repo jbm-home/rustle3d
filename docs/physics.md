@@ -188,6 +188,11 @@ buckled inward. With the garment's own width it hangs as an A-line.
 
 ### Known issues
 
+- **Start pose at the hips.** Panels start at girth / 2π (the equivalent
+  circle), but the body is wider than deep at the hips: before simulating,
+  the body shows through at the sides. The drape pushes the cloth out
+  (the SDF sees 2 cm deep). Use the body's radial extent per angle.
+
 - **Real time with little headroom.** The three-piece skirt (1 700
   particles, 30 substeps) steps in about 14 ms per 16.7 ms frame on an
   Apple M-series laptop, most of it the serial constraint solve. Next

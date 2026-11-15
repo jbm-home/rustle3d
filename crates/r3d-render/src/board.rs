@@ -3,13 +3,13 @@
 
 use bytemuck::{Pod, Zeroable};
 use glam::camera::rh::proj::directx;
-use r3d_core::{PanelId, Project};
+use r3d_core::{EdgeId, PanelId, Project, SeamId};
 use r3d_geom::{Aabb, DVec2, polygon};
 use wgpu::util::DeviceExt;
 
 use crate::gpu::Gpu;
 use crate::targets::Attachments;
-use crate::theme::{PIECE_COLORS, Rgba, Theme};
+use crate::theme::{PIECE_COLORS, Rgba, SEAM_COLORS, Theme};
 use crate::{MSAA_SAMPLES, Target};
 
 const NOTCH_MM: f64 = 6.0;
@@ -35,6 +35,20 @@ pub struct BoardPanel {
 pub struct BoardScene {
     pub panels: Vec<BoardPanel>,
     pub selected: Vec<PanelId>,
+    /// Every contour edge, for picking and drawing seams.
+    pub edges: Vec<BoardEdge>,
+    pub selected_edge: Option<EdgeId>,
+}
+
+/// A contour edge on the board.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BoardEdge {
+    pub id: EdgeId,
+    pub panel: PanelId,
+    /// From its start to its end (mm).
+    pub points: Vec<DVec2>,
+    /// Index of its seam (both sides share one colour), if sewn.
+    pub seam: Option<usize>,
 }
 
 impl BoardScene {
@@ -72,10 +86,58 @@ impl BoardScene {
                 })
             })
             .collect();
+        let seams: Vec<SeamId> = project.seams().keys().copied().collect();
+        let edges = project
+            .panels()
+            .iter()
+            .flat_map(|(id, panel)| panel.contour.iter().map(move |e| (*id, *e)))
+            .filter_map(|(panel, e)| {
+                Some(BoardEdge {
+                    id: e,
+                    panel,
+                    points: project.edge_polyline(e)?,
+                    seam: project
+                        .seam_of(e)
+                        .and_then(|s| seams.iter().position(|x| *x == s)),
+                })
+            })
+            .collect();
         Self {
             panels,
             selected: selected.to_vec(),
+            edges,
+            selected_edge: None,
         }
+    }
+
+    /// The same scene with `edge` highlighted.
+    pub fn with_selected_edge(mut self, edge: Option<EdgeId>) -> Self {
+        self.selected_edge = edge;
+        self
+    }
+
+    /// The edge nearest to a board point, within `max_mm`.
+    pub fn edge_at(&self, p: DVec2, max_mm: f64) -> Option<&BoardEdge> {
+        self.edges
+            .iter()
+            .filter_map(|e| {
+                let d = e
+                    .points
+                    .windows(2)
+                    .map(|w| {
+                        let ab = w[1] - w[0];
+                        let t = if ab.length_squared() > 0.0 {
+                            ((p - w[0]).dot(ab) / ab.length_squared()).clamp(0.0, 1.0)
+                        } else {
+                            0.0
+                        };
+                        p.distance(w[0] + ab * t)
+                    })
+                    .fold(f64::MAX, f64::min);
+                (d <= max_mm).then_some((d, e))
+            })
+            .min_by(|a, b| a.0.total_cmp(&b.0))
+            .map(|(_, e)| e)
     }
 
     pub fn bounds(&self) -> Option<Aabb> {
@@ -349,6 +411,24 @@ impl BoardRenderer {
             for (pos, outward) in &panel.notches {
                 batch.segment(*pos, *pos - *outward * NOTCH_MM, width, line_color);
             }
+        }
+        // Seams: both sides in the same colour, over the outlines.
+        for edge in &scene.edges {
+            if let Some(k) = edge.seam {
+                batch.polyline(
+                    &edge.points,
+                    false,
+                    2.5 * px,
+                    SEAM_COLORS[k % SEAM_COLORS.len()],
+                );
+            }
+        }
+        if let Some(edge) = scene
+            .edges
+            .iter()
+            .find(|e| Some(e.id) == scene.selected_edge)
+        {
+            batch.polyline(&edge.points, false, 4.5 * px, theme.selection);
         }
 
         let transform = directx::orthographic(

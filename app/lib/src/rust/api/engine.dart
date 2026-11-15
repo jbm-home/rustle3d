@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `adjust_by`, `edited`, `err`, `form`, `graphics`, `library`, `new`, `new`, `pick_cloth`, `poisoned`, `presets_file`, `rebuild`, `resync_if_due`, `rgba`, `selected`, `sim`, `to_theme`, `workspace`
+// These functions are ignored because they are not marked as `pub`: `adjust_by`, `cloth_hit`, `edited`, `err`, `form`, `graphics`, `library`, `new`, `new`, `pick_cloth`, `poisoned`, `presets_file`, `rebuild`, `resync_if_due`, `rgba`, `selected`, `sim`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
@@ -120,6 +120,10 @@ abstract class Engine implements RustOpaqueInterface {
   /// Replace the shared selection with these panel ids; unknown ids are
   /// ignored. Returns the resulting selection.
   List<String> select({required List<String> panels});
+
+  /// The edge picked within the selection (by a click near a border, in
+  /// either view), if any.
+  String? selectedEdge();
 
   /// The shared selection (panel ids).
   List<String> selection();

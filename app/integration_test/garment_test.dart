@@ -50,7 +50,16 @@ void main() {
     await tester.tapAt(centre);
     await tester.pump();
     expect(engine.selection(), hasLength(1));
+    expect(engine.selectedEdge(), isNull);
     expect(engine.simulationStatus().running, isFalse);
+
+    // Clicking near the hem picks the edge as well (shown in both views).
+    for (var dy = 60.0; dy < 300 && engine.selectedEdge() == null; dy += 2) {
+      await tester.tapAt(centre + Offset(0, dy));
+      await tester.pump();
+    }
+    expect(engine.selectedEdge(), isNotNull);
+    expect(engine.selection(), hasLength(1));
 
     final gesture = await tester.startGesture(
       centre,

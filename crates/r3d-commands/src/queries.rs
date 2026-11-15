@@ -443,6 +443,7 @@ impl QuerySpec for SeamList {
             Ok(serde_json::json!({
                 "edge": s.edge,
                 "panel": edge.panel,
+                "panel_name": p.panel(edge.panel).map(|panel| panel.name.clone()),
                 "reversed": s.reversed,
                 "length_mm": r3(p.edge_length(s.edge).unwrap_or_default()),
             }))

@@ -7,6 +7,16 @@ pub type Rgba = [f32; 4];
 /// Number of colours used to tell pattern pieces apart.
 pub const PIECE_COLORS: usize = 8;
 
+/// Seam colours on the board, cycled: both sides of a seam share one.
+pub const SEAM_COLORS: [Rgba; 6] = [
+    hex(0xE0567A),
+    hex(0x2F9E8F),
+    hex(0xE58A2B),
+    hex(0x6C63E0),
+    hex(0x3E8FD8),
+    hex(0xB65BC7),
+];
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Theme {
     pub board_background: Rgba,
