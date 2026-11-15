@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `avatar_mesh`, `err`, `graphics`, `library`, `new`, `new`, `pick_cloth`, `poisoned`, `presets_file`, `rgba`, `selected`, `sim`, `to_theme`, `workspace`
+// These functions are ignored because they are not marked as `pub`: `edited`, `err`, `form`, `graphics`, `library`, `new`, `new`, `pick_cloth`, `poisoned`, `presets_file`, `rebuild`, `resync_if_due`, `rgba`, `selected`, `sim`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
@@ -53,9 +53,9 @@ abstract class Engine implements RustOpaqueInterface {
       RustLib.instance.api.crateApiEngineEngineOpen(path: path);
 
   /// ⌥-click at (`x`, `y`) in the 3D view: pin the cloth there, where it
-  /// is now (a `pin.add` command, so it is saved and undoable), and hold
-  /// it at once in the running simulation. Returns the new pin's id, or
-  /// `None` when there is no cloth under the cursor.
+  /// is now (a `pin.add` command, so it is saved and undoable; the running
+  /// simulation follows). Returns the new pin's id, or `None` when there
+  /// is no cloth under the cursor.
   String? pinAt({required int view, required double x, required double y});
 
   /// Pointer down at (`x`, `y`): in the 3D view, on the cloth, get ready
@@ -75,8 +75,8 @@ abstract class Engine implements RustOpaqueInterface {
   /// a half-drawn frame. Returns the CPU + GPU time in milliseconds.
   double renderView({required int view});
 
-  /// Rebuild the simulation from the document: placed pieces around the
-  /// body, paused. This is also how edits reach the simulation.
+  /// Start the simulation again from the pattern: the pieces around the
+  /// body, paused.
   SimStatus resetSimulation();
 
   /// Run one step (a JSON object, as in scripts and MCP) and return its
@@ -117,8 +117,7 @@ abstract class Engine implements RustOpaqueInterface {
   /// The latest simulation state.
   SimStatus simulationStatus();
 
-  /// Remove a pin (`pin.remove`) and free its cloth at once in the
-  /// running simulation.
+  /// Remove a pin (`pin.remove`); the cloth there moves again.
   void unpin({required String pin});
 
   /// A scroll of `amount` (positive = zoom in) at pixel (`x`, `y`).

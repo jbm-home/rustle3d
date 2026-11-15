@@ -1856,9 +1856,9 @@ class EngineImpl extends RustOpaque implements Engine {
       RustLib.instance.api.crateApiEngineEngineFitBoard(that: this, view: view);
 
   /// ⌥-click at (`x`, `y`) in the 3D view: pin the cloth there, where it
-  /// is now (a `pin.add` command, so it is saved and undoable), and hold
-  /// it at once in the running simulation. Returns the new pin's id, or
-  /// `None` when there is no cloth under the cursor.
+  /// is now (a `pin.add` command, so it is saved and undoable; the running
+  /// simulation follows). Returns the new pin's id, or `None` when there
+  /// is no cloth under the cursor.
   String? pinAt({required int view, required double x, required double y}) =>
       RustLib.instance.api.crateApiEngineEnginePinAt(
         that: this,
@@ -1898,8 +1898,8 @@ class EngineImpl extends RustOpaque implements Engine {
   double renderView({required int view}) => RustLib.instance.api
       .crateApiEngineEngineRenderView(that: this, view: view);
 
-  /// Rebuild the simulation from the document: placed pieces around the
-  /// body, paused. This is also how edits reach the simulation.
+  /// Start the simulation again from the pattern: the pieces around the
+  /// body, paused.
   SimStatus resetSimulation() =>
       RustLib.instance.api.crateApiEngineEngineResetSimulation(that: this);
 
@@ -1955,8 +1955,7 @@ class EngineImpl extends RustOpaque implements Engine {
   SimStatus simulationStatus() =>
       RustLib.instance.api.crateApiEngineEngineSimulationStatus(that: this);
 
-  /// Remove a pin (`pin.remove`) and free its cloth at once in the
-  /// running simulation.
+  /// Remove a pin (`pin.remove`); the cloth there moves again.
   void unpin({required String pin}) =>
       RustLib.instance.api.crateApiEngineEngineUnpin(that: this, pin: pin);
 

@@ -22,8 +22,11 @@ the avatar in real time, and I can pull on it to check how it hangs.
   position, from the start of every simulation. Pins are listed in the
   inspector and removable; adding or removing one applies at once to the
   running simulation (undo/redo apply on the next Restart).
-- Pattern or material edits while the simulation runs update it live (the
-  panel is remeshed, positions carry over).
+- Pattern or material edits while the simulation runs update it live
+  (implemented): the scene is rebuilt at most every 100 ms and each
+  particle takes the position of the same pattern point in the previous
+  drape (barycentric remapping, extrapolated where a panel grew); seams
+  stay closed and the simulation time carries on.
 - "Save drape" stores the current shape in the project; reopening shows it
   without re-simulating.
 - Quality setting: particle spacing (Draft 20 mm / Normal 10 mm / Fine 5 mm).

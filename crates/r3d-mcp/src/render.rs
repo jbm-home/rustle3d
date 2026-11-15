@@ -6,7 +6,6 @@ use glam::Vec3;
 use r3d_commands::CommandError;
 use r3d_commands::Workspace;
 use r3d_commands::drape;
-use r3d_commands::queries::body_model;
 use r3d_core::{Localizable, Message};
 use r3d_render::board::BoardView;
 use r3d_render::offscreen::{PNG_FORMAT, render_png};
@@ -101,8 +100,8 @@ pub fn render(
             ))
         }
         View::Garment => {
-            let body = drape::fitted_body(project)?;
-            let built = drape::prepare(project, body.as_deref())?;
+            let form = drape::Form::of_project(project)?;
+            let built = drape::prepare(project, form.as_ref())?;
             let start: Vec<Vec3> = built.scene.particles.iter().map(|p| p.position).collect();
             let cached = drape::load_cache(ws.dir(), project, start.len());
             let drape_state = if cached.is_some() {
@@ -118,18 +117,8 @@ pub fn render(
                 garment.map(|g| g.fabric).unwrap_or_default(),
                 garment.and_then(|g| g.color.as_deref()),
             );
-            let avatar = match body {
-                Some(b) => Some(mesh(
-                    b,
-                    body_model()?
-                        .triangles()
-                        .iter()
-                        .flatten()
-                        .copied()
-                        .collect(),
-                )),
-                None => None,
-            };
+            let avatar =
+                form.map(|f| mesh(f.positions, f.triangles.iter().flatten().copied().collect()));
             let pieces: Vec<Mesh> = built
                 .pieces
                 .iter()

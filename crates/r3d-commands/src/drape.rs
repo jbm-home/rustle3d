@@ -10,7 +10,7 @@
 //! the project folder, keyed by a fingerprint of the document, so renders
 //! can show it without simulating again.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::ops::Range;
 use std::path::Path;
 use std::time::Instant;
@@ -54,30 +54,49 @@ pub struct Piece {
     pub indices: Vec<u32>,
 }
 
-/// The body to collide with: positions (m) and triangles.
-#[derive(Debug, Clone, Copy)]
-pub struct BodyMesh<'a> {
-    pub positions: &'a [Vec3],
-    pub triangles: &'a [[u32; 3]],
+/// The dress form garments are draped on: the fitted body (m), its
+/// profile and its distance field. Building one takes a fraction of a
+/// second, so callers keep it for as long as the measurements do not change.
+#[derive(Debug, Clone)]
+pub struct Form {
+    pub positions: Vec<Vec3>,
+    pub triangles: Vec<[u32; 3]>,
+    /// Equivalent radius (girth / 2π, m) every `PROFILE_STEP` from the floor.
+    profile: Vec<f32>,
+    collider: StaticMesh,
 }
 
 /// Height step of the body profile (m).
 const PROFILE_STEP: f32 = 0.01;
 
-/// The body's equivalent radius (girth / 2π, m) every `PROFILE_STEP` from
-/// the floor, or the default radius where there is no body.
-fn body_profile(body: Option<BodyMesh<'_>>) -> Vec<f32> {
-    let Some(b) = body else {
-        return vec![DEFAULT_BODY_RADIUS_M];
-    };
-    let height = b.positions.iter().map(|p| p.y).fold(0.0, f32::max);
-    let steps = (height / PROFILE_STEP).ceil() as usize;
-    (0..=steps)
-        .map(|k| {
-            girth_at(b.positions, b.triangles, k as f32 * PROFILE_STEP, 0.0)
-                .map_or(0.0, |cm| cm / 100.0 / std::f32::consts::TAU)
-        })
-        .collect()
+impl Form {
+    pub fn new(positions: Vec<Vec3>, triangles: Vec<[u32; 3]>) -> Self {
+        let height = positions.iter().map(|p| p.y).fold(0.0, f32::max);
+        let steps = (height / PROFILE_STEP).ceil() as usize;
+        let profile = (0..=steps)
+            .map(|k| {
+                girth_at(&positions, &triangles, k as f32 * PROFILE_STEP, 0.0)
+                    .map_or(0.0, |cm| cm / 100.0 / std::f32::consts::TAU)
+            })
+            .collect();
+        let collider = StaticMesh::new(positions.clone(), triangles.clone(), BODY_VOXEL);
+        Self {
+            positions,
+            triangles,
+            profile,
+            collider,
+        }
+    }
+
+    /// The project's avatar fitted to its measurements, if it has one.
+    pub fn of_project(project: &Project) -> Result<Option<Self>, CommandError> {
+        let Some(avatar) = project.avatar() else {
+            return Ok(None);
+        };
+        let model = body_model()?;
+        let positions = fitted_positions(model, &fit(model, &avatar.body));
+        Ok(Some(Self::new(positions, model.triangles().to_vec())))
+    }
 }
 
 /// The widest body section between heights `top` and `top - below` (m):
@@ -162,7 +181,7 @@ fn segment_counts(project: &Project, spacing: f64) -> BTreeMap<EdgeId, usize> {
 /// Build the scene. Panels without a placement are left out.
 pub fn build(
     project: &Project,
-    body: Option<BodyMesh<'_>>,
+    form: Option<&Form>,
     spacing_mm: f64,
 ) -> Result<Drape, CommandError> {
     let spacing = spacing_mm.max(2.0);
@@ -171,7 +190,8 @@ pub fn build(
         .default_garment()
         .and_then(|g| project.garments().get(&g));
     let fabric = fabric_preset(garment.map(|g| g.fabric).unwrap_or_default()).params();
-    let profile = body_profile(body);
+    let default_profile = [DEFAULT_BODY_RADIUS_M];
+    let profile = form.map_or(&default_profile[..], |f| &f.profile[..]);
 
     let mut scene = SimScene {
         fabrics: vec![fabric],
@@ -247,7 +267,7 @@ pub fn build(
         for v in &mesh.vertices {
             let below = ((l.top - v.y) / 1000.0) as f32;
             let y = top_y - below;
-            let r = (body_radius(&profile, top_y, below) + gap)
+            let r = (body_radius(profile, top_y, below) + gap)
                 .max(around(y) / std::f32::consts::TAU)
                 .max(1e-3);
             let theta = angle0 + ((v.x - centre) / 1000.0) as f32 / r;
@@ -293,13 +313,7 @@ pub fn build(
         }
     }
 
-    if let Some(b) = body {
-        scene.collider = Some(StaticMesh::new(
-            b.positions.to_vec(),
-            b.triangles.to_vec(),
-            BODY_VOXEL,
-        ));
-    }
+    scene.collider = form.map(|f| f.collider.clone());
     // Pins: the cloth around each pin starts at the pin's place, keeping
     // its local shape, and does not move.
     let mut pins = Vec::new();
@@ -344,37 +358,100 @@ pub fn pinned_by(piece: &Piece, rest: &[Vec2], at: Vec2) -> Vec<usize> {
     near.into_iter().map(|(_, i)| i).collect()
 }
 
-/// The project's avatar fitted to its measurements (m), if it has one.
-pub fn fitted_body(project: &Project) -> Result<Option<Vec<Vec3>>, CommandError> {
-    let Some(avatar) = project.avatar() else {
-        return Ok(None);
-    };
-    let model = body_model()?;
-    Ok(Some(fitted_positions(model, &fit(model, &avatar.body))))
+/// Build the scene for the project as it is, at the default spacing.
+pub fn prepare(project: &Project, form: Option<&Form>) -> Result<Drape, CommandError> {
+    build(project, form, DEFAULT_SPACING_MM)
 }
 
-/// Build the scene for the project as it is: fitted avatar, default
-/// spacing.
-pub fn prepare(project: &Project, body: Option<&[Vec3]>) -> Result<Drape, CommandError> {
-    let triangles = match body {
-        Some(_) => body_model()?.triangles(),
-        None => &[],
-    };
-    build(
-        project,
-        body.map(|positions| BodyMesh {
-            positions,
-            triangles,
-        }),
-        DEFAULT_SPACING_MM,
-    )
+/// Start `new` where `old` is now (`positions`): each particle takes the
+/// position of the same pattern point in the old drape, interpolated in
+/// the old triangle that contains it, or extrapolated from the nearest one
+/// when the panel grew. Particles of new panels, and pinned ones, keep
+/// their own start. This is how pattern edits reach a running simulation
+/// without a jump (architecture §7.8).
+pub fn carry_over(old: &Drape, positions: &[Vec3], new: &mut Drape) {
+    let rest_old: Vec<Vec2> = old.scene.particles.iter().map(|p| p.rest).collect();
+    let rest = |k: usize| rest_old.get(k).copied();
+    for piece in &new.pieces {
+        let Some(before) = old.pieces.iter().find(|p| p.panel == piece.panel) else {
+            continue;
+        };
+        let corners: Vec<[usize; 3]> = before
+            .indices
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .map(|t| t.map(|i| before.particles.start + i as usize))
+            .collect();
+        // Old triangles binned by their pattern bounding box, so a point
+        // inside the old shape only tests a few.
+        let cell = |p: Vec2| (p / CARRY_CELL_M).floor().as_ivec2().to_array();
+        let mut grid: HashMap<[i32; 2], Vec<usize>> = HashMap::new();
+        for (k, t) in corners.iter().enumerate() {
+            let pts: Vec<Vec2> = t.iter().filter_map(|i| rest(*i)).collect();
+            let lo = pts.iter().fold(Vec2::MAX, |a, b| a.min(*b));
+            let hi = pts.iter().fold(Vec2::MIN, |a, b| a.max(*b));
+            let (a, b) = (cell(lo), cell(hi));
+            for x in a[0]..=b[0] {
+                for y in a[1]..=b[1] {
+                    grid.entry([x, y]).or_default().push(k);
+                }
+            }
+        }
+        let weights = |p: Vec2, t: &[usize; 3]| {
+            let [a, b, c] = t.map(rest);
+            barycentric(p, a?, b?, c?)
+        };
+        // The triangle whose smallest weight is largest: the one containing
+        // the point, or the closest one outside.
+        let best_of = |p: Vec2, candidates: &mut dyn Iterator<Item = &[usize; 3]>| {
+            candidates
+                .filter_map(|t| Some((weights(p, t)?, *t)))
+                .max_by(|x, y| x.0.min_element().total_cmp(&y.0.min_element()))
+        };
+        for i in piece.particles.clone() {
+            let Some(p) = new.scene.particles.get_mut(i) else {
+                continue;
+            };
+            if p.pinned {
+                continue;
+            }
+            let near = grid
+                .get(&cell(p.rest))
+                .map(Vec::as_slice)
+                .unwrap_or_default();
+            let inside = best_of(p.rest, &mut near.iter().filter_map(|k| corners.get(*k)))
+                .filter(|(w, _)| w.min_element() >= -1e-4);
+            let best = inside.or_else(|| best_of(p.rest, &mut corners.iter()));
+            if let Some((w, t)) = best
+                && let [Some(a), Some(b), Some(c)] = t.map(|k| positions.get(k).copied())
+            {
+                p.position = a * w.x + b * w.y + c * w.z;
+            }
+        }
+    }
+}
+
+/// Bin size of the carry-over grid on the pattern (m).
+const CARRY_CELL_M: f32 = 0.05;
+
+/// Barycentric weights of `p` in triangle `abc` (2D); `None` if it is flat.
+fn barycentric(p: Vec2, a: Vec2, b: Vec2, c: Vec2) -> Option<Vec3> {
+    let (v0, v1, v2) = (b - a, c - a, p - a);
+    let det = v0.perp_dot(v1);
+    if det.abs() < 1e-12 {
+        return None;
+    }
+    let v = v2.perp_dot(v1) / det;
+    let w = v0.perp_dot(v2) / det;
+    Some(Vec3::new(1.0 - v - w, v, w))
 }
 
 /// What a headless drape produced.
 #[derive(Debug, Clone)]
 pub struct Simulated {
     pub drape: Drape,
-    pub body: Option<Vec<Vec3>>,
+    pub form: Option<Form>,
     pub positions: Vec<Vec3>,
     pub frames: u32,
     pub ms_per_frame: f64,
@@ -383,8 +460,8 @@ pub struct Simulated {
 
 /// Simulate `frames` frames of 1/60 s from the starting positions.
 pub fn simulate(project: &Project, frames: u32) -> Result<Simulated, CommandError> {
-    let body = fitted_body(project)?;
-    let drape = prepare(project, body.as_deref())?;
+    let form = Form::of_project(project)?;
+    let drape = prepare(project, form.as_ref())?;
     if drape.pieces.is_empty() {
         return Err(CommandError::NothingToSimulate);
     }
@@ -398,7 +475,7 @@ pub fn simulate(project: &Project, frames: u32) -> Result<Simulated, CommandErro
         positions: solver.positions().to_vec(),
         stats: solver.stats(),
         drape,
-        body,
+        form,
         frames,
         ms_per_frame,
     })

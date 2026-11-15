@@ -121,10 +121,11 @@ class _ShellState extends State<Shell> {
     });
   }
 
+  /// The running drape follows the new fabric (the engine carries edits
+  /// over).
   void _setFabric(String fabric) {
     _run({'type': 'garment.set_fabric', 'fabric': fabric});
     _refresh();
-    _restart();
   }
 
   void _addRectangle() {

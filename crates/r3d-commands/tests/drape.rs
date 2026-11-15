@@ -1,9 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // test code
 //! End to end: a sewn skirt on the avatar drapes and stays on the hips.
 
-use r3d_avatar::fit::{fit, fitted_positions};
-use r3d_commands::drape::{BodyMesh, DEFAULT_SPACING_MM, build};
-use r3d_commands::queries::body_model;
+use r3d_commands::drape::{DEFAULT_SPACING_MM, Form, build};
 use r3d_commands::{Script, Session, Step, templates};
 use r3d_core::Project;
 use r3d_sim::Solver;
@@ -21,18 +19,8 @@ fn skirt_template_closes_and_stays_on_the_body() {
     assert!(seams.iter().all(|s| s["mismatch_mm"] == 0.0), "{seams:?}");
 
     let project = s.project();
-    let body = project.avatar().unwrap().body;
-    let model = body_model().unwrap();
-    let positions = fitted_positions(model, &fit(model, &body));
-    let drape = build(
-        project,
-        Some(BodyMesh {
-            positions: &positions,
-            triangles: model.triangles(),
-        }),
-        DEFAULT_SPACING_MM,
-    )
-    .unwrap();
+    let form = Form::of_project(project).unwrap().unwrap();
+    let drape = build(project, Some(&form), DEFAULT_SPACING_MM).unwrap();
     assert!(!drape.scene.seams.is_empty());
     // All pieces share the same waistline and hem: sewn points pair at the
     // same pattern height (a reversed seam would twist the skirt).
@@ -85,17 +73,8 @@ fn a_pin_holds_the_cloth_where_it_says() {
         serde_json::json!({"type": "pin.add", "panel": front, "at": [390, 0], "position": hand});
     s.run_step(&Step::from_value(pin).unwrap()).unwrap();
 
-    let model = body_model().unwrap();
-    let positions = fitted_positions(model, &fit(model, &s.project().avatar().unwrap().body));
-    let drape = build(
-        s.project(),
-        Some(BodyMesh {
-            positions: &positions,
-            triangles: model.triangles(),
-        }),
-        DEFAULT_SPACING_MM,
-    )
-    .unwrap();
+    let form = Form::of_project(s.project()).unwrap().unwrap();
+    let drape = build(s.project(), Some(&form), DEFAULT_SPACING_MM).unwrap();
     let held = drape.pins[0].1.clone();
     assert!(held.len() > 3, "{held:?}");
     let mut solver = Solver::new(drape.scene);
@@ -108,4 +87,66 @@ fn a_pin_holds_the_cloth_where_it_says() {
         "{at}"
     );
     assert!(solver.stats().max_seam_gap < 0.005);
+}
+
+#[test]
+fn edits_carry_the_drape_over_without_a_jump() {
+    let mut s = Session::new(Project::new("t"));
+    let body = serde_json::json!({"type": "avatar.set",
+        "body": {"masculinity": 0, "height_cm": 168, "bust_cm": 90, "waist_cm": 73, "hips_cm": 98}});
+    s.run_step(&Step::from_value(body).unwrap()).unwrap();
+    let script = Script::parse(templates::get("a-line-skirt").unwrap()).unwrap();
+    let results = script.run(|step| s.run_step(step)).unwrap();
+    let front = &results[2]["created"];
+    let form = Form::of_project(s.project()).unwrap().unwrap();
+    let old = build(s.project(), Some(&form), DEFAULT_SPACING_MM).unwrap();
+    let mut solver = Solver::new(old.scene.clone());
+    for _ in 0..90 {
+        solver.step(1.0 / 60.0);
+    }
+    let draped = solver.positions().to_vec();
+
+    // Lengthen the front by 50 mm: move its two hem corners down.
+    for (k, x) in [(1, 0.0), (2, 780.0)] {
+        let step = serde_json::json!({"type": "point.move", "point": front[k], "to": [x, -50.0]});
+        s.run_step(&Step::from_value(step).unwrap()).unwrap();
+    }
+    let mut new = build(s.project(), Some(&form), DEFAULT_SPACING_MM).unwrap();
+    r3d_commands::drape::carry_over(&old, &draped, &mut new);
+
+    let front_old = &old.pieces[0];
+    let front_new = &new.pieces[0];
+    let pos = |d: &r3d_commands::drape::Drape, i: usize| d.scene.particles[i].position;
+    let rest = |d: &r3d_commands::drape::Drape, i: usize| d.scene.particles[i].rest;
+    // A waist particle (rest y = 0.6 m) is where the drape left it.
+    let waist_new = front_new
+        .particles
+        .clone()
+        .find(|i| rest(&new, *i).y > 0.599)
+        .unwrap();
+    let waist_old = front_old
+        .particles
+        .clone()
+        .min_by(|a, b| {
+            rest(&old, *a)
+                .distance(rest(&new, waist_new))
+                .total_cmp(&rest(&old, *b).distance(rest(&new, waist_new)))
+        })
+        .unwrap();
+    assert!(pos(&new, waist_new).distance(draped[waist_old]) < 0.005);
+    // The new hem (rest y < 0) continues the drape below the old hem.
+    let old_hem = front_old
+        .particles
+        .clone()
+        .map(|i| draped[i].y)
+        .fold(f32::MAX, f32::min);
+    let new_hem = front_new
+        .particles
+        .clone()
+        .map(|i| pos(&new, i).y)
+        .fold(f32::MAX, f32::min);
+    assert!(
+        new_hem < old_hem - 0.03 && new_hem > old_hem - 0.08,
+        "{old_hem} -> {new_hem}"
+    );
 }

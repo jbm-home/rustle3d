@@ -82,5 +82,12 @@ opt-level = 2
 [profile.dev.package.r3d-sim]
 opt-level = 2
 
+# Meshing and the drape carry-over run on every pattern edit while draping.
+[profile.dev.package.r3d-geom]
+opt-level = 2
+
+[profile.dev.package.r3d-commands]
+opt-level = 2
+
 [profile.release]
 lto = "thin"

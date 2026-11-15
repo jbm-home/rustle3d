@@ -10,16 +10,14 @@ use std::time::Instant;
 use flutter_rust_bridge::frb;
 use std::path::PathBuf;
 
-use r3d_avatar::fit::{fit, fitted_positions};
 use r3d_avatar::presets::{BodyPreset, PresetLibrary};
-use r3d_commands::drape;
-use r3d_commands::queries::body_model;
+use r3d_commands::drape::{self, Drape, Form};
 use r3d_commands::{Script, Step, Workspace, templates};
 use r3d_sim::Solver;
 
-use crate::cloth::{Cloth, Held, Hit, PICK_PX};
+use crate::cloth::{Held, Hit, PICK_PX, RESYNC_EVERY, Sync};
 use crate::sim::SimThread;
-use r3d_core::{Body, Fabric, Localizable, Message, PanelId, PinId};
+use r3d_core::{Body, Fabric, Localizable, Message, PanelId};
 use r3d_render::board::BoardView;
 use r3d_render::theme::PIECE_COLORS;
 use r3d_render::{
@@ -155,19 +153,6 @@ impl Graphics {
     }
 }
 
-/// The avatar mesh fitted to `body`.
-fn avatar_mesh(body: &Body) -> Result<Mesh, ApiError> {
-    let model = body_model().map_err(err)?;
-    let fitted = fit(model, body);
-    let mut mesh = Mesh {
-        positions: fitted_positions(model, &fitted),
-        normals: Vec::new(),
-        indices: model.triangles().iter().flatten().copied().collect(),
-    };
-    mesh.recompute_normals();
-    Ok(mesh)
-}
-
 /// A fabric choice for the UI.
 #[derive(Debug, Clone)]
 pub struct FabricSwatch {
@@ -203,8 +188,12 @@ pub struct Engine {
     library_dir: Mutex<Option<PathBuf>>,
     /// The simulation thread, started on first use.
     sim: Mutex<Option<SimThread>>,
-    /// How to draw the loaded simulation.
-    cloth: Mutex<Cloth>,
+    /// The loaded simulation's scene (pieces, pattern positions).
+    cloth: Mutex<Option<Drape>>,
+    /// The dress form for the current measurements.
+    form: Mutex<Option<(Body, Form)>>,
+    /// Edits not yet carried into the running simulation.
+    sync: Mutex<Sync>,
     /// The cloth under the pointer since it went down, if any.
     held: Mutex<Option<Held>>,
 }
@@ -233,7 +222,9 @@ impl Engine {
             selection: Mutex::new(Vec::new()),
             library_dir: Mutex::new(None),
             sim: Mutex::new(None),
-            cloth: Mutex::new(Cloth::default()),
+            cloth: Mutex::new(None),
+            form: Mutex::new(None),
+            sync: Mutex::new(Sync::default()),
             held: Mutex::new(None),
         })
     }
@@ -259,29 +250,87 @@ impl Engine {
         Ok(slot)
     }
 
-    /// Rebuild the simulation from the document: placed pieces around the
-    /// body, paused. This is also how edits reach the simulation.
-    #[frb(sync)]
-    pub fn reset_simulation(&self) -> Result<SimStatus, ApiError> {
+    /// The dress form for the project's measurements, built when they
+    /// change (`None` without an avatar).
+    fn form(
+        &self,
+        project: &r3d_core::Project,
+    ) -> Result<MutexGuard<'_, Option<(Body, Form)>>, ApiError> {
+        let mut slot = self.form.lock().map_err(|_| poisoned())?;
+        let body = project.avatar().map(|a| a.body);
+        if slot.as_ref().map(|(b, _)| *b) != body {
+            *slot = match (body, Form::of_project(project).map_err(err)?) {
+                (Some(b), Some(f)) => Some((b, f)),
+                _ => None,
+            };
+        }
+        Ok(slot)
+    }
+
+    /// Rebuild the simulation from the document. With `carry`, the cloth
+    /// continues from where it is (pattern edits while draping); without,
+    /// it starts again around the body, paused.
+    fn rebuild(&self, carry: bool) -> Result<(), ApiError> {
         let ws = self.workspace()?;
         let project = ws.session().project();
-        let body = drape::fitted_body(project).map_err(err)?;
-        let drape = drape::prepare(project, body.as_deref()).map_err(err)?;
+        let form = self.form(project)?;
+        let mut drape = drape::prepare(project, form.as_ref().map(|(_, f)| f)).map_err(err)?;
+        drop(form);
         drop(ws);
-        let cloth = Cloth {
-            rest: drape.scene.particles.iter().map(|p| p.rest).collect(),
-            pins: drape.pins.into_iter().collect(),
-            pieces: drape.pieces,
-        };
         let sim = self.sim()?;
         let thread = sim.as_ref().ok_or_else(poisoned)?;
-        if cloth.pieces.is_empty() {
+        let now = thread.latest();
+        let mut cloth = self.cloth.lock().map_err(|_| poisoned())?;
+        let carry = carry && now.loaded;
+        if carry && let Some(old) = cloth.as_ref() {
+            drape::carry_over(old, &now.positions, &mut drape);
+        }
+        if drape.pieces.is_empty() {
             thread.clear();
         } else {
-            thread.load(Solver::new(drape.scene));
+            let mut solver = Solver::new(drape.scene.clone());
+            if carry {
+                solver.continue_at(now.time);
+            }
+            thread.load(solver);
+            if carry && now.running {
+                thread.set_running(true);
+            }
         }
-        *self.cloth.lock().map_err(|_| poisoned())? = cloth;
-        drop(sim);
+        *cloth = Some(drape);
+        Ok(())
+    }
+
+    /// Carry pending edits into the running simulation, at most every
+    /// `RESYNC_EVERY` (a drag in 2D sends edits every frame).
+    fn resync_if_due(&self) -> Result<(), ApiError> {
+        let due = {
+            let mut sync = self.sync.lock().map_err(|_| poisoned())?;
+            let due = sync.pending && sync.last.elapsed() >= RESYNC_EVERY;
+            if due {
+                sync.pending = false;
+                sync.last = Instant::now();
+            }
+            due
+        };
+        let loaded = self.cloth.lock().map_err(|_| poisoned())?.is_some();
+        if due && loaded {
+            self.rebuild(true)?;
+        }
+        Ok(())
+    }
+
+    /// Note that the document changed: the drape follows on a next frame.
+    fn edited(&self) -> Result<(), ApiError> {
+        self.sync.lock().map_err(|_| poisoned())?.pending = true;
+        Ok(())
+    }
+
+    /// Start the simulation again from the pattern: the pieces around the
+    /// body, paused.
+    #[frb(sync)]
+    pub fn reset_simulation(&self) -> Result<SimStatus, ApiError> {
+        self.rebuild(false)?;
         self.simulation_status()
     }
 
@@ -328,6 +377,9 @@ impl Engine {
         let step = Step::from_value(value).map_err(err)?;
         let mut ws = self.workspace()?;
         let result = ws.run_step(&step).map_err(err)?;
+        if !matches!(step, Step::Query(_)) {
+            self.edited()?;
+        }
         if ws.session().is_dirty() {
             ws.save().map_err(err)?;
         }
@@ -345,6 +397,7 @@ impl Engine {
         let script = Script::parse(&script_json).map_err(err)?;
         let mut ws = self.workspace()?;
         let results = script.run(|step| ws.run_step(step)).map_err(err)?;
+        self.edited()?;
         if ws.session().is_dirty() {
             ws.save().map_err(err)?;
         }
@@ -453,6 +506,7 @@ impl Engine {
     #[frb(sync)]
     pub fn render_view(&self, view: u32) -> Result<f64, ApiError> {
         let start = Instant::now();
+        self.resync_if_due()?;
         let selected = self.selected()?.clone();
         let ws = self.workspace()?;
         let project = ws.session().project();
@@ -481,10 +535,16 @@ impl Engine {
             ViewKind::Garment => {
                 let body = project.avatar().map(|a| a.body);
                 if body != g.avatar.as_ref().map(|(b, _)| *b) {
-                    g.avatar = match body {
-                        Some(b) => Some((b, avatar_mesh(&b)?)),
-                        None => None,
-                    };
+                    let form = self.form(project)?;
+                    g.avatar = form.as_ref().map(|(b, f)| {
+                        let mut mesh = Mesh {
+                            positions: f.positions.clone(),
+                            normals: Vec::new(),
+                            indices: f.triangles.iter().flatten().copied().collect(),
+                        };
+                        mesh.recompute_normals();
+                        (*b, mesh)
+                    });
                 }
                 let garment = project
                     .default_garment()
@@ -502,8 +562,8 @@ impl Engine {
                     .unwrap_or_default();
                 let cloth = self.cloth.lock().map_err(|_| poisoned())?;
                 let pieces: Vec<(PanelId, Mesh)> = cloth
-                    .pieces
                     .iter()
+                    .flat_map(|d| &d.pieces)
                     .filter_map(|piece| {
                         let positions = published.positions.get(piece.particles.clone())?;
                         let mut mesh = Mesh {
@@ -607,8 +667,8 @@ impl Engine {
             .cloth
             .lock()
             .map_err(|_| poisoned())?
-            .pieces
             .iter()
+            .flat_map(|d| &d.pieces)
             .find(|piece| piece.particles.contains(&particle))
             .map(|piece| piece.panel);
         Ok(Some(Hit {
@@ -678,9 +738,9 @@ impl Engine {
     }
 
     /// ⌥-click at (`x`, `y`) in the 3D view: pin the cloth there, where it
-    /// is now (a `pin.add` command, so it is saved and undoable), and hold
-    /// it at once in the running simulation. Returns the new pin's id, or
-    /// `None` when there is no cloth under the cursor.
+    /// is now (a `pin.add` command, so it is saved and undoable; the running
+    /// simulation follows). Returns the new pin's id, or `None` when there
+    /// is no cloth under the cursor.
     #[frb(sync)]
     pub fn pin_at(&self, view: u32, x: f64, y: f64) -> Result<Option<String>, ApiError> {
         let slot = self.graphics()?;
@@ -694,10 +754,14 @@ impl Engine {
         let Some(panel) = hit.panel else {
             return Ok(None);
         };
-        let at = {
-            let cloth = self.cloth.lock().map_err(|_| poisoned())?;
-            cloth.rest.get(hit.particle).copied().unwrap_or_default()
-        };
+        let at = self
+            .cloth
+            .lock()
+            .map_err(|_| poisoned())?
+            .as_ref()
+            .and_then(|d| d.scene.particles.get(hit.particle))
+            .map(|p| p.rest)
+            .unwrap_or_default();
         let p = hit.position;
         let step = serde_json::json!({
             "type": "pin.add",
@@ -707,44 +771,14 @@ impl Engine {
         });
         let out: serde_json::Value = serde_json::from_str(&self.run(step.to_string())?)
             .map_err(|e| ApiError::new("internal", e.to_string()))?;
-        let Some(id) = out["created"][0]
-            .as_str()
-            .and_then(|s| s.parse::<PinId>().ok())
-        else {
-            return Err(ApiError::new("internal", "pin.add created no pin"));
-        };
-        let held = {
-            let mut cloth = self.cloth.lock().map_err(|_| poisoned())?;
-            let held = cloth
-                .pieces
-                .iter()
-                .find(|piece| piece.particles.contains(&hit.particle))
-                .map(|piece| drape::pinned_by(piece, &cloth.rest, at))
-                .unwrap_or_default();
-            cloth.pins.insert(id, held.clone());
-            held
-        };
-        if let Some(thread) = self.sim()?.as_ref() {
-            thread.pin(held, true);
-        }
-        Ok(Some(id.to_string()))
+        Ok(out["created"][0].as_str().map(str::to_owned))
     }
 
-    /// Remove a pin (`pin.remove`) and free its cloth at once in the
-    /// running simulation.
+    /// Remove a pin (`pin.remove`); the cloth there moves again.
     #[frb(sync)]
     pub fn unpin(&self, pin: String) -> Result<(), ApiError> {
-        let id: PinId = pin
-            .parse()
-            .map_err(|_| ApiError::new("malformed", format!("not a pin id: {pin}")))?;
-        let step = serde_json::json!({ "type": "pin.remove", "pin": id });
+        let step = serde_json::json!({ "type": "pin.remove", "pin": pin });
         self.run(step.to_string())?;
-        let held = self.cloth.lock().map_err(|_| poisoned())?.pins.remove(&id);
-        if let Some(held) = held {
-            if let Some(thread) = self.sim()?.as_ref() {
-                thread.pin(held, false);
-            }
-        }
         Ok(())
     }
 

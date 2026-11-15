@@ -4,7 +4,7 @@
 
 use r3d_avatar::fit::{fit, fitted_positions};
 use r3d_avatar::model::BodyModel;
-use r3d_commands::drape::{self, BodyMesh};
+use r3d_commands::drape;
 use r3d_commands::{Script, Session, templates};
 use r3d_core::{Fabric, Project};
 use r3d_render::board::BoardView;
@@ -96,11 +96,8 @@ fn view3d_renders_the_avatar_and_the_cloth() {
     let mut session = Session::new(Project::new("t"));
     let script = Script::parse(templates::get("a-line-skirt").unwrap()).unwrap();
     script.run(|step| session.run_step(step)).unwrap();
-    let body_mesh = BodyMesh {
-        positions: &avatar.positions,
-        triangles: model.triangles(),
-    };
-    let scene = drape::build(session.project(), Some(body_mesh), 25.0)
+    let form = drape::Form::new(avatar.positions.clone(), model.triangles().to_vec());
+    let scene = drape::build(session.project(), Some(&form), 25.0)
         .unwrap()
         .scene;
     let mut skirt = Mesh {
