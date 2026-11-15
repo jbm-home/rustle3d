@@ -12,13 +12,14 @@ use std::path::PathBuf;
 
 use r3d_avatar::fit::{fit, fitted_positions};
 use r3d_avatar::presets::{BodyPreset, PresetLibrary};
-use r3d_commands::drape::{self, Piece};
+use r3d_commands::drape;
 use r3d_commands::queries::body_model;
 use r3d_commands::{Script, Step, Workspace, templates};
 use r3d_sim::Solver;
 
+use crate::cloth::{Cloth, Held, Hit, PICK_PX};
 use crate::sim::SimThread;
-use r3d_core::{Body, Fabric, Localizable, Message, PanelId};
+use r3d_core::{Body, Fabric, Localizable, Message, PanelId, PinId};
 use r3d_render::board::BoardView;
 use r3d_render::theme::PIECE_COLORS;
 use r3d_render::{
@@ -176,26 +177,6 @@ pub struct FabricSwatch {
     pub argb: u32,
 }
 
-/// Pick radius on the cloth (physical pixels).
-const PICK_PX: f32 = 24.0;
-
-/// Cloth under a pressed pointer. The grab starts on the first move, so a
-/// simple click only selects.
-#[derive(Clone, Copy)]
-struct Held {
-    particle: usize,
-    /// Where it was when pressed: the pulling plane goes through it.
-    anchor: glam::Vec3,
-    pulling: bool,
-}
-
-/// A cloth particle under the cursor.
-struct Hit {
-    particle: usize,
-    position: glam::Vec3,
-    panel: Option<PanelId>,
-}
-
 /// State of the cloth simulation, for the UI.
 #[derive(Debug, Clone)]
 pub struct SimStatus {
@@ -223,7 +204,7 @@ pub struct Engine {
     /// The simulation thread, started on first use.
     sim: Mutex<Option<SimThread>>,
     /// How to draw the loaded simulation.
-    cloth: Mutex<Vec<Piece>>,
+    cloth: Mutex<Cloth>,
     /// The cloth under the pointer since it went down, if any.
     held: Mutex<Option<Held>>,
 }
@@ -252,7 +233,7 @@ impl Engine {
             selection: Mutex::new(Vec::new()),
             library_dir: Mutex::new(None),
             sim: Mutex::new(None),
-            cloth: Mutex::new(Vec::new()),
+            cloth: Mutex::new(Cloth::default()),
             held: Mutex::new(None),
         })
     }
@@ -287,15 +268,19 @@ impl Engine {
         let body = drape::fitted_body(project).map_err(err)?;
         let drape = drape::prepare(project, body.as_deref()).map_err(err)?;
         drop(ws);
-        let parts = drape.pieces;
+        let cloth = Cloth {
+            rest: drape.scene.particles.iter().map(|p| p.rest).collect(),
+            pins: drape.pins.into_iter().collect(),
+            pieces: drape.pieces,
+        };
         let sim = self.sim()?;
         let thread = sim.as_ref().ok_or_else(poisoned)?;
-        if parts.is_empty() {
+        if cloth.pieces.is_empty() {
             thread.clear();
         } else {
             thread.load(Solver::new(drape.scene));
         }
-        *self.cloth.lock().map_err(|_| poisoned())? = parts;
+        *self.cloth.lock().map_err(|_| poisoned())? = cloth;
         drop(sim);
         self.simulation_status()
     }
@@ -517,6 +502,7 @@ impl Engine {
                     .unwrap_or_default();
                 let cloth = self.cloth.lock().map_err(|_| poisoned())?;
                 let pieces: Vec<(PanelId, Mesh)> = cloth
+                    .pieces
                     .iter()
                     .filter_map(|piece| {
                         let positions = published.positions.get(piece.particles.clone())?;
@@ -621,6 +607,7 @@ impl Engine {
             .cloth
             .lock()
             .map_err(|_| poisoned())?
+            .pieces
             .iter()
             .find(|piece| piece.particles.contains(&particle))
             .map(|piece| piece.panel);
@@ -686,6 +673,77 @@ impl Engine {
         }
         if let Some(h) = self.held.lock().map_err(|_| poisoned())?.as_mut() {
             h.pulling = true;
+        }
+        Ok(())
+    }
+
+    /// ⌥-click at (`x`, `y`) in the 3D view: pin the cloth there, where it
+    /// is now (a `pin.add` command, so it is saved and undoable), and hold
+    /// it at once in the running simulation. Returns the new pin's id, or
+    /// `None` when there is no cloth under the cursor.
+    #[frb(sync)]
+    pub fn pin_at(&self, view: u32, x: f64, y: f64) -> Result<Option<String>, ApiError> {
+        let slot = self.graphics()?;
+        let Some(v) = slot.as_ref().and_then(|g| g.views.get(&view)) else {
+            return Ok(None);
+        };
+        let Some(hit) = self.pick_cloth(v, &slot, x, y)? else {
+            return Ok(None);
+        };
+        drop(slot);
+        let Some(panel) = hit.panel else {
+            return Ok(None);
+        };
+        let at = {
+            let cloth = self.cloth.lock().map_err(|_| poisoned())?;
+            cloth.rest.get(hit.particle).copied().unwrap_or_default()
+        };
+        let p = hit.position;
+        let step = serde_json::json!({
+            "type": "pin.add",
+            "panel": panel,
+            "at": [f64::from(at.x) * 1000.0, f64::from(at.y) * 1000.0],
+            "position": [p.x, p.y, p.z],
+        });
+        let out: serde_json::Value = serde_json::from_str(&self.run(step.to_string())?)
+            .map_err(|e| ApiError::new("internal", e.to_string()))?;
+        let Some(id) = out["created"][0]
+            .as_str()
+            .and_then(|s| s.parse::<PinId>().ok())
+        else {
+            return Err(ApiError::new("internal", "pin.add created no pin"));
+        };
+        let held = {
+            let mut cloth = self.cloth.lock().map_err(|_| poisoned())?;
+            let held = cloth
+                .pieces
+                .iter()
+                .find(|piece| piece.particles.contains(&hit.particle))
+                .map(|piece| drape::pinned_by(piece, &cloth.rest, at))
+                .unwrap_or_default();
+            cloth.pins.insert(id, held.clone());
+            held
+        };
+        if let Some(thread) = self.sim()?.as_ref() {
+            thread.pin(held, true);
+        }
+        Ok(Some(id.to_string()))
+    }
+
+    /// Remove a pin (`pin.remove`) and free its cloth at once in the
+    /// running simulation.
+    #[frb(sync)]
+    pub fn unpin(&self, pin: String) -> Result<(), ApiError> {
+        let id: PinId = pin
+            .parse()
+            .map_err(|_| ApiError::new("malformed", format!("not a pin id: {pin}")))?;
+        let step = serde_json::json!({ "type": "pin.remove", "pin": id });
+        self.run(step.to_string())?;
+        let held = self.cloth.lock().map_err(|_| poisoned())?.pins.remove(&id);
+        if let Some(held) = held {
+            if let Some(thread) = self.sim()?.as_ref() {
+                thread.pin(held, false);
+            }
         }
         Ok(())
     }

@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:rustle3d/main.dart';
@@ -62,5 +63,20 @@ void main() {
     expect(engine.simulationStatus().running, isTrue);
     await gesture.up();
     await tester.pump();
+
+    // ⌥-click pins the cloth (a pin.add, listed) instead of selecting.
+    engine.select(panels: []);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+    await tester.tapAt(centre);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+    await tester.pump();
+    final pins =
+        jsonDecode(engine.run(stepJson: '{"type":"pin.list"}')) as List;
+    expect(pins, hasLength(1));
+    expect(engine.selection(), isEmpty);
+    expect(find.text('Pins'), findsOneWidget);
+
+    engine.unpin(pin: pins.first['id'] as String);
+    expect(jsonDecode(engine.run(stepJson: '{"type":"pin.list"}')), isEmpty);
   });
 }

@@ -18,7 +18,7 @@ use std::time::Instant;
 use glam::{Vec2, Vec3};
 use r3d_avatar::fit::{fit, fitted_positions};
 use r3d_avatar::measure::girth_at;
-use r3d_core::{EdgeId, Fabric, PanelId, Project};
+use r3d_core::{EdgeId, Fabric, PanelId, PinId, Project};
 use r3d_geom::DVec2;
 use r3d_geom::mesh::mesh_polygon;
 use r3d_sim::collide::StaticMesh;
@@ -41,6 +41,8 @@ pub struct Drape {
     pub scene: SimScene,
     /// One entry per simulated panel, in particle order.
     pub pieces: Vec<Piece>,
+    /// The particles each pin holds.
+    pub pins: Vec<(PinId, Vec<usize>)>,
 }
 
 /// The particles and triangles of one panel, to draw it on its own.
@@ -298,7 +300,48 @@ pub fn build(
             BODY_VOXEL,
         ));
     }
-    Ok(Drape { scene, pieces })
+    // Pins: the cloth around each pin starts at the pin's place, keeping
+    // its local shape, and does not move.
+    let mut pins = Vec::new();
+    let rest: Vec<Vec2> = scene.particles.iter().map(|p| p.rest).collect();
+    for (id, pin) in project.pins() {
+        let Some(piece) = pieces.iter().find(|p| p.panel == pin.panel) else {
+            continue;
+        };
+        let held = pinned_by(piece, &rest, (pin.at / 1000.0).as_vec2());
+        let Some(&center) = held.first() else {
+            continue;
+        };
+        let origin = scene.particles[center].position;
+        for i in &held {
+            let p = &mut scene.particles[*i];
+            p.position = pin.position.as_vec3() + (p.position - origin);
+            p.pinned = true;
+        }
+        pins.push((*id, held));
+    }
+    Ok(Drape {
+        scene,
+        pieces,
+        pins,
+    })
+}
+
+/// Cloth within this distance of a pin (on the pattern) is held (m).
+pub const PIN_RADIUS_M: f32 = 0.03;
+
+/// The particles of `piece` a pin at `at` (pattern, m) holds: those within
+/// [`PIN_RADIUS_M`] on the pattern, the closest first. `rest` is every
+/// particle's pattern position.
+pub fn pinned_by(piece: &Piece, rest: &[Vec2], at: Vec2) -> Vec<usize> {
+    let mut near: Vec<(f32, usize)> = piece
+        .particles
+        .clone()
+        .filter_map(|i| Some((rest.get(i)?.distance(at), i)))
+        .filter(|(d, _)| *d < PIN_RADIUS_M)
+        .collect();
+    near.sort_by(|a, b| a.0.total_cmp(&b.0));
+    near.into_iter().map(|(_, i)| i).collect()
 }
 
 /// The project's avatar fitted to its measurements (m), if it has one.

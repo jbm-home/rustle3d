@@ -79,6 +79,8 @@ pub struct Solver {
     prev: Vec<Vec3>,
     v: Vec<Vec3>,
     w: Vec<f32>,
+    /// Inverse masses ignoring pins, to unpin.
+    w_free: Vec<f32>,
     thickness: Vec<f32>,
     friction: Vec<f32>,
     damping: Vec<f32>,
@@ -201,11 +203,15 @@ impl Solver {
             }
         }
 
+        let w_free: Vec<f32> = mass
+            .iter()
+            .map(|m| if *m <= 0.0 { 0.0 } else { 1.0 / m })
+            .collect();
         let w = scene
             .particles
             .iter()
-            .zip(&mass)
-            .map(|(p, m)| if p.pinned || *m <= 0.0 { 0.0 } else { 1.0 / m })
+            .zip(&w_free)
+            .map(|(p, w)| if p.pinned { 0.0 } else { *w })
             .collect();
         let x: Vec<Vec3> = scene.particles.iter().map(|p| p.position).collect();
         Self {
@@ -213,6 +219,7 @@ impl Solver {
             v: vec![Vec3::ZERO; n],
             x,
             w,
+            w_free,
             thickness,
             friction,
             damping,
@@ -268,6 +275,26 @@ impl Solver {
     pub fn move_grab(&mut self, target: Vec3) {
         if let Some(g) = &mut self.grab {
             g.target = target;
+        }
+    }
+
+    /// Hold these particles still where they are (out-of-range ones are
+    /// ignored).
+    pub fn pin(&mut self, particles: &[usize]) {
+        for i in particles {
+            if let (Some(w), Some(v)) = (self.w.get_mut(*i), self.v.get_mut(*i)) {
+                *w = 0.0;
+                *v = Vec3::ZERO;
+            }
+        }
+    }
+
+    /// Let these particles move again.
+    pub fn unpin(&mut self, particles: &[usize]) {
+        for i in particles {
+            if let (Some(w), Some(free)) = (self.w.get_mut(*i), self.w_free.get(*i)) {
+                *w = *free;
+            }
         }
     }
 

@@ -31,6 +31,7 @@ class _ShellState extends State<Shell> {
   Map<String, dynamic> _summary = const {};
   List<String> _selection = const [];
   Map<String, dynamic>? _panel;
+  List<dynamic> _pins = const [];
   String _tool = 'select';
 
   // Performance readouts, smoothed and refreshed twice a second.
@@ -74,6 +75,7 @@ class _ShellState extends State<Shell> {
           ? _run({'type': 'panel.get', 'panel': _selection.first})
                 as Map<String, dynamic>?
           : null;
+      _pins = (_run({'type': 'pin.list'}) as List<dynamic>?) ?? const [];
     });
   }
 
@@ -252,6 +254,10 @@ class _ShellState extends State<Shell> {
                             kind: ViewKind.garment,
                             onSelection: (_) => _refresh(),
                             onFrameTime: (ms) => _onFrame(false, ms),
+                            onPinned: (_) {
+                              _refresh();
+                              _toast('Pinned. Remove it in the inspector.');
+                            },
                           ),
                         ),
                       ),
@@ -263,6 +269,11 @@ class _ShellState extends State<Shell> {
                           panel: _panel,
                           summary: _summary,
                           onFabric: _setFabric,
+                          pins: _pins,
+                          onUnpin: (pin) {
+                            _guard(() => widget.engine.unpin(pin: pin));
+                            _refresh();
+                          },
                           run: (step) {
                             _run(step);
                             _refresh();
@@ -276,7 +287,7 @@ class _ShellState extends State<Shell> {
               ),
               _StatusBar(
                 hint: _selection.isEmpty
-                    ? 'Click a piece to select it · drag the 3D cloth to pull it · scroll to zoom · R adds a rectangle'
+                    ? 'Click a piece to select it · drag the 3D cloth to pull it, ⌥-click to pin it · scroll to zoom'
                     : 'Adjust the selection in the inspector · ⌫ deletes · ⌘Z undoes',
                 stats:
                     '${_simStats()}Rust render · pattern ${_boardMs.toStringAsFixed(1)} ms · '
@@ -676,6 +687,8 @@ class _Inspector extends StatelessWidget {
     required this.panel,
     required this.summary,
     required this.onFabric,
+    required this.pins,
+    required this.onUnpin,
     required this.run,
     required this.onDelete,
   });
@@ -684,6 +697,8 @@ class _Inspector extends StatelessWidget {
   final Map<String, dynamic>? panel;
   final Map<String, dynamic> summary;
   final ValueChanged<String> onFabric;
+  final List<dynamic> pins;
+  final ValueChanged<String> onUnpin;
   final ValueChanged<Map<String, Object?>> run;
   final VoidCallback onDelete;
 
@@ -702,7 +717,12 @@ class _Inspector extends StatelessWidget {
         child: KeyedSubtree(
           key: ValueKey(selection.join(',')),
           child: switch (selection.length) {
-            0 => _EmptyInspector(summary: summary, onFabric: onFabric),
+            0 => _EmptyInspector(
+              summary: summary,
+              onFabric: onFabric,
+              pins: pins,
+              onUnpin: onUnpin,
+            ),
             1 when panel != null => _PanelInspector(
               panel: panel!,
               run: run,
@@ -717,17 +737,23 @@ class _Inspector extends StatelessWidget {
 }
 
 class _EmptyInspector extends StatelessWidget {
-  const _EmptyInspector({required this.summary, required this.onFabric});
+  const _EmptyInspector({
+    required this.summary,
+    required this.onFabric,
+    required this.pins,
+    required this.onUnpin,
+  });
 
   final Map<String, dynamic> summary;
   final ValueChanged<String> onFabric;
+  final List<dynamic> pins;
+  final ValueChanged<String> onUnpin;
 
   @override
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
     final count = summary['counts']?['panels'] ?? 0;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return ListView(
       children: [
         Text(
           'Inspector',
@@ -771,6 +797,61 @@ class _EmptyInspector extends StatelessWidget {
               'cotton',
           onPick: onFabric,
         ),
+        const SizedBox(height: Space.l),
+        Divider(color: p.border, height: 1),
+        const SizedBox(height: Space.l),
+        _PinList(pins: pins, onUnpin: onUnpin),
+      ],
+    );
+  }
+}
+
+/// The pins holding the cloth, each removable.
+class _PinList extends StatelessWidget {
+  const _PinList({required this.pins, required this.onUnpin});
+
+  final List<dynamic> pins;
+  final ValueChanged<String> onUnpin;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Pins',
+          style: ts(fontSize: 14, fontWeight: FontWeight.w600, color: p.text),
+        ),
+        const SizedBox(height: Space.xs),
+        Text(
+          pins.isEmpty
+              ? '⌥-click the cloth in 3D to hold it in place.'
+              : '⌥-click the cloth in 3D to add one.',
+          style: ts(fontSize: 12.5, height: 1.45, color: p.textMuted),
+        ),
+        for (final pin in pins)
+          Padding(
+            padding: const EdgeInsets.only(top: Space.s),
+            child: Row(
+              children: [
+                Icon(Icons.push_pin_rounded, size: 16, color: p.accent),
+                const SizedBox(width: Space.s),
+                Expanded(
+                  child: Text(
+                    '${pin['panel_name'] ?? pin['panel']}',
+                    style: ts(fontSize: 13, color: p.text),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                _IconAction(
+                  icon: Icons.close_rounded,
+                  tip: 'Remove this pin',
+                  onTap: () => onUnpin(pin['id'] as String),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }

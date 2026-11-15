@@ -6,6 +6,7 @@
 //! `flutter_rust_bridge_codegen generate` (run in `app/`) from [`api`].
 
 pub mod api;
+mod cloth;
 mod sim;
 mod surface;
 

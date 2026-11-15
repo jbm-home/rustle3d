@@ -14,8 +14,13 @@ the avatar in real time, and I can pull on it to check how it hangs.
 - **Grab** (implemented): click and drag cloth in 3D to pull it (soft
   constraint on the cloth within 3 cm of the picked point, offsets kept),
   and release to let go. A click without moving only selects the piece
-  under the cursor; grabbing a paused simulation runs it. **Pin**: Alt+click pins a vertex region in place; pins
-  are listed and removable.
+  under the cursor; grabbing a paused simulation runs it. **Pin** (implemented): ⌥-click (Alt-click) pins the cloth
+  under the cursor where it is. Pins are document entities (`pin.add`,
+  `pin.remove`, `pin.list`; saved, undoable, available to agents): the
+  cloth within 3 cm of the point on the pattern is held at the pin's 3D
+  position, from the start of every simulation. Pins are listed in the
+  inspector and removable; adding or removing one applies at once to the
+  running simulation (undo/redo apply on the next Restart).
 - Pattern or material edits while the simulation runs update it live (the
   panel is remeshed, positions carry over).
 - "Save drape" stores the current shape in the project; reopening shows it

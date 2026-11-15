@@ -23,6 +23,8 @@ enum Control {
     /// Move the held cloth's target.
     GrabTo(Vec3),
     Release,
+    /// Hold these particles still, or let them go.
+    Pin(Vec<usize>, bool),
     Clear,
     Stop,
 }
@@ -104,6 +106,11 @@ impl SimThread {
 
     pub fn release(&self) {
         let _ = self.tx.send(Control::Release);
+    }
+
+    /// Hold these particles still (`true`) or free them.
+    pub fn pin(&self, particles: Vec<usize>, pinned: bool) {
+        let _ = self.tx.send(Control::Pin(particles, pinned));
     }
 
     pub fn clear(&self) {
@@ -192,6 +199,15 @@ fn run(rx: &Receiver<Control>, out: &Mutex<Published>) {
             Some(Control::Release) => {
                 if let Some(s) = solver.as_mut() {
                     s.release();
+                }
+            }
+            Some(Control::Pin(particles, pinned)) => {
+                if let Some(s) = solver.as_mut() {
+                    if pinned {
+                        s.pin(&particles);
+                    } else {
+                        s.unpin(&particles);
+                    }
                 }
             }
             Some(Control::Clear) => {

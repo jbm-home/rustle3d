@@ -18,6 +18,7 @@ class RustView extends StatefulWidget {
     required this.kind,
     this.onSelection,
     this.onFrameTime,
+    this.onPinned,
   });
 
   final Engine engine;
@@ -28,6 +29,9 @@ class RustView extends StatefulWidget {
 
   /// Called with the Rust render time (CPU + GPU, ms) of each frame.
   final ValueChanged<double>? onFrameTime;
+
+  /// Called with the new pin's id after an ⌥-click on the cloth.
+  final ValueChanged<String>? onPinned;
 
   @override
   State<RustView> createState() => _RustViewState();
@@ -126,6 +130,19 @@ class _RustViewState extends State<RustView>
             _downAt = e.localPosition;
             _dragged = false;
             final view = _viewId;
+            // ⌥-click pins the cloth under the cursor.
+            if (view != null && HardwareKeyboard.instance.isAltPressed) {
+              final pin = widget.engine.pinAt(
+                view: view,
+                x: e.localPosition.dx * _ratio,
+                y: e.localPosition.dy * _ratio,
+              );
+              if (pin != null) {
+                _dragged = true; // not a selection click
+                widget.onPinned?.call(pin);
+                return;
+              }
+            }
             _holding =
                 view != null &&
                 widget.engine.press(
