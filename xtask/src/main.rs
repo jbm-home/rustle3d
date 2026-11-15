@@ -1,6 +1,10 @@
 //! Developer tasks: `cargo xtask <task>`.
 //!
 //! - `gen-docs`: regenerate `docs/commands.md` from the command registry.
+//! - `fetch-makehuman`: rebuild the avatar body pack from MakeHuman's CC0
+//!   assets (network).
+
+mod makehuman;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -22,7 +26,8 @@ fn main() -> ExitCode {
     let task = std::env::args().nth(1);
     let result = match task.as_deref() {
         Some("gen-docs") => gen_docs(),
-        _ => Err("usage: cargo xtask gen-docs".to_owned()),
+        Some("fetch-makehuman") => makehuman::run(&root()),
+        _ => Err("usage: cargo xtask <gen-docs|fetch-makehuman>".to_owned()),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,

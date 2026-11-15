@@ -31,5 +31,8 @@ placeholder to be replaced by our own icon before any release.
 Manrope, from the Google Fonts repository (https://github.com/google/fonts),
 under the SIL Open Font License 1.1 (full text: `OFL-manrope.txt`).
 
-_None yet._ Default avatars derived from MakeHuman (CC0) will be listed here
-and in `assets/avatars/README.md` when they are added (milestone M5).
+### Avatar body — `assets/avatars/makehuman-body.r3dbody`
+
+Derived from MakeHuman's assets (base mesh and morph targets), CC0 1.0
+Universal, https://github.com/makehumancommunity/makehuman. Details and
+changes: `assets/avatars/README.md`. No MakeHuman code (AGPL) is used.

@@ -8,7 +8,10 @@ license.workspace = true
 publish = false
 
 [dependencies]
+r3d-avatar.workspace = true
 r3d-commands.workspace = true
+glam.workspace = true
+ureq.workspace = true
 
 [lints]
 workspace = true

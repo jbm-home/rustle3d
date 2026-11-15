@@ -103,6 +103,33 @@ pub fn is_simple(pts: &[DVec2]) -> bool {
     true
 }
 
+/// Convex hull (counter-clockwise, no collinear points), Andrew's monotone
+/// chain. A tape measure around a body section follows this hull.
+pub fn convex_hull(pts: &[DVec2]) -> Vec<DVec2> {
+    let mut p: Vec<DVec2> = pts.iter().copied().filter(|v| v.is_finite()).collect();
+    p.sort_by(|a, b| a.x.total_cmp(&b.x).then(a.y.total_cmp(&b.y)));
+    p.dedup();
+    if p.len() < 3 {
+        return p;
+    }
+    let half = |points: &mut dyn Iterator<Item = DVec2>| {
+        let mut chain: Vec<DVec2> = Vec::new();
+        for q in points {
+            while chain.len() >= 2
+                && orient(chain[chain.len() - 2], chain[chain.len() - 1], q) <= 0.0
+            {
+                chain.pop();
+            }
+            chain.push(q);
+        }
+        chain.pop(); // shared with the other half
+        chain
+    };
+    let mut hull = half(&mut p.iter().copied());
+    hull.extend(half(&mut p.iter().rev().copied()));
+    hull
+}
+
 /// Triangulate a simple **counter-clockwise** polygon by ear clipping, for
 /// display (filled panels). Returns index triples into `pts`. `O(n²)`, fine
 /// for pattern outlines. Collinear vertices are handled; a polygon that is
@@ -284,6 +311,17 @@ mod tests {
             .iter()
             .map(|t| signed_area(&[pts[t[0]], pts[t[1]], pts[t[2]]]))
             .sum()
+    }
+
+    #[test]
+    fn convex_hull_of_square_with_inner_points() {
+        let mut pts = square();
+        pts.push(DVec2::new(50.0, 50.0));
+        pts.push(DVec2::new(50.0, 0.0)); // collinear on an edge
+        let hull = convex_hull(&pts);
+        assert_eq!(hull.len(), 4);
+        assert!((perimeter(&hull) - 400.0).abs() < 1e-9);
+        assert!(signed_area(&hull) > 0.0);
     }
 
     #[test]
