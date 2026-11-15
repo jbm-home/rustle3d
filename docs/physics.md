@@ -223,11 +223,15 @@ buckled inward. With the garment's own width it hangs as an A-line.
 
 Reference machine: 8+ core desktop or laptop CPU (Apple M-series, recent x86).
 
-| Scene | Particles | Target |
-|---|---|---|
-| Skirt on avatar | ~4k | ≥ 60 fps, 15 substeps |
-| T-shirt on avatar | ~10k | ≥ 30 fps, 15 substeps (stretch: 60 fps) |
-| Dress | ~20k | ≥ 15 fps interactive; GPU backend later for 60 fps |
+| Scene | Particles | Target | Measured (2026-11-15, M-series, 30 substeps) |
+|---|---|---|---|
+| Skirt on avatar | ~4k | ≥ 60 fps, 15 substeps | 31 ms/frame (sheet on a sphere, `cargo bench -p r3d-sim`); the 1.7k-particle skirt: 14 ms |
+| T-shirt on avatar | ~10k | ≥ 30 fps, 15 substeps (stretch: 60 fps) | 70 ms/frame |
+| Dress | ~20k | ≥ 15 fps interactive; GPU backend later for 60 fps | — |
+
+We are about 2× off: 30 substeps are needed for the membrane to converge
+(§4), and the constraint solve is serial (§6). Leads: fewer substeps with a
+better-converging solver (e.g. Vertex Block Descent [12]), or the GPU.
 
 Budget per 30 fps frame: ≤ 20 ms solver, ≤ 3 ms rebuild of the spatial hash,
 with the rest left for rendering and UI. Rebuilding the scene after a pattern

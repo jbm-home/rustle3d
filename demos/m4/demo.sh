@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# M4 demo: a body, the sewn A-line skirt template placed around it, a seam
-# report, a headless drape, renders of the pattern and of the draped
-# garment, then the same in the app with real-time physics.
+# M4–M7 demo: a body, the sewn A-line skirt template placed around it, a
+# seam report, headless drapes in cotton and denim, a pin holding the hem,
+# renders of each; then the same live in the app (Simulate, drag to pull,
+# option-click to pin).
 # Run from the repository root: ./demos/m4/demo.sh
 set -euo pipefail
 
@@ -23,7 +24,13 @@ echo "== 3. Drape it headless (5 s of simulated time), in cotton then denim"
 "$R3D" simulate "$OUT" --frames 300 >/dev/null
 "$R3D" render "$OUT" --view 3d --out "$OUT/../denim.png" >/dev/null
 "$R3D" render "$OUT" --view board --out "$OUT/../pattern.png" >/dev/null
+
+echo "== 4. Pin the middle of the front hem out in front of the knees"
+"$R3D" run "$OUT" <(echo '[{"type": "pin.add", "panel": "panel:2", "at": [390, 0], "position": [0.05, 0.62, 0.32]}]') >/dev/null
+"$R3D" simulate "$OUT" --frames 240 >/dev/null
+"$R3D" render "$OUT" --view 3d --out "$OUT/../pinned.png" >/dev/null
 ls -1 "$(dirname "$OUT")"/*.png
 
 echo
-echo "Drape it live in the app: (cd app && flutter run -d macos), then Simulate (Space)."
+echo "Live in the app: (cd app && flutter run -d macos --release), then Simulate (Space),"
+echo "drag the cloth to pull it, option-click to pin it."

@@ -13,5 +13,12 @@ glam.workspace = true
 rayon.workspace = true
 serde.workspace = true
 
+[dev-dependencies]
+criterion.workspace = true
+
+[[bench]]
+name = "solver"
+harness = false
+
 [lints]
 workspace = true

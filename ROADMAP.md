@@ -17,10 +17,10 @@ can be tested through MCP as soon as they exist.
 | M1 | Document + commands + CLI ✅ | 1.5–2 wk | CLI script builds panels, undo/redo, save/reopen |
 | M2 | Geometry, 2D export, headless MCP ✅ | 2 wk | An agent drafts a skirt pattern via MCP and exports a tiled PDF |
 | M3 | Flutter + Rust spike, design system, 2D editor | 4–5 wk | Draw and edit panels in a polished UI (**visual gate**) |
-| M4 | Simulation v1 | 3 wk | A pinned panel drapes in real time in the 3D view |
-| M5 | Avatar, collisions, arrangement | 3 wk | Panels arranged around the avatar fall onto it |
-| M6 | Sewing + synced views | 3 wk | A skirt made from scratch, sewn and draped |
-| M7 | Materials, self-collision, grab/pin | 2–3 wk | The same T-shirt in jersey vs denim; pull it with the mouse |
+| M4 | Simulation v1 ✅ | 3 wk | A pinned panel drapes in real time in the 3D view |
+| M5 | Avatar, collisions, arrangement ✅ | 3 wk | Panels arranged around the avatar fall onto it |
+| M6 | Sewing + synced views ✅ (UI tools → M8) | 3 wk | A skirt made from scratch, sewn and draped |
+| M7 | Materials, self-collision, grab/pin ✅ (T-shirt → M10) | 2–3 wk | The same T-shirt in jersey vs denim; pull it with the mouse |
 | M8 | 3D → 2D editing tools | 3 wk | Lengthen a hem and take in a seam directly in 3D; the pattern follows |
 | M9 | glTF export, attached MCP | 2 wk | An agent edits the garment live in the open app; the result opens in a game engine |
 | M10 | Templates, guided flow, polish → **v0.1** | 3–4 wk | A first-time user makes a T-shirt in < 10 minutes |
@@ -81,55 +81,54 @@ Total: roughly 7.5–8.5 months to v0.1, then M11–M12.
   both themes, reviewed before going further.
 - **Demo**: draw a skirt by hand; an agent renders the board to PNG.
 
-## M4 — Simulation v1
+## M4–M7 — Simulation, avatar, sewing, materials ✅ (closed 2026-11-15)
 
-Status (2026-11-15): meshing, solver (membrane, dihedral bending, seams,
-pins, avatar and ground contacts, friction), reference scenes and the sim
-bridge are done; schema v4 brings seams, placements and fabrics (M5/M6
-items pulled forward). The app simulates on its own thread (Simulate /
-Pause / Restart, fabric swatches). Contacts run in parallel: the skirt
-simulates in real time (≈ 14 ms per frame). The CLI simulates and renders
-headless (`r3d simulate`, `r3d render --view board|3d`), and the
-`simulate` action is available to scripts and MCP. Agents can `simulate` and
-look at the result with `render_3d` / `render_board` (PNG). The avatar
-collides through a narrow-band SDF. Self-collision (particle repulsion) is in. Panels start
-at the garment's own width, so the A-line hangs as one (denim vs cotton
-visibly differ). Grab: drag the cloth in 3D
-to pull it; a click selects the piece under the cursor. Pins: ⌥-click the cloth to hold it;
-saved in the project (schema v5), listed and removable in the inspector.
-Next: close M4–M7 (demo and docs), then M8 (3D → 2D editing).
-- `r3d-geom`: constrained triangulation of panels at a target particle
-  spacing, with matching vertex counts along future seams (moved from M2).
-- `r3d-sim`: `Solver` trait, XPBD small steps, strain-based stretch/shear,
-  quadratic bending, pins, gravity, ground plane, graph coloring + rayon,
-  deterministic mode, `criterion` benchmarks.
-- Sim bridge (core → `SimScene`), simulation thread, triple buffer.
-- 3D view: camera presets, cloth shading; `render_3d`.
-- CLI `simulate`; reference scenes 1 and 5.
-- **Demo**: `r3d simulate demo.r3d --steps 300 && r3d render demo.r3d --view 3d --out drape.png`.
+Built together, because each needed the others to be shown. Demo:
+`./demos/m4/demo.sh` (CLI: body, sewn skirt template, drapes in cotton and
+denim, a pin, renders), then the same live in the app.
 
-## M5 — Avatar, collisions, arrangement
-- Vendored MakeHuman CC0 avatars (decimated, glTF), provenance recorded.
-- OBJ/glTF avatar import, SDF builder (winding numbers) + cache, friction.
-- Arrangement points, wrap placement, "Arrange all".
-- Reference scene 2.
-- **Demo**: two rectangles arranged front/back fall onto the avatar.
+Done:
+- `r3d-geom`: constrained Delaunay meshing of panels at a target spacing,
+  boundaries sampled edge by edge so seam sides match.
+- `r3d-sim`: XPBD small steps (30 substeps), strain-based membrane,
+  dihedral bending, seams with a sewing ramp, pins, gravity, ground,
+  friction; avatar contacts through a narrow-band SDF (pseudo-normal
+  sign); particle self-collision; grab; contacts in parallel; deterministic
+  for any thread count; reference scenes and `criterion` benchmarks.
+- Avatar: MakeHuman CC0 body fitted to measurements, size presets and the
+  user's named presets (Body panel).
+- Document (schema v4–v5): seams, panel placements, garment fabric and
+  colour, pins — all through commands, undoable, available to agents.
+- Sim bridge (`r3d_commands::drape`): placed panels start around the body
+  at the garment's own width; drape cache keyed by a document fingerprint.
+- App: simulation thread; Simulate / Pause / Restart; fabric swatches;
+  per-piece rendering with fabric looks; click picks the piece in 3D (the
+  selection is shared with the pattern view); drag pulls the cloth;
+  ⌥-click pins it; pins listed and removable.
+- CLI / MCP: `simulate` action, `r3d simulate`, `r3d render --view
+  board|3d`, MCP `render_board` / `render_3d` (PNG).
+- One template source (`templates/a-line-skirt.json`).
 
-## M6 — Sewing + synced views
-- Seam model, commands and validation; seam tool with mismatch badges and
-  direction arrows; seam resampling; sewing phase and welding.
-- Shared selection/hover between 2D and 3D, picking in 3D.
-- Reference scenes 3 and 4.
-- **Demo**: skirt from scratch → sewn → draped, all reproducible by a CLI script.
+Measured and dropped: per-colour parallel constraint solving (slower at
+garment sizes, `docs/physics.md` §6). The planned triple buffer is a
+mutex-guarded snapshot (enough at these sizes).
 
-## M7 — Materials, self-collision, grab/pin
-- Fabric presets and material library; simple/advanced material inspector.
-- Particle self-collision with spatial hashing.
-- Mouse grab and pins in 3D; live remeshing after edits while simulating.
-- Hit the performance targets in `docs/physics.md` §7.
-- **Demo**: T-shirt in jersey vs denim, pulled with the mouse.
+Moved to later milestones:
+- To M8: sewing and arranging in the UI (seam tool with mismatch badges
+  and direction arrows, placement around the body, "Arrange all"), live
+  re-simulation after pattern edits (positions carried over), camera
+  presets. They are what makes the 2D ↔ 3D loop fluid.
+- To M10 (templates, polish): a T-shirt template and the jersey vs denim
+  T-shirt demo; the material library and an advanced material inspector.
+- Performance targets of `docs/physics.md` §7 (measured ≈ 2× off): a
+  better-converging solver or the GPU backend, after v0.1.
+- OBJ/glTF avatar import (with the winding-number SDF sign): with M9.
 
 ## M8 — 3D → 2D editing tools
+- From M4–M7: live re-simulation after pattern edits (positions carried
+  over, so editing in 2D updates the drape without a restart); sewing and
+  arranging in the UI (seam tool with mismatch badges and direction
+  arrows, placement around the body, "Arrange all"); camera presets.
 - Pattern coordinates on every simulated vertex; ID-buffer picking.
 - Tools: lengthen/shorten by dragging an edge in 3D, pinch to take in or let
   out a seam, draw style lines on the garment, select pattern elements in

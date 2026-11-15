@@ -455,3 +455,8 @@ must be **i18n-ready from day one**:
 | 2026-11-14 | MSRV = current stable (1.100) | An application gains nothing from an old MSRV, which only made Cargo pick older dependencies |
 | 2026-11-14 | i18n-ready from M1: structured error codes + args, catalog-keyed UI strings | English default, other languages later without refactoring |
 | 2026-11-15 | Solver parallelism: contacts in parallel (rayon, per particle); constraints stay serial Gauss–Seidel. Per-colour parallel constraints measured and dropped | On a garment-sized mesh (1 700 particles, 32 colours × 30 substeps ≈ 1 000 dispatches per frame) per-colour parallelism ran at 45 ms/frame vs 22 ms serial; contacts were 60 % of a step and parallelise coarsely (14 ms/frame, identical results for any thread count) |
+| 2026-11-15 | Seams, placements, fabrics (schema v4) and pins (schema v5) are document entities edited by commands | Undoable, saved, and drivable by agents like every other edit; pins survive a restart of the simulation |
+| 2026-11-15 | Simulation thread with a mutex-guarded snapshot of positions instead of a triple buffer; controls publish their effect at once | Simple and fast enough at garment sizes; callers see a consistent status as soon as a call returns |
+| 2026-11-15 | Avatar SDF signed with angle-weighted pseudo-normals, built in 0.16 s and not cached on disk | The MakeHuman body is a closed manifold; winding numbers and a disk cache stay for imported avatars |
+| 2026-11-15 | Templates are scripts in `templates/`, embedded by `r3d-commands` | One source for the app, tests and demos |
+| 2026-11-15 | Rendering for agents lives in `r3d_mcp::render`, shared with `r3d render` | `r3d-commands` stays free of GPU code; one place composes the scene |
