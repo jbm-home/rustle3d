@@ -7,9 +7,9 @@
 
 use std::mem;
 
-use crate::id::{EdgeId, GarmentId, InternalLineId, NotchId, PanelId, PointId};
+use crate::id::{EdgeId, GarmentId, InternalLineId, NotchId, PanelId, PointId, SeamId};
 use crate::model::{
-    Avatar, DisplayUnit, Edge, Garment, IdMap, InternalLine, Notch, Panel, Point, Project,
+    Avatar, DisplayUnit, Edge, Garment, IdMap, InternalLine, Notch, Panel, Point, Project, Seam,
 };
 
 /// Before/after values of one entity. `None` means "absent".
@@ -20,15 +20,17 @@ pub struct EntityChange<K, V> {
     pub after: Option<V>,
 }
 
-/// One recorded change.
+/// One recorded change. Entity changes are boxed so that the enum stays
+/// small whatever the size of the entities.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Change {
-    Garment(EntityChange<GarmentId, Garment>),
-    Panel(EntityChange<PanelId, Panel>),
-    Point(EntityChange<PointId, Point>),
-    Edge(EntityChange<EdgeId, Edge>),
-    Notch(EntityChange<NotchId, Notch>),
-    InternalLine(EntityChange<InternalLineId, InternalLine>),
+    Garment(Box<EntityChange<GarmentId, Garment>>),
+    Panel(Box<EntityChange<PanelId, Panel>>),
+    Point(Box<EntityChange<PointId, Point>>),
+    Edge(Box<EntityChange<EdgeId, Edge>>),
+    Notch(Box<EntityChange<NotchId, Notch>>),
+    InternalLine(Box<EntityChange<InternalLineId, InternalLine>>),
+    Seam(Box<EntityChange<SeamId, Seam>>),
     Avatar {
         before: Option<Avatar>,
         after: Option<Avatar>,
@@ -68,6 +70,7 @@ impl Change {
             Change::Edge(c) => set(&mut p.edges, c.id, pick!(c)),
             Change::Notch(c) => set(&mut p.notches, c.id, pick!(c)),
             Change::InternalLine(c) => set(&mut p.internal_lines, c.id, pick!(c)),
+            Change::Seam(c) => set(&mut p.seams, c.id, pick!(c)),
             Change::Name { before, after } => {
                 p.name = if forward { after } else { before }.clone();
             }
@@ -89,6 +92,7 @@ impl Change {
             (Change::Point(a), Change::Point(b)) if a.id == b.id => a.after = b.after.clone(),
             (Change::Edge(a), Change::Edge(b)) if a.id == b.id => a.after = b.after.clone(),
             (Change::Notch(a), Change::Notch(b)) if a.id == b.id => a.after = b.after.clone(),
+            (Change::Seam(a), Change::Seam(b)) if a.id == b.id => a.after = b.after,
             (Change::InternalLine(a), Change::InternalLine(b)) if a.id == b.id => {
                 a.after = b.after.clone()
             }
@@ -166,21 +170,21 @@ macro_rules! entity_ops {
         #[doc = concat!("Insert or replace a ", $kind, ".")]
         pub fn $put(&mut self, id: $Id, value: $V) {
             let before = self.project.$map.insert(id, value.clone());
-            self.changes.push(Change::$variant(EntityChange {
+            self.changes.push(Change::$variant(Box::new(EntityChange {
                 id,
                 before,
                 after: Some(value),
-            }));
+            })));
         }
 
         #[doc = concat!("Remove a ", $kind, "; returns it if it existed.")]
         pub fn $remove(&mut self, id: $Id) -> Option<$V> {
             let before = self.project.$map.remove(&id)?;
-            self.changes.push(Change::$variant(EntityChange {
+            self.changes.push(Change::$variant(Box::new(EntityChange {
                 id,
                 before: Some(before.clone()),
                 after: None,
-            }));
+            })));
             Some(before)
         }
     };
@@ -276,6 +280,17 @@ impl<'a> Transaction<'a> {
             after: name,
         });
     }
+
+    entity_ops!(
+        "seam",
+        SeamId,
+        Seam,
+        seams,
+        Seam,
+        new_seam_id,
+        put_seam,
+        remove_seam
+    );
 
     pub fn set_avatar(&mut self, avatar: Option<Avatar>) {
         let before = mem::replace(&mut self.project.avatar, avatar.clone());

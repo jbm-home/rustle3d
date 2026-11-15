@@ -79,6 +79,16 @@ fn every_command_round_trips() {
     h.round_trip(json!({"type": "panel.translate", "panel": panel, "delta": [100, -50]}));
     h.round_trip(json!({"type": "panel.set_grain", "panel": panel, "angle_deg": 45}));
     h.round_trip(json!({"type": "panel.set_seam_allowance", "panel": panel, "mm": 15}));
+    h.round_trip(json!({"type": "panel.place", "panel": panel, "angle_deg": 0, "top_cm": 104}));
+    h.round_trip(json!({"type": "garment.set_fabric", "fabric": "denim"}));
+    h.round_trip(json!({"type": "garment.set_color", "color": "#335577"}));
+    let poly_edge = poly.created[5].to_string();
+    let other_edge = rect.created[7].to_string();
+    let seam = h.round_trip(json!({"type": "seam.add",
+        "a": {"edge": poly_edge}, "b": {"edge": other_edge, "reversed": true}}));
+    let seam = seam.created[0].to_string();
+    h.round_trip(json!({"type": "seam.flip", "seam": seam}));
+    h.round_trip(json!({"type": "seam.remove", "seam": seam}));
 
     let split = h.round_trip(json!({"type": "edge.split", "edge": edge, "at_mm": 100}));
     let new_point = split.created[0].to_string();

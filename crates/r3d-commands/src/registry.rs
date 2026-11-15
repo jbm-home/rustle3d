@@ -128,6 +128,7 @@ command_registry! {
     "panel.set_seam_allowance" => PanelSetSeamAllowance,
     "panel.mirror" => PanelMirror,
     "panel.unlink" => PanelUnlink,
+    "panel.place" => PanelPlace,
     "panel.delete" => PanelDelete,
     "point.move" => PointMove,
     "point.remove" => PointRemove,
@@ -138,6 +139,11 @@ command_registry! {
     "notch.remove" => NotchRemove,
     "internal_line.add" => InternalLineAdd,
     "internal_line.remove" => InternalLineRemove,
+    "seam.add" => SeamAdd,
+    "seam.remove" => SeamRemove,
+    "seam.flip" => SeamFlip,
+    "garment.set_fabric" => GarmentSetFabric,
+    "garment.set_color" => GarmentSetColor,
 }
 
 query_registry! {
@@ -148,6 +154,7 @@ query_registry! {
     "measure.contour_length" => MeasureContourLength,
     "avatar.get" => AvatarGet,
     "avatar.presets" => AvatarPresets,
+    "seam.list" => SeamList,
 }
 
 action_registry! {

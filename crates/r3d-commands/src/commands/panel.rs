@@ -1,4 +1,4 @@
-use r3d_core::{AnyId, Edge, EdgeCurve, MirrorLink, Panel, PanelId, Point, Transaction};
+use r3d_core::{AnyId, Edge, EdgeCurve, MirrorLink, Panel, PanelId, Placement, Point, Transaction};
 use r3d_geom::{DVec2, polygon};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -86,6 +86,7 @@ fn create_panel(
             grain_angle_deg,
             seam_allowance_mm: 0.0,
             mirror_of: None,
+            placement: None,
         },
     );
     let mut created: Vec<AnyId> = vec![panel.into()];
@@ -348,6 +349,12 @@ impl CommandSpec for PanelDelete {
             .filter(|(_, l)| l.panel == self.panel)
             .map(|(id, _)| *id)
             .collect();
+        let seams: Vec<_> = p
+            .seams()
+            .iter()
+            .filter(|(_, s)| panel.contour.iter().any(|e| s.touches(*e)))
+            .map(|(id, _)| *id)
+            .collect();
         let copies: Vec<_> = p
             .panels()
             .iter()
@@ -356,6 +363,9 @@ impl CommandSpec for PanelDelete {
             .collect();
         for id in notches {
             tx.remove_notch(id);
+        }
+        for id in seams {
+            tx.remove_seam(id);
         }
         for id in lines {
             tx.remove_internal_line(id);
@@ -380,5 +390,49 @@ impl CommandSpec for PanelDelete {
 
     fn confirmed(&self) -> bool {
         self.confirm
+    }
+}
+
+/// Place a panel around the body for the simulation.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PanelPlace {
+    pub panel: PanelId,
+    /// Angle around the body (degrees): 0 front, 90 the body's left side,
+    /// 180 back, 270 right side.
+    pub angle_deg: f64,
+    /// Height of the panel's top above the floor (cm).
+    pub top_cm: f64,
+    /// Distance from the body at the start of the simulation (mm,
+    /// default 30).
+    #[serde(default = "default_offset")]
+    pub offset_mm: f64,
+}
+
+fn default_offset() -> f64 {
+    30.0
+}
+
+impl Described for PanelPlace {
+    const SUMMARY: &'static str = "Place a panel around the body for the 3D simulation: angle (0 front, 90 left side, 180 back, 270 right side), height of its top in cm, distance from the body in mm. Unplaced panels are not simulated.";
+}
+
+impl CommandSpec for PanelPlace {
+    fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        finite("angle_deg", &[self.angle_deg])?;
+        positive("top_cm", self.top_cm)?;
+        non_negative("offset_mm", self.offset_mm)?;
+        let mut p = get_panel(tx.project(), self.panel)?;
+        p.placement = Some(Placement {
+            angle_deg: self.angle_deg.rem_euclid(360.0),
+            top_cm: self.top_cm,
+            offset_mm: self.offset_mm,
+        });
+        tx.put_panel(self.panel, p);
+        Ok(CommandOutput::default())
+    }
+
+    fn merge_key(&self) -> Option<String> {
+        Some(format!("panel.place:{}", self.panel))
     }
 }

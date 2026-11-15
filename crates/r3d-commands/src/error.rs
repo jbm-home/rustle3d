@@ -30,6 +30,8 @@ pub enum Invalid {
     OtherPanel,
     #[error("must be between {0} and {1}")]
     Range(f64, f64),
+    #[error("has an invalid format")]
+    Format,
 }
 
 impl Invalid {
@@ -47,6 +49,7 @@ impl Invalid {
             Invalid::NotLinked => "invalid.not_linked",
             Invalid::OtherPanel => "invalid.other_panel",
             Invalid::Range(..) => "invalid.range",
+            Invalid::Format => "invalid.format",
         }
     }
 }
@@ -65,6 +68,8 @@ pub enum CommandError {
     ConfirmationRequired { command: &'static str },
     #[error("{panel} is a linked mirror copy: edit its source, or unlink it first")]
     LinkedMirror { panel: AnyId },
+    #[error("{edge} is sewn ({seam}): remove the seam first")]
+    Sewn { edge: AnyId, seam: AnyId },
     #[error("nothing to undo")]
     NothingToUndo,
     #[error("nothing to redo")]
@@ -124,6 +129,9 @@ impl Localizable for CommandError {
                 Message::new("confirmation_required", text).arg("command", command)
             }
             Self::LinkedMirror { panel } => Message::new("linked_mirror", text).arg("panel", panel),
+            Self::Sewn { edge, seam } => Message::new("sewn", text)
+                .arg("edge", edge)
+                .arg("seam", seam),
             Self::NothingToUndo => Message::new("nothing_to_undo", text),
             Self::NothingToRedo => Message::new("nothing_to_redo", text),
             Self::UnknownType { name } => Message::new("unknown_type", text).arg("name", name),

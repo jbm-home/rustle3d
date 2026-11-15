@@ -259,8 +259,18 @@ fn sync_panel(tx: &mut Transaction<'_>, copy_id: PanelId) -> Result<(), CommandE
         (starts, copy.contour.clone())
     } else {
         let (old_notches, _) = derived_ids(p, copy_id, &copy.contour);
+        // The copy's edges are replaced: seams on them cannot follow.
+        let old_seams: Vec<_> = p
+            .seams()
+            .iter()
+            .filter(|(_, s)| copy.contour.iter().any(|e| s.touches(*e)))
+            .map(|(id, _)| *id)
+            .collect();
         for id in old_notches {
             tx.remove_notch(id);
+        }
+        for id in old_seams {
+            tx.remove_seam(id);
         }
         for e in &copy.contour {
             if let Some(edge) = tx.remove_edge(*e) {

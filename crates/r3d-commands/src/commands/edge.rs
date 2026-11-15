@@ -3,7 +3,7 @@ use r3d_core::{Edge, EdgeCurve, EdgeId, Notch, Panel, Point, Transaction};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{Vec2, editable_edge_panel, v};
+use super::{Vec2, editable_edge_panel, not_sewn, v};
 use crate::error::{CommandError, Invalid, finite};
 use crate::spec::{CommandOutput, CommandSpec, Described};
 
@@ -66,6 +66,7 @@ impl CommandSpec for EdgeSplit {
     fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
         finite("at_mm", &[self.at_mm])?;
         let (edge, panel) = editable_edge_panel(tx, self.edge)?;
+        not_sewn(tx, self.edge)?;
         let geom = tx
             .project()
             .edge_geometry(self.edge)

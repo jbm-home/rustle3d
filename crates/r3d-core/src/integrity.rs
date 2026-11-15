@@ -32,6 +32,10 @@ pub enum IntegrityError {
     BadMirror { panel: AnyId },
     #[error("the avatar has invalid measurements")]
     BadAvatar,
+    #[error("{seam} is invalid (missing edge, same edge twice, or an edge sewn twice)")]
+    BadSeam { seam: AnyId },
+    #[error("{entity} has an invalid value")]
+    BadValue { entity: AnyId },
 }
 
 impl Localizable for IntegrityError {
@@ -66,6 +70,10 @@ impl Localizable for IntegrityError {
                 Message::new("integrity.out_of_range", text).arg("entity", entity)
             }
             Self::BadAvatar => Message::new("integrity.bad_avatar", text),
+            Self::BadSeam { seam } => Message::new("integrity.bad_seam", text).arg("seam", seam),
+            Self::BadValue { entity } => {
+                Message::new("integrity.bad_value", text).arg("entity", entity)
+            }
             Self::BadMirror { panel } => {
                 Message::new("integrity.bad_mirror", text).arg("panel", panel)
             }
@@ -79,6 +87,38 @@ impl Project {
         use IntegrityError as E;
         if self.garments.is_empty() {
             return Err(E::NoGarment);
+        }
+        for (id, g) in &self.garments {
+            let hex_ok = g.color.as_ref().is_none_or(|c| {
+                c.len() == 7 && c.starts_with('#') && c[1..].chars().all(|h| h.is_ascii_hexdigit())
+            });
+            if !hex_ok {
+                return Err(E::BadValue {
+                    entity: (*id).into(),
+                });
+            }
+        }
+        let mut sewn = std::collections::BTreeSet::new();
+        for (id, seam) in &self.seams {
+            let ok = seam.a.edge != seam.b.edge
+                && self.edges.contains_key(&seam.a.edge)
+                && self.edges.contains_key(&seam.b.edge)
+                && sewn.insert(seam.a.edge)
+                && sewn.insert(seam.b.edge);
+            if !ok {
+                return Err(E::BadSeam { seam: (*id).into() });
+            }
+        }
+        for (id, panel) in &self.panels {
+            if let Some(p) = &panel.placement
+                && ![p.angle_deg, p.top_cm, p.offset_mm]
+                    .iter()
+                    .all(|v| v.is_finite())
+            {
+                return Err(E::BadValue {
+                    entity: (*id).into(),
+                });
+            }
         }
         if let Some(a) = &self.avatar {
             let b = a.body;
@@ -101,7 +141,8 @@ impl Project {
                 self.internal_lines
                     .keys()
                     .map(|k| (AnyId::from(*k), k.raw())),
-            );
+            )
+            .chain(self.seams.keys().map(|k| (AnyId::from(*k), k.raw())));
         for (entity, raw) in ids {
             if raw >= self.next_id {
                 return Err(E::IdCounter { entity });

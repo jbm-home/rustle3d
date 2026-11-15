@@ -10,7 +10,7 @@ use glam::DVec2;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::id::{EdgeId, GarmentId, InternalLineId, NotchId, PanelId, PointId};
+use crate::id::{EdgeId, GarmentId, InternalLineId, NotchId, PanelId, PointId, SeamId};
 
 /// Ordered entity map.
 pub type IdMap<K, V> = BTreeMap<K, V>;
@@ -41,6 +41,7 @@ pub struct Project {
     pub(crate) internal_lines: IdMap<InternalLineId, InternalLine>,
     /// The body the garment is made for, if any.
     pub(crate) avatar: Option<Avatar>,
+    pub(crate) seams: IdMap<SeamId, Seam>,
 }
 
 /// Body measurements (cm), the input of the avatar fitting.
@@ -70,6 +71,59 @@ pub struct Avatar {
 #[serde(deny_unknown_fields)]
 pub struct Garment {
     pub name: String,
+    /// What the garment is made of.
+    pub fabric: Fabric,
+    /// Display colour as `#RRGGBB`; `None` uses the fabric's usual colour.
+    pub color: Option<String>,
+}
+
+/// The built-in fabrics (physical and visual presets).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum Fabric {
+    #[default]
+    Cotton,
+    Denim,
+    Jersey,
+    Silk,
+    Wool,
+}
+
+/// Where a panel sits around the body for the simulation: wrapped on a
+/// vertical cylinder around the body's axis.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Placement {
+    /// Angle around the body (degrees): 0 = front, 90 = the body's left
+    /// side, 180 = back, 270 = right side. The panel's centre goes there.
+    pub angle_deg: f64,
+    /// Height of the panel's top above the floor (cm).
+    pub top_cm: f64,
+    /// Distance between the body and the panel when it starts (mm).
+    pub offset_mm: f64,
+}
+
+/// One side of a seam: a whole edge, walked from its start point unless
+/// `reversed`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SeamSide {
+    pub edge: EdgeId,
+    pub reversed: bool,
+}
+
+/// Two edges sewn together, point for point along their lengths.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Seam {
+    pub a: SeamSide,
+    pub b: SeamSide,
+}
+
+impl Seam {
+    pub fn touches(&self, edge: EdgeId) -> bool {
+        self.a.edge == edge || self.b.edge == edge
+    }
 }
 
 /// A flat pattern panel bounded by a closed loop of edges.
@@ -88,6 +142,9 @@ pub struct Panel {
     /// Set when this panel is a linked mirror copy: its geometry is derived
     /// from `source` and kept in sync by the command layer.
     pub mirror_of: Option<MirrorLink>,
+    /// Where the panel starts around the body; unplaced panels are not
+    /// simulated.
+    pub placement: Option<Placement>,
 }
 
 /// Link from a mirror copy to its source panel: the copy is the source
@@ -181,6 +238,8 @@ impl Project {
             garment,
             Garment {
                 name: DEFAULT_GARMENT_NAME.to_owned(),
+                fabric: Fabric::default(),
+                color: None,
             },
         );
         Self {
@@ -194,6 +253,7 @@ impl Project {
             notches: IdMap::new(),
             internal_lines: IdMap::new(),
             avatar: None,
+            seams: IdMap::new(),
         }
     }
 
@@ -223,6 +283,18 @@ impl Project {
 
     pub fn notches(&self) -> &IdMap<NotchId, Notch> {
         &self.notches
+    }
+
+    pub fn seams(&self) -> &IdMap<SeamId, Seam> {
+        &self.seams
+    }
+
+    /// The seam an edge belongs to, if any.
+    pub fn seam_of(&self, edge: EdgeId) -> Option<SeamId> {
+        self.seams
+            .iter()
+            .find(|(_, s)| s.touches(edge))
+            .map(|(id, _)| *id)
     }
 
     pub fn avatar(&self) -> Option<&Avatar> {

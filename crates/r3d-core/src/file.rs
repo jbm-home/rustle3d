@@ -20,12 +20,12 @@ use crate::model::Project;
 /// Identifies a Rustle3D project file.
 pub const FORMAT: &str = "rustle3d.project";
 /// Version written by this build.
-pub const SCHEMA_VERSION: u32 = 3;
+pub const SCHEMA_VERSION: u32 = 4;
 
 type Migration = fn(Value) -> Result<Value, FileError>;
 
 /// `MIGRATIONS[i]` migrates schema version `i + 1` to `i + 2`.
-const MIGRATIONS: &[Migration] = &[migrate_v1_to_v2, migrate_v2_to_v3];
+const MIGRATIONS: &[Migration] = &[migrate_v1_to_v2, migrate_v2_to_v3, migrate_v3_to_v4];
 
 fn object<'a>(
     value: &'a mut Value,
@@ -34,6 +34,24 @@ fn object<'a>(
     value.as_object_mut().ok_or_else(|| FileError::Json {
         detail: format!("{what} is not an object"),
     })
+}
+
+/// v4 adds seams, panel placements and the garment's fabric.
+fn migrate_v3_to_v4(mut project: Value) -> Result<Value, FileError> {
+    let root = object(&mut project, "project")?;
+    root.insert("seams".into(), Value::Object(Default::default()));
+    for (key, field, value) in [
+        ("panels", "placement", Value::Null),
+        ("garments", "fabric", Value::from("cotton")),
+        ("garments", "color", Value::Null),
+    ] {
+        if let Some(map) = root.get_mut(key) {
+            for item in object(map, key)?.values_mut() {
+                object(item, key)?.insert(field.into(), value.clone());
+            }
+        }
+    }
+    Ok(project)
 }
 
 /// v3 adds the project's avatar (body measurements).

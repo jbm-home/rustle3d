@@ -2,21 +2,25 @@
 
 mod avatar;
 mod edge;
+mod garment;
 mod internal_line;
 mod mirror;
 mod notch;
 mod panel;
 mod point;
 mod project;
+mod seam;
 
 pub use avatar::*;
 pub use edge::*;
+pub use garment::*;
 pub use internal_line::*;
 pub use mirror::*;
 pub use notch::*;
 pub use panel::*;
 pub use point::*;
 pub use project::*;
+pub use seam::*;
 
 use r3d_core::{EdgeId, Panel, PanelId, Project, Transaction};
 use r3d_geom::DVec2;
@@ -43,6 +47,17 @@ pub(crate) fn editable_panel(tx: &Transaction<'_>, id: PanelId) -> Result<Panel,
         return Err(CommandError::LinkedMirror { panel: id.into() });
     }
     Ok(panel)
+}
+
+/// Refuse to change the shape of a sewn edge (seams are whole edges).
+pub(crate) fn not_sewn(tx: &Transaction<'_>, edge: EdgeId) -> Result<(), CommandError> {
+    match tx.project().seam_of(edge) {
+        Some(seam) => Err(CommandError::Sewn {
+            edge: edge.into(),
+            seam: seam.into(),
+        }),
+        None => Ok(()),
+    }
 }
 
 /// The panel owning `edge`, if editable.

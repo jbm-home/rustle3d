@@ -138,6 +138,12 @@ define_id!(
     InternalLine,
     "line"
 );
+define_id!(
+    /// A seam: two edges sewn together.
+    SeamId,
+    Seam,
+    "seam"
+);
 
 /// Any entity ID, for messages and command outputs.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -148,6 +154,7 @@ pub enum AnyId {
     Edge(EdgeId),
     Notch(NotchId),
     InternalLine(InternalLineId),
+    Seam(SeamId),
 }
 
 impl fmt::Display for AnyId {
@@ -159,6 +166,7 @@ impl fmt::Display for AnyId {
             AnyId::Edge(id) => id.fmt(f),
             AnyId::Notch(id) => id.fmt(f),
             AnyId::InternalLine(id) => id.fmt(f),
+            AnyId::Seam(id) => id.fmt(f),
         }
     }
 }
@@ -180,9 +188,10 @@ impl FromStr for AnyId {
             EdgeId::PREFIX => s.parse().map(AnyId::Edge),
             NotchId::PREFIX => s.parse().map(AnyId::Notch),
             InternalLineId::PREFIX => s.parse().map(AnyId::InternalLine),
+            SeamId::PREFIX => s.parse().map(AnyId::Seam),
             _ => Err(ParseIdError {
                 text: s.to_owned(),
-                expected: "garment|panel|point|edge|notch|line",
+                expected: "garment|panel|point|edge|notch|line|seam",
             }),
         }
     }
@@ -208,7 +217,7 @@ impl JsonSchema for AnyId {
     fn json_schema(_: &mut SchemaGenerator) -> Schema {
         json_schema!({
             "type": "string",
-            "pattern": "^(garment|panel|point|edge|notch|line):[1-9][0-9]*$",
+            "pattern": "^(garment|panel|point|edge|notch|line|seam):[1-9][0-9]*$",
         })
     }
 }

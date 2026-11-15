@@ -548,6 +548,57 @@ Make a linked mirror copy independent: it keeps its current shape and can then b
 
 </details>
 
+### `panel.place`
+
+Place a panel around the body for the 3D simulation: angle (0 front, 90 left side, 180 back, 270 right side), height of its top in cm, distance from the body in mm. Unplaced panels are not simulated.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "PanelId": {
+      "description": "Identifier of a panel, e.g. `panel:1`.",
+      "pattern": "^panel:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Place a panel around the body for the simulation.",
+  "properties": {
+    "angle_deg": {
+      "description": "Angle around the body (degrees): 0 front, 90 the body's left side,\n180 back, 270 right side.",
+      "format": "double",
+      "type": "number"
+    },
+    "offset_mm": {
+      "default": 30.0,
+      "description": "Distance from the body at the start of the simulation (mm,\ndefault 30).",
+      "format": "double",
+      "type": "number"
+    },
+    "panel": {
+      "$ref": "#/$defs/PanelId"
+    },
+    "top_cm": {
+      "description": "Height of the panel's top above the floor (cm).",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "panel",
+    "angle_deg",
+    "top_cm"
+  ],
+  "title": "PanelPlace",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `panel.delete`
 
 Delete a panel with its points, edges, notches and internal lines. Linked mirror copies of it become independent. Destructive: requires "confirm": true.
@@ -1061,6 +1112,228 @@ Remove an internal line.
 
 </details>
 
+### `seam.add`
+
+Sew two whole edges together. Points are matched along the edges, start to start unless a side is reversed (use seam.flip if the seam looks twisted). An edge can be in one seam only. Returns the seam.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "EdgeId": {
+      "description": "Identifier of a edge, e.g. `edge:1`.",
+      "pattern": "^edge:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "SeamSideSpec": {
+      "additionalProperties": false,
+      "description": "One side of a new seam.",
+      "properties": {
+        "edge": {
+          "$ref": "#/$defs/EdgeId"
+        },
+        "reversed": {
+          "default": false,
+          "description": "Walk this edge from its end point instead of its start.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "edge"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Sew two edges together.",
+  "properties": {
+    "a": {
+      "$ref": "#/$defs/SeamSideSpec"
+    },
+    "b": {
+      "$ref": "#/$defs/SeamSideSpec"
+    }
+  },
+  "required": [
+    "a",
+    "b"
+  ],
+  "title": "SeamAdd",
+  "type": "object"
+}
+```
+
+</details>
+
+### `seam.remove`
+
+Remove a seam (the edges are no longer sewn).
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "SeamId": {
+      "description": "Identifier of a seam, e.g. `seam:1`.",
+      "pattern": "^seam:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Unpick a seam.",
+  "properties": {
+    "seam": {
+      "$ref": "#/$defs/SeamId"
+    }
+  },
+  "required": [
+    "seam"
+  ],
+  "title": "SeamRemove",
+  "type": "object"
+}
+```
+
+</details>
+
+### `seam.flip`
+
+Reverse how a seam matches its two edges (fixes a twisted seam).
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "SeamId": {
+      "description": "Identifier of a seam, e.g. `seam:1`.",
+      "pattern": "^seam:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Flip the direction of a seam's second side.",
+  "properties": {
+    "seam": {
+      "$ref": "#/$defs/SeamId"
+    }
+  },
+  "required": [
+    "seam"
+  ],
+  "title": "SeamFlip",
+  "type": "object"
+}
+```
+
+</details>
+
+### `garment.set_fabric`
+
+Choose what the garment is made of: cotton, denim, jersey, silk or wool. Sets how it drapes and how it looks.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "Fabric": {
+      "description": "The built-in fabrics (physical and visual presets).",
+      "enum": [
+        "cotton",
+        "denim",
+        "jersey",
+        "silk",
+        "wool"
+      ],
+      "type": "string"
+    },
+    "GarmentId": {
+      "description": "Identifier of a garment, e.g. `garment:1`.",
+      "pattern": "^garment:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Choose the garment's fabric.",
+  "properties": {
+    "fabric": {
+      "$ref": "#/$defs/Fabric",
+      "description": "`cotton`, `denim`, `jersey`, `silk` or `wool`."
+    },
+    "garment": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/GarmentId"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Defaults to the project's garment."
+    }
+  },
+  "required": [
+    "fabric"
+  ],
+  "title": "GarmentSetFabric",
+  "type": "object"
+}
+```
+
+</details>
+
+### `garment.set_color`
+
+Set the garment's colour as #RRGGBB, or clear it to use the fabric's usual colour.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "GarmentId": {
+      "description": "Identifier of a garment, e.g. `garment:1`.",
+      "pattern": "^garment:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Choose the garment's colour.",
+  "properties": {
+    "color": {
+      "description": "`#RRGGBB`, or omitted to use the fabric's usual colour.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "garment": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/GarmentId"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Defaults to the project's garment."
+    }
+  },
+  "title": "GarmentSetColor",
+  "type": "object"
+}
+```
+
+</details>
+
 ## Queries
 
 Read-only. Lengths in mm, areas in mm², rounded to 0.001.
@@ -1240,6 +1513,24 @@ Built-in body presets: standard women's and men's sizes, as {name, body} pairs u
   "additionalProperties": false,
   "description": "The built-in body presets (standard sizes).",
   "title": "AvatarPresets",
+  "type": "object"
+}
+```
+
+</details>
+
+### `seam.list`
+
+Every seam: its two edges (with their panels and lengths in mm, and direction) and the length mismatch in mm.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Every seam with the lengths of its two sides.",
+  "title": "SeamList",
   "type": "object"
 }
 ```

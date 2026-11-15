@@ -417,3 +417,38 @@ impl QuerySpec for AvatarPresets {
         to_value(&r3d_avatar::presets::builtin())
     }
 }
+
+/// Every seam with the lengths of its two sides.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SeamList {}
+
+impl Described for SeamList {
+    const SUMMARY: &'static str = "Every seam: its two edges (with their panels and lengths in mm, and direction) and the length mismatch in mm.";
+}
+
+impl QuerySpec for SeamList {
+    fn run(&self, p: &Project) -> Result<Value, CommandError> {
+        let side = |s: &r3d_core::SeamSide| -> Result<Value, CommandError> {
+            let edge = p.edge(s.edge).ok_or_else(|| missing(s.edge))?;
+            Ok(serde_json::json!({
+                "edge": s.edge,
+                "panel": edge.panel,
+                "reversed": s.reversed,
+                "length_mm": r3(p.edge_length(s.edge).unwrap_or_default()),
+            }))
+        };
+        let seams = p
+            .seams()
+            .iter()
+            .map(|(id, s)| {
+                let (a, b) = (side(&s.a)?, side(&s.b)?);
+                let mismatch = (a["length_mm"].as_f64().unwrap_or_default()
+                    - b["length_mm"].as_f64().unwrap_or_default())
+                .abs();
+                Ok(serde_json::json!({ "id": id, "a": a, "b": b, "mismatch_mm": r3(mismatch) }))
+            })
+            .collect::<Result<Vec<_>, CommandError>>()?;
+        Ok(Value::Array(seams))
+    }
+}

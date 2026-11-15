@@ -59,6 +59,7 @@ fn project(w: f64, h: f64, allowance: f64) -> Project {
             grain_angle_deg: 90.0,
             seam_allowance_mm: allowance,
             mirror_of: None,
+            placement: None,
         },
     );
     tx.commit();

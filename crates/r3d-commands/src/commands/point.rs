@@ -2,7 +2,7 @@ use r3d_core::{Edge, EdgeCurve, Notch, Panel, Point, PointId, Transaction};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{Vec2, editable_panel, v};
+use super::{Vec2, editable_panel, not_sewn, v};
 use crate::error::{CommandError, Invalid, finite};
 use crate::spec::{CommandOutput, CommandSpec, Described};
 
@@ -98,6 +98,8 @@ impl CommandSpec for PointRemove {
         };
         let (a_id, a) = find(&|e| e.end == self.point)?;
         let (b_id, b) = find(&|e| e.start == self.point)?;
+        not_sewn(tx, a_id)?;
+        not_sewn(tx, b_id)?;
         let a_len = p.edge_length(a_id).unwrap_or_default();
         let pos = |id| p.point(id).map(|pt| pt.pos).unwrap_or_default();
         let curve = match (&a.curve, &b.curve) {
