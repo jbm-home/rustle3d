@@ -1,8 +1,18 @@
 //! Cloth simulation for Rustle3D.
 //!
-//! An XPBD solver on the CPU (parallelized with rayon) behind a `Solver`
-//! trait, so that GPU or alternative methods (e.g. Vertex Block Descent) can
-//! be added later. Includes avatar collision (SDF), self-collision (spatial
-//! hashing) and a deterministic mode for regression tests.
+//! XPBD with small steps ([`solver`]): anisotropic membrane (warp, weft,
+//! shear) and dihedral bending per triangle pair, seams, pins, gravity,
+//! collisions with a static body ([`collide`]) and the ground, friction.
+//! Deterministic: the same scene always gives the same result.
 //!
-//! Units: metres, `f32`, Y-up. See `docs/physics.md`.
+//! Units: metres, kilograms, seconds; `f32`; Y up. See `docs/physics.md`
+//! for the method and the papers it comes from.
+
+pub mod collide;
+pub mod fabric;
+pub mod scene;
+pub mod solver;
+
+pub use fabric::{FabricParams, FabricPreset};
+pub use scene::SimScene;
+pub use solver::Solver;

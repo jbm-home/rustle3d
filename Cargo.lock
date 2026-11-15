@@ -1694,6 +1694,10 @@ dependencies = [
 [[package]]
 name = "r3d-sim"
 version = "0.0.0"
+dependencies = [
+ "glam",
+ "serde",
+]
 
 [[package]]
 name = "r3d_ffi"
