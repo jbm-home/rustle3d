@@ -130,8 +130,9 @@ Status (2026-11-15): live re-simulation is in: pattern, fabric and pin
 edits reach the running drape within 100 ms, positions carried over
 (`drape::carry_over`), no restart. The Length tool is in: ⇧-drag a hem in 3D (`edge.lengthen`, the
 whole hemline moves along the grain). Fit is in too: ⇧-drag a seam
-(`seam.take_in`, tapered when grabbed near an end). Next: the M8 demo
-(shorten and take in the waist from a script), then Pick and Draw.
+(`seam.take_in`, tapered when grabbed near an end). Demo:
+`./demos/m8/demo.sh` (shorten 30 mm, take in the waist, drape and PDF
+follow). Next: Pick (edges and points from 3D) and Draw on the garment.
 - From M4–M7: live re-simulation after pattern edits (positions carried
   over, so editing in 2D updates the drape without a restart); sewing and
   arranging in the UI (seam tool with mismatch badges and direction
