@@ -4,17 +4,17 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use crate::fit::BodySpec;
+use r3d_core::Body;
 
 /// A named set of measurements.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BodyPreset {
     pub name: String,
-    pub body: BodySpec,
+    pub body: Body,
 }
 
-const fn spec(masculinity: f32, height: f32, bust: f32, waist: f32, hips: f32) -> BodySpec {
-    BodySpec {
+const fn spec(masculinity: f64, height: f64, bust: f64, waist: f64, hips: f64) -> Body {
+    Body {
         masculinity,
         height_cm: height,
         bust_cm: bust,
@@ -26,7 +26,7 @@ const fn spec(masculinity: f32, height: f32, bust: f32, waist: f32, hips: f32) -
 /// Standard sizes. Approximate values from common European size charts
 /// (general garment-making knowledge); good starting points to adjust.
 pub fn builtin() -> Vec<BodyPreset> {
-    let table: [(&str, BodySpec); 9] = [
+    let table: [(&str, Body); 9] = [
         ("Women XS", spec(0.0, 166.0, 80.0, 63.0, 88.0)),
         ("Women S", spec(0.0, 168.0, 84.0, 67.0, 92.0)),
         ("Women M", spec(0.0, 168.0, 90.0, 73.0, 98.0)),

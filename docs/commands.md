@@ -90,6 +90,95 @@ Choose the unit used to display lengths (storage is always mm).
 
 </details>
 
+### `avatar.set`
+
+Set the avatar's body: masculinity (0 feminine – 1 masculine) and height, bust, waist and hips in cm. The 3D body is fitted to these measurements; avatar.get reports what it actually measures.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "Body": {
+      "additionalProperties": false,
+      "description": "Body measurements (cm), the input of the avatar fitting.",
+      "properties": {
+        "bust_cm": {
+          "format": "double",
+          "type": "number"
+        },
+        "height_cm": {
+          "format": "double",
+          "type": "number"
+        },
+        "hips_cm": {
+          "format": "double",
+          "type": "number"
+        },
+        "masculinity": {
+          "description": "0 = feminine body, 1 = masculine body.",
+          "format": "double",
+          "type": "number"
+        },
+        "waist_cm": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "masculinity",
+        "height_cm",
+        "bust_cm",
+        "waist_cm",
+        "hips_cm"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Set the avatar's measurements.",
+  "properties": {
+    "body": {
+      "$ref": "#/$defs/Body",
+      "description": "Measurements in cm; `masculinity` 0 = feminine body, 1 = masculine."
+    },
+    "preset": {
+      "description": "Name of the preset the measurements come from, if any.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "body"
+  ],
+  "title": "AvatarSet",
+  "type": "object"
+}
+```
+
+</details>
+
+### `avatar.remove`
+
+Remove the avatar from the project.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Remove the avatar.",
+  "title": "AvatarRemove",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `panel.create_rect`
 
 Create a rectangular panel. Returns the panel, then its 4 points (counter-clockwise from the origin), then its 4 edges.
@@ -1115,6 +1204,42 @@ Length (mm) along a panel contour from one point to another, walking in contour 
     "to"
   ],
   "title": "MeasureContourLength",
+  "type": "object"
+}
+```
+
+</details>
+
+### `avatar.get`
+
+The avatar's requested measurements, its preset, and the measurements the fitted 3D body actually reaches (they can differ slightly for extreme sizes). Null when there is no avatar.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The avatar and what the fitted body actually measures.",
+  "title": "AvatarGet",
+  "type": "object"
+}
+```
+
+</details>
+
+### `avatar.presets`
+
+Built-in body presets: standard women's and men's sizes, as {name, body} pairs usable with avatar.set.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The built-in body presets (standard sizes).",
+  "title": "AvatarPresets",
   "type": "object"
 }
 ```

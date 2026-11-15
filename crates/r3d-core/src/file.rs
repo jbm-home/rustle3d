@@ -20,12 +20,12 @@ use crate::model::Project;
 /// Identifies a Rustle3D project file.
 pub const FORMAT: &str = "rustle3d.project";
 /// Version written by this build.
-pub const SCHEMA_VERSION: u32 = 2;
+pub const SCHEMA_VERSION: u32 = 3;
 
 type Migration = fn(Value) -> Result<Value, FileError>;
 
 /// `MIGRATIONS[i]` migrates schema version `i + 1` to `i + 2`.
-const MIGRATIONS: &[Migration] = &[migrate_v1_to_v2];
+const MIGRATIONS: &[Migration] = &[migrate_v1_to_v2, migrate_v2_to_v3];
 
 fn object<'a>(
     value: &'a mut Value,
@@ -34,6 +34,12 @@ fn object<'a>(
     value.as_object_mut().ok_or_else(|| FileError::Json {
         detail: format!("{what} is not an object"),
     })
+}
+
+/// v3 adds the project's avatar (body measurements).
+fn migrate_v2_to_v3(mut project: Value) -> Result<Value, FileError> {
+    object(&mut project, "project")?.insert("avatar".into(), Value::Null);
+    Ok(project)
 }
 
 /// v2 adds notches, internal lines, seam allowances and mirror links.

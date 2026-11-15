@@ -1,5 +1,6 @@
 //! Command implementations, grouped by entity.
 
+mod avatar;
 mod edge;
 mod internal_line;
 mod mirror;
@@ -8,6 +9,7 @@ mod panel;
 mod point;
 mod project;
 
+pub use avatar::*;
 pub use edge::*;
 pub use internal_line::*;
 pub use mirror::*;

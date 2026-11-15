@@ -8,7 +8,9 @@
 use std::mem;
 
 use crate::id::{EdgeId, GarmentId, InternalLineId, NotchId, PanelId, PointId};
-use crate::model::{DisplayUnit, Edge, Garment, IdMap, InternalLine, Notch, Panel, Point, Project};
+use crate::model::{
+    Avatar, DisplayUnit, Edge, Garment, IdMap, InternalLine, Notch, Panel, Point, Project,
+};
 
 /// Before/after values of one entity. `None` means "absent".
 #[derive(Clone, Debug, PartialEq)]
@@ -27,6 +29,10 @@ pub enum Change {
     Edge(EntityChange<EdgeId, Edge>),
     Notch(EntityChange<NotchId, Notch>),
     InternalLine(EntityChange<InternalLineId, InternalLine>),
+    Avatar {
+        before: Option<Avatar>,
+        after: Option<Avatar>,
+    },
     Name {
         before: String,
         after: String,
@@ -68,6 +74,9 @@ impl Change {
             Change::DisplayUnit { before, after } => {
                 p.display_unit = if forward { *after } else { *before };
             }
+            Change::Avatar { before, after } => {
+                p.avatar = if forward { after } else { before }.clone();
+            }
         }
     }
 
@@ -84,6 +93,7 @@ impl Change {
                 a.after = b.after.clone()
             }
             (Change::Name { after, .. }, Change::Name { after: b, .. }) => *after = b.clone(),
+            (Change::Avatar { after, .. }, Change::Avatar { after: b, .. }) => *after = b.clone(),
             (Change::DisplayUnit { after, .. }, Change::DisplayUnit { after: b, .. }) => {
                 *after = *b
             }
@@ -264,6 +274,14 @@ impl<'a> Transaction<'a> {
         self.changes.push(Change::Name {
             before,
             after: name,
+        });
+    }
+
+    pub fn set_avatar(&mut self, avatar: Option<Avatar>) {
+        let before = mem::replace(&mut self.project.avatar, avatar.clone());
+        self.changes.push(Change::Avatar {
+            before,
+            after: avatar,
         });
     }
 

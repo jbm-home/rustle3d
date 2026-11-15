@@ -30,6 +30,8 @@ pub enum IntegrityError {
     OutOfRange { entity: AnyId },
     #[error("{panel} has an invalid mirror link (missing axis, self or chained source)")]
     BadMirror { panel: AnyId },
+    #[error("the avatar has invalid measurements")]
+    BadAvatar,
 }
 
 impl Localizable for IntegrityError {
@@ -63,6 +65,7 @@ impl Localizable for IntegrityError {
             Self::OutOfRange { entity } => {
                 Message::new("integrity.out_of_range", text).arg("entity", entity)
             }
+            Self::BadAvatar => Message::new("integrity.bad_avatar", text),
             Self::BadMirror { panel } => {
                 Message::new("integrity.bad_mirror", text).arg("panel", panel)
             }
@@ -76,6 +79,15 @@ impl Project {
         use IntegrityError as E;
         if self.garments.is_empty() {
             return Err(E::NoGarment);
+        }
+        if let Some(a) = &self.avatar {
+            let b = a.body;
+            let sizes = [b.height_cm, b.bust_cm, b.waist_cm, b.hips_cm];
+            if !(0.0..=1.0).contains(&b.masculinity)
+                || sizes.iter().any(|v| !(v.is_finite() && *v > 0.0))
+            {
+                return Err(E::BadAvatar);
+            }
         }
         let ids = self
             .garments

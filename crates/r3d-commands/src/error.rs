@@ -28,6 +28,8 @@ pub enum Invalid {
     NotLinked,
     #[error("must be on the same panel")]
     OtherPanel,
+    #[error("must be between {0} and {1}")]
+    Range(f64, f64),
 }
 
 impl Invalid {
@@ -44,6 +46,7 @@ impl Invalid {
             Invalid::OutsideEdge(_) => "invalid.outside_edge",
             Invalid::NotLinked => "invalid.not_linked",
             Invalid::OtherPanel => "invalid.other_panel",
+            Invalid::Range(..) => "invalid.range",
         }
     }
 }
@@ -113,6 +116,7 @@ impl Localizable for CommandError {
                 match reason {
                     Invalid::TooFewPoints(n) => m.arg("min", n),
                     Invalid::OutsideEdge(len) => m.arg("length_mm", format!("{len:.3}")),
+                    Invalid::Range(min, max) => m.arg("min", min).arg("max", max),
                     _ => m,
                 }
             }

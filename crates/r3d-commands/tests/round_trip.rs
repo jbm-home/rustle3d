@@ -52,6 +52,10 @@ fn every_command_round_trips() {
 
     h.round_trip(json!({"type": "project.rename", "name": "Skirt"}));
     h.round_trip(json!({"type": "project.set_display_unit", "unit": "cm"}));
+    let body =
+        json!({"masculinity": 0, "height_cm": 168, "bust_cm": 90, "waist_cm": 73, "hips_cm": 98});
+    h.round_trip(json!({"type": "avatar.set", "body": body, "preset": "Women M"}));
+    h.round_trip(json!({"type": "avatar.remove"}));
 
     let rect = h.round_trip(json!({
         "type": "panel.create_rect", "name": "Front", "origin": [10, 20], "width": 400, "height": 600

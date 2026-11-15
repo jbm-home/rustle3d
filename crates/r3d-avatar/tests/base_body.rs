@@ -27,24 +27,25 @@ fn builtin_body_measures_like_an_adult() {
 
 #[test]
 fn fitting_reaches_typical_measurements() {
-    use r3d_avatar::fit::{BodySpec, fit};
+    use r3d_avatar::fit::fit;
+    use r3d_core::Body;
     let model = BodyModel::builtin().unwrap();
     let specs = [
-        BodySpec {
+        Body {
             masculinity: 0.0,
             height_cm: 168.0,
             bust_cm: 92.0,
             waist_cm: 74.0,
             hips_cm: 100.0,
         },
-        BodySpec {
+        Body {
             masculinity: 0.0,
             height_cm: 160.0,
             bust_cm: 84.0,
             waist_cm: 66.0,
             hips_cm: 92.0,
         },
-        BodySpec {
+        Body {
             masculinity: 1.0,
             height_cm: 180.0,
             bust_cm: 100.0,
@@ -61,9 +62,10 @@ fn fitting_reaches_typical_measurements() {
             start.elapsed(),
             f.shape
         );
-        assert!((a.height_cm - spec.height_cm).abs() < 0.5);
-        assert!((a.bust_cm - spec.bust_cm).abs() < 1.5, "bust");
-        assert!((a.waist_cm - spec.waist_cm).abs() < 1.5, "waist");
-        assert!((a.hips_cm - spec.hips_cm).abs() < 1.5, "hips");
+        let off = |got: f32, want: f64| (got as f64 - want).abs();
+        assert!(off(a.height_cm, spec.height_cm) < 0.5);
+        assert!(off(a.bust_cm, spec.bust_cm) < 1.5, "bust");
+        assert!(off(a.waist_cm, spec.waist_cm) < 1.5, "waist");
+        assert!(off(a.hips_cm, spec.hips_cm) < 1.5, "hips");
     }
 }

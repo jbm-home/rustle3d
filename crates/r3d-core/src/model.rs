@@ -39,6 +39,29 @@ pub struct Project {
     pub(crate) edges: IdMap<EdgeId, Edge>,
     pub(crate) notches: IdMap<NotchId, Notch>,
     pub(crate) internal_lines: IdMap<InternalLineId, InternalLine>,
+    /// The body the garment is made for, if any.
+    pub(crate) avatar: Option<Avatar>,
+}
+
+/// Body measurements (cm), the input of the avatar fitting.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Body {
+    /// 0 = feminine body, 1 = masculine body.
+    pub masculinity: f64,
+    pub height_cm: f64,
+    pub bust_cm: f64,
+    pub waist_cm: f64,
+    pub hips_cm: f64,
+}
+
+/// The avatar of a project: measurements, and the preset they came from.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Avatar {
+    pub body: Body,
+    /// Name of the preset the measurements were taken from, if any.
+    pub preset: Option<String>,
 }
 
 /// A group of panels worn together. v0.1 uses a single garment, but the
@@ -170,6 +193,7 @@ impl Project {
             edges: IdMap::new(),
             notches: IdMap::new(),
             internal_lines: IdMap::new(),
+            avatar: None,
         }
     }
 
@@ -199,6 +223,10 @@ impl Project {
 
     pub fn notches(&self) -> &IdMap<NotchId, Notch> {
         &self.notches
+    }
+
+    pub fn avatar(&self) -> Option<&Avatar> {
+        self.avatar.as_ref()
     }
 
     pub fn internal_lines(&self) -> &IdMap<InternalLineId, InternalLine> {

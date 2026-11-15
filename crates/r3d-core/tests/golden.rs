@@ -12,7 +12,8 @@ use std::path::PathBuf;
 use glam::DVec2;
 use r3d_core::file::{self, SCHEMA_VERSION};
 use r3d_core::{
-    Edge, EdgeCurve, InternalLine, Notch, Panel, PathSegment, Point, Project, Transaction,
+    Avatar, Body, Edge, EdgeCurve, InternalLine, Notch, Panel, PathSegment, Point, Project,
+    Transaction,
 };
 
 fn golden_dir(version: u32) -> PathBuf {
@@ -99,6 +100,16 @@ fn sample() -> Project {
             ],
         },
     );
+    tx.set_avatar(Some(Avatar {
+        body: Body {
+            masculinity: 0.0,
+            height_cm: 168.0,
+            bust_cm: 90.0,
+            waist_cm: 73.0,
+            hips_cm: 98.0,
+        },
+        preset: Some("Women M".into()),
+    }));
     tx.commit();
     p
 }

@@ -11,12 +11,12 @@ fn every_builtin_size_can_be_fitted() {
         let a = fit(&model, &preset.body).achieved;
         let b = preset.body;
         let worst = [
-            (a.bust_cm - b.bust_cm).abs(),
-            (a.waist_cm - b.waist_cm).abs(),
-            (a.hips_cm - b.hips_cm).abs(),
+            (a.bust_cm as f64 - b.bust_cm).abs(),
+            (a.waist_cm as f64 - b.waist_cm).abs(),
+            (a.hips_cm as f64 - b.hips_cm).abs(),
         ]
         .into_iter()
-        .fold(0.0, f32::max);
+        .fold(0.0, f64::max);
         eprintln!("{}: off by at most {worst:.2} cm", preset.name);
         // Within 1.5 cm for common sizes; the XL sizes reach the edge of the
         // morph targets' range (moderately extrapolated) and land within 3 cm.

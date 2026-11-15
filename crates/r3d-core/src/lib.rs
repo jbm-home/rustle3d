@@ -21,6 +21,6 @@ pub use edit::{ChangeSet, Transaction};
 pub use id::{AnyId, EdgeId, GarmentId, InternalLineId, NotchId, PanelId, PointId};
 pub use message::{Localizable, Message};
 pub use model::{
-    DisplayUnit, Edge, EdgeCurve, Garment, InternalLine, MirrorLink, Notch, Panel, PathSegment,
-    Point, Project,
+    Avatar, Body, DisplayUnit, Edge, EdgeCurve, Garment, InternalLine, MirrorLink, Notch, Panel,
+    PathSegment, Point, Project,
 };

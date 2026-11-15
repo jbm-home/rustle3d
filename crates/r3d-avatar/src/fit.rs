@@ -6,21 +6,10 @@
 //! with a numerical Jacobian (our own method).
 
 use glam::Vec3;
-use serde::{Deserialize, Serialize};
+use r3d_core::Body;
 
 use crate::measure::{Measurements, measure};
 use crate::model::{BodyModel, BodyShape, MAX_EXTRAPOLATION};
-
-/// What the user asks for.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct BodySpec {
-    /// 0 = feminine body, 1 = masculine body.
-    pub masculinity: f32,
-    pub height_cm: f32,
-    pub bust_cm: f32,
-    pub waist_cm: f32,
-    pub hips_cm: f32,
-}
 
 /// A fitted body.
 #[derive(Debug, Clone, PartialEq)]
@@ -69,11 +58,12 @@ fn scaled(model: &BodyModel, shape: &BodyShape, height_cm: f32) -> (Measurements
     )
 }
 
-fn residuals(m: &Measurements, spec: &BodySpec) -> [f32; 3] {
+fn residuals(m: &Measurements, spec: &Body) -> [f32; 3] {
+    let rel = |got: f32, want: f64| (got - want as f32) / (want as f32).max(1.0);
     [
-        (m.bust_cm - spec.bust_cm) / spec.bust_cm.max(1.0),
-        (m.waist_cm - spec.waist_cm) / spec.waist_cm.max(1.0),
-        (m.hips_cm - spec.hips_cm) / spec.hips_cm.max(1.0),
+        rel(m.bust_cm, spec.bust_cm),
+        rel(m.waist_cm, spec.waist_cm),
+        rel(m.hips_cm, spec.hips_cm),
     ]
 }
 
@@ -103,10 +93,11 @@ fn solve4(mut a: [[f32; 4]; 4], mut b: [f32; 4]) -> Option<[f32; 4]> {
 }
 
 /// Find the shape that best matches `spec`.
-pub fn fit(model: &BodyModel, spec: &BodySpec) -> Fit {
+pub fn fit(model: &BodyModel, spec: &Body) -> Fit {
+    let height_cm = spec.height_cm as f32;
     // Stature proportions: interpolate between the short and tall targets.
     let neutral = BodyShape {
-        masculinity: spec.masculinity.clamp(0.0, 1.0),
+        masculinity: (spec.masculinity as f32).clamp(0.0, 1.0),
         ..BodyShape::default()
     };
     let height_of = |stature: f32| {
@@ -114,16 +105,16 @@ pub fn fit(model: &BodyModel, spec: &BodySpec) -> Fit {
         p.iter().map(|v| v.y).fold(0.0, f32::max) * 100.0
     };
     let (short, mid, tall) = (height_of(-1.0), height_of(0.0), height_of(1.0));
-    let stature = if spec.height_cm >= mid {
-        ((spec.height_cm - mid) / (tall - mid).max(1e-3)).clamp(0.0, 1.0)
+    let stature = if height_cm >= mid {
+        ((height_cm - mid) / (tall - mid).max(1e-3)).clamp(0.0, 1.0)
     } else {
-        -((mid - spec.height_cm) / (mid - short).max(1e-3)).clamp(0.0, 1.0)
+        -((mid - height_cm) / (mid - short).max(1e-3)).clamp(0.0, 1.0)
     };
     let base = BodyShape { stature, ..neutral };
 
     let mut u = [0.0f32; 4];
     for _ in 0..ITERATIONS {
-        let (m, _) = scaled(model, &with_params(base, u), spec.height_cm);
+        let (m, _) = scaled(model, &with_params(base, u), height_cm);
         let r = residuals(&m, spec);
         if r.iter().all(|e| e.abs() < 0.002) {
             break;
@@ -137,7 +128,7 @@ pub fn fit(model: &BodyModel, spec: &BodySpec) -> Fit {
             if h.abs() < 1e-6 {
                 continue;
             }
-            let (mj, _) = scaled(model, &with_params(base, v), spec.height_cm);
+            let (mj, _) = scaled(model, &with_params(base, v), height_cm);
             let rj = residuals(&mj, spec);
             for i in 0..3 {
                 jac[i][j] = (rj[i] - r[i]) / h;
@@ -159,7 +150,7 @@ pub fn fit(model: &BodyModel, spec: &BodySpec) -> Fit {
         }
     }
     let shape = with_params(base, u);
-    let (achieved, scale) = scaled(model, &shape, spec.height_cm);
+    let (achieved, scale) = scaled(model, &shape, height_cm);
     Fit {
         shape,
         scale,

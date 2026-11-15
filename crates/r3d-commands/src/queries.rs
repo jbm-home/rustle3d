@@ -362,3 +362,58 @@ impl QuerySpec for MeasureContourLength {
         Ok(serde_json::json!({ "length_mm": r3(length), "edges": edges }))
     }
 }
+
+/// The built-in body model, loaded once (it embeds a few MB of geometry).
+pub fn body_model() -> Result<&'static r3d_avatar::model::BodyModel, CommandError> {
+    static MODEL: std::sync::OnceLock<Result<r3d_avatar::model::BodyModel, String>> =
+        std::sync::OnceLock::new();
+    MODEL
+        .get_or_init(|| r3d_avatar::model::BodyModel::builtin().map_err(|e| e.to_string()))
+        .as_ref()
+        .map_err(|e| CommandError::Internal { detail: e.clone() })
+}
+
+/// The avatar and what the fitted body actually measures.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AvatarGet {}
+
+impl Described for AvatarGet {
+    const SUMMARY: &'static str = "The avatar's requested measurements, its preset, and the measurements the fitted 3D body actually reaches (they can differ slightly for extreme sizes). Null when there is no avatar.";
+}
+
+impl QuerySpec for AvatarGet {
+    fn run(&self, p: &Project) -> Result<Value, CommandError> {
+        let Some(avatar) = p.avatar() else {
+            return Ok(Value::Null);
+        };
+        let fit = r3d_avatar::fit::fit(body_model()?, &avatar.body);
+        let a = fit.achieved;
+        let r1 = |v: f32| (v as f64 * 10.0).round() / 10.0;
+        Ok(serde_json::json!({
+            "body": avatar.body,
+            "preset": avatar.preset,
+            "achieved": {
+                "height_cm": r1(a.height_cm),
+                "bust_cm": r1(a.bust_cm),
+                "waist_cm": r1(a.waist_cm),
+                "hips_cm": r1(a.hips_cm),
+            },
+        }))
+    }
+}
+
+/// The built-in body presets (standard sizes).
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AvatarPresets {}
+
+impl Described for AvatarPresets {
+    const SUMMARY: &'static str = "Built-in body presets: standard women's and men's sizes, as {name, body} pairs usable with avatar.set.";
+}
+
+impl QuerySpec for AvatarPresets {
+    fn run(&self, _p: &Project) -> Result<Value, CommandError> {
+        to_value(&r3d_avatar::presets::builtin())
+    }
+}

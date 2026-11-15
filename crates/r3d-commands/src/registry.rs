@@ -118,6 +118,8 @@ macro_rules! action_registry {
 command_registry! {
     "project.rename" => ProjectRename,
     "project.set_display_unit" => ProjectSetDisplayUnit,
+    "avatar.set" => AvatarSet,
+    "avatar.remove" => AvatarRemove,
     "panel.create_rect" => PanelCreateRect,
     "panel.create_polygon" => PanelCreatePolygon,
     "panel.rename" => PanelRename,
@@ -144,6 +146,8 @@ query_registry! {
     "panel.get" => PanelGet,
     "measure.distance" => MeasureDistance,
     "measure.contour_length" => MeasureContourLength,
+    "avatar.get" => AvatarGet,
+    "avatar.presets" => AvatarPresets,
 }
 
 action_registry! {
