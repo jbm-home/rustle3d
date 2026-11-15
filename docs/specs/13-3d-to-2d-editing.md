@@ -24,8 +24,11 @@ point to move.
     command `seam.take_in` moves both sides inward by half the amount;
     with linked mirror copies the symmetric seam changes too, so every
     seam stays matched.
-  - **Draw on garment**: a line drawn on the 3D surface becomes an internal
-    line on the pattern (style line, pocket placement).
+  - **Draw on garment** (implemented): with the Draw tool (D), a drag on the
+    3D garment becomes an internal line on the pattern (exact hits mapped
+    to the pattern, points 8 mm apart, one panel per stroke); the stroke
+    is shown under the cursor while drawing. Internal lines are not drawn
+    on the 3D garment yet.
   - **Pick** (implemented for panels and edges): clicking the 3D garment
     selects the panel under the cursor (exact ray / triangle hit, mapped to
     the pattern) and the edge when the hit is within 20 mm of one; the edge

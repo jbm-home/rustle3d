@@ -20,6 +20,8 @@ class RustView extends StatefulWidget {
     this.onSelection,
     this.onFrameTime,
     this.onPinned,
+    this.drawing = false,
+    this.onDrawn,
   });
 
   final Engine engine;
@@ -33,6 +35,12 @@ class RustView extends StatefulWidget {
 
   /// Called with the new pin's id after an ⌥-click on the cloth.
   final ValueChanged<String>? onPinned;
+
+  /// The Draw-on-garment tool is active: drags draw on the cloth.
+  final bool drawing;
+
+  /// Called with the new internal line's id after a stroke.
+  final ValueChanged<String>? onDrawn;
 
   @override
   State<RustView> createState() => _RustViewState();
@@ -56,6 +64,9 @@ class _RustViewState extends State<RustView>
   /// While lengthening a hem in 3D: the change so far (mm) and where to
   /// show it.
   PatternChange? _change;
+
+  /// The stroke being drawn on the garment (screen points), if any.
+  List<Offset>? _stroke;
   Offset _labelAt = Offset.zero;
 
   @override
@@ -137,6 +148,15 @@ class _RustViewState extends State<RustView>
             _dragged = false;
             final view = _viewId;
             // ⌥-click pins the cloth under the cursor.
+            if (view != null && widget.drawing) {
+              final started = widget.engine.strokeStart(
+                view: view,
+                x: e.localPosition.dx * _ratio,
+                y: e.localPosition.dy * _ratio,
+              );
+              if (started) setState(() => _stroke = [e.localPosition]);
+              return;
+            }
             if (view != null && HardwareKeyboard.instance.isAltPressed) {
               final pin = widget.engine.pinAt(
                 view: view,
@@ -163,6 +183,16 @@ class _RustViewState extends State<RustView>
             final view = _viewId;
             if (view == null) return;
             if ((e.localPosition - _downAt).distance > 3) _dragged = true;
+            if (_stroke case final stroke?) {
+              widget.engine.strokeTo(
+                view: view,
+                x: e.localPosition.dx * _ratio,
+                y: e.localPosition.dy * _ratio,
+              );
+              setState(() => stroke.add(e.localPosition));
+              return;
+            }
+            if (widget.drawing) return;
             if (_holding) {
               final change = widget.engine.pull(
                 view: view,
@@ -184,6 +214,13 @@ class _RustViewState extends State<RustView>
             );
           },
           onPointerUp: (e) {
+            if (_stroke != null) {
+              setState(() => _stroke = null);
+              final line = widget.engine.strokeEnd();
+              if (line != null) widget.onDrawn?.call(line);
+              return;
+            }
+            if (widget.drawing) return;
             if (_holding) {
               _holding = false;
               widget.engine.release();
@@ -223,6 +260,17 @@ class _RustViewState extends State<RustView>
                       : Texture(textureId: texture),
                 ),
               ),
+              if (_stroke case final stroke?)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: CustomPaint(
+                      painter: _StrokePainter(
+                        stroke,
+                        Tokens.of(context).accent,
+                      ),
+                    ),
+                  ),
+                ),
               if (_change case final change?)
                 Positioned(
                   left: _labelAt.dx + 14,
@@ -274,4 +322,33 @@ class _ChangeLabel extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The line being drawn on the garment, under the cursor.
+class _StrokePainter extends CustomPainter {
+  _StrokePainter(this.points, this.color);
+
+  final List<Offset> points;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (points.length < 2) return;
+    final path = Path()..moveTo(points.first.dx, points.first.dy);
+    for (final p in points.skip(1)) {
+      path.lineTo(p.dx, p.dy);
+    }
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color
+        ..strokeWidth = 3
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_StrokePainter old) => true;
 }

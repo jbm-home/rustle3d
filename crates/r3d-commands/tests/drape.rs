@@ -150,3 +150,41 @@ fn edits_carry_the_drape_over_without_a_jump() {
         "{old_hem} -> {new_hem}"
     );
 }
+
+#[test]
+fn a_skirt_made_from_scratch_sews_arranges_and_drapes() {
+    let mut s = Session::new(Project::new("t"));
+    let run =
+        |s: &mut Session, v: serde_json::Value| s.run_step(&Step::from_value(v).unwrap()).unwrap();
+    run(
+        &mut s,
+        serde_json::json!({"type": "avatar.set",
+        "body": {"masculinity": 0, "height_cm": 168, "bust_cm": 90, "waist_cm": 73, "hips_cm": 98}}),
+    );
+    // Two trapezoids, no placement, no seam direction given.
+    let a = run(
+        &mut s,
+        serde_json::json!({"type": "panel.create_polygon", "name": "Front",
+        "points": [[0, 0], [600, 0], [500, 600], [100, 600]]}),
+    );
+    let b = run(
+        &mut s,
+        serde_json::json!({"type": "panel.create_polygon", "name": "Back",
+        "points": [[700, 0], [1300, 0], [1200, 600], [800, 600]]}),
+    );
+    let (a, b) = (&a["created"], &b["created"]);
+    run(
+        &mut s,
+        serde_json::json!({"type": "seam.add", "a": {"edge": a[6]}, "b": {"edge": b[8]}}),
+    );
+    run(
+        &mut s,
+        serde_json::json!({"type": "seam.add", "a": {"edge": b[6]}, "b": {"edge": a[8]}}),
+    );
+    run(&mut s, serde_json::json!({"type": "garment.arrange"}));
+
+    let out = r3d_commands::drape::simulate(s.project(), 120).unwrap();
+    let top = out.positions.iter().map(|p| p.y).fold(f32::MIN, f32::max);
+    assert!(out.stats.max_seam_gap < 0.005, "{:?}", out.stats);
+    assert!(top > 0.95, "slid down: {top}");
+}

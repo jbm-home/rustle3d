@@ -132,6 +132,39 @@ class _ShellState extends State<Shell> {
     _refresh();
   }
 
+  /// The first edge picked with the Sew tool.
+  String? _sewFrom;
+
+  void _setTool(String tool) => setState(() {
+    _tool = tool;
+    _sewFrom = null;
+  });
+
+  /// Sew tool: the first click picks an edge, the second sews them.
+  void _sewClick() {
+    final edge = _guard<String?>(widget.engine.selectedEdge);
+    if (edge == null) {
+      _refresh();
+      return;
+    }
+    final from = _sewFrom;
+    if (from == null || from == edge) {
+      setState(() => _sewFrom = edge);
+      _refresh();
+      return;
+    }
+    final out = _run({
+      'type': 'seam.add',
+      'a': {'edge': from},
+      'b': {'edge': edge},
+    });
+    setState(() => _sewFrom = null);
+    _refresh();
+    if (out != null) {
+      _toast('Sewn. Flip it in the inspector if it looks twisted.');
+    }
+  }
+
   void _addRectangle() {
     final panels = (_summary['panels'] as List<dynamic>? ?? const []);
     var right = 0.0;
@@ -199,6 +232,10 @@ class _ShellState extends State<Shell> {
         const SingleActivator(LogicalKeyboardKey.keyZ, meta: true, shift: true):
             _redo,
         const SingleActivator(LogicalKeyboardKey.keyR): _addRectangle,
+        const SingleActivator(LogicalKeyboardKey.keyV): () =>
+            _setTool('select'),
+        const SingleActivator(LogicalKeyboardKey.keyD): () => _setTool('draw'),
+        const SingleActivator(LogicalKeyboardKey.keyS): () => _setTool('sew'),
         const SingleActivator(LogicalKeyboardKey.backspace): _deleteSelected,
         const SingleActivator(LogicalKeyboardKey.space): () =>
             _setRunning(!(_sim?.running ?? false)),
@@ -228,7 +265,7 @@ class _ShellState extends State<Shell> {
                           if (tool == 'rectangle') {
                             _addRectangle();
                           } else {
-                            setState(() => _tool = tool);
+                            _setTool(tool);
                           }
                         },
                       ),
@@ -239,7 +276,8 @@ class _ShellState extends State<Shell> {
                           child: RustView(
                             engine: widget.engine,
                             kind: ViewKind.board,
-                            onSelection: (_) => _refresh(),
+                            onSelection: (_) =>
+                                _tool == 'sew' ? _sewClick() : _refresh(),
                             onFrameTime: (ms) => _onFrame(true, ms),
                           ),
                         ),
@@ -262,6 +300,11 @@ class _ShellState extends State<Shell> {
                             onPinned: (_) {
                               _refresh();
                               _toast('Pinned. Remove it in the inspector.');
+                            },
+                            drawing: _tool == 'draw',
+                            onDrawn: (_) {
+                              _refresh();
+                              _toast('Line added to the pattern.');
                             },
                           ),
                         ),
@@ -293,9 +336,14 @@ class _ShellState extends State<Shell> {
                 ),
               ),
               _StatusBar(
-                hint: _selection.isEmpty
-                    ? 'In 3D: drag to pull the cloth · ⇧-drag a hem to lengthen, a seam to take in · ⌥-click to pin'
-                    : 'Adjust the selection in the inspector · ⌫ deletes · ⌘Z undoes',
+                hint: switch (_tool) {
+                  'sew' when _sewFrom == null =>
+                    'Sew: click the first edge on the pattern · V to stop',
+                  'sew' => 'Sew: now click the edge to sew it to · V to stop',
+                  'draw' => 'Draw: drag on the 3D garment; the line goes on the pattern · V to stop',
+                  _ when _selection.isEmpty => 'In 3D: drag to pull the cloth · ⇧-drag a hem to lengthen, a seam to take in · ⌥-click to pin',
+                  _ => 'Adjust the selection in the inspector · ⌫ deletes · ⌘Z undoes',
+                },
                 stats:
                     '${_simStats()}Rust render · pattern ${_boardMs.toStringAsFixed(1)} ms · '
                     '3D ${_garmentMs.toStringAsFixed(1)} ms · ${_fps.toStringAsFixed(0)} fps',
@@ -521,8 +569,15 @@ class _ToolRail extends StatelessWidget {
     ),
     ('polygon', Icons.pentagon_outlined, 'Polygon', 'P', 'Coming soon'),
     ('curve', Icons.gesture_rounded, 'Curve', 'C', 'Coming soon'),
+    (
+      'draw',
+      Icons.brush_rounded,
+      'Draw on garment',
+      'D',
+      'Drag on the 3D garment: the line goes on the pattern',
+    ),
     ('notch', Icons.vertical_align_center_rounded, 'Notch', 'N', 'Coming soon'),
-    ('sew', Icons.link_rounded, 'Sew', 'S', 'Coming soon'),
+    ('sew', Icons.link_rounded, 'Sew', 'S', 'Click two edges on the pattern'),
   ];
 
   @override
@@ -731,6 +786,7 @@ class _Inspector extends StatelessWidget {
             0 => _EmptyInspector(
               summary: summary,
               onFabric: onFabric,
+              onArrange: () => run({'type': 'garment.arrange'}),
               pins: pins,
               onUnpin: onUnpin,
             ),
@@ -753,12 +809,14 @@ class _EmptyInspector extends StatelessWidget {
   const _EmptyInspector({
     required this.summary,
     required this.onFabric,
+    required this.onArrange,
     required this.pins,
     required this.onUnpin,
   });
 
   final Map<String, dynamic> summary;
   final ValueChanged<String> onFabric;
+  final VoidCallback onArrange;
   final List<dynamic> pins;
   final ValueChanged<String> onUnpin;
 
@@ -809,6 +867,17 @@ class _EmptyInspector extends StatelessWidget {
                   as String? ??
               'cotton',
           onPick: onFabric,
+        ),
+        const SizedBox(height: Space.l),
+        OutlinedButton.icon(
+          onPressed: onArrange,
+          icon: const Icon(Icons.threesixty_rounded, size: 18),
+          label: const Text('Arrange around the body'),
+        ),
+        const SizedBox(height: Space.xs),
+        Text(
+          'Places every piece around the body in seam order, at the waist.',
+          style: ts(fontSize: 12, height: 1.4, color: p.textMuted),
         ),
         const SizedBox(height: Space.l),
         Divider(color: p.border, height: 1),

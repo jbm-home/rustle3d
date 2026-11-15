@@ -21,7 +21,7 @@ can be tested through MCP as soon as they exist.
 | M5 | Avatar, collisions, arrangement ✅ | 3 wk | Panels arranged around the avatar fall onto it |
 | M6 | Sewing + synced views ✅ (UI tools → M8) | 3 wk | A skirt made from scratch, sewn and draped |
 | M7 | Materials, self-collision, grab/pin ✅ (T-shirt → M10) | 2–3 wk | The same T-shirt in jersey vs denim; pull it with the mouse |
-| M8 | 3D → 2D editing tools | 3 wk | Lengthen a hem and take in a seam directly in 3D; the pattern follows |
+| M8 | 3D → 2D editing tools ✅ | 3 wk | Lengthen a hem and take in a seam directly in 3D; the pattern follows |
 | M9 | glTF export, attached MCP | 2 wk | An agent edits the garment live in the open app; the result opens in a game engine |
 | M10 | Templates, guided flow, polish → **v0.1** | 3–4 wk | A first-time user makes a T-shirt in < 10 minutes |
 | M11 | Photorealistic rendering | 4–6 wk | A path-traced studio image of the draped garment |
@@ -124,25 +124,25 @@ Moved to later milestones:
   better-converging solver or the GPU backend, after v0.1.
 - OBJ/glTF avatar import (with the winding-number SDF sign): with M9.
 
-## M8 — 3D → 2D editing tools
+## M8 — 3D → 2D editing tools ✅ (closed 2026-11-15)
 
-Status (2026-11-15): live re-simulation is in: pattern, fabric and pin
-edits reach the running drape within 100 ms, positions carried over
-(`drape::carry_over`), no restart. The Length tool is in: ⇧-drag a hem in 3D (`edge.lengthen`, the
-whole hemline moves along the grain). Fit is in too: ⇧-drag a seam
-(`seam.take_in`, tapered when grabbed near an end). Demo:
-`./demos/m8/demo.sh` (shorten 30 mm, take in the waist, drape and PDF
-follow). Next: Pick (edges and points from 3D) and Draw on the garment.
-- From M4–M7: live re-simulation after pattern edits (positions carried
-  over, so editing in 2D updates the drape without a restart); sewing and
-  arranging in the UI (seam tool with mismatch badges and direction
-  arrows, placement around the body, "Arrange all"); camera presets.
-- Pattern coordinates on every simulated vertex; ID-buffer picking.
-- Tools: lengthen/shorten by dragging an edge in 3D, pinch to take in or let
-  out a seam, draw style lines on the garment, select pattern elements in
-  3D. All of them emit ordinary pattern commands (architecture §7.8).
-- **Demo**: shorten a skirt and take in its waist in 3D; the pattern and its
-  PDF export follow.
+Demo: `./demos/m8/demo.sh` (shorten 30 mm and take in the waist from a
+script; drape, pattern and PDF follow); in the app, the same with
+⇧-drag in 3D.
+
+Done: live re-simulation after any edit (positions carried over); Length
+(⇧-drag a hem, `edge.lengthen`, the whole hemline moves); Fit (⇧-drag a
+seam, `seam.take_in`, tapered near an end, symmetric across linked
+mirrors); Pick (panel and edge from either view, exact ray / triangle
+hit; the edge card in the inspector); Draw on garment (D, internal line
+on the pattern); the Sew tool (S, click two edges; direction chosen);
+seams drawn on the board; "Arrange around the body" (`garment.arrange`).
+A skirt made from scratch with these sews, arranges and drapes (test).
+
+Left for later: picking points and notches in 3D; internal lines and the
+selected edge drawn on the 3D garment; per-panel placement in the UI and
+dragging panels in 3D (M10); camera presets (M10); mismatch badges and
+seam direction arrows on the board (M10).
 
 ## M9 — glTF export, attached MCP
 - glTF 2.0/GLB garment export with pattern UVs and `KHR_materials_sheen`;

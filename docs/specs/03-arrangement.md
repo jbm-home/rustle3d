@@ -6,6 +6,16 @@ Provenance: maintainer's functional brief (2026-11-14); general garment-making k
 As a designer, I place panels around the avatar in a couple of clicks before
 simulating, so that seams can close without tangling.
 
+## Status (2026-11-15)
+
+Implemented, simpler than below: each panel has a placement (angle around
+the body's vertical axis, top height, offset; `panel.place`) and
+`garment.arrange` ("Arrange around the body" in the inspector) places
+every panel evenly in the order the seams join them, at the avatar's
+waist. Panels start wrapped at the larger of the body's and the garment's
+own radius. Not yet: arrangement points on arms and legs, per-panel
+placement in the UI, dragging panels in 3D.
+
 ## Behavior
 - The avatar has **arrangement points**: front torso, back torso, left/right
   side, left/right arm (front/back), left/right leg (front/back), waist

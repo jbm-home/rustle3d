@@ -155,5 +155,38 @@ void main() {
     }
     engine.run(stepJson: '{"type":"history.undo"}');
     expect(width(), closeTo(wide, 1e-6));
+
+    // Draw on garment (D): a stroke across the skirt becomes an internal
+    // line on the pattern.
+    int lines() {
+      final summary = jsonDecode(
+        engine.run(stepJson: '{"type":"project.summary"}'),
+      );
+      return (summary['panels'] as List).fold<int>(0, (n, p) {
+        final panel = jsonDecode(
+          engine.run(
+            stepJson: jsonEncode({'type': 'panel.get', 'panel': p['id']}),
+          ),
+        );
+        return n + (panel['internal_lines'] as List).length;
+      });
+    }
+
+    final linesBefore = lines();
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyD);
+    await tester.pump();
+    final stroke = await tester.startGesture(
+      centre + const Offset(-20, 0),
+      kind: PointerDeviceKind.mouse,
+    );
+    for (var i = 0; i < 10; i++) {
+      await stroke.moveBy(const Offset(0, 8));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await stroke.up();
+    await tester.pump();
+    expect(lines(), linesBefore + 1);
+    engine.run(stepJson: '{"type":"history.undo"}');
+    expect(lines(), linesBefore);
   });
 }
