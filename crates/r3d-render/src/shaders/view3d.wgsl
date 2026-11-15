@@ -1,17 +1,23 @@
-// 3D view: backdrop gradient, ground with contact shadow, cloth with a soft
-// wrapped diffuse and a sheen term (fabric look). Theme colours arrive in
-// sRGB; lighting happens in linear space; output is sRGB-encoded.
+// 3D view: backdrop gradient, ground with contact shadow, and surfaces
+// (cloth, avatar) with a soft wrapped diffuse and a sheen term. Colours
+// arrive in sRGB; lighting happens in linear space; output is sRGB-encoded.
 
 struct Globals {
     view_proj: mat4x4<f32>,
     eye: vec4<f32>,
-    cloth: vec4<f32>,
-    sheen: vec4<f32>,
     sky_top: vec4<f32>,
     sky_bottom: vec4<f32>,
     ground: vec4<f32>,
 };
 @group(0) @binding(0) var<uniform> g: Globals;
+
+struct Material {
+    base: vec4<f32>,
+    sheen: vec4<f32>,
+    // x: sheen amount
+    params: vec4<f32>,
+};
+@group(1) @binding(0) var<uniform> m: Material;
 
 fn lin(c: vec3<f32>) -> vec3<f32> {
     return pow(c, vec3<f32>(2.2));
@@ -66,20 +72,20 @@ fn fs_ground(i: GroundOut) -> @location(0) vec4<f32> {
     return vec4<f32>(g.ground.rgb * shadow, fade);
 }
 
-struct ClothIn {
+struct SurfaceIn {
     @location(0) pos: vec3<f32>,
     @location(1) normal: vec3<f32>,
 };
 
-struct ClothOut {
+struct SurfaceOut {
     @builtin(position) clip: vec4<f32>,
     @location(0) world: vec3<f32>,
     @location(1) normal: vec3<f32>,
 };
 
 @vertex
-fn vs_cloth(v: ClothIn) -> ClothOut {
-    var o: ClothOut;
+fn vs_surface(v: SurfaceIn) -> SurfaceOut {
+    var o: SurfaceOut;
     o.clip = g.view_proj * vec4<f32>(v.pos, 1.0);
     o.world = v.pos;
     o.normal = v.normal;
@@ -87,7 +93,7 @@ fn vs_cloth(v: ClothIn) -> ClothOut {
 }
 
 @fragment
-fn fs_cloth(i: ClothOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
+fn fs_surface(i: SurfaceOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
     var n = normalize(i.normal);
     if !front {
         n = -n;
@@ -97,7 +103,7 @@ fn fs_cloth(i: ClothOut, @builtin(front_facing) front: bool) -> @location(0) vec
     let key = normalize(vec3<f32>(-0.6, 0.7, 0.4));
     let fill = normalize(vec3<f32>(0.8, 0.2, 0.35));
     let rim = normalize(vec3<f32>(-0.2, 0.4, -0.9));
-    let base = lin(g.cloth.rgb);
+    let base = lin(m.base.rgb);
     let hemi = mix(lin(g.ground.rgb) * 0.35, lin(g.sky_top.rgb), n.y * 0.5 + 0.5);
     // Slightly wrapped diffuse: fabric scatters a little past the
     // terminator, but folds must keep their shading.
@@ -107,7 +113,7 @@ fn fs_cloth(i: ClothOut, @builtin(front_facing) front: bool) -> @location(0) vec
     let nv = clamp(dot(n, v), 0.0, 1.0);
     // Sheen: fibres catch light at grazing angles.
     let sheen = pow(1.0 - nv, 5.0) * 0.45 + pow(max(dot(n, rim), 0.0), 2.0) * 0.12;
-    var c = base * (kd * 1.25 + fd * 0.22 + hemi * 0.18) + lin(g.sheen.rgb) * sheen;
+    var c = base * (kd * 1.25 + fd * 0.22 + hemi * 0.18) + lin(m.sheen.rgb) * sheen * m.params.x;
     if !front {
         c = c * 0.55;
     }

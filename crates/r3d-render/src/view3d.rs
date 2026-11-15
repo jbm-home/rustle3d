@@ -1,12 +1,12 @@
-//! The 3D view: backdrop, ground and cloth.
+//! The 3D view: backdrop, ground and surfaces (avatar, cloth).
 
 use bytemuck::{Pod, Zeroable};
 
 use crate::camera::OrbitCamera;
 use crate::gpu::Gpu;
-use crate::mesh::ClothMesh;
+use crate::mesh::Mesh;
 use crate::targets::{Attachments, DEPTH_FORMAT};
-use crate::theme::Theme;
+use crate::theme::{Rgba, Theme};
 use crate::{MSAA_SAMPLES, Target};
 
 #[repr(C)]
@@ -14,12 +14,59 @@ use crate::{MSAA_SAMPLES, Target};
 struct Globals {
     view_proj: [[f32; 4]; 4],
     eye: [f32; 4],
-    cloth: [f32; 4],
-    sheen: [f32; 4],
     sky_top: [f32; 4],
     sky_bottom: [f32; 4],
     ground: [f32; 4],
 }
+
+/// How a surface looks.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Material {
+    pub base: Rgba,
+    /// Colour of the grazing-angle sheen of fibres.
+    pub sheen: Rgba,
+    /// Strength of the sheen (0 = matte).
+    pub sheen_amount: f32,
+}
+
+impl Material {
+    /// Fabric, from the theme's cloth colours.
+    pub fn cloth(theme: &Theme) -> Self {
+        Self {
+            base: theme.cloth,
+            sheen: theme.cloth_sheen,
+            sheen_amount: 1.0,
+        }
+    }
+
+    /// The avatar: a matte dress form.
+    pub fn mannequin(theme: &Theme) -> Self {
+        Self {
+            base: theme.avatar,
+            sheen: theme.avatar,
+            sheen_amount: 0.2,
+        }
+    }
+}
+
+/// One mesh to draw with its material.
+#[derive(Debug, Clone, Copy)]
+pub struct Draw<'a> {
+    pub mesh: &'a Mesh,
+    pub material: Material,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+struct MaterialUniform {
+    base: [f32; 4],
+    sheen: [f32; 4],
+    params: [f32; 4],
+}
+
+/// Materials live in one buffer, one 256-byte slot per draw (dynamic
+/// offsets must be aligned to this).
+const MATERIAL_STRIDE: u64 = 256;
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -60,9 +107,12 @@ pub struct ViewRenderer3d {
     format: wgpu::TextureFormat,
     backdrop: wgpu::RenderPipeline,
     ground: wgpu::RenderPipeline,
-    cloth: wgpu::RenderPipeline,
+    surface: wgpu::RenderPipeline,
     globals: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
+    material_layout: wgpu::BindGroupLayout,
+    /// Material buffer and its bind group, grown to the number of draws.
+    materials: Option<(Growable, wgpu::BindGroup)>,
     vertices: Option<Growable>,
     indices: Option<Growable>,
     attachments: Option<Attachments>,
@@ -117,12 +167,35 @@ impl ViewRenderer3d {
                 resource: globals.as_entire_binding(),
             }],
         });
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("3d"),
+        let material_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("3d material"),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: true,
+                    min_binding_size: wgpu::BufferSize::new(
+                        std::mem::size_of::<MaterialUniform>() as u64
+                    ),
+                },
+                count: None,
+            }],
+        });
+        // The backdrop and the ground only need the globals; surfaces also
+        // take a material.
+        let scene_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("3d scene"),
             bind_group_layouts: &[Some(&layout)],
             immediate_size: 0,
         });
+        let surface_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("3d surface"),
+            bind_group_layouts: &[Some(&layout), Some(&material_layout)],
+            immediate_size: 0,
+        });
         let pipeline = |label,
+                        layout: &wgpu::PipelineLayout,
                         vs,
                         fs,
                         buffers: &[Option<wgpu::VertexBufferLayout<'_>>],
@@ -130,7 +203,7 @@ impl ViewRenderer3d {
                         blend| {
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some(label),
-                layout: Some(&pipeline_layout),
+                layout: Some(layout),
                 vertex: wgpu::VertexState {
                     module: &shader,
                     entry_point: Some(vs),
@@ -166,6 +239,7 @@ impl ViewRenderer3d {
             format,
             backdrop: pipeline(
                 "backdrop",
+                &scene_layout,
                 "vs_backdrop",
                 "fs_backdrop",
                 &[],
@@ -174,35 +248,39 @@ impl ViewRenderer3d {
             ),
             ground: pipeline(
                 "ground",
+                &scene_layout,
                 "vs_ground",
                 "fs_ground",
                 &[],
                 depth(false, wgpu::CompareFunction::Less),
                 Some(wgpu::BlendState::ALPHA_BLENDING),
             ),
-            cloth: pipeline(
-                "cloth",
-                "vs_cloth",
-                "fs_cloth",
+            surface: pipeline(
+                "surface",
+                &surface_layout,
+                "vs_surface",
+                "fs_surface",
                 &[Some(vertex_layout)],
                 depth(true, wgpu::CompareFunction::Less),
                 None,
             ),
             globals,
             bind_group,
+            material_layout,
+            materials: None,
             vertices: None,
             indices: None,
             attachments: None,
         }
     }
 
-    /// Draw `mesh` seen by `camera` into `target`.
+    /// Draw the scene (backdrop, ground, then `draws`) seen by `camera`.
     pub fn render(
         &mut self,
         gpu: &Gpu,
         target: Target<'_>,
         camera: &OrbitCamera,
-        mesh: &ClothMesh,
+        draws: &[Draw<'_>],
         theme: &Theme,
     ) {
         let Target {
@@ -216,25 +294,43 @@ impl ViewRenderer3d {
                 .view_proj(width as f32 / height.max(1) as f32)
                 .to_cols_array_2d(),
             eye: [eye.x, eye.y, eye.z, 1.0],
-            cloth: theme.cloth,
-            sheen: theme.cloth_sheen,
             sky_top: theme.sky_top,
             sky_bottom: theme.sky_bottom,
             ground: theme.ground,
         };
         gpu.queue
             .write_buffer(&self.globals, 0, bytemuck::bytes_of(&globals));
-        let vertices: Vec<Vertex> = mesh
-            .positions
-            .iter()
-            .zip(&mesh.normals)
-            .map(|(p, n)| Vertex {
-                pos: p.to_array(),
-                normal: n.to_array(),
-            })
-            .collect();
-        let index_count = mesh.indices.len() as u32;
-        if index_count > 0 {
+
+        // Pack every mesh into one vertex and one index buffer.
+        let mut vertices: Vec<Vertex> = Vec::new();
+        let mut indices: Vec<u32> = Vec::new();
+        let mut ranges = Vec::with_capacity(draws.len());
+        let mut material_bytes = vec![0u8; draws.len() * MATERIAL_STRIDE as usize];
+        for (i, d) in draws.iter().enumerate() {
+            let first_index = indices.len() as u32;
+            let base_vertex = vertices.len() as i32;
+            vertices.extend(
+                d.mesh
+                    .positions
+                    .iter()
+                    .zip(&d.mesh.normals)
+                    .map(|(p, n)| Vertex {
+                        pos: p.to_array(),
+                        normal: n.to_array(),
+                    }),
+            );
+            indices.extend_from_slice(&d.mesh.indices);
+            ranges.push((first_index..indices.len() as u32, base_vertex));
+            let uniform = MaterialUniform {
+                base: d.material.base,
+                sheen: d.material.sheen,
+                params: [d.material.sheen_amount, 0.0, 0.0, 0.0],
+            };
+            let at = i * MATERIAL_STRIDE as usize;
+            material_bytes[at..at + std::mem::size_of::<MaterialUniform>()]
+                .copy_from_slice(bytemuck::bytes_of(&uniform));
+        }
+        if !indices.is_empty() {
             Growable::write(
                 &mut self.vertices,
                 gpu,
@@ -245,8 +341,9 @@ impl ViewRenderer3d {
                 &mut self.indices,
                 gpu,
                 wgpu::BufferUsages::INDEX,
-                bytemuck::cast_slice(&mesh.indices),
+                bytemuck::cast_slice(&indices),
             );
+            self.write_materials(gpu, &material_bytes);
         }
 
         let att = Attachments::get(
@@ -288,13 +385,51 @@ impl ViewRenderer3d {
             pass.draw(0..3, 0..1);
             pass.set_pipeline(&self.ground);
             pass.draw(0..6, 0..1);
-            if let (true, Some(v), Some(i)) = (index_count > 0, &self.vertices, &self.indices) {
-                pass.set_pipeline(&self.cloth);
+            if let (false, Some(v), Some(i), Some((_, materials))) = (
+                indices.is_empty(),
+                &self.vertices,
+                &self.indices,
+                &self.materials,
+            ) {
+                pass.set_pipeline(&self.surface);
                 pass.set_vertex_buffer(0, v.buffer.slice(..));
                 pass.set_index_buffer(i.buffer.slice(..), wgpu::IndexFormat::Uint32);
-                pass.draw_indexed(0..index_count, 0, 0..1);
+                for (n, (range, base_vertex)) in ranges.into_iter().enumerate() {
+                    pass.set_bind_group(1, materials, &[(n as u64 * MATERIAL_STRIDE) as u32]);
+                    pass.draw_indexed(range, base_vertex, 0..1);
+                }
             }
         }
         gpu.queue.submit([encoder.finish()]);
+    }
+
+    fn write_materials(&mut self, gpu: &Gpu, bytes: &[u8]) {
+        let grows = self
+            .materials
+            .as_ref()
+            .is_none_or(|(g, _)| g.capacity < bytes.len() as u64);
+        if grows {
+            let mut slot = None;
+            Growable::write(&mut slot, gpu, wgpu::BufferUsages::UNIFORM, bytes);
+            if let Some(buffer) = slot {
+                let bind_group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("3d materials"),
+                    layout: &self.material_layout,
+                    entries: &[wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                            buffer: &buffer.buffer,
+                            offset: 0,
+                            size: wgpu::BufferSize::new(
+                                std::mem::size_of::<MaterialUniform>() as u64
+                            ),
+                        }),
+                    }],
+                });
+                self.materials = Some((buffer, bind_group));
+            }
+        } else if let Some((g, _)) = &self.materials {
+            gpu.queue.write_buffer(&g.buffer, 0, bytes);
+        }
     }
 }

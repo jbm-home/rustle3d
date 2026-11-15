@@ -22,6 +22,8 @@ pub struct Theme {
     pub ground: Rgba,
     pub cloth: Rgba,
     pub cloth_sheen: Rgba,
+    /// The avatar (a neutral dress-form tone).
+    pub avatar: Rgba,
 }
 
 const fn hex(rgb: u32) -> Rgba {
@@ -46,6 +48,7 @@ impl Theme {
         ground: hex(0xE7E4DE),
         cloth: hex(0x8A9BB8),
         cloth_sheen: hex(0xE8ECF5),
+        avatar: hex(0xD9DCE3),
     };
 
     pub const DARK: Theme = Theme {
@@ -60,5 +63,6 @@ impl Theme {
         ground: hex(0x1E1E22),
         cloth: hex(0x7C8DAD),
         cloth_sheen: hex(0xC9D2E6),
+        avatar: hex(0x6B7080),
     };
 }

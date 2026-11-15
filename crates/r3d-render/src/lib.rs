@@ -21,9 +21,9 @@ mod targets;
 pub use board::{BoardRenderer, BoardScene};
 pub use camera::OrbitCamera;
 pub use gpu::{Gpu, RenderError};
-pub use mesh::ClothMesh;
+pub use mesh::Mesh;
 pub use theme::Theme;
-pub use view3d::ViewRenderer3d;
+pub use view3d::{Draw, Material, ViewRenderer3d};
 
 /// Samples per pixel for anti-aliasing.
 pub const MSAA_SAMPLES: u32 = 4;

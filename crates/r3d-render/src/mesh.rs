@@ -2,17 +2,16 @@
 
 use glam::Vec3;
 
-/// A cloth mesh in metres: positions, per-vertex normals and triangles.
-/// The simulation (M4) produces these; until then [`ClothMesh::demo_skirt`]
-/// stands in for it.
+/// A triangle mesh in metres: positions, per-vertex normals and triangles
+/// (cloth from the simulation, the avatar body, …).
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct ClothMesh {
+pub struct Mesh {
     pub positions: Vec<Vec3>,
     pub normals: Vec<Vec3>,
     pub indices: Vec<u32>,
 }
 
-impl ClothMesh {
+impl Mesh {
     /// Recompute area-weighted vertex normals from the triangles.
     pub fn recompute_normals(&mut self) {
         self.normals.clear();
@@ -80,7 +79,7 @@ mod tests {
 
     #[test]
     fn demo_skirt_has_ten_thousand_vertices_and_unit_normals() {
-        let m = ClothMesh::demo_skirt(100, 100, 0.5);
+        let m = Mesh::demo_skirt(100, 100, 0.5);
         assert_eq!(m.positions.len(), 10_000);
         assert_eq!(m.indices.len(), 100 * 99 * 6);
         assert!(m.normals.iter().all(|n| (n.length() - 1.0).abs() < 1e-4));

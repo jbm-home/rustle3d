@@ -31,6 +31,7 @@ class Palette {
     required this.ground,
     required this.cloth,
     required this.clothSheen,
+    required this.avatar,
     required this.pieces,
   });
 
@@ -55,6 +56,7 @@ class Palette {
   final Color ground;
   final Color cloth;
   final Color clothSheen;
+  final Color avatar;
 
   /// Eight piece colours, cycled in project order.
   final List<Color> pieces;
@@ -70,6 +72,7 @@ class Palette {
     ground: ground.toARGB32(),
     cloth: cloth.toARGB32(),
     clothSheen: clothSheen.toARGB32(),
+    avatar: avatar.toARGB32(),
     pieces: Uint32List.fromList([for (final c in pieces) c.toARGB32()]),
   );
 
@@ -93,6 +96,7 @@ class Palette {
     ground: Color(0xFFE2E5EB),
     cloth: Color(0xFF5E6B8A),
     clothSheen: Color(0xFFE3E8F5),
+    avatar: Color(0xFFD9DCE3),
     pieces: [
       Color(0xFFE4DDFF),
       Color(0xFFD5EEF5),
@@ -125,6 +129,7 @@ class Palette {
     ground: Color(0xFF12141A),
     cloth: Color(0xFF7D89A8),
     clothSheen: Color(0xFFD7DCEF),
+    avatar: Color(0xFF6B7080),
     pieces: [
       Color(0xFF2E2655),
       Color(0xFF1C3A43),

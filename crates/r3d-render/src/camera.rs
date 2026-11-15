@@ -18,10 +18,11 @@ pub struct OrbitCamera {
 impl Default for OrbitCamera {
     fn default() -> Self {
         Self {
-            target: Vec3::new(0.0, 0.75, 0.0),
-            yaw: 0.6,
-            pitch: 0.12,
-            distance: 2.4,
+            // Frames a standing adult (about 1.8 m) from head to toe.
+            target: Vec3::new(0.0, 0.9, 0.0),
+            yaw: 0.5,
+            pitch: 0.08,
+            distance: 3.6,
             fov_y: 35f32.to_radians(),
         }
     }

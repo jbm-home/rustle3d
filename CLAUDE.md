@@ -90,7 +90,8 @@ If a request would break one of these rules, stop and say so.
 ## 3. Commands
 
 ```sh
-./scripts/check.sh                           # run before EVERY commit (fmt, clippy, tests, docs, flutter analyze)
+./scripts/check.sh                           # run before EVERY commit; commit only if it exits 0 (never through a pipe)
+./scripts/app-screenshot.sh out.png          # capture the app window for visual review
 cargo build                                  # whole workspace
 cargo test                                   # all tests
 cargo test -p r3d-core                       # one crate

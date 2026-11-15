@@ -2,12 +2,15 @@
 //! Offscreen renders of the board and the 3D view. Set `R3D_RENDER_OUT` to a
 //! folder to keep the PNGs for visual review.
 
+use r3d_avatar::fit::{fit, fitted_positions};
+use r3d_avatar::model::BodyModel;
 use r3d_commands::{Script, Session};
 use r3d_core::Project;
 use r3d_render::board::BoardView;
 use r3d_render::offscreen::{PNG_FORMAT, render_png};
 use r3d_render::{
-    BoardRenderer, BoardScene, ClothMesh, Gpu, OrbitCamera, Target, Theme, ViewRenderer3d,
+    BoardRenderer, BoardScene, Draw, Gpu, Material, Mesh, OrbitCamera, Target, Theme,
+    ViewRenderer3d,
 };
 
 fn skirt_project() -> Project {
@@ -76,9 +79,19 @@ fn board_renders_panels_in_both_themes() {
 }
 
 #[test]
-fn view3d_renders_the_demo_cloth() {
+fn view3d_renders_the_avatar_and_the_cloth() {
     let Some(gpu) = gpu() else { return };
-    let mesh = ClothMesh::demo_skirt(100, 100, 1.0);
+    let model = BodyModel::builtin().unwrap();
+    let body = r3d_avatar::presets::builtin()[2].body; // Women M
+    let fitted = fit(&model, &body);
+    let positions = fitted_positions(&model, &fitted);
+    let mut avatar = Mesh {
+        positions,
+        normals: Vec::new(),
+        indices: model.triangles().iter().flatten().copied().collect(),
+    };
+    avatar.recompute_normals();
+    let skirt = Mesh::demo_skirt(100, 100, 1.0);
     let camera = OrbitCamera::default();
     let (w, h) = (900, 900);
     let mut renderer = ViewRenderer3d::new(&gpu, PNG_FORMAT);
@@ -86,13 +99,23 @@ fn view3d_renders_the_demo_cloth() {
         ("view3d-light.png", Theme::LIGHT),
         ("view3d-dark.png", Theme::DARK),
     ] {
+        let draws = [
+            Draw {
+                mesh: &avatar,
+                material: Material::mannequin(&theme),
+            },
+            Draw {
+                mesh: &skirt,
+                material: Material::cloth(&theme),
+            },
+        ];
         let png = render_png(&gpu, w, h, |view_tex| {
             let target = Target {
                 view: view_tex,
                 width: w,
                 height: h,
             };
-            renderer.render(&gpu, target, &camera, &mesh, &theme);
+            renderer.render(&gpu, target, &camera, &draws, &theme);
         })
         .unwrap();
         assert!(distinct_colours(&png) > 100, "{name} looks blank");

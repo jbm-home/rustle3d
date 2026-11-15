@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'src/design/tokens.dart';
 import 'src/rust/api/engine.dart';
@@ -23,6 +24,19 @@ Future<void> main() async {
   if ((summary['counts']['panels'] as int) == 0) {
     engine.runScript(
       scriptJson: await rootBundle.loadString('assets/demo_skirt.json'),
+    );
+  }
+  engine.setLibraryDir(path: (await getApplicationSupportDirectory()).path);
+  // Every project starts with a body to dress: a standard size.
+  if (jsonDecode(engine.run(stepJson: '{"type":"avatar.get"}')) == null) {
+    final presets = jsonDecode(engine.bodyPresets()) as List;
+    final standard = presets.firstWhere((p) => p['name'] == 'Women M');
+    engine.run(
+      stepJson: jsonEncode({
+        'type': 'avatar.set',
+        'body': standard['body'],
+        'preset': standard['name'],
+      }),
     );
   }
   // Review aids for screenshots:

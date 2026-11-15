@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'body_panel.dart';
 import 'design/tokens.dart';
 import 'rust/api/engine.dart';
 import 'views/rust_view.dart';
@@ -163,6 +164,7 @@ class _ShellState extends State<Shell> {
                 onToggleTheme: widget.onToggleTheme,
                 onUndo: _undo,
                 onRedo: _redo,
+                onBody: () => showBodyPanel(context, widget.engine, _refresh),
               ),
               Expanded(
                 child: Padding(
@@ -246,6 +248,7 @@ class _TopBar extends StatelessWidget {
     required this.onToggleTheme,
     required this.onUndo,
     required this.onRedo,
+    required this.onBody,
   });
 
   final String projectName;
@@ -253,6 +256,7 @@ class _TopBar extends StatelessWidget {
   final VoidCallback onToggleTheme;
   final VoidCallback onUndo;
   final VoidCallback onRedo;
+  final VoidCallback onBody;
 
   @override
   Widget build(BuildContext context) {
@@ -312,6 +316,12 @@ class _TopBar extends StatelessWidget {
                 ),
             ],
             const Spacer(),
+            TextButton.icon(
+              onPressed: onBody,
+              icon: const Icon(Icons.accessibility_new_rounded, size: 18),
+              label: const Text('Body'),
+            ),
+            const SizedBox(width: Space.s),
             _IconAction(
               icon: Icons.undo_rounded,
               tip: 'Undo  ⌘Z',

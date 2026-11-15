@@ -67,7 +67,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -90236513;
+  int get rustContentHash => 481905683;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -87,11 +87,18 @@ abstract class RustLibApi extends BaseApi {
     required int height,
   });
 
+  String crateApiEngineEngineBodyPresets({required Engine that});
+
   List<String> crateApiEngineEngineClick({
     required Engine that,
     required int view,
     required double x,
     required double y,
+  });
+
+  void crateApiEngineEngineDeleteBodyPreset({
+    required Engine that,
+    required String name,
   });
 
   void crateApiEngineEngineDetachView({
@@ -125,6 +132,12 @@ abstract class RustLibApi extends BaseApi {
     required String scriptJson,
   });
 
+  void crateApiEngineEngineSaveBodyPreset({
+    required Engine that,
+    required String name,
+    required String bodyJson,
+  });
+
   List<String> crateApiEngineEngineSelect({
     required Engine that,
     required List<String> panels,
@@ -135,6 +148,11 @@ abstract class RustLibApi extends BaseApi {
   void crateApiEngineEngineSetCanvas({
     required Engine that,
     required CanvasColors colors,
+  });
+
+  void crateApiEngineEngineSetLibraryDir({
+    required Engine that,
+    required String path,
   });
 
   void crateApiEngineEngineZoom({
@@ -200,6 +218,32 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  String crateApiEngineEngineBodyPresets({required Engine that}) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEngine(
+            that,
+            serializer,
+          );
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 2)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_api_error,
+        ),
+        constMeta: kCrateApiEngineEngineBodyPresetsConstMeta,
+        argValues: [that],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEngineEngineBodyPresetsConstMeta =>
+      const TaskConstMeta(debugName: "Engine_body_presets", argNames: ["that"]);
+
+  @override
   List<String> crateApiEngineEngineClick({
     required Engine that,
     required int view,
@@ -217,7 +261,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_u_32(view, serializer);
           sse_encode_f_64(x, serializer);
           sse_encode_f_64(y, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 2)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 3)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_list_String,
@@ -236,6 +280,39 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  void crateApiEngineEngineDeleteBodyPreset({
+    required Engine that,
+    required String name,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEngine(
+            that,
+            serializer,
+          );
+          sse_encode_String(name, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 4)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_api_error,
+        ),
+        constMeta: kCrateApiEngineEngineDeleteBodyPresetConstMeta,
+        argValues: [that, name],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEngineEngineDeleteBodyPresetConstMeta =>
+      const TaskConstMeta(
+        debugName: "Engine_delete_body_preset",
+        argNames: ["that", "name"],
+      );
+
+  @override
   void crateApiEngineEngineDetachView({
     required Engine that,
     required int view,
@@ -249,7 +326,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_u_32(view, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 3)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 5)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -286,7 +363,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_u_32(view, serializer);
           sse_encode_f_64(dx, serializer);
           sse_encode_f_64(dy, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 4)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -315,7 +392,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_u_32(view, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 5)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 7)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -341,7 +418,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(path, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8)!;
         },
         codec: SseCodec(
           decodeSuccessData:
@@ -372,7 +449,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_u_32(view, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 7)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_f_64,
@@ -405,7 +482,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(stepJson, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -437,7 +514,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(scriptJson, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -457,6 +534,41 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  void crateApiEngineEngineSaveBodyPreset({
+    required Engine that,
+    required String name,
+    required String bodyJson,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEngine(
+            that,
+            serializer,
+          );
+          sse_encode_String(name, serializer);
+          sse_encode_String(bodyJson, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_api_error,
+        ),
+        constMeta: kCrateApiEngineEngineSaveBodyPresetConstMeta,
+        argValues: [that, name, bodyJson],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEngineEngineSaveBodyPresetConstMeta =>
+      const TaskConstMeta(
+        debugName: "Engine_save_body_preset",
+        argNames: ["that", "name", "bodyJson"],
+      );
+
+  @override
   List<String> crateApiEngineEngineSelect({
     required Engine that,
     required List<String> panels,
@@ -470,7 +582,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_list_String(panels, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 13)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_list_String,
@@ -498,7 +610,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that,
             serializer,
           );
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_list_String,
@@ -528,7 +640,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_box_autoadd_canvas_colors(colors, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 15)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -545,6 +657,39 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(
         debugName: "Engine_set_canvas",
         argNames: ["that", "colors"],
+      );
+
+  @override
+  void crateApiEngineEngineSetLibraryDir({
+    required Engine that,
+    required String path,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEngine(
+            that,
+            serializer,
+          );
+          sse_encode_String(path, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_api_error,
+        ),
+        constMeta: kCrateApiEngineEngineSetLibraryDirConstMeta,
+        argValues: [that, path],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEngineEngineSetLibraryDirConstMeta =>
+      const TaskConstMeta(
+        debugName: "Engine_set_library_dir",
+        argNames: ["that", "path"],
       );
 
   @override
@@ -567,7 +712,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_f_64(x, serializer);
           sse_encode_f_64(y, serializer);
           sse_encode_f_64(amount, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 13)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 17)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -658,8 +803,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   CanvasColors dco_decode_canvas_colors(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 11)
-      throw Exception('unexpected arr length: expect 11 but see ${arr.length}');
+    if (arr.length != 12)
+      throw Exception('unexpected arr length: expect 12 but see ${arr.length}');
     return CanvasColors(
       boardBackground: dco_decode_u_32(arr[0]),
       gridMinor: dco_decode_u_32(arr[1]),
@@ -671,7 +816,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       ground: dco_decode_u_32(arr[7]),
       cloth: dco_decode_u_32(arr[8]),
       clothSheen: dco_decode_u_32(arr[9]),
-      pieces: dco_decode_list_prim_u_32_strict(arr[10]),
+      avatar: dco_decode_u_32(arr[10]),
+      pieces: dco_decode_list_prim_u_32_strict(arr[11]),
     );
   }
 
@@ -839,6 +985,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_ground = sse_decode_u_32(deserializer);
     var var_cloth = sse_decode_u_32(deserializer);
     var var_clothSheen = sse_decode_u_32(deserializer);
+    var var_avatar = sse_decode_u_32(deserializer);
     var var_pieces = sse_decode_list_prim_u_32_strict(deserializer);
     return CanvasColors(
       boardBackground: var_boardBackground,
@@ -851,6 +998,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       ground: var_ground,
       cloth: var_cloth,
       clothSheen: var_clothSheen,
+      avatar: var_avatar,
       pieces: var_pieces,
     );
   }
@@ -1046,6 +1194,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_u_32(self.ground, serializer);
     sse_encode_u_32(self.cloth, serializer);
     sse_encode_u_32(self.clothSheen, serializer);
+    sse_encode_u_32(self.avatar, serializer);
     sse_encode_list_prim_u_32_strict(self.pieces, serializer);
   }
 
@@ -1189,6 +1338,11 @@ class EngineImpl extends RustOpaque implements Engine {
     height: height,
   );
 
+  /// Body presets as JSON: `[{name, body, builtin}]`, standard sizes first,
+  /// then the user's own.
+  String bodyPresets() =>
+      RustLib.instance.api.crateApiEngineEngineBodyPresets(that: this);
+
   /// A click at pixel (`x`, `y`) of a view. Updates the shared selection
   /// and returns it (panel ids).
   List<String> click({
@@ -1201,6 +1355,10 @@ class EngineImpl extends RustOpaque implements Engine {
     x: x,
     y: y,
   );
+
+  /// Delete one of the user's body presets.
+  void deleteBodyPreset({required String name}) => RustLib.instance.api
+      .crateApiEngineEngineDeleteBodyPreset(that: this, name: name);
 
   /// Stop rendering into a view (its UI texture is about to go away).
   void detachView({required int view}) => RustLib.instance.api
@@ -1235,6 +1393,15 @@ class EngineImpl extends RustOpaque implements Engine {
   String runScript({required String scriptJson}) => RustLib.instance.api
       .crateApiEngineEngineRunScript(that: this, scriptJson: scriptJson);
 
+  /// Save (or replace) one of the user's body presets. `body_json` is a
+  /// `Body` object as in the `avatar.set` command.
+  void saveBodyPreset({required String name, required String bodyJson}) =>
+      RustLib.instance.api.crateApiEngineEngineSaveBodyPreset(
+        that: this,
+        name: name,
+        bodyJson: bodyJson,
+      );
+
   /// Replace the shared selection with these panel ids; unknown ids are
   /// ignored. Returns the resulting selection.
   List<String> select({required List<String> panels}) => RustLib.instance.api
@@ -1248,6 +1415,10 @@ class EngineImpl extends RustOpaque implements Engine {
   /// the 3D view match the app theme.
   void setCanvas({required CanvasColors colors}) => RustLib.instance.api
       .crateApiEngineEngineSetCanvas(that: this, colors: colors);
+
+  /// Where the user's libraries (body presets…) are stored.
+  void setLibraryDir({required String path}) => RustLib.instance.api
+      .crateApiEngineEngineSetLibraryDir(that: this, path: path);
 
   /// A scroll of `amount` (positive = zoom in) at pixel (`x`, `y`).
   void zoom({
