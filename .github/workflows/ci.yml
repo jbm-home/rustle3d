@@ -1,9 +1,10 @@
 name: CI
 
+# Manual only for now (Actions tab > CI > Run workflow): local
+# ./scripts/check.sh gates every commit. Restore the push/pull_request
+# triggers once the project is more stable.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
