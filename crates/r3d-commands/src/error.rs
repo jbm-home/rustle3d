@@ -34,6 +34,8 @@ pub enum Invalid {
     Format,
     #[error("would turn a panel inside out")]
     Inverted,
+    #[error("must be an end point of the seam")]
+    NotSeamEnd,
 }
 
 impl Invalid {
@@ -53,6 +55,7 @@ impl Invalid {
             Invalid::Range(..) => "invalid.range",
             Invalid::Format => "invalid.format",
             Invalid::Inverted => "invalid.inverted",
+            Invalid::NotSeamEnd => "invalid.not_seam_end",
         }
     }
 }

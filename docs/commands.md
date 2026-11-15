@@ -1273,6 +1273,61 @@ Lengthen (mm > 0) or shorten (mm < 0) the garment at an open edge such as a hem:
 
 </details>
 
+### `seam.take_in`
+
+Take in (mm > 0) or let out (mm < 0) a seam: both sides move inward by half of mm, perpendicular to the seam, so they stay matched. With `at` (an end point of the seam) only that end moves, tapering the change (e.g. take in the waist only). With a linked mirror copy, the symmetric seam changes too.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "PointId": {
+      "description": "Identifier of a point, e.g. `point:1`.",
+      "pattern": "^point:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "SeamId": {
+      "description": "Identifier of a seam, e.g. `seam:1`.",
+      "pattern": "^seam:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Take in (mm > 0) or let out (mm < 0) a seam.",
+  "properties": {
+    "at": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PointId"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "An end point of the seam (on either side) to take in at that end\nonly, tapering to nothing at the other end. Omitted: the whole seam."
+    },
+    "mm": {
+      "description": "Total width taken in (mm): each side moves half of it inward.\nNegative lets the seam out.",
+      "format": "double",
+      "type": "number"
+    },
+    "seam": {
+      "$ref": "#/$defs/SeamId"
+    }
+  },
+  "required": [
+    "seam",
+    "mm"
+  ],
+  "title": "SeamTakeIn",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `pin.add`
 
 Pin the cloth: the panel's cloth within 3 cm of `at` (pattern mm) is held still at `position` (3D metres) during the simulation. Returns the pin.

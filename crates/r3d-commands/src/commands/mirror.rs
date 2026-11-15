@@ -130,6 +130,23 @@ impl CommandSpec for PanelUnlink {
     }
 }
 
+/// For an edge of a linked mirror copy: the source edge it mirrors, and a
+/// point map (the copy's start mirrors the source's end, as reflection
+/// reverses the contour). `None` for edges of ordinary panels.
+pub(crate) fn mirrored_source(
+    p: &Project,
+    edge: EdgeId,
+) -> Option<(EdgeId, [(PointId, PointId); 2])> {
+    let e = p.edge(edge)?;
+    let copy = p.panel(e.panel)?;
+    let source = p.panel(copy.mirror_of.as_ref()?.source)?;
+    let k = copy.contour.iter().position(|c| *c == edge)?;
+    let n = copy.contour.len();
+    let src_id = *source.contour.get(n.checked_sub(1 + k)?)?;
+    let s = p.edge(src_id)?;
+    Some((src_id, [(e.start, s.end), (e.end, s.start)]))
+}
+
 /// Recompute every linked mirror copy from its source.
 pub(crate) fn sync_mirrors(tx: &mut Transaction<'_>) -> Result<(), CommandError> {
     let copies: Vec<PanelId> = tx

@@ -12,6 +12,7 @@ mod pin;
 mod point;
 mod project;
 mod seam;
+mod take_in;
 
 pub use avatar::*;
 pub use edge::*;
@@ -25,11 +26,14 @@ pub use pin::*;
 pub use point::*;
 pub use project::*;
 pub use seam::*;
+pub use take_in::*;
 
-use r3d_core::{EdgeId, Panel, PanelId, Project, Transaction};
+use std::collections::{BTreeMap, BTreeSet};
+
+use r3d_core::{Edge, EdgeCurve, EdgeId, Panel, PanelId, Point, PointId, Project, Transaction};
 use r3d_geom::DVec2;
 
-use crate::error::CommandError;
+use crate::error::{CommandError, Invalid};
 
 /// A 2D position or vector in millimetres, as `[x, y]`.
 pub type Vec2 = [f64; 2];
@@ -76,4 +80,85 @@ pub(crate) fn editable_edge_panel(
         .ok_or_else(|| CommandError::not_found(edge))?;
     let panel = editable_panel(tx, e.panel)?;
     Ok((e, panel))
+}
+
+/// Move contour points by the given offsets (mm); curve handles stay
+/// attached to their points.
+pub(crate) fn move_points(tx: &mut Transaction<'_>, moves: &BTreeMap<PointId, DVec2>) {
+    let p = tx.project();
+    let edges: Vec<(EdgeId, Edge)> = p
+        .edges()
+        .iter()
+        .filter(|(_, e)| moves.contains_key(&e.start) || moves.contains_key(&e.end))
+        .map(|(id, e)| (*id, e.clone()))
+        .collect();
+    let points: Vec<(PointId, Point)> = moves
+        .keys()
+        .filter_map(|id| Some((*id, p.point(*id)?.clone())))
+        .collect();
+    let at = |pt: PointId| moves.get(&pt).copied().unwrap_or_default();
+    for (id, edge) in edges {
+        if let EdgeCurve::Cubic { c1, c2 } = edge.curve {
+            let curve = EdgeCurve::Cubic {
+                c1: c1 + at(edge.start),
+                c2: c2 + at(edge.end),
+            };
+            tx.put_edge(id, Edge { curve, ..edge });
+        }
+    }
+    for (id, point) in points {
+        tx.put_point(
+            id,
+            Point {
+                pos: point.pos + at(id),
+                ..point
+            },
+        );
+    }
+}
+
+/// Whether each panel's outline is simple and counter-clockwise (right
+/// way out).
+pub(crate) fn outline_states(
+    p: &Project,
+    panels: &BTreeSet<PanelId>,
+) -> BTreeMap<PanelId, (bool, bool)> {
+    panels
+        .iter()
+        .map(|id| {
+            let outline = p.panel_outline(*id).unwrap_or_default();
+            let simple = r3d_geom::polygon::is_simple(&outline);
+            (
+                *id,
+                (simple, r3d_geom::polygon::signed_area(&outline) > 0.0),
+            )
+        })
+        .collect()
+}
+
+/// Refuse a change that made a panel cross itself or turn inside out
+/// (compared with `before`, from [`outline_states`]; a panel that was
+/// already invalid can still be edited, e.g. to fix it).
+pub(crate) fn check_outlines(
+    tx: &Transaction<'_>,
+    before: &BTreeMap<PanelId, (bool, bool)>,
+    field: &'static str,
+) -> Result<(), CommandError> {
+    let panels = before.keys().copied().collect();
+    for (id, (simple, right_way)) in outline_states(tx.project(), &panels) {
+        let (was_simple, was_right_way) = before.get(&id).copied().unwrap_or((false, false));
+        if was_simple && !simple {
+            return Err(CommandError::invalid(field, Invalid::NotSimple));
+        }
+        if was_right_way && !right_way {
+            return Err(CommandError::invalid(field, Invalid::Inverted));
+        }
+    }
+    Ok(())
+}
+
+/// The centre of a panel's outline (mm).
+pub(crate) fn centre(p: &Project, panel: PanelId) -> DVec2 {
+    let outline = p.panel_outline(panel).unwrap_or_default();
+    outline.iter().fold(DVec2::ZERO, |a, b| a + *b) / outline.len().max(1) as f64
 }

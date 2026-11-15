@@ -3,14 +3,13 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use r3d_core::{Edge, EdgeCurve, EdgeId, PanelId, Point, PointId, Project, Transaction};
+use r3d_core::{EdgeId, PanelId, PointId, Project, Transaction};
 use r3d_geom::DVec2;
-use r3d_geom::polygon;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::not_sewn;
-use crate::error::{CommandError, Invalid, finite};
+use super::{centre, check_outlines, move_points, not_sewn, outline_states};
+use crate::error::{CommandError, finite};
 use crate::spec::{CommandOutput, CommandSpec, Described};
 
 /// Move an open edge, and the line it continues across seams, along the
@@ -113,9 +112,7 @@ impl CommandSpec for EdgeLengthen {
             }
             // Outward along the grain: away from the panel's centre.
             let grain = DVec2::from_angle(panel.grain_angle_deg.to_radians());
-            let outline = p.panel_outline(edge.panel).unwrap_or_default();
-            let centre =
-                outline.iter().fold(DVec2::ZERO, |a, b| a + *b) / outline.len().max(1) as f64;
+            let centre = centre(p, edge.panel);
             let ends =
                 [edge.start, edge.end].map(|id| p.point(id).map(|pt| pt.pos).unwrap_or_default());
             let side = ((ends[0] + ends[1]) / 2.0 - centre).dot(grain).signum();
@@ -133,48 +130,9 @@ impl CommandSpec for EdgeLengthen {
             });
         }
 
-        // Handles stay attached to their moved points.
-        let edges_to_update: Vec<(EdgeId, Edge)> = p
-            .edges()
-            .iter()
-            .filter(|(_, e)| moves.contains_key(&e.start) || moves.contains_key(&e.end))
-            .map(|(id, e)| (*id, e.clone()))
-            .collect();
-        let points: Vec<(PointId, Point)> = moves
-            .keys()
-            .filter_map(|id| Some((*id, p.point(*id)?.clone())))
-            .collect();
-        for (id, edge) in edges_to_update {
-            if let EdgeCurve::Cubic { c1, c2 } = edge.curve {
-                let at = |pt: PointId| moves.get(&pt).copied().unwrap_or_default();
-                let curve = EdgeCurve::Cubic {
-                    c1: c1 + at(edge.start),
-                    c2: c2 + at(edge.end),
-                };
-                tx.put_edge(id, Edge { curve, ..edge });
-            }
-        }
-        for (id, point) in points {
-            let d = moves.get(&id).copied().unwrap_or_default();
-            tx.put_point(
-                id,
-                Point {
-                    pos: point.pos + d,
-                    ..point
-                },
-            );
-        }
-        for panel in &panels {
-            let outline = tx.project().panel_outline(*panel).unwrap_or_default();
-            if !polygon::is_simple(&outline) {
-                return Err(CommandError::invalid("mm", Invalid::NotSimple));
-            }
-            // Contours are counter-clockwise: a hem pushed past the waist
-            // flips the panel.
-            if polygon::signed_area(&outline) <= 0.0 {
-                return Err(CommandError::invalid("mm", Invalid::Inverted));
-            }
-        }
+        let before = outline_states(tx.project(), &panels);
+        move_points(tx, &moves);
+        check_outlines(tx, &before, "mm")?;
         Ok(CommandOutput::default())
     }
 
