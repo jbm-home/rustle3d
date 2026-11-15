@@ -134,21 +134,19 @@ measurement-based calibration on the roadmap.
 
 ### Avatar (static for the MVP)
 
-- When the avatar is loaded, build a **signed distance field** on a regular
-  grid (default 4 mm voxels, narrow band). The sign comes from the
-  generalized winding number [9], which is robust to small holes in the
-  mesh. It is built in the background and cached in `.r3d-cache/`.
-- Particle vs SDF at every substep, with thickness `h`. Small substeps keep
-  per-substep displacement below `h` at normal speeds, which prevents
-  tunneling. Velocity clamping per substep is a safety net.
+- When the avatar is fitted, build a **narrow-band signed distance field**
+  (`collide::StaticMesh`): nodes 5 mm apart, computed only within 2 cm of
+  the surface and stored in 8×8×8 bricks (a few MB). The sign comes from
+  angle-weighted pseudo-normals [17], exact for closed
+  manifold meshes; the MakeHuman body is closed (checked: no boundary or
+  non-manifold edge). Built in parallel per brick in ~0.16 s, so it is not
+  cached on disk. (The winding-number sign [9] stays the plan for open or
+  imported avatars.)
+- Particle vs SDF at every substep: trilinear distance and gradient,
+  constant time. Penetrations up to the band (2 cm) are pushed back out,
+  far more than a particle moves in a substep.
 - Later (animated avatars): a BVH over the moving mesh with continuous
   vertex–triangle tests [6].
-- **Current implementation** (until the SDF lands): closest point on the
-  avatar's triangles through a uniform grid (`collide::StaticMesh`). The
-  search radius is thickness + 5 mm + the distance the particle moved in
-  the substep: a particle outside at the start of the substep cannot be
-  deeper than that, so fast motion (seams pulling a tight waist in) does
-  not tunnel through the body.
 - The cloth is kept at its thickness **plus a 2.5 mm skin margin** from the
   body: cloth triangles (~25 mm) and the avatar's are flat chords of curved
   surfaces, and without the margin the body shows through between cloth
@@ -177,19 +175,18 @@ that flared pieces do not overlap before the seams close.
 ### Known issues
 
 - **Real time with little headroom.** The three-piece skirt (1 700
-  particles, 30 substeps) steps in about 14 ms per 16.7 ms frame on an
-  Apple M-series laptop. Next speed-ups: the avatar SDF (§5, an O(1)
-  contact query instead of a triangle search), then fewer substeps once
-  convergence improves. With damping set to 0, kinetic + gravitational
+  particles, 30 substeps) steps in about 13 ms per 16.7 ms frame on an
+  Apple M-series laptop, most of it the serial constraint solve. Next
+  speed-up: fewer substeps once convergence improves. With damping set to 0, kinetic + gravitational
   energy decreases steadily: the solver is stable; a sheet hung by two
   corners needs about ten seconds to come to rest.
 
 ## 6. Parallelism and determinism
 
-- **Contacts** (a closest-point search on the avatar per particle and per
-  substep, about 60 % of a step) are independent per particle and run in
-  parallel with rayon: one dispatch per substep, identical results for any
-  thread count (tested).
+- **Contacts** are independent per particle and run in parallel with
+  rayon: one dispatch per substep, identical results for any thread count
+  (tested). (Before the SDF they were a closest-triangle search and 60 % of
+  a step.)
 - **Constraints** are solved serially (Gauss–Seidel, fixed order). Splitting
   them into independent sets by graph colouring and solving each colour in
   parallel was measured on the skirt (1 700 particles, 11 membrane + 20
@@ -248,5 +245,7 @@ benchmarks track these numbers per release.
 14. M. Li, D. Kaufman, C. Jiang. *Codimensional Incremental Potential Contact.* SIGGRAPH 2021.
 15. X. Provot. *Deformation Constraints in a Mass-Spring Model to Describe Rigid Cloth Behavior.* Graphics Interface 1995.
 16. S. Kawabata. *The Standardization and Analysis of Hand Evaluation.* Textile Machinery Society of Japan, 1980.
+17. J. A. Bærentzen, H. Aanæs. *Signed Distance Computation Using the Angle Weighted Pseudonormal.* IEEE TVCG 11(3), 2005.
+18. C. Ericson. *Real-Time Collision Detection*, §5.1.5 (closest point on a triangle). Morgan Kaufmann, 2004.
 
 Reading order for contributors: [1] → [2] → [3] → [4] → [5] → [7] → [8] → [6].

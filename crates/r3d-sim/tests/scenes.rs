@@ -103,33 +103,37 @@ fn cloth_lands_on_the_ground() {
     assert!(s.stats().max_speed < 0.2, "{:?}", s.stats());
 }
 
-/// An icosphere-like UV sphere mesh.
+/// A closed UV sphere mesh (one vertex per pole).
 fn sphere(center: Vec3, radius: f32) -> StaticMesh {
-    let (rings, segments) = (24, 48);
-    let mut positions = Vec::new();
-    for r in 0..=rings {
+    let (rings, segments) = (24u32, 48u32);
+    let at = |phi: f32, theta: f32| {
+        center + radius * Vec3::new(phi.sin() * theta.cos(), phi.cos(), phi.sin() * theta.sin())
+    };
+    let mut positions = vec![center + Vec3::Y * radius];
+    for r in 1..rings {
         let phi = std::f32::consts::PI * r as f32 / rings as f32;
         for s in 0..segments {
-            let theta = std::f32::consts::TAU * s as f32 / segments as f32;
-            positions.push(
-                center
-                    + radius
-                        * Vec3::new(phi.sin() * theta.cos(), phi.cos(), phi.sin() * theta.sin()),
-            );
+            positions.push(at(phi, std::f32::consts::TAU * s as f32 / segments as f32));
         }
     }
+    let south = positions.len() as u32;
+    positions.push(center - Vec3::Y * radius);
+    let ring = |r: u32, s: u32| 1 + (r - 1) * segments + s % segments;
     let mut triangles = Vec::new();
-    for r in 0..rings {
+    // Counter-clockwise seen from outside.
+    for s in 0..segments {
+        triangles.push([0, ring(1, s + 1), ring(1, s)]);
+        triangles.push([south, ring(rings - 1, s), ring(rings - 1, s + 1)]);
+    }
+    for r in 1..rings - 1 {
         for s in 0..segments {
-            let a = (r * segments + s) as u32;
-            let b = (r * segments + (s + 1) % segments) as u32;
-            let (c, d) = (a + segments as u32, b + segments as u32);
-            // Outward-facing (counter-clockwise seen from outside).
+            let (a, b) = (ring(r, s), ring(r, s + 1));
+            let (c, d) = (ring(r + 1, s), ring(r + 1, s + 1));
             triangles.push([a, b, c]);
             triangles.push([b, d, c]);
         }
     }
-    StaticMesh::new(positions, triangles, 0.05)
+    StaticMesh::new(positions, triangles, 0.005)
 }
 
 #[test]

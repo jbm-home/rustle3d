@@ -25,8 +25,6 @@ pub const SUBSTEPS: u32 = 30;
 /// Time over which seams pull together (s).
 pub const SEWING_TIME: f32 = 0.6;
 const GRAVITY: Vec3 = Vec3::new(0.0, -9.81, 0.0);
-/// Extra search distance around the cloth thickness for contacts (m).
-const CONTACT_MARGIN: f32 = 0.005;
 /// Distance kept between the cloth and the body on top of the fabric
 /// thickness (m). Cloth triangles (~25 mm) are flat chords of a curved
 /// surface, and so are the avatar's: without this margin the body pokes
@@ -292,16 +290,14 @@ impl Solver {
                     return;
                 }
                 let mut contact_normal = None;
-                // A particle outside at the start of the substep can only be
-                // as deep as it moved: search that far, so fast motion (seams
-                // closing a tight waist) cannot tunnel through the body.
+                // The body's distance field sees penetrations up to its band
+                // (2 cm) deep, far more than a particle moves in a substep.
                 let distance = thickness + SKIN;
-                let reach = distance + CONTACT_MARGIN + x.distance(*prev);
                 if let Some(body) = collider
-                    && let Some(c) = body.closest(*x, reach)
-                    && (*x - c.point).dot(c.normal) < distance
+                    && let Some(c) = body.sample(*x)
+                    && c.distance < distance
                 {
-                    *x = c.point + c.normal * distance;
+                    *x += c.normal * (distance - c.distance);
                     contact_normal = Some(c.normal);
                 }
                 if ground && x.y < *thickness {

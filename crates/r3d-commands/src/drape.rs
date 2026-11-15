@@ -30,6 +30,8 @@ use crate::queries::body_model;
 
 /// Default distance between cloth vertices (mm): interactive on a laptop.
 pub const DEFAULT_SPACING_MM: f64 = 25.0;
+/// Grid step of the avatar's distance field (m).
+const BODY_VOXEL: f32 = 0.005;
 /// Body radius assumed when there is no avatar (m).
 const DEFAULT_BODY_RADIUS_M: f32 = 0.16;
 /// Panels start on a cone that widens downwards (radius gained per metre
@@ -240,7 +242,7 @@ pub fn build(
         scene.collider = Some(StaticMesh::new(
             b.positions.to_vec(),
             b.triangles.to_vec(),
-            0.04,
+            BODY_VOXEL,
         ));
     }
     Ok(Drape { scene, pieces })

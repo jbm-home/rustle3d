@@ -1,138 +1,368 @@
-//! Collisions with a static triangle mesh (the avatar), using a uniform
-//! grid of triangles for fast nearest-surface queries.
+//! Collisions with a static closed triangle mesh (the avatar) through a
+//! narrow-band signed distance field (docs/physics.md §5).
+//!
+//! The field is sampled on grid nodes `VOXEL` apart, only within `BAND` of
+//! the surface, stored in 8×8×8 bricks so that empty space costs nothing.
+//! The sign comes from angle-weighted pseudo-normals (Bærentzen & Aanæs,
+//! "Signed distance computation using the angle weighted pseudonormal",
+//! IEEE TVCG 2005), which is exact for closed manifold meshes such as the
+//! avatar. A query is a trilinear interpolation: constant time.
 
 use std::collections::HashMap;
 
 use glam::Vec3;
+use rayon::prelude::*;
 
-/// A static triangle mesh prepared for proximity queries.
+/// Nodes per brick side.
+const BRICK: usize = 8;
+const BRICK_NODES: usize = BRICK * BRICK * BRICK;
+/// Distance from the surface (m) within which the field is computed. A
+/// point deeper inside than this is not seen as inside.
+pub const BAND: f32 = 0.02;
+
+/// A static closed mesh prepared for distance queries.
 #[derive(Debug, Clone)]
 pub struct StaticMesh {
-    positions: Vec<Vec3>,
-    triangles: Vec<[u32; 3]>,
-    normals: Vec<Vec3>,
-    cell: f32,
-    grid: HashMap<[i32; 3], Vec<u32>>,
+    origin: Vec3,
+    voxel: f32,
+    /// Bricks along x, y, z.
+    dims: [usize; 3],
+    /// For each brick, its slot in `values`, or `u32::MAX` when far from
+    /// the surface.
+    slots: Vec<u32>,
+    values: Vec<f32>,
 }
 
-/// The closest point of the mesh to a query point.
+/// The surface seen from a query point.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Contact {
-    pub point: Vec3,
-    /// Outward face normal at the closest triangle.
+    /// Signed distance to the surface (m): negative inside.
+    pub distance: f32,
+    /// Outward surface direction (unit).
     pub normal: Vec3,
 }
 
+/// Which part of a triangle a closest point lies on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Feature {
+    Vertex(usize),
+    /// Edge from corner `i` to corner `(i + 1) % 3`.
+    Edge(usize),
+    Face,
+}
+
+/// Outward normals used for the sign: per face, per edge, per vertex.
+struct PseudoNormals {
+    face: Vec<Vec3>,
+    edge: HashMap<(u32, u32), Vec3>,
+    vertex: Vec<Vec3>,
+}
+
+impl PseudoNormals {
+    fn new(positions: &[Vec3], triangles: &[[u32; 3]]) -> Self {
+        let mut face = Vec::with_capacity(triangles.len());
+        let mut edge: HashMap<(u32, u32), Vec3> = HashMap::new();
+        let mut vertex = vec![Vec3::ZERO; positions.len()];
+        for t in triangles {
+            let p = t.map(|v| positions[v as usize]);
+            let n = (p[1] - p[0]).cross(p[2] - p[0]).normalize_or_zero();
+            face.push(n);
+            for k in 0..3 {
+                let (a, b) = (t[k], t[(k + 1) % 3]);
+                *edge.entry((a.min(b), a.max(b))).or_default() += n;
+                let (u, w) = (p[(k + 1) % 3] - p[k], p[(k + 2) % 3] - p[k]);
+                vertex[t[k] as usize] += n * u.angle_between(w);
+            }
+        }
+        Self { face, edge, vertex }
+    }
+
+    fn at(&self, triangle: usize, t: &[u32; 3], feature: Feature) -> Vec3 {
+        match feature {
+            Feature::Face => self.face[triangle],
+            Feature::Edge(k) => {
+                let (a, b) = (t[k], t[(k + 1) % 3]);
+                self.edge
+                    .get(&(a.min(b), a.max(b)))
+                    .copied()
+                    .unwrap_or_default()
+            }
+            Feature::Vertex(k) => self.vertex[t[k] as usize],
+        }
+    }
+}
+
 impl StaticMesh {
-    /// `cell` should be a few times the query radius.
-    pub fn new(positions: Vec<Vec3>, triangles: Vec<[u32; 3]>, cell: f32) -> Self {
-        let cell = cell.max(1e-3);
-        let mut grid: HashMap<[i32; 3], Vec<u32>> = HashMap::new();
-        let mut normals = Vec::with_capacity(triangles.len());
+    /// Build the field of a closed mesh with nodes `voxel` metres apart.
+    /// Triangles with out-of-range corners are ignored.
+    pub fn new(positions: Vec<Vec3>, triangles: Vec<[u32; 3]>, voxel: f32) -> Self {
+        let voxel = voxel.max(1e-3);
+        let n = positions.len();
+        let triangles: Vec<[u32; 3]> = triangles
+            .into_iter()
+            .filter(|t| t.iter().all(|v| (*v as usize) < n))
+            .collect();
+        let normals = PseudoNormals::new(&positions, &triangles);
+        let (lo, hi) = positions
+            .iter()
+            .fold((Vec3::MAX, Vec3::MIN), |(lo, hi), p| {
+                (lo.min(*p), hi.max(*p))
+            });
+        let pad = Vec3::splat(BAND + voxel);
+        let origin = if n == 0 { Vec3::ZERO } else { lo - pad };
+        let brick = voxel * BRICK as f32;
+        let size = if n == 0 {
+            Vec3::ZERO
+        } else {
+            hi + pad - origin
+        };
+        let dims = [size.x, size.y, size.z].map(|s| ((s / brick).ceil() as usize).max(1));
+        let brick_id = |b: [usize; 3]| (b[2] * dims[1] + b[1]) * dims[0] + b[0];
+        let to_brick = |p: Vec3, round_up: bool| -> [usize; 3] {
+            let q = (p - origin) / brick;
+            [q.x, q.y, q.z]
+                .map(|v| if round_up { v.ceil() } else { v.floor() })
+                .map(|v| v.max(0.0) as usize)
+        };
+
+        // Triangles near each brick.
+        let mut near: Vec<Vec<u32>> = vec![Vec::new(); dims[0] * dims[1] * dims[2]];
         for (i, t) in triangles.iter().enumerate() {
-            let [a, b, c] = t.map(|v| positions.get(v as usize).copied().unwrap_or_default());
-            normals.push((b - a).cross(c - a).normalize_or_zero());
-            let lo = a.min(b).min(c);
-            let hi = a.max(b).max(c);
-            let (l, h) = (key(lo, cell), key(hi, cell));
-            for x in l[0]..=h[0] {
-                for y in l[1]..=h[1] {
-                    for z in l[2]..=h[2] {
-                        grid.entry([x, y, z]).or_default().push(i as u32);
+            let p = t.map(|v| positions[v as usize]);
+            let (a, b) = (
+                to_brick(p[0].min(p[1]).min(p[2]) - pad, false),
+                to_brick(p[0].max(p[1]).max(p[2]) + pad, true),
+            );
+            for z in a[2]..b[2].min(dims[2]) {
+                for y in a[1]..b[1].min(dims[1]) {
+                    for x in a[0]..b[0].min(dims[0]) {
+                        near[brick_id([x, y, z])].push(i as u32);
                     }
                 }
             }
         }
-        Self {
-            positions,
-            triangles,
-            normals,
-            cell,
-            grid,
+        let mut slots = vec![u32::MAX; near.len()];
+        let mut filled = Vec::new();
+        for (id, list) in near.iter().enumerate() {
+            if !list.is_empty() {
+                slots[id] = filled.len() as u32;
+                filled.push(id);
+            }
         }
-    }
 
-    pub fn positions(&self) -> &[Vec3] {
-        &self.positions
-    }
-
-    pub fn triangles(&self) -> &[[u32; 3]] {
-        &self.triangles
-    }
-
-    /// The closest surface point within `radius` of `p`, if any.
-    pub fn closest(&self, p: Vec3, radius: f32) -> Option<Contact> {
-        let (l, h) = (
-            key(p - Vec3::splat(radius), self.cell),
-            key(p + Vec3::splat(radius), self.cell),
-        );
-        let mut best: Option<(f32, Contact)> = None;
-        for x in l[0]..=h[0] {
-            for y in l[1]..=h[1] {
-                for z in l[2]..=h[2] {
-                    let Some(list) = self.grid.get(&[x, y, z]) else {
-                        continue;
-                    };
-                    for &t in list {
-                        let [a, b, c] = self.triangles[t as usize]
-                            .map(|v| self.positions.get(v as usize).copied().unwrap_or_default());
-                        let q = closest_on_triangle(p, a, b, c);
-                        let d = q.distance_squared(p);
-                        if d <= radius * radius && best.as_ref().is_none_or(|(bd, _)| d < *bd) {
-                            best = Some((
-                                d,
-                                Contact {
-                                    point: q,
-                                    normal: self.normals[t as usize],
-                                },
-                            ));
+        // Each brick's nodes, from the triangles near it (in parallel; each
+        // brick writes only its own values).
+        let mut values = vec![BAND; filled.len() * BRICK_NODES];
+        values
+            .par_chunks_mut(BRICK_NODES)
+            .zip(&filled)
+            .for_each(|(out, id)| {
+                let b = [
+                    id % dims[0],
+                    (id / dims[0]) % dims[1],
+                    id / (dims[0] * dims[1]),
+                ];
+                for (k, value) in out.iter_mut().enumerate() {
+                    let local = [k % BRICK, (k / BRICK) % BRICK, k / (BRICK * BRICK)];
+                    let node = Vec3::new(
+                        (b[0] * BRICK + local[0]) as f32,
+                        (b[1] * BRICK + local[1]) as f32,
+                        (b[2] * BRICK + local[2]) as f32,
+                    );
+                    let p = origin + node * voxel;
+                    let mut best = (BAND * BAND, None);
+                    for &ti in &near[*id] {
+                        let t = &triangles[ti as usize];
+                        let [a, b, c] = t.map(|v| positions[v as usize]);
+                        let (q, feature) = closest_feature(p, a, b, c);
+                        let d2 = q.distance_squared(p);
+                        if d2 < best.0 {
+                            best = (d2, Some((q, ti as usize, feature)));
                         }
                     }
+                    if let (d2, Some((q, ti, feature))) = best {
+                        let pn = normals.at(ti, &triangles[ti], feature);
+                        let sign = if (p - q).dot(pn) < 0.0 { -1.0 } else { 1.0 };
+                        *value = sign * d2.sqrt();
+                    }
                 }
-            }
+            });
+        Self {
+            origin,
+            voxel,
+            dims,
+            slots,
+            values,
         }
-        best.map(|(_, c)| c)
+    }
+
+    /// Field value at grid node `(x, y, z)`; `BAND` far from the surface.
+    fn node(&self, x: usize, y: usize, z: usize) -> f32 {
+        let b = [x / BRICK, y / BRICK, z / BRICK];
+        if b[0] >= self.dims[0] || b[1] >= self.dims[1] || b[2] >= self.dims[2] {
+            return BAND;
+        }
+        let id = (b[2] * self.dims[1] + b[1]) * self.dims[0] + b[0];
+        let Some(&slot) = self.slots.get(id) else {
+            return BAND;
+        };
+        let local = ((z % BRICK) * BRICK + y % BRICK) * BRICK + x % BRICK;
+        self.values
+            .get(slot as usize * BRICK_NODES + local)
+            .copied()
+            .unwrap_or(BAND)
+    }
+
+    /// Signed distance and outward direction at `p`, when `p` is within
+    /// the band around the surface.
+    pub fn sample(&self, p: Vec3) -> Option<Contact> {
+        let q = (p - self.origin) / self.voxel;
+        if q.min_element() < 0.0 {
+            return None;
+        }
+        let (x, y, z) = (q.x as usize, q.y as usize, q.z as usize);
+        let f = q - Vec3::new(x as f32, y as f32, z as f32);
+        let c = |dx: usize, dy: usize, dz: usize| self.node(x + dx, y + dy, z + dz);
+        let corners = [
+            c(0, 0, 0),
+            c(1, 0, 0),
+            c(0, 1, 0),
+            c(1, 1, 0),
+            c(0, 0, 1),
+            c(1, 0, 1),
+            c(0, 1, 1),
+            c(1, 1, 1),
+        ];
+        if corners.iter().all(|v| *v >= BAND) {
+            return None;
+        }
+        let [c000, c100, c010, c110, c001, c101, c011, c111] = corners;
+        let lerp = |a: f32, b: f32, t: f32| a + (b - a) * t;
+        // Along x, then y, then z; the gradient from the same factors.
+        let (x00, x10) = (lerp(c000, c100, f.x), lerp(c010, c110, f.x));
+        let (x01, x11) = (lerp(c001, c101, f.x), lerp(c011, c111, f.x));
+        let (y0, y1) = (lerp(x00, x10, f.y), lerp(x01, x11, f.y));
+        let distance = lerp(y0, y1, f.z);
+        let dx = lerp(
+            lerp(c100 - c000, c110 - c010, f.y),
+            lerp(c101 - c001, c111 - c011, f.y),
+            f.z,
+        );
+        let dy = lerp(x10 - x00, x11 - x01, f.z);
+        let dz = y1 - y0;
+        let normal = Vec3::new(dx, dy, dz).try_normalize()?;
+        Some(Contact { distance, normal })
     }
 }
 
-fn key(p: Vec3, cell: f32) -> [i32; 3] {
-    [
-        (p.x / cell).floor() as i32,
-        (p.y / cell).floor() as i32,
-        (p.z / cell).floor() as i32,
-    ]
-}
-
-/// Closest point on triangle `abc` to `p` (Ericson, Real-Time Collision
-/// Detection, §5.1.5).
-pub fn closest_on_triangle(p: Vec3, a: Vec3, b: Vec3, c: Vec3) -> Vec3 {
+/// Closest point on triangle `abc` to `p`, and the feature it lies on
+/// (Ericson, Real-Time Collision Detection, §5.1.5).
+pub fn closest_feature(p: Vec3, a: Vec3, b: Vec3, c: Vec3) -> (Vec3, Feature) {
     let (ab, ac, ap) = (b - a, c - a, p - a);
     let (d1, d2) = (ab.dot(ap), ac.dot(ap));
     if d1 <= 0.0 && d2 <= 0.0 {
-        return a;
+        return (a, Feature::Vertex(0));
     }
     let bp = p - b;
     let (d3, d4) = (ab.dot(bp), ac.dot(bp));
     if d3 >= 0.0 && d4 <= d3 {
-        return b;
+        return (b, Feature::Vertex(1));
     }
     let vc = d1 * d4 - d3 * d2;
     if vc <= 0.0 && d1 >= 0.0 && d3 <= 0.0 {
-        return a + ab * (d1 / (d1 - d3));
+        return (a + ab * (d1 / (d1 - d3)), Feature::Edge(0));
     }
     let cp = p - c;
     let (d5, d6) = (ab.dot(cp), ac.dot(cp));
     if d6 >= 0.0 && d5 <= d6 {
-        return c;
+        return (c, Feature::Vertex(2));
     }
     let vb = d5 * d2 - d1 * d6;
     if vb <= 0.0 && d2 >= 0.0 && d6 <= 0.0 {
-        return a + ac * (d2 / (d2 - d6));
+        return (a + ac * (d2 / (d2 - d6)), Feature::Edge(2));
     }
     let va = d3 * d6 - d5 * d4;
     if va <= 0.0 && (d4 - d3) >= 0.0 && (d5 - d6) >= 0.0 {
-        return b + (c - b) * ((d4 - d3) / ((d4 - d3) + (d5 - d6)));
+        let t = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+        return (b + (c - b) * t, Feature::Edge(1));
     }
     let denom = 1.0 / (va + vb + vc);
-    a + ab * (vb * denom) + ac * (vc * denom)
+    (a + ab * (vb * denom) + ac * (vc * denom), Feature::Face)
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+    use super::*;
+
+    /// A closed cube of side `s` centred at the origin (12 triangles,
+    /// counter-clockwise seen from outside).
+    fn cube(s: f32) -> StaticMesh {
+        let h = s / 2.0;
+        let positions = (0..8)
+            .map(|i| {
+                Vec3::new(
+                    if i & 1 == 0 { -h } else { h },
+                    if i & 2 == 0 { -h } else { h },
+                    if i & 4 == 0 { -h } else { h },
+                )
+            })
+            .collect();
+        let quads = [
+            [0, 2, 3, 1], // -z
+            [4, 5, 7, 6], // +z
+            [0, 1, 5, 4], // -y
+            [2, 6, 7, 3], // +y
+            [0, 4, 6, 2], // -x
+            [1, 3, 7, 5], // +x
+        ];
+        let triangles = quads
+            .iter()
+            .flat_map(|[a, b, c, d]| [[*a, *b, *c], [*a, *c, *d]])
+            .collect();
+        StaticMesh::new(positions, triangles, 0.005)
+    }
+
+    #[test]
+    fn distances_and_normals_near_a_cube() {
+        let m = cube(0.2);
+        let cases = [
+            (Vec3::new(0.0, 0.11, 0.0), 0.01, Vec3::Y),
+            (Vec3::new(0.0, 0.09, 0.0), -0.01, Vec3::Y),
+            (Vec3::new(-0.105, 0.02, 0.03), 0.005, -Vec3::X),
+            (Vec3::new(0.03, -0.02, 0.115), 0.015, Vec3::Z),
+        ];
+        for (p, d, n) in cases {
+            let c = m.sample(p).unwrap();
+            assert!((c.distance - d).abs() < 1e-3, "{p}: {} vs {d}", c.distance);
+            assert!(c.normal.dot(n) > 0.99, "{p}: {}", c.normal);
+        }
+        // Far outside, and deep inside beyond the band: nothing.
+        assert!(m.sample(Vec3::new(0.0, 0.3, 0.0)).is_none());
+        assert!(m.sample(Vec3::ZERO).is_none());
+    }
+
+    #[test]
+    fn closest_feature_regions() {
+        let (a, b, c) = (Vec3::ZERO, Vec3::X, Vec3::Y);
+        assert_eq!(
+            closest_feature(Vec3::new(-1.0, -1.0, 0.0), a, b, c).1,
+            Feature::Vertex(0)
+        );
+        assert_eq!(
+            closest_feature(Vec3::new(0.5, -1.0, 0.0), a, b, c).1,
+            Feature::Edge(0)
+        );
+        assert_eq!(
+            closest_feature(Vec3::new(1.0, 1.0, 0.0), a, b, c).1,
+            Feature::Edge(1)
+        );
+        assert_eq!(
+            closest_feature(Vec3::new(-1.0, 0.5, 0.0), a, b, c).1,
+            Feature::Edge(2)
+        );
+        let (q, feature) = closest_feature(Vec3::new(0.2, 0.2, 1.0), a, b, c);
+        assert_eq!(feature, Feature::Face);
+        assert!(q.distance(Vec3::new(0.2, 0.2, 0.0)) < 1e-6);
+    }
 }
