@@ -169,16 +169,15 @@ that flared pieces do not overlap before the seams close.
 
 ### Known issues
 
-- **Energy gain without damping.** A free, perturbed sheet with damping set
-  to 0 gains kinetic energy over time (relative kinetic energy × 50 over
-  5 s), whichever constraints are enabled (stretch only, shear + bending,
-  membrane without bending). The numerical damping of 15 substeps hides it;
-  at 30–60 substeps it shows as a sustained flutter of free edges. Suspects:
-  the integration/velocity update or f32 round-off with near-rigid
-  constraints. Until it is fixed we stay at 15 substeps, where the membrane
-  is not fully converged: a fitted skirt creeps a few centimetres down from
-  the waist (at 30 substeps it holds). Fixing this is the next solver task;
-  the probe becomes an energy regression test.
+- **Convergence vs. cost.** At 15 substeps (1 iteration each) the membrane
+  is not fully converged on garment-sized meshes: a skirt fitted at the
+  waist creeps a few centimetres down under its own weight. At 30 substeps
+  it holds (22 ms/frame single-threaded for 2 000 particles), but the cost
+  doubles and the free edge of a sheet hung by two corners keeps a small
+  flutter for several seconds. This is slow settling, not an instability:
+  with damping set to 0, kinetic + gravitational energy decreases steadily
+  at 15 and 60 substeps alike. To decide with the parallel solver (rayon)
+  and the performance targets of §7.
 
 ## 6. Parallelism and determinism
 

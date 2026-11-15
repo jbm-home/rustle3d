@@ -62,7 +62,7 @@ fn demo_skirt_closes_and_stays_on_the_body() {
     assert!(stats.max_seam_gap < 0.005, "seams open: {stats:?}");
     // Placed at the waist (1.10 m) and fitted to it, it hangs above the
     // hips (widest at 0.82 m). It still creeps down a few centimetres: the
-    // membrane is not fully converged at this step count (docs/physics.md,
+    // membrane is not fully converged at 15 substeps (docs/physics.md §5,
     // known issues).
     assert!(high > 0.95, "skirt slid down: top at {high}");
     assert!(low > 0.2, "skirt collapsed: hem at {low}");
