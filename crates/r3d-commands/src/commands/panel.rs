@@ -349,6 +349,12 @@ impl CommandSpec for PanelDelete {
             .filter(|(_, l)| l.panel == self.panel)
             .map(|(id, _)| *id)
             .collect();
+        let pins: Vec<_> = p
+            .pins()
+            .iter()
+            .filter(|(_, pin)| pin.panel == self.panel)
+            .map(|(id, _)| *id)
+            .collect();
         let seams: Vec<_> = p
             .seams()
             .iter()
@@ -366,6 +372,9 @@ impl CommandSpec for PanelDelete {
         }
         for id in seams {
             tx.remove_seam(id);
+        }
+        for id in pins {
+            tx.remove_pin(id);
         }
         for id in lines {
             tx.remove_internal_line(id);

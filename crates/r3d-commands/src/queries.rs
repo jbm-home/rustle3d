@@ -461,3 +461,32 @@ impl QuerySpec for SeamList {
         Ok(Value::Array(seams))
     }
 }
+
+/// Every pin.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PinList {}
+
+impl Described for PinList {
+    const SUMMARY: &'static str = "Every pin: its panel, the pinned point on the pattern (mm) and where it is held in 3D (m).";
+}
+
+impl QuerySpec for PinList {
+    fn run(&self, p: &Project) -> Result<Value, CommandError> {
+        Ok(Value::Array(
+            p.pins()
+                .iter()
+                .map(|(id, pin)| {
+                    let name = p.panel(pin.panel).map(|panel| panel.name.clone());
+                    serde_json::json!({
+                        "id": id,
+                        "panel": pin.panel,
+                        "panel_name": name,
+                        "at": [r3(pin.at.x), r3(pin.at.y)],
+                        "position": [r3(pin.position.x), r3(pin.position.y), r3(pin.position.z)],
+                    })
+                })
+                .collect(),
+        ))
+    }
+}

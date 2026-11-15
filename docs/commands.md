@@ -1233,6 +1233,94 @@ Reverse how a seam matches its two edges (fixes a twisted seam).
 
 </details>
 
+### `pin.add`
+
+Pin the cloth: the panel's cloth within 3 cm of `at` (pattern mm) is held still at `position` (3D metres) during the simulation. Returns the pin.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "PanelId": {
+      "description": "Identifier of a panel, e.g. `panel:1`.",
+      "pattern": "^panel:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Pin the cloth in 3D.",
+  "properties": {
+    "at": {
+      "description": "The pinned point on the pattern, `[x, y]` in mm.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+    },
+    "panel": {
+      "$ref": "#/$defs/PanelId"
+    },
+    "position": {
+      "description": "Where it is held in 3D, `[x, y, z]` in metres (Y up, the avatar's\nfeet at y = 0).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 3,
+      "minItems": 3,
+      "type": "array"
+    }
+  },
+  "required": [
+    "panel",
+    "at",
+    "position"
+  ],
+  "title": "PinAdd",
+  "type": "object"
+}
+```
+
+</details>
+
+### `pin.remove`
+
+Remove a pin: the cloth there is free again.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "PinId": {
+      "description": "Identifier of a pin, e.g. `pin:1`.",
+      "pattern": "^pin:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Remove a pin.",
+  "properties": {
+    "pin": {
+      "$ref": "#/$defs/PinId"
+    }
+  },
+  "required": [
+    "pin"
+  ],
+  "title": "PinRemove",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `garment.set_fabric`
 
 Choose what the garment is made of: cotton, denim, jersey, silk or wool. Sets how it drapes and how it looks.
@@ -1531,6 +1619,24 @@ Every seam: its two edges (with their panels and lengths in mm, and direction) a
   "additionalProperties": false,
   "description": "Every seam with the lengths of its two sides.",
   "title": "SeamList",
+  "type": "object"
+}
+```
+
+</details>
+
+### `pin.list`
+
+Every pin: its panel, the pinned point on the pattern (mm) and where it is held in 3D (m).
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Every pin.",
+  "title": "PinList",
   "type": "object"
 }
 ```

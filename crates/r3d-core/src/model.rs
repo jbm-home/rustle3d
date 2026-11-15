@@ -6,11 +6,11 @@
 
 use std::collections::BTreeMap;
 
-use glam::DVec2;
+use glam::{DVec2, DVec3};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::id::{EdgeId, GarmentId, InternalLineId, NotchId, PanelId, PointId, SeamId};
+use crate::id::{EdgeId, GarmentId, InternalLineId, NotchId, PanelId, PinId, PointId, SeamId};
 
 /// Ordered entity map.
 pub type IdMap<K, V> = BTreeMap<K, V>;
@@ -42,6 +42,7 @@ pub struct Project {
     /// The body the garment is made for, if any.
     pub(crate) avatar: Option<Avatar>,
     pub(crate) seams: IdMap<SeamId, Seam>,
+    pub(crate) pins: IdMap<PinId, Pin>,
 }
 
 /// Body measurements (cm), the input of the avatar fitting.
@@ -110,6 +111,17 @@ pub struct Placement {
 pub struct SeamSide {
     pub edge: EdgeId,
     pub reversed: bool,
+}
+
+/// A pin: the cloth around a point of a panel is held at a place in 3D.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Pin {
+    pub panel: PanelId,
+    /// The pinned point on the pattern (mm).
+    pub at: DVec2,
+    /// Where it is held in 3D (m, Y up, the avatar's feet at y = 0).
+    pub position: DVec3,
 }
 
 /// Two edges sewn together, point for point along their lengths.
@@ -254,6 +266,7 @@ impl Project {
             internal_lines: IdMap::new(),
             avatar: None,
             seams: IdMap::new(),
+            pins: IdMap::new(),
         }
     }
 
@@ -287,6 +300,10 @@ impl Project {
 
     pub fn seams(&self) -> &IdMap<SeamId, Seam> {
         &self.seams
+    }
+
+    pub fn pins(&self) -> &IdMap<PinId, Pin> {
+        &self.pins
     }
 
     /// The seam an edge belongs to, if any.

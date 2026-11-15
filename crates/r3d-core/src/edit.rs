@@ -7,9 +7,10 @@
 
 use std::mem;
 
-use crate::id::{EdgeId, GarmentId, InternalLineId, NotchId, PanelId, PointId, SeamId};
+use crate::id::{EdgeId, GarmentId, InternalLineId, NotchId, PanelId, PinId, PointId, SeamId};
 use crate::model::{
-    Avatar, DisplayUnit, Edge, Garment, IdMap, InternalLine, Notch, Panel, Point, Project, Seam,
+    Avatar, DisplayUnit, Edge, Garment, IdMap, InternalLine, Notch, Panel, Pin, Point, Project,
+    Seam,
 };
 
 /// Before/after values of one entity. `None` means "absent".
@@ -31,6 +32,7 @@ pub enum Change {
     Notch(Box<EntityChange<NotchId, Notch>>),
     InternalLine(Box<EntityChange<InternalLineId, InternalLine>>),
     Seam(Box<EntityChange<SeamId, Seam>>),
+    Pin(Box<EntityChange<PinId, Pin>>),
     Avatar {
         before: Option<Avatar>,
         after: Option<Avatar>,
@@ -71,6 +73,7 @@ impl Change {
             Change::Notch(c) => set(&mut p.notches, c.id, pick!(c)),
             Change::InternalLine(c) => set(&mut p.internal_lines, c.id, pick!(c)),
             Change::Seam(c) => set(&mut p.seams, c.id, pick!(c)),
+            Change::Pin(c) => set(&mut p.pins, c.id, pick!(c)),
             Change::Name { before, after } => {
                 p.name = if forward { after } else { before }.clone();
             }
@@ -93,6 +96,7 @@ impl Change {
             (Change::Edge(a), Change::Edge(b)) if a.id == b.id => a.after = b.after.clone(),
             (Change::Notch(a), Change::Notch(b)) if a.id == b.id => a.after = b.after.clone(),
             (Change::Seam(a), Change::Seam(b)) if a.id == b.id => a.after = b.after,
+            (Change::Pin(a), Change::Pin(b)) if a.id == b.id => a.after = b.after,
             (Change::InternalLine(a), Change::InternalLine(b)) if a.id == b.id => {
                 a.after = b.after.clone()
             }
@@ -290,6 +294,10 @@ impl<'a> Transaction<'a> {
         new_seam_id,
         put_seam,
         remove_seam
+    );
+
+    entity_ops!(
+        "pin", PinId, Pin, pins, Pin, new_pin_id, put_pin, remove_pin
     );
 
     pub fn set_avatar(&mut self, avatar: Option<Avatar>) {

@@ -142,6 +142,8 @@ command_registry! {
     "seam.add" => SeamAdd,
     "seam.remove" => SeamRemove,
     "seam.flip" => SeamFlip,
+    "pin.add" => PinAdd,
+    "pin.remove" => PinRemove,
     "garment.set_fabric" => GarmentSetFabric,
     "garment.set_color" => GarmentSetColor,
 }
@@ -155,6 +157,7 @@ query_registry! {
     "avatar.get" => AvatarGet,
     "avatar.presets" => AvatarPresets,
     "seam.list" => SeamList,
+    "pin.list" => PinList,
 }
 
 action_registry! {

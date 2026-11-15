@@ -109,6 +109,14 @@ impl Project {
                 return Err(E::BadSeam { seam: (*id).into() });
             }
         }
+        for (id, pin) in &self.pins {
+            let finite = pin.at.is_finite() && pin.position.is_finite();
+            if !finite || !self.panels.contains_key(&pin.panel) {
+                return Err(E::BadValue {
+                    entity: (*id).into(),
+                });
+            }
+        }
         for (id, panel) in &self.panels {
             if let Some(p) = &panel.placement
                 && ![p.angle_deg, p.top_cm, p.offset_mm]
@@ -142,7 +150,8 @@ impl Project {
                     .keys()
                     .map(|k| (AnyId::from(*k), k.raw())),
             )
-            .chain(self.seams.keys().map(|k| (AnyId::from(*k), k.raw())));
+            .chain(self.seams.keys().map(|k| (AnyId::from(*k), k.raw())))
+            .chain(self.pins.keys().map(|k| (AnyId::from(*k), k.raw())));
         for (entity, raw) in ids {
             if raw >= self.next_id {
                 return Err(E::IdCounter { entity });

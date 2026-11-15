@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use glam::DVec2;
 use r3d_core::file::{self, SCHEMA_VERSION};
 use r3d_core::{
-    Avatar, Body, Edge, EdgeCurve, InternalLine, Notch, Panel, PathSegment, Placement, Point,
+    Avatar, Body, Edge, EdgeCurve, InternalLine, Notch, Panel, PathSegment, Pin, Placement, Point,
     Project, Seam, SeamSide, Transaction,
 };
 
@@ -77,6 +77,15 @@ fn sample() -> Project {
                 top_cm: 104.0,
                 offset_mm: 30.0,
             }),
+        },
+    );
+    let pin = tx.new_pin_id();
+    tx.put_pin(
+        pin,
+        Pin {
+            panel,
+            at: DVec2::new(10.0, 20.0),
+            position: glam::DVec3::new(0.05, 1.1, 0.12),
         },
     );
     let seam = tx.new_seam_id();

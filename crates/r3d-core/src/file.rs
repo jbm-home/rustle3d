@@ -20,12 +20,17 @@ use crate::model::Project;
 /// Identifies a Rustle3D project file.
 pub const FORMAT: &str = "rustle3d.project";
 /// Version written by this build.
-pub const SCHEMA_VERSION: u32 = 4;
+pub const SCHEMA_VERSION: u32 = 5;
 
 type Migration = fn(Value) -> Result<Value, FileError>;
 
 /// `MIGRATIONS[i]` migrates schema version `i + 1` to `i + 2`.
-const MIGRATIONS: &[Migration] = &[migrate_v1_to_v2, migrate_v2_to_v3, migrate_v3_to_v4];
+const MIGRATIONS: &[Migration] = &[
+    migrate_v1_to_v2,
+    migrate_v2_to_v3,
+    migrate_v3_to_v4,
+    migrate_v4_to_v5,
+];
 
 fn object<'a>(
     value: &'a mut Value,
@@ -34,6 +39,12 @@ fn object<'a>(
     value.as_object_mut().ok_or_else(|| FileError::Json {
         detail: format!("{what} is not an object"),
     })
+}
+
+/// v5 adds pins.
+fn migrate_v4_to_v5(mut project: Value) -> Result<Value, FileError> {
+    object(&mut project, "project")?.insert("pins".into(), Value::Object(Default::default()));
+    Ok(project)
 }
 
 /// v4 adds seams, panel placements and the garment's fabric.
