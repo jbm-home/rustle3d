@@ -149,6 +149,12 @@ measurement-based calibration on the roadmap.
   the substep: a particle outside at the start of the substep cannot be
   deeper than that, so fast motion (seams pulling a tight waist in) does
   not tunnel through the body.
+- The cloth is kept at its thickness **plus a 2.5 mm skin margin** from the
+  body: cloth triangles (~25 mm) and the avatar's are flat chords of curved
+  surfaces, and without the margin the body shows through between cloth
+  vertices.
+- Without self-collision (below) a wide hem can fold through itself; this
+  is visible on the A-line skirt and is the next physics item (M7).
 
 ### Starting positions
 

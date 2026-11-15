@@ -1639,9 +1639,11 @@ version = "0.0.0"
 dependencies = [
  "assert_cmd",
  "clap",
+ "glam",
  "r3d-commands",
  "r3d-core",
  "r3d-mcp",
+ "r3d-render",
  "serde_json",
  "tempfile",
 ]

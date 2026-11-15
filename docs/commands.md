@@ -1568,6 +1568,33 @@ Export all panels as an SVG at 1:1 scale (cutting and sewing lines, notches, int
 
 </details>
 
+### `simulate`
+
+Drape the placed and sewn panels on the avatar for a number of frames (1/60 s each, deterministic) and cache the result in the project, so `r3d render --view 3d` shows it. Returns the garment's extent, how open the seams are and whether the cloth has settled.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Drape the garment headless and cache the result.",
+  "properties": {
+    "frames": {
+      "default": 300,
+      "description": "Frames of 1/60 s to simulate (1–3600, default 300 = 5 s).",
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "title": "Simulate",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `export.pdf`
 
 Export all panels as a PDF at 1:1 scale, tiled on A4/Letter pages (labelled A1, A2…, with overlap guides) or on one large page. Print at 100 % and check the 100 mm test square. Returns the written path and page count.

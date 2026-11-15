@@ -269,3 +269,90 @@ fn run_resolves_references_to_earlier_results() {
     assert_eq!(err["error"]["args"]["step"], "3");
     assert_eq!(err["error"]["args"]["reference"], "$9.created[0]");
 }
+
+/// A project with a body and the sewn skirt template.
+fn skirt_project(dir: &std::path::Path) {
+    r3d().arg("new").arg(dir).assert().success();
+    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+    for script in ["demos/m4/body.json", "templates/a-line-skirt.json"] {
+        r3d()
+            .arg("run")
+            .arg(dir)
+            .arg(format!("{root}/{script}"))
+            .assert()
+            .success();
+    }
+}
+
+#[test]
+fn simulate_caches_a_drape_that_render_uses() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("Skirt.r3d");
+    skirt_project(&dir);
+
+    let out = r3d()
+        .args(["simulate", "--frames", "60"])
+        .arg(&dir)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let report = json_of(&out);
+    assert_eq!(report["pieces"], 3);
+    assert!(
+        report["max_seam_gap_mm"].as_f64().unwrap() < 5.0,
+        "{report}"
+    );
+    assert!(dir.join(".r3d-cache/drape.bin").is_file());
+
+    let png = tmp.path().join("drape.png");
+    let render = r3d()
+        .args(["render", "--view", "3d", "--size", "320x240", "--out"])
+        .arg(&png)
+        .arg(&dir)
+        .output()
+        .unwrap();
+    // Machines without any GPU adapter cannot render; everything else must.
+    if render.status.success() {
+        let info = json_of(&render.stdout);
+        assert_eq!(info["drape"], "simulated");
+        assert!(std::fs::read(&png).unwrap().starts_with(b"\x89PNG"));
+    } else {
+        assert_eq!(json_of(&render.stderr)["error"]["code"], "gpu");
+    }
+
+    // Any edit makes the cached drape stale: renders fall back to the start.
+    r3d()
+        .arg("run")
+        .arg(&dir)
+        .arg("-")
+        .write_stdin(r#"[{"type": "garment.set_fabric", "fabric": "silk"}]"#)
+        .assert()
+        .success();
+    let render = r3d()
+        .args(["render", "--view", "3d", "--size", "64x64", "--out"])
+        .arg(&png)
+        .arg(&dir)
+        .output()
+        .unwrap();
+    if render.status.success() {
+        assert_eq!(json_of(&render.stdout)["drape"], "start");
+    }
+}
+
+#[test]
+fn simulate_without_placed_panels_is_a_user_error() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("Empty.r3d");
+    r3d().arg("new").arg(&dir).assert().success();
+    let out = r3d()
+        .arg("simulate")
+        .arg(&dir)
+        .assert()
+        .code(1)
+        .get_output()
+        .stderr
+        .clone();
+    assert_eq!(json_of(&out)["error"]["code"], "nothing_to_simulate");
+}

@@ -2,22 +2,31 @@
 //!
 //! Every placed panel is meshed (`r3d_geom::mesh`) with its boundary
 //! sampled edge by edge; the two edges of a seam get the same number of
-//! samples, so their vertices pair up one to one. Panels start wrapped on a
-//! vertical cylinder around the body (see `Placement`), and the cloth
-//! collides with the fitted avatar and the ground.
+//! samples, so their vertices pair up one to one. Panels start wrapped
+//! around the body (see `start_radius`), and the cloth collides with the
+//! fitted avatar and the ground.
+//!
+//! [`simulate`] runs a drape headless (CLI, agents); its result is cached in
+//! the project folder, keyed by a fingerprint of the document, so renders
+//! can show it without simulating again.
 
 use std::collections::BTreeMap;
+use std::ops::Range;
+use std::path::Path;
+use std::time::Instant;
 
 use glam::{Vec2, Vec3};
+use r3d_avatar::fit::{fit, fitted_positions};
 use r3d_avatar::measure::girth_at;
 use r3d_core::{EdgeId, Fabric, PanelId, Project};
 use r3d_geom::DVec2;
 use r3d_geom::mesh::mesh_polygon;
 use r3d_sim::collide::StaticMesh;
 use r3d_sim::scene::{Particle, Triangle};
-use r3d_sim::{FabricPreset, SimScene};
+use r3d_sim::{FabricPreset, SUBSTEPS, SimScene, Solver, StepStats};
 
 use crate::error::CommandError;
+use crate::queries::body_model;
 
 /// Default distance between cloth vertices (mm): interactive on a laptop.
 pub const DEFAULT_SPACING_MM: f64 = 25.0;
@@ -32,8 +41,17 @@ const FLARE: f32 = 0.35;
 #[derive(Debug, Clone)]
 pub struct Drape {
     pub scene: SimScene,
-    /// Which panel each particle belongs to.
-    pub particle_panels: Vec<PanelId>,
+    /// One entry per simulated panel, in particle order.
+    pub pieces: Vec<Piece>,
+}
+
+/// The particles and triangles of one panel, to draw it on its own.
+#[derive(Debug, Clone)]
+pub struct Piece {
+    pub panel: PanelId,
+    pub particles: Range<usize>,
+    /// Triangle corners, indices local to `particles`.
+    pub indices: Vec<u32>,
 }
 
 /// The body to collide with: positions (m) and triangles.
@@ -128,7 +146,7 @@ pub fn build(
         ground: true,
         ..SimScene::default()
     };
-    let mut particle_panels = Vec::new();
+    let mut pieces = Vec::new();
     // Particle indices along each edge, start to end inclusive.
     let mut edge_vertices: BTreeMap<EdgeId, Vec<u32>> = BTreeMap::new();
 
@@ -181,8 +199,12 @@ pub fn build(
                 rest: Vec2::new((v.x / 1000.0) as f32, (v.y / 1000.0) as f32),
                 pinned: false,
             });
-            particle_panels.push(*panel_id);
         }
+        pieces.push(Piece {
+            panel: *panel_id,
+            particles: offset as usize..scene.particles.len(),
+            indices: mesh.triangles.iter().flatten().copied().collect(),
+        });
         let grain = (panel.grain_angle_deg as f32).to_radians();
         let warp = Vec2::new(grain.cos(), grain.sin());
         scene
@@ -221,8 +243,125 @@ pub fn build(
             0.04,
         ));
     }
-    Ok(Drape {
-        scene,
-        particle_panels,
+    Ok(Drape { scene, pieces })
+}
+
+/// The project's avatar fitted to its measurements (m), if it has one.
+pub fn fitted_body(project: &Project) -> Result<Option<Vec<Vec3>>, CommandError> {
+    let Some(avatar) = project.avatar() else {
+        return Ok(None);
+    };
+    let model = body_model()?;
+    Ok(Some(fitted_positions(model, &fit(model, &avatar.body))))
+}
+
+/// Build the scene for the project as it is: fitted avatar, default
+/// spacing.
+pub fn prepare(project: &Project, body: Option<&[Vec3]>) -> Result<Drape, CommandError> {
+    let triangles = match body {
+        Some(_) => body_model()?.triangles(),
+        None => &[],
+    };
+    build(
+        project,
+        body.map(|positions| BodyMesh {
+            positions,
+            triangles,
+        }),
+        DEFAULT_SPACING_MM,
+    )
+}
+
+/// What a headless drape produced.
+#[derive(Debug, Clone)]
+pub struct Simulated {
+    pub drape: Drape,
+    pub body: Option<Vec<Vec3>>,
+    pub positions: Vec<Vec3>,
+    pub frames: u32,
+    pub ms_per_frame: f64,
+    pub stats: StepStats,
+}
+
+/// Simulate `frames` frames of 1/60 s from the starting positions.
+pub fn simulate(project: &Project, frames: u32) -> Result<Simulated, CommandError> {
+    let body = fitted_body(project)?;
+    let drape = prepare(project, body.as_deref())?;
+    if drape.pieces.is_empty() {
+        return Err(CommandError::NothingToSimulate);
+    }
+    let mut solver = Solver::new(drape.scene.clone());
+    let start = Instant::now();
+    for _ in 0..frames {
+        solver.step(1.0 / 60.0);
+    }
+    let ms_per_frame = start.elapsed().as_secs_f64() * 1000.0 / f64::from(frames.max(1));
+    Ok(Simulated {
+        positions: solver.positions().to_vec(),
+        stats: solver.stats(),
+        drape,
+        body,
+        frames,
+        ms_per_frame,
     })
+}
+
+/// Where the last headless drape is cached, relative to the project folder.
+pub const CACHE_FILE: &str = ".r3d-cache/drape.bin";
+const CACHE_MAGIC: &[u8; 8] = b"R3DDRP01";
+
+/// Fingerprint of everything a drape depends on: the document (schema
+/// JSON), the mesh spacing and the solver's substeps. FNV-1a, stable
+/// across runs and platforms.
+pub fn fingerprint(project: &Project) -> Result<u64, CommandError> {
+    let json = r3d_core::file::to_json(project).map_err(|e| internal(e.to_string()))?;
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    let tail = [
+        DEFAULT_SPACING_MM.to_le_bytes(),
+        u64::from(SUBSTEPS).to_le_bytes(),
+    ];
+    for b in json.as_bytes().iter().chain(tail.iter().flatten()) {
+        hash = (hash ^ u64::from(*b)).wrapping_mul(0x0100_0000_01b3);
+    }
+    Ok(hash)
+}
+
+/// Encode a drape for [`CACHE_FILE`].
+pub fn encode_cache(fingerprint: u64, positions: &[Vec3]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(16 + positions.len() * 12);
+    bytes.extend_from_slice(CACHE_MAGIC);
+    bytes.extend_from_slice(&fingerprint.to_le_bytes());
+    for p in positions {
+        for c in p.to_array() {
+            bytes.extend_from_slice(&c.to_le_bytes());
+        }
+    }
+    bytes
+}
+
+/// The cached drape positions in the project folder `dir`, if they were
+/// made from this exact document; `None` otherwise (stale, missing or
+/// damaged cache: it is only a cache).
+pub fn load_cache(dir: &Path, project: &Project, particles: usize) -> Option<Vec<Vec3>> {
+    let bytes = std::fs::read(dir.join(CACHE_FILE)).ok()?;
+    let (head, body) = bytes.split_at_checked(16)?;
+    let (magic, print) = head.split_at(8);
+    if magic != CACHE_MAGIC
+        || print != fingerprint(project).ok()?.to_le_bytes()
+        || body.len() != particles * 12
+    {
+        return None;
+    }
+    Some(
+        body.as_chunks::<12>()
+            .0
+            .iter()
+            .map(|c| {
+                let (xyz, _) = c.as_chunks::<4>();
+                let [x, y, z] =
+                    [0, 1, 2].map(|i| xyz.get(i).map_or(0.0, |b| f32::from_le_bytes(*b)));
+                Vec3::new(x, y, z)
+            })
+            .collect(),
+    )
 }

@@ -88,8 +88,10 @@ pins, avatar and ground contacts, friction), reference scenes and the sim
 bridge are done; schema v4 brings seams, placements and fabrics (M5/M6
 items pulled forward). The app simulates on its own thread (Simulate /
 Pause / Restart, fabric swatches). Contacts run in parallel: the skirt
-simulates in real time (≈ 14 ms per frame). Next: the CLI `simulate` and
-`render`.
+simulates in real time (≈ 14 ms per frame). The CLI simulates and renders
+headless (`r3d simulate`, `r3d render --view board|3d`), and the
+`simulate` action is available to scripts and MCP. Next: MCP `render_3d`
+(PNG content), the avatar SDF, then self-collision and grab (M7).
 - `r3d-geom`: constrained triangulation of panels at a target particle
   spacing, with matching vertex counts along future seams (moved from M2).
 - `r3d-sim`: `Solver` trait, XPBD small steps, strain-based stretch/shear,

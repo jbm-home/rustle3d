@@ -90,6 +90,8 @@ pub enum CommandError {
         reference: String,
         reason: &'static str,
     },
+    #[error("nothing to simulate: place at least one panel around the body (panel.place)")]
+    NothingToSimulate,
     #[error("internal error: {detail}")]
     Internal { detail: String },
 }
@@ -134,6 +136,7 @@ impl Localizable for CommandError {
                 .arg("seam", seam),
             Self::NothingToUndo => Message::new("nothing_to_undo", text),
             Self::NothingToRedo => Message::new("nothing_to_redo", text),
+            Self::NothingToSimulate => Message::new("nothing_to_simulate", text),
             Self::UnknownType { name } => Message::new("unknown_type", text).arg("name", name),
             Self::Malformed { name, detail } => Message::new("malformed", text)
                 .arg("name", name)

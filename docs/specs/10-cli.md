@@ -8,7 +8,8 @@ scripts, simulate, export and render.
 
 ## Behavior
 `r3d` binary (clap). Implemented: `new`, `run`, `query`, `schema` (M1),
-`export`, `mcp` (M2). The others arrive with their milestones. `run
+`export`, `mcp` (M2), `simulate`, `render` (M4). The others arrive with
+their milestones. `run
 --dry-run` uses a bare session: actions such as exports are refused and
 nothing is written. Scripts can refer to earlier results
 (`"$3.created[0]"`), see `docs/commands.md`.
@@ -16,9 +17,15 @@ nothing is written. Scripts can refer to earlier results
 - `r3d run <project> <script.json|->`: execute a JSON list of commands (same
   format as the MCP batch) and save. Use `--dry-run` to validate only.
 - `r3d query <project> <query-json>`: print query results as JSON.
-- `r3d simulate <project> --steps N [--deterministic] [--save-drape]`.
+- `r3d simulate <project> [--frames N]`: drape the placed, sewn garment on
+  the avatar for N frames of 1/60 s (default 300) and print a report
+  (extent, seam gap, settled). Always deterministic. The result is cached
+  in `.r3d-cache/drape.bin`, keyed by a fingerprint of the document, so a
+  stale drape is never shown. Same as the `simulate` action (scripts, MCP).
 - `r3d export <project> --format svg|pdf|obj|gltf [--out path]`.
-- `r3d render <project> --view board|3d --out file.png [--size WxH]`.
+- `r3d render <project> --view board|3d --out file.png [--size WxH]`: the
+  3D view shows the cached drape when it matches the document, otherwise
+  the starting positions; the JSON output says which (`"drape"`).
 - `r3d mcp [--project path] [--attach]`: MCP server (see 09).
 - `r3d schema [command]`: print JSON schemas.
 - Output is machine-readable JSON by default when piped. Exit codes: 0 ok,

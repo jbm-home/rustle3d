@@ -8,6 +8,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+use crate::drape;
+use crate::error::{CommandError, Invalid};
 use crate::spec::Described;
 use crate::workspace::{Workspace, WorkspaceError};
 
@@ -111,3 +113,51 @@ impl ActionSpec for ExportPdf {
         Ok(json!({ "path": written, "pages": pages }))
     }
 }
+
+/// Drape the garment headless and cache the result.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Simulate {
+    /// Frames of 1/60 s to simulate (1–3600, default 300 = 5 s).
+    #[serde(default = "default_frames")]
+    pub frames: u32,
+}
+
+fn default_frames() -> u32 {
+    300
+}
+
+impl Described for Simulate {
+    const SUMMARY: &'static str = "Drape the placed and sewn panels on the avatar for a number of frames (1/60 s each, deterministic) and cache the result in the project, so `r3d render --view 3d` shows it. Returns the garment's extent, how open the seams are and whether the cloth has settled.";
+}
+
+impl ActionSpec for Simulate {
+    fn run(&self, ws: &Workspace) -> Result<Value, WorkspaceError> {
+        if !(1..=3600).contains(&self.frames) {
+            return Err(CommandError::invalid("frames", Invalid::Range(1.0, 3600.0)).into());
+        }
+        let project = ws.session().project();
+        let out = drape::simulate(project, self.frames)?;
+        let cache = drape::encode_cache(drape::fingerprint(project)?, &out.positions);
+        ws.write(drape::CACHE_FILE, &cache)?;
+        let ys = out.positions.iter().map(|p| p.y);
+        let top = ys.clone().fold(f32::MIN, f32::max);
+        let bottom = ys.fold(f32::MAX, f32::min);
+        let r3 = |v: f64| (v * 1000.0).round() / 1000.0;
+        Ok(json!({
+            "frames": out.frames,
+            "simulated_s": r3(f64::from(out.frames) / 60.0),
+            "particles": out.positions.len(),
+            "pieces": out.drape.pieces.len(),
+            "ms_per_frame": r3(out.ms_per_frame),
+            "top_m": r3(top.into()),
+            "bottom_m": r3(bottom.into()),
+            "max_seam_gap_mm": r3(f64::from(out.stats.max_seam_gap) * 1000.0),
+            "max_speed_m_s": r3(out.stats.max_speed.into()),
+            "settled": out.stats.max_speed < SETTLED_SPEED,
+        }))
+    }
+}
+
+/// Below this particle speed (m/s) the cloth counts as settled.
+const SETTLED_SPEED: f32 = 0.05;

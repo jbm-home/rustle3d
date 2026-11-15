@@ -15,4 +15,4 @@ pub mod solver;
 
 pub use fabric::{FabricParams, FabricPreset};
 pub use scene::SimScene;
-pub use solver::Solver;
+pub use solver::{SUBSTEPS, Solver, StepStats};

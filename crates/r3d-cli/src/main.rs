@@ -9,6 +9,8 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+mod render;
+
 use clap::{Parser, Subcommand, ValueEnum};
 use r3d_commands::step::parse_query;
 use r3d_commands::{Action, Command, CommandError, Info, Query, Script, Session, Step, Workspace};
@@ -77,6 +79,27 @@ enum Cmd {
         /// Output path relative to the project (default: exports/<name>.<ext>).
         #[arg(long)]
         out: Option<String>,
+    },
+    /// Drape the placed, sewn garment on the avatar (deterministic) and
+    /// cache the result in the project for `render --view 3d`.
+    Simulate {
+        project: PathBuf,
+        /// Frames of 1/60 s (default 300 = 5 s).
+        #[arg(long, default_value_t = 300)]
+        frames: u32,
+    },
+    /// Render the pattern (`board`) or the garment on the avatar (`3d`) to
+    /// a PNG file.
+    Render {
+        project: PathBuf,
+        #[arg(long, value_enum)]
+        view: render::View,
+        /// Output PNG file.
+        #[arg(long)]
+        out: PathBuf,
+        /// Image size, e.g. 1200x900.
+        #[arg(long, default_value = "1200x900", value_parser = parse_size)]
+        size: (u32, u32),
     },
     /// List every operation, or print the JSON schema of one.
     Schema { name: Option<String> },
@@ -204,6 +227,46 @@ fn cmd_export(
     print_json(&result)
 }
 
+fn cmd_simulate(project: &Path, frames: u32) -> Result<(), Failure> {
+    let mut ws = Workspace::open(project)?;
+    let step = Step::from_value(json!({ "type": "simulate", "frames": frames }))?;
+    print_json(&ws.run_step(&step)?)
+}
+
+fn parse_size(s: &str) -> Result<(u32, u32), String> {
+    let (w, h) = s
+        .split_once('x')
+        .ok_or("expected WIDTHxHEIGHT, e.g. 1200x900")?;
+    let parse = |v: &str| {
+        v.parse::<u32>()
+            .ok()
+            .filter(|n| (16..=8192).contains(n))
+            .ok_or("sizes must be 16 to 8192 pixels")
+    };
+    Ok((parse(w)?, parse(h)?))
+}
+
+fn cmd_render(
+    project: &Path,
+    view: render::View,
+    out: &Path,
+    size: (u32, u32),
+) -> Result<(), Failure> {
+    let ws = Workspace::open(project)?;
+    let (png, mut info) = render::render(&ws, view, size.0, size.1)?;
+    std::fs::write(out, &png).map_err(|e| Failure {
+        message: Message::new(
+            "write_failed",
+            format!("cannot write {}: {e}", out.display()),
+        )
+        .arg("path", out.display()),
+        code: 1,
+    })?;
+    info["out"] = Value::from(out.display().to_string());
+    info["size"] = json!([size.0, size.1]);
+    print_json(&info)
+}
+
 fn cmd_schema(name: Option<&str>) -> Result<(), Failure> {
     let groups = [
         ("commands", Command::registry()),
@@ -260,6 +323,13 @@ fn main() -> ExitCode {
             paper,
             out,
         } => cmd_export(&project, format, paper, out),
+        Cmd::Simulate { project, frames } => cmd_simulate(&project, frames),
+        Cmd::Render {
+            project,
+            view,
+            out,
+            size,
+        } => cmd_render(&project, view, &out, size),
         Cmd::Schema { name } => cmd_schema(name.as_deref()),
         Cmd::Mcp { project } => cmd_mcp(&project),
     };

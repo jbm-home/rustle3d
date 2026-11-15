@@ -12,7 +12,7 @@ use std::path::PathBuf;
 
 use r3d_avatar::fit::{fit, fitted_positions};
 use r3d_avatar::presets::{BodyPreset, PresetLibrary};
-use r3d_commands::drape::{self, BodyMesh};
+use r3d_commands::drape::{self, Piece};
 use r3d_commands::queries::body_model;
 use r3d_commands::{Script, Step, Workspace, templates};
 use r3d_sim::Solver;
@@ -167,17 +167,6 @@ fn avatar_mesh(body: &Body) -> Result<Mesh, ApiError> {
     Ok(mesh)
 }
 
-/// Where each piece's particles sit in the simulation, to draw one mesh per
-/// piece (own material, selection tint).
-struct ClothPart {
-    panel: PanelId,
-    /// First particle of the piece (pieces are contiguous).
-    start: usize,
-    count: usize,
-    /// Triangles, in indices local to the piece.
-    indices: Vec<u32>,
-}
-
 /// A fabric choice for the UI.
 #[derive(Debug, Clone)]
 pub struct FabricSwatch {
@@ -214,7 +203,7 @@ pub struct Engine {
     /// The simulation thread, started on first use.
     sim: Mutex<Option<SimThread>>,
     /// How to draw the loaded simulation.
-    cloth: Mutex<Vec<ClothPart>>,
+    cloth: Mutex<Vec<Piece>>,
 }
 
 fn poisoned() -> ApiError {
@@ -272,42 +261,10 @@ impl Engine {
     pub fn reset_simulation(&self) -> Result<SimStatus, ApiError> {
         let ws = self.workspace()?;
         let project = ws.session().project();
-        let model = body_model().map_err(err)?;
-        let body = project
-            .avatar()
-            .map(|a| fitted_positions(model, &fit(model, &a.body)));
-        let drape = drape::build(
-            project,
-            body.as_deref().map(|positions| BodyMesh {
-                positions,
-                triangles: model.triangles(),
-            }),
-            drape::DEFAULT_SPACING_MM,
-        )
-        .map_err(err)?;
+        let body = drape::fitted_body(project).map_err(err)?;
+        let drape = drape::prepare(project, body.as_deref()).map_err(err)?;
         drop(ws);
-        let mut parts: Vec<ClothPart> = Vec::new();
-        for (i, panel) in drape.particle_panels.iter().enumerate() {
-            match parts.last_mut() {
-                Some(p) if p.panel == *panel => p.count += 1,
-                _ => parts.push(ClothPart {
-                    panel: *panel,
-                    start: i,
-                    count: 1,
-                    indices: Vec::new(),
-                }),
-            }
-        }
-        for t in &drape.scene.triangles {
-            let first = t.vertices[0] as usize;
-            if let Some(p) = parts
-                .iter_mut()
-                .find(|p| (p.start..p.start + p.count).contains(&first))
-            {
-                p.indices
-                    .extend(t.vertices.iter().map(|v| *v - p.start as u32));
-            }
-        }
+        let parts = drape.pieces;
         let sim = self.sim()?;
         let thread = sim.as_ref().ok_or_else(poisoned)?;
         if parts.is_empty() {
@@ -538,17 +495,15 @@ impl Engine {
                 let cloth = self.cloth.lock().map_err(|_| poisoned())?;
                 let pieces: Vec<(PanelId, Mesh)> = cloth
                     .iter()
-                    .filter_map(|part| {
-                        let positions = published
-                            .positions
-                            .get(part.start..part.start + part.count)?;
+                    .filter_map(|piece| {
+                        let positions = published.positions.get(piece.particles.clone())?;
                         let mut mesh = Mesh {
                             positions: positions.to_vec(),
                             normals: Vec::new(),
-                            indices: part.indices.clone(),
+                            indices: piece.indices.clone(),
                         };
                         mesh.recompute_normals();
-                        Some((part.panel, mesh))
+                        Some((piece.panel, mesh))
                     })
                     .collect();
                 drop(cloth);

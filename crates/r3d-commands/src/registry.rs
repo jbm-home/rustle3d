@@ -159,5 +159,6 @@ query_registry! {
 
 action_registry! {
     "export.svg" => ExportSvg,
+    "simulate" => Simulate,
     "export.pdf" => ExportPdf,
 }
