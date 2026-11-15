@@ -34,10 +34,6 @@ pub const DEFAULT_SPACING_MM: f64 = 25.0;
 const BODY_VOXEL: f32 = 0.005;
 /// Body radius assumed when there is no avatar (m).
 const DEFAULT_BODY_RADIUS_M: f32 = 0.16;
-/// Panels start on a cone that widens downwards (radius gained per metre
-/// below the panel's top), so flared pieces do not overlap before the
-/// seams pull them together.
-const FLARE: f32 = 0.35;
 
 /// A built simulation scene.
 #[derive(Debug, Clone)]
@@ -82,15 +78,47 @@ fn body_profile(body: Option<BodyMesh<'_>>) -> Vec<f32> {
         .collect()
 }
 
-/// Radius at which a panel whose top is at `top` starts, `below` metres
-/// under its top: the widest body section between the two heights (a
-/// garment hangs outside everything above it), plus the offset and the
-/// flare.
-fn start_radius(profile: &[f32], top: f32, below: f32, offset: f32) -> f32 {
-    let index = |y: f32| ((y / PROFILE_STEP).round().max(0.0) as usize).min(profile.len() - 1);
-    let (lo, hi) = (index(top - below), index(top));
-    let body = profile[lo..=hi].iter().copied().fold(0.0, f32::max);
-    body + offset + FLARE * below
+/// The widest body section between heights `top` and `top - below` (m):
+/// a garment hangs outside everything above it.
+fn body_radius(profile: &[f32], top: f32, below: f32) -> f32 {
+    let last = profile.len().saturating_sub(1);
+    let index = |y: f32| ((y / PROFILE_STEP).round().max(0.0) as usize).min(last);
+    profile
+        .get(index(top - below)..=index(top))
+        .map_or(0.0, |s| s.iter().copied().fold(0.0, f32::max))
+}
+
+/// Horizontal span of a closed polygon at height `y` (same units).
+fn span_at(polygon: &[DVec2], y: f64) -> f64 {
+    let (mut lo, mut hi) = (f64::MAX, f64::MIN);
+    for (a, b) in polygon.iter().zip(polygon.iter().cycle().skip(1)) {
+        if (a.y - y) * (b.y - y) <= 0.0 && a.y != b.y {
+            let x = a.x + (b.x - a.x) * (y - a.y) / (b.y - a.y);
+            lo = lo.min(x);
+            hi = hi.max(x);
+        }
+    }
+    if hi >= lo { hi - lo } else { 0.0 }
+}
+
+/// A placed panel, meshed, before it is positioned in 3D.
+struct Laid {
+    panel: PanelId,
+    place: r3d_core::Placement,
+    boundary: Vec<DVec2>,
+    /// Index in `boundary` of each contour edge's first sample.
+    starts: Vec<usize>,
+    mesh: r3d_geom::mesh::PanelMesh,
+    /// Pattern height of the panel's top (mm).
+    top: f64,
+}
+
+impl Laid {
+    /// Width of the panel at world height `y` (m).
+    fn width_at(&self, y: f32) -> f32 {
+        let below_mm = f64::from(self.place.top_cm as f32 / 100.0 - y) * 1000.0;
+        (span_at(&self.boundary, self.top - below_mm) / 1000.0) as f32
+    }
 }
 
 pub fn fabric_preset(f: Fabric) -> FabricPreset {
@@ -152,6 +180,9 @@ pub fn build(
     // Particle indices along each edge, start to end inclusive.
     let mut edge_vertices: BTreeMap<EdgeId, Vec<u32>> = BTreeMap::new();
 
+    // Mesh every placed panel first: the starting radius depends on the
+    // width of all of them.
+    let mut laid = Vec::new();
     for (panel_id, panel) in project.panels() {
         let Some(place) = panel.placement else {
             continue;
@@ -171,31 +202,53 @@ pub fn build(
         }
         let mesh =
             mesh_polygon(&boundary, spacing).map_err(|e| internal(format!("{panel_id}: {e}")))?;
+        let top = mesh.vertices.iter().fold(f64::MIN, |m, v| m.max(v.y));
+        laid.push(Laid {
+            panel: *panel_id,
+            place,
+            boundary,
+            starts,
+            mesh,
+            top,
+        });
+    }
+    // The garment's circumference at a height: all its panels side by side.
+    let around = |y: f32| laid.iter().map(|l| l.width_at(y)).sum::<f32>();
+
+    for l in &laid {
+        let Some(panel) = project.panel(l.panel) else {
+            continue;
+        };
+        let mesh = &l.mesh;
         let offset = scene.particles.len() as u32;
-        let total = boundary.len();
-        for (i, e) in panel.contour.iter().enumerate() {
+        let total = l.boundary.len();
+        for (e, start) in panel.contour.iter().zip(&l.starts) {
             let n = counts.get(e).copied().unwrap_or(1);
             let verts = (0..=n)
-                .map(|k| offset + mesh.boundary[(starts[i] + k) % total])
+                .filter_map(|k| mesh.boundary.get((start + k) % total))
+                .map(|b| offset + b)
                 .collect();
             edge_vertices.insert(*e, verts);
         }
 
-        // Wrap on the cone: the panel's horizontal centre goes to the
+        // Wrap around the body: the panel's horizontal centre goes to the
         // placement angle, its top to the placement height; distances along
-        // the pattern are kept as arc lengths.
+        // the pattern are kept as arc lengths. At each height the radius is
+        // the larger of the body's (plus the gap) and the garment's own
+        // (circumference / 2π), so the panels start just touching.
         let lo = mesh.vertices.iter().fold(f64::MAX, |m, v| m.min(v.x));
         let hi = mesh.vertices.iter().fold(f64::MIN, |m, v| m.max(v.x));
-        let top = mesh.vertices.iter().fold(f64::MIN, |m, v| m.max(v.y));
         let centre = (lo + hi) / 2.0;
-        let gap = (place.offset_mm / 1000.0) as f32;
-        let top_y = place.top_cm as f32 / 100.0;
-        let angle0 = (place.angle_deg as f32).to_radians();
+        let gap = (l.place.offset_mm / 1000.0) as f32;
+        let top_y = l.place.top_cm as f32 / 100.0;
+        let angle0 = (l.place.angle_deg as f32).to_radians();
         for v in &mesh.vertices {
-            let below = ((top - v.y) / 1000.0) as f32;
-            let r = start_radius(&profile, top_y, below, gap);
-            let theta = angle0 + ((v.x - centre) / 1000.0) as f32 / r;
+            let below = ((l.top - v.y) / 1000.0) as f32;
             let y = top_y - below;
+            let r = (body_radius(&profile, top_y, below) + gap)
+                .max(around(y) / std::f32::consts::TAU)
+                .max(1e-3);
+            let theta = angle0 + ((v.x - centre) / 1000.0) as f32 / r;
             scene.particles.push(Particle {
                 position: Vec3::new(r * theta.sin(), y, r * theta.cos()),
                 rest: Vec2::new((v.x / 1000.0) as f32, (v.y / 1000.0) as f32),
@@ -203,7 +256,7 @@ pub fn build(
             });
         }
         pieces.push(Piece {
-            panel: *panel_id,
+            panel: l.panel,
             particles: offset as usize..scene.particles.len(),
             indices: mesh.triangles.iter().flatten().copied().collect(),
         });

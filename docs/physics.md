@@ -159,10 +159,16 @@ measurement-based calibration on the roadmap.
 Placed panels start wrapped around the body's vertical axis
 (`r3d_commands::drape`): the panel's centre at its placement angle, its top
 at the placement height, horizontal pattern distances kept as arc lengths.
-The radius at each height is the widest body section between the panel's
-top and that height (girth / 2π, so a garment starts outside everything
-above it), plus the placement offset, plus a flare of 0.35 m per metre so
-that flared pieces do not overlap before the seams close.
+At each height the radius is the larger of
+- the widest body section between the panel's top and that height
+  (girth / 2π: a garment starts outside everything above it), plus the
+  placement offset;
+- the garment's own circumference there (the widths of all placed panels
+  side by side) / 2π, so the panels start just touching.
+
+An earlier fixed flare (radius growing 0.35 m per metre) started an A-line
+hem at 2.5 m around for 1.56 m of cloth: the seams pulled it in and the hem
+buckled inward. With the garment's own width it hangs as an A-line.
 
 ### Self-collision
 
@@ -189,10 +195,10 @@ that flared pieces do not overlap before the seams close.
   0, kinetic + gravitational energy decreases steadily: the solver is
   stable; a sheet hung by two corners needs about ten seconds to come to
   rest.
-- **Fabric presets are not calibrated.** The A-line hem gathers inward
-  instead of flaring: the presets' bending values (§3) are first
-  estimates. Calibrate them against simple physical tests (cantilever
-  bending length, drape coefficient) before judging garment shapes.
+- **Fabric presets are first estimates** (§3). Cotton's bending length
+  (≈ 2 cm) is plausible; calibrate all presets against simple physical
+  tests (cantilever bending length, drape coefficient) when comparing
+  garments with real ones.
 
 ## 6. Parallelism and determinism
 
