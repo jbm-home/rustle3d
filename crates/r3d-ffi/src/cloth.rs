@@ -3,7 +3,7 @@
 
 use std::time::{Duration, Instant};
 
-use r3d_core::{EdgeId, PanelId};
+use r3d_core::{EdgeId, PanelId, PointId, SeamId};
 
 /// Pattern edits not yet carried into the running simulation.
 pub(crate) struct Sync {
@@ -44,7 +44,25 @@ pub(crate) enum Tool {
     /// Lengthen or shorten the garment at an open edge (`edge.lengthen`):
     /// `applied` mm so far.
     Length { edge: EdgeId, applied: f64 },
+    /// Take in or let out a seam (`seam.take_in`), at one end (`at`) or
+    /// along all of it: `applied` mm so far.
+    Fit {
+        seam: SeamId,
+        at: Option<PointId>,
+        applied: f64,
+    },
 }
+
+/// What ⇧-dragging a particle on a contour edge adjusts.
+#[derive(Clone, Copy)]
+pub(crate) enum Adjust {
+    Length(EdgeId),
+    Fit(SeamId, Option<PointId>),
+}
+
+/// Along a seam, grabbing within this fraction of an end adjusts that end
+/// only.
+pub(crate) const SEAM_END: f32 = 0.3;
 
 /// A cloth particle under the cursor.
 pub(crate) struct Hit {

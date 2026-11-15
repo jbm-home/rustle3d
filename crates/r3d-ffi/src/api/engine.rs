@@ -15,9 +15,9 @@ use r3d_commands::drape::{self, Drape, Form};
 use r3d_commands::{Script, Step, Workspace, templates};
 use r3d_sim::Solver;
 
-use crate::cloth::{Held, Hit, PICK_PX, RESYNC_EVERY, Sync, Tool};
+use crate::cloth::{Adjust, Held, Hit, PICK_PX, RESYNC_EVERY, SEAM_END, Sync, Tool};
 use crate::sim::SimThread;
-use r3d_core::{Body, EdgeId, Fabric, Localizable, Message, PanelId};
+use r3d_core::{Body, Fabric, Localizable, Message, PanelId};
 use r3d_render::board::BoardView;
 use r3d_render::theme::PIECE_COLORS;
 use r3d_render::{
@@ -160,6 +160,15 @@ pub struct FabricSwatch {
     pub id: String,
     /// Default colour, ARGB.
     pub argb: u32,
+}
+
+/// A pattern change made by dragging in 3D, for the label by the cursor.
+#[derive(Debug, Clone)]
+pub struct PatternChange {
+    /// `length` (hem moved; positive = longer) or `fit` (seam taken in;
+    /// positive = taken in, negative = let out).
+    pub kind: String,
+    pub mm: f64,
 }
 
 /// State of the cloth simulation, for the UI.
@@ -681,27 +690,40 @@ impl Engine {
     }
 
     /// Pointer down at (`x`, `y`): in the 3D view, on the cloth, get ready
-    /// to drag it. With `lengthen` (⇧ held) the drag moves the open edge
-    /// under the cursor (a hem) in the pattern; otherwise it pulls the
-    /// cloth. Returns whether there is something to drag (then moves
-    /// should call `pull`); otherwise drags orbit as usual.
+    /// to drag it. With `adjust` (⇧ held) the drag changes the pattern at
+    /// the contour edge under the cursor: an open edge (a hem) is
+    /// lengthened, a seam is taken in or let out (at the nearer end when
+    /// grabbed near one). Otherwise the drag pulls the cloth. Returns
+    /// whether there is something to drag (then moves should call `pull`);
+    /// otherwise drags orbit as usual.
     #[frb(sync)]
-    pub fn press(&self, view: u32, x: f64, y: f64, lengthen: bool) -> Result<bool, ApiError> {
-        // Particles on open (unsewn) edges, for the Length tool.
-        let open: HashMap<usize, EdgeId> = if lengthen {
+    pub fn press(&self, view: u32, x: f64, y: f64, adjust: bool) -> Result<bool, ApiError> {
+        // Particles on contour edges, and what dragging them adjusts.
+        let mut open: HashMap<usize, Adjust> = HashMap::new();
+        if adjust {
             let ws = self.workspace()?;
             let project = ws.session().project();
-            self.cloth
-                .lock()
-                .map_err(|_| poisoned())?
-                .iter()
-                .flat_map(|d| &d.edges)
-                .filter(|(e, _)| project.seam_of(**e).is_none())
-                .flat_map(|(e, particles)| particles.iter().map(move |i| (*i, *e)))
-                .collect()
-        } else {
-            HashMap::new()
-        };
+            let cloth = self.cloth.lock().map_err(|_| poisoned())?;
+            for (e, particles) in cloth.iter().flat_map(|d| &d.edges) {
+                let n = particles.len().max(2) - 1;
+                for (k, i) in particles.iter().enumerate() {
+                    let tool = match project.seam_of(*e) {
+                        None => Adjust::Length(*e),
+                        Some(seam) => {
+                            let t = k as f32 / n as f32;
+                            let edge = project.edge(*e);
+                            let at = match edge {
+                                Some(edge) if t < SEAM_END => Some(edge.start),
+                                Some(edge) if t > 1.0 - SEAM_END => Some(edge.end),
+                                _ => None,
+                            };
+                            Adjust::Fit(seam, at)
+                        }
+                    };
+                    open.insert(*i, tool);
+                }
+            }
+        }
         let slot = self.graphics()?;
         let Some(v) = slot.as_ref().and_then(|g| g.views.get(&view)) else {
             return Ok(false);
@@ -709,18 +731,22 @@ impl Engine {
         if v.kind != ViewKind::Garment {
             return Ok(false);
         }
-        let only = |i: usize| !lengthen || open.contains_key(&i);
+        let only = |i: usize| !adjust || open.contains_key(&i);
         let Some(hit) = self.pick_cloth(v, &slot, x, y, &only)? else {
             return Ok(false);
         };
         drop(slot);
         let tool = match open.get(&hit.particle) {
-            Some(edge) => {
+            Some(adjust) => {
                 // Show the panel being changed in both views.
                 *self.selected()? = hit.panel.into_iter().collect();
-                Tool::Length {
-                    edge: *edge,
-                    applied: 0.0,
+                match *adjust {
+                    Adjust::Length(edge) => Tool::Length { edge, applied: 0.0 },
+                    Adjust::Fit(seam, at) => Tool::Fit {
+                        seam,
+                        at,
+                        applied: 0.0,
+                    },
                 }
             }
             None => Tool::Pull { pulling: false },
@@ -735,11 +761,13 @@ impl Engine {
 
     /// Pointer moved to (`x`, `y`) after `press`: pull the cloth there (on
     /// the plane facing the camera through the grabbed point; the
-    /// simulation runs while it is held), or, with the Length tool, move
-    /// the edge by the vertical distance dragged (down = longer). Returns
-    /// the length change so far (mm) for the Length tool.
+    /// simulation runs while it is held); with the Length tool, move the
+    /// edge by the vertical distance dragged (down = longer); with the Fit
+    /// tool, take the seam in by twice the distance dragged towards the
+    /// body (away lets it out). Returns the change so far (mm) for the
+    /// pattern tools.
     #[frb(sync)]
-    pub fn pull(&self, view: u32, x: f64, y: f64) -> Result<Option<f64>, ApiError> {
+    pub fn pull(&self, view: u32, x: f64, y: f64) -> Result<Option<PatternChange>, ApiError> {
         let Some(held) = *self.held.lock().map_err(|_| poisoned())? else {
             return Ok(None);
         };
@@ -771,27 +799,54 @@ impl Engine {
             }
             Tool::Length { edge, applied } => {
                 let total = (f64::from(anchor.y - target.y) * 1000.0).round();
-                let mut now = applied;
-                if total != applied {
-                    let step = serde_json::json!({
-                        "type": "edge.lengthen", "edge": edge, "mm": total - applied,
-                    });
-                    // Past a limit (a hem crossing the waist) the edge
-                    // simply stops following.
-                    if self.run(step.to_string()).is_ok() {
-                        now = total;
-                    }
+                let step = serde_json::json!({ "type": "edge.lengthen", "edge": edge });
+                Tool::Length {
+                    edge,
+                    applied: self.adjust_by(step, applied, total),
                 }
-                Tool::Length { edge, applied: now }
+            }
+            Tool::Fit { seam, at, applied } => {
+                // Towards the body's vertical axis takes in.
+                let radius = |p: glam::Vec3| glam::Vec2::new(p.x, p.z).length();
+                let total = (f64::from(radius(anchor) - radius(target)) * 2000.0).round();
+                let mut step = serde_json::json!({ "type": "seam.take_in", "seam": seam });
+                if let Some(at) = at {
+                    step["at"] = serde_json::json!(at);
+                }
+                Tool::Fit {
+                    seam,
+                    at,
+                    applied: self.adjust_by(step, applied, total),
+                }
             }
         };
         if let Some(h) = self.held.lock().map_err(|_| poisoned())?.as_mut() {
             h.tool = tool;
         }
+        let change = |kind: &str, mm: f64| PatternChange {
+            kind: kind.into(),
+            mm,
+        };
         Ok(match tool {
-            Tool::Length { applied, .. } => Some(applied),
+            Tool::Length { applied, .. } => Some(change("length", applied)),
+            Tool::Fit { applied, .. } => Some(change("fit", applied)),
             Tool::Pull { .. } => None,
         })
+    }
+
+    /// Run `step` with `"mm"` = `total - applied` and return the new total
+    /// applied. Past a limit (a hem crossing the waist) the pattern simply
+    /// stops following.
+    fn adjust_by(&self, mut step: serde_json::Value, applied: f64, total: f64) -> f64 {
+        if total == applied {
+            return applied;
+        }
+        step["mm"] = serde_json::json!(total - applied);
+        if self.run(step.to_string()).is_ok() {
+            total
+        } else {
+            applied
+        }
     }
 
     /// ⌥-click at (`x`, `y`) in the 3D view: pin the cloth there, where it

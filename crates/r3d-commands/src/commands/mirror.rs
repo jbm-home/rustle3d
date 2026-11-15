@@ -147,6 +147,23 @@ pub(crate) fn mirrored_source(
     Some((src_id, [(e.start, s.end), (e.end, s.start)]))
 }
 
+/// The edge mirroring `edge` across a linked mirror, either way (copy →
+/// source, or source → its first copy), with the matching points.
+pub(crate) fn mirror_twin(p: &Project, edge: EdgeId) -> Option<(EdgeId, [(PointId, PointId); 2])> {
+    if let Some(found) = mirrored_source(p, edge) {
+        return Some(found);
+    }
+    let panel = p.edge(edge)?.panel;
+    let copy = p
+        .panels()
+        .values()
+        .find(|c| c.mirror_of.as_ref().is_some_and(|l| l.source == panel))?;
+    let j = p.panel(panel)?.contour.iter().position(|e| *e == edge)?;
+    let twin = *copy.contour.get(copy.contour.len().checked_sub(1 + j)?)?;
+    let (e, t) = (p.edge(edge)?, p.edge(twin)?);
+    Some((twin, [(e.start, t.end), (e.end, t.start)]))
+}
+
 /// Recompute every linked mirror copy from its source.
 pub(crate) fn sync_mirrors(tx: &mut Transaction<'_>) -> Result<(), CommandError> {
     let copies: Vec<PanelId> = tx

@@ -7,9 +7,9 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `edited`, `err`, `form`, `graphics`, `library`, `new`, `new`, `pick_cloth`, `poisoned`, `presets_file`, `rebuild`, `resync_if_due`, `rgba`, `selected`, `sim`, `to_theme`, `workspace`
+// These functions are ignored because they are not marked as `pub`: `adjust_by`, `edited`, `err`, `form`, `graphics`, `library`, `new`, `new`, `pick_cloth`, `poisoned`, `presets_file`, `rebuild`, `resync_if_due`, `rgba`, `selected`, `sim`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Engine>>
 abstract class Engine implements RustOpaqueInterface {
@@ -59,23 +59,31 @@ abstract class Engine implements RustOpaqueInterface {
   String? pinAt({required int view, required double x, required double y});
 
   /// Pointer down at (`x`, `y`): in the 3D view, on the cloth, get ready
-  /// to drag it. With `lengthen` (⇧ held) the drag moves the open edge
-  /// under the cursor (a hem) in the pattern; otherwise it pulls the
-  /// cloth. Returns whether there is something to drag (then moves
-  /// should call `pull`); otherwise drags orbit as usual.
+  /// to drag it. With `adjust` (⇧ held) the drag changes the pattern at
+  /// the contour edge under the cursor: an open edge (a hem) is
+  /// lengthened, a seam is taken in or let out (at the nearer end when
+  /// grabbed near one). Otherwise the drag pulls the cloth. Returns
+  /// whether there is something to drag (then moves should call `pull`);
+  /// otherwise drags orbit as usual.
   bool press({
     required int view,
     required double x,
     required double y,
-    required bool lengthen,
+    required bool adjust,
   });
 
   /// Pointer moved to (`x`, `y`) after `press`: pull the cloth there (on
   /// the plane facing the camera through the grabbed point; the
-  /// simulation runs while it is held), or, with the Length tool, move
-  /// the edge by the vertical distance dragged (down = longer). Returns
-  /// the length change so far (mm) for the Length tool.
-  double? pull({required int view, required double x, required double y});
+  /// simulation runs while it is held); with the Length tool, move the
+  /// edge by the vertical distance dragged (down = longer); with the Fit
+  /// tool, take the seam in by twice the distance dragged towards the
+  /// body (away lets it out). Returns the change so far (mm) for the
+  /// pattern tools.
+  PatternChange? pull({
+    required int view,
+    required double x,
+    required double y,
+  });
 
   /// Pointer up: let go of the cloth.
   void release();
@@ -242,6 +250,27 @@ class FabricSwatch {
           runtimeType == other.runtimeType &&
           id == other.id &&
           argb == other.argb;
+}
+
+/// A pattern change made by dragging in 3D, for the label by the cursor.
+class PatternChange {
+  /// `length` (hem moved; positive = longer) or `fit` (seam taken in;
+  /// positive = taken in, negative = let out).
+  final String kind;
+  final double mm;
+
+  const PatternChange({required this.kind, required this.mm});
+
+  @override
+  int get hashCode => kind.hashCode ^ mm.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PatternChange &&
+          runtimeType == other.runtimeType &&
+          kind == other.kind &&
+          mm == other.mm;
 }
 
 /// State of the cloth simulation, for the UI.

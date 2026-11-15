@@ -288,7 +288,7 @@ class _ShellState extends State<Shell> {
               ),
               _StatusBar(
                 hint: _selection.isEmpty
-                    ? 'Click a piece to select it · in 3D: drag to pull the cloth, ⇧-drag a hem to lengthen, ⌥-click to pin'
+                    ? 'In 3D: drag to pull the cloth · ⇧-drag a hem to lengthen, a seam to take in · ⌥-click to pin'
                     : 'Adjust the selection in the inspector · ⌫ deletes · ⌘Z undoes',
                 stats:
                     '${_simStats()}Rust render · pattern ${_boardMs.toStringAsFixed(1)} ms · '

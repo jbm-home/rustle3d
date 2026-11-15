@@ -55,15 +55,20 @@ fn taking_in_a_side_seam_keeps_it_matched() {
     s.undo().unwrap();
     assert_eq!(pos(&s, &hem), hem0);
 
-    // Only at the waist: the hem stays, the seam stays matched.
+    // Only at the waist: the hem stays. The back is a linked mirror, so the
+    // left side seam is taken in too (its waist point moves right), and
+    // every seam stays matched even though the change is tapered.
+    let left_waist = front[4].clone(); // (205, 600)
+    let left0 = pos(&s, &left_waist);
     run(
         &mut s,
-        json!({"type": "seam.take_in", "seam": side_seam, "mm": 20, "at": waist}),
+        json!({"type": "seam.take_in", "seam": side_seam, "mm": 60, "at": waist}),
     )
     .unwrap();
     assert_eq!(pos(&s, &hem), hem0);
-    assert!(pos(&s, &waist).0 < waist0.0 - 5.0);
-    assert!(max_mismatch(&mut s) < 0.5);
+    assert!(pos(&s, &waist).0 < waist0.0 - 20.0);
+    assert!(pos(&s, &left_waist).0 > left0.0 + 20.0);
+    assert!(max_mismatch(&mut s) < 0.5, "{}", max_mismatch(&mut s));
 
     let err = run(
         &mut s,

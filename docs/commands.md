@@ -1275,7 +1275,7 @@ Lengthen (mm > 0) or shorten (mm < 0) the garment at an open edge such as a hem:
 
 ### `seam.take_in`
 
-Take in (mm > 0) or let out (mm < 0) a seam: both sides move inward by half of mm, perpendicular to the seam, so they stay matched. With `at` (an end point of the seam) only that end moves, tapering the change (e.g. take in the waist only). With a linked mirror copy, the symmetric seam changes too.
+Take in (mm > 0) or let out (mm < 0) a seam: both sides move inward by half of mm, perpendicular to the seam, so they stay matched. With `at` (an end point of the seam) only that end moves, tapering the change (e.g. take in the waist only). With linked mirror copies the symmetric seam is taken in too, so every seam stays matched.
 
 <details><summary>Parameters (JSON schema)</summary>
 

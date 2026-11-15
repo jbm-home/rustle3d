@@ -18,8 +18,12 @@ point to move.
     the whole hemline moves and seam sides stay matched; the drag is one
     undo step, a label shows the change next to the cursor, the panel is
     selected in both views and the drape follows live.
-  - **Fit**: pinch across a seam to take in, or spread to let out. Both
-    sides of the seam move equally, so their lengths stay matched.
+  - **Fit** (implemented): ⇧-drag a seam in 3D towards the body to take
+    it in, away to let it out (twice the distance dragged). Grabbed near
+    one end, only that end changes (taper: take in the waist only). The
+    command `seam.take_in` moves both sides inward by half the amount;
+    with linked mirror copies the symmetric seam changes too, so every
+    seam stays matched.
   - **Draw on garment**: a line drawn on the 3D surface becomes an internal
     line on the pattern (style line, pocket placement).
   - **Pick**: clicking the 3D garment selects the panel, edge, point or

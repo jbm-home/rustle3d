@@ -61,7 +61,7 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CanvasColors dco_decode_box_autoadd_canvas_colors(dynamic raw);
 
   @protected
-  double dco_decode_box_autoadd_f_64(dynamic raw);
+  PatternChange dco_decode_box_autoadd_pattern_change(dynamic raw);
 
   @protected
   CanvasColors dco_decode_canvas_colors(dynamic raw);
@@ -94,7 +94,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String? dco_decode_opt_String(dynamic raw);
 
   @protected
-  double? dco_decode_opt_box_autoadd_f_64(dynamic raw);
+  PatternChange? dco_decode_opt_box_autoadd_pattern_change(dynamic raw);
+
+  @protected
+  PatternChange dco_decode_pattern_change(dynamic raw);
 
   @protected
   (String, String) dco_decode_record_string_string(dynamic raw);
@@ -158,7 +161,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  double sse_decode_box_autoadd_f_64(SseDeserializer deserializer);
+  PatternChange sse_decode_box_autoadd_pattern_change(
+    SseDeserializer deserializer,
+  );
 
   @protected
   CanvasColors sse_decode_canvas_colors(SseDeserializer deserializer);
@@ -195,7 +200,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String? sse_decode_opt_String(SseDeserializer deserializer);
 
   @protected
-  double? sse_decode_opt_box_autoadd_f_64(SseDeserializer deserializer);
+  PatternChange? sse_decode_opt_box_autoadd_pattern_change(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PatternChange sse_decode_pattern_change(SseDeserializer deserializer);
 
   @protected
   (String, String) sse_decode_record_string_string(
@@ -266,7 +276,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_box_autoadd_f_64(double self, SseSerializer serializer);
+  void sse_encode_box_autoadd_pattern_change(
+    PatternChange self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_canvas_colors(CanvasColors self, SseSerializer serializer);
@@ -311,7 +324,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_opt_String(String? self, SseSerializer serializer);
 
   @protected
-  void sse_encode_opt_box_autoadd_f_64(double? self, SseSerializer serializer);
+  void sse_encode_opt_box_autoadd_pattern_change(
+    PatternChange? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_pattern_change(PatternChange self, SseSerializer serializer);
 
   @protected
   void sse_encode_record_string_string(

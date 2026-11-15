@@ -109,5 +109,42 @@ void main() {
     expect(frontBottom(), lessThan(before - 20));
     engine.run(stepJson: '{"type":"history.undo"}');
     expect(frontBottom(), before);
+
+    // ⇧-drag on a seam takes it in or lets it out (towards or away from
+    // the body; the direction itself is tested on the command): the
+    // pattern's width changes, the seams stay matched, one undo restores.
+    double width() {
+      final summary = jsonDecode(
+        engine.run(stepJson: '{"type":"project.summary"}'),
+      );
+      return (summary['panels'] as List).fold<double>(0, (sum, p) {
+        final bbox = p['bbox'];
+        return sum + (bbox['max'][0] as num) - (bbox['min'][0] as num);
+      });
+    }
+
+    final wide = width();
+    for (var dx = -160.0; dx <= 160 && width() == wide; dx += 6) {
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      final drag = await tester.startGesture(
+        centre + Offset(dx, -20),
+        kind: PointerDeviceKind.mouse,
+      );
+      for (var i = 0; i < 6; i++) {
+        await drag.moveBy(const Offset(4, 0));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await drag.up();
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.pump();
+    }
+    expect((width() - wide).abs(), greaterThan(1));
+    final seams =
+        jsonDecode(engine.run(stepJson: '{"type":"seam.list"}')) as List;
+    for (final seam in seams) {
+      expect(seam['mismatch_mm'] as num, lessThan(0.5));
+    }
+    engine.run(stepJson: '{"type":"history.undo"}');
+    expect(width(), closeTo(wide, 1e-6));
   });
 }

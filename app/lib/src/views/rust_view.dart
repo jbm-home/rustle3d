@@ -55,7 +55,7 @@ class _RustViewState extends State<RustView>
 
   /// While lengthening a hem in 3D: the change so far (mm) and where to
   /// show it.
-  double? _lengthMm;
+  PatternChange? _change;
   Offset _labelAt = Offset.zero;
 
   @override
@@ -156,7 +156,7 @@ class _RustViewState extends State<RustView>
                   x: e.localPosition.dx * _ratio,
                   y: e.localPosition.dy * _ratio,
                   // ⇧-drag on a hem lengthens the garment.
-                  lengthen: HardwareKeyboard.instance.isShiftPressed,
+                  adjust: HardwareKeyboard.instance.isShiftPressed,
                 );
           },
           onPointerMove: (e) {
@@ -164,14 +164,14 @@ class _RustViewState extends State<RustView>
             if (view == null) return;
             if ((e.localPosition - _downAt).distance > 3) _dragged = true;
             if (_holding) {
-              final mm = widget.engine.pull(
+              final change = widget.engine.pull(
                 view: view,
                 x: e.localPosition.dx * _ratio,
                 y: e.localPosition.dy * _ratio,
               );
-              if (mm != null) {
+              if (change != null) {
                 setState(() {
-                  _lengthMm = mm;
+                  _change = change;
                   _labelAt = e.localPosition;
                 });
               }
@@ -187,8 +187,8 @@ class _RustViewState extends State<RustView>
             if (_holding) {
               _holding = false;
               widget.engine.release();
-              if (_lengthMm != null) {
-                setState(() => _lengthMm = null);
+              if (_change != null) {
+                setState(() => _change = null);
                 // The pattern changed: let the shell refresh.
                 widget.onSelection?.call(widget.engine.selection());
               }
@@ -223,11 +223,11 @@ class _RustViewState extends State<RustView>
                       : Texture(textureId: texture),
                 ),
               ),
-              if (_lengthMm case final mm?)
+              if (_change case final change?)
                 Positioned(
                   left: _labelAt.dx + 14,
                   top: _labelAt.dy - 30,
-                  child: _LengthLabel(mm: mm),
+                  child: _ChangeLabel(change: change),
                 ),
             ],
           ),
@@ -237,16 +237,25 @@ class _RustViewState extends State<RustView>
   }
 }
 
-/// "+30 mm" next to the cursor while lengthening in 3D.
-class _LengthLabel extends StatelessWidget {
-  const _LengthLabel({required this.mm});
+/// "Longer 30 mm", "Taken in 12 mm"… next to the cursor while changing
+/// the pattern in 3D.
+class _ChangeLabel extends StatelessWidget {
+  const _ChangeLabel({required this.change});
 
-  final double mm;
+  final PatternChange change;
+
+  String get _text {
+    final mm = change.mm;
+    final amount = '${mm.abs().toStringAsFixed(0)} mm';
+    return switch (change.kind) {
+      'fit' => mm >= 0 ? 'Taken in $amount' : 'Let out $amount',
+      _ => mm >= 0 ? 'Longer $amount' : 'Shorter $amount',
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
-    final sign = mm > 0 ? '+' : (mm < 0 ? '−' : '');
     return IgnorePointer(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -255,7 +264,7 @@ class _LengthLabel extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
         ),
         child: Text(
-          '${mm > 0 ? 'Longer' : 'Shorter'} $sign${mm.abs().toStringAsFixed(0)} mm',
+          _text,
           style: ts(
             fontSize: 12.5,
             fontWeight: FontWeight.w600,

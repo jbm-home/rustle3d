@@ -131,10 +131,10 @@ abstract class RustLibApi extends BaseApi {
     required int view,
     required double x,
     required double y,
-    required bool lengthen,
+    required bool adjust,
   });
 
-  double? crateApiEngineEnginePull({
+  PatternChange? crateApiEngineEnginePull({
     required Engine that,
     required int view,
     required double x,
@@ -541,7 +541,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required int view,
     required double x,
     required double y,
-    required bool lengthen,
+    required bool adjust,
   }) {
     return handler.executeSync(
       SyncTask(
@@ -554,7 +554,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_u_32(view, serializer);
           sse_encode_f_64(x, serializer);
           sse_encode_f_64(y, serializer);
-          sse_encode_bool(lengthen, serializer);
+          sse_encode_bool(adjust, serializer);
           return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11)!;
         },
         codec: SseCodec(
@@ -562,7 +562,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_api_error,
         ),
         constMeta: kCrateApiEngineEnginePressConstMeta,
-        argValues: [that, view, x, y, lengthen],
+        argValues: [that, view, x, y, adjust],
         apiImpl: this,
       ),
     );
@@ -570,11 +570,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   TaskConstMeta get kCrateApiEngineEnginePressConstMeta => const TaskConstMeta(
     debugName: "Engine_press",
-    argNames: ["that", "view", "x", "y", "lengthen"],
+    argNames: ["that", "view", "x", "y", "adjust"],
   );
 
   @override
-  double? crateApiEngineEnginePull({
+  PatternChange? crateApiEngineEnginePull({
     required Engine that,
     required int view,
     required double x,
@@ -594,7 +594,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12)!;
         },
         codec: SseCodec(
-          decodeSuccessData: sse_decode_opt_box_autoadd_f_64,
+          decodeSuccessData: sse_decode_opt_box_autoadd_pattern_change,
           decodeErrorData: sse_decode_api_error,
         ),
         constMeta: kCrateApiEngineEnginePullConstMeta,
@@ -1157,9 +1157,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  double dco_decode_box_autoadd_f_64(dynamic raw) {
+  PatternChange dco_decode_box_autoadd_pattern_change(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
-    return raw as double;
+    return dco_decode_pattern_change(raw);
   }
 
   @protected
@@ -1243,9 +1243,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  double? dco_decode_opt_box_autoadd_f_64(dynamic raw) {
+  PatternChange? dco_decode_opt_box_autoadd_pattern_change(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
-    return raw == null ? null : dco_decode_box_autoadd_f_64(raw);
+    return raw == null ? null : dco_decode_box_autoadd_pattern_change(raw);
+  }
+
+  @protected
+  PatternChange dco_decode_pattern_change(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return PatternChange(
+      kind: dco_decode_String(arr[0]),
+      mm: dco_decode_f_64(arr[1]),
+    );
   }
 
   @protected
@@ -1386,9 +1398,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  double sse_decode_box_autoadd_f_64(SseDeserializer deserializer) {
+  PatternChange sse_decode_box_autoadd_pattern_change(
+    SseDeserializer deserializer,
+  ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-    return (sse_decode_f_64(deserializer));
+    return (sse_decode_pattern_change(deserializer));
   }
 
   @protected
@@ -1504,14 +1518,24 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  double? sse_decode_opt_box_autoadd_f_64(SseDeserializer deserializer) {
+  PatternChange? sse_decode_opt_box_autoadd_pattern_change(
+    SseDeserializer deserializer,
+  ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
     if (sse_decode_bool(deserializer)) {
-      return (sse_decode_box_autoadd_f_64(deserializer));
+      return (sse_decode_box_autoadd_pattern_change(deserializer));
     } else {
       return null;
     }
+  }
+
+  @protected
+  PatternChange sse_decode_pattern_change(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_kind = sse_decode_String(deserializer);
+    var var_mm = sse_decode_f_64(deserializer);
+    return PatternChange(kind: var_kind, mm: var_mm);
   }
 
   @protected
@@ -1660,9 +1684,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_box_autoadd_f_64(double self, SseSerializer serializer) {
+  void sse_encode_box_autoadd_pattern_change(
+    PatternChange self,
+    SseSerializer serializer,
+  ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_f_64(self, serializer);
+    sse_encode_pattern_change(self, serializer);
   }
 
   @protected
@@ -1763,13 +1790,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_opt_box_autoadd_f_64(double? self, SseSerializer serializer) {
+  void sse_encode_opt_box_autoadd_pattern_change(
+    PatternChange? self,
+    SseSerializer serializer,
+  ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
     sse_encode_bool(self != null, serializer);
     if (self != null) {
-      sse_encode_box_autoadd_f_64(self, serializer);
+      sse_encode_box_autoadd_pattern_change(self, serializer);
     }
+  }
+
+  @protected
+  void sse_encode_pattern_change(PatternChange self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.kind, serializer);
+    sse_encode_f_64(self.mm, serializer);
   }
 
   @protected
@@ -1916,35 +1953,42 @@ class EngineImpl extends RustOpaque implements Engine {
       );
 
   /// Pointer down at (`x`, `y`): in the 3D view, on the cloth, get ready
-  /// to drag it. With `lengthen` (⇧ held) the drag moves the open edge
-  /// under the cursor (a hem) in the pattern; otherwise it pulls the
-  /// cloth. Returns whether there is something to drag (then moves
-  /// should call `pull`); otherwise drags orbit as usual.
+  /// to drag it. With `adjust` (⇧ held) the drag changes the pattern at
+  /// the contour edge under the cursor: an open edge (a hem) is
+  /// lengthened, a seam is taken in or let out (at the nearer end when
+  /// grabbed near one). Otherwise the drag pulls the cloth. Returns
+  /// whether there is something to drag (then moves should call `pull`);
+  /// otherwise drags orbit as usual.
   bool press({
     required int view,
     required double x,
     required double y,
-    required bool lengthen,
+    required bool adjust,
   }) => RustLib.instance.api.crateApiEngineEnginePress(
     that: this,
     view: view,
     x: x,
     y: y,
-    lengthen: lengthen,
+    adjust: adjust,
   );
 
   /// Pointer moved to (`x`, `y`) after `press`: pull the cloth there (on
   /// the plane facing the camera through the grabbed point; the
-  /// simulation runs while it is held), or, with the Length tool, move
-  /// the edge by the vertical distance dragged (down = longer). Returns
-  /// the length change so far (mm) for the Length tool.
-  double? pull({required int view, required double x, required double y}) =>
-      RustLib.instance.api.crateApiEngineEnginePull(
-        that: this,
-        view: view,
-        x: x,
-        y: y,
-      );
+  /// simulation runs while it is held); with the Length tool, move the
+  /// edge by the vertical distance dragged (down = longer); with the Fit
+  /// tool, take the seam in by twice the distance dragged towards the
+  /// body (away lets it out). Returns the change so far (mm) for the
+  /// pattern tools.
+  PatternChange? pull({
+    required int view,
+    required double x,
+    required double y,
+  }) => RustLib.instance.api.crateApiEngineEnginePull(
+    that: this,
+    view: view,
+    x: x,
+    y: y,
+  );
 
   /// Pointer up: let go of the cloth.
   void release() =>
