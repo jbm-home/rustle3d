@@ -15,6 +15,7 @@
 use std::collections::HashMap;
 
 use glam::{Vec2, Vec3};
+use rayon::prelude::*;
 
 use crate::collide::StaticMesh;
 use crate::scene::SimScene;
@@ -264,35 +265,50 @@ impl Solver {
         }
     }
 
+    /// Contacts with the body and the ground. The most expensive part of a
+    /// substep (a closest-point search per particle), and independent per
+    /// particle: solved in parallel, with the same result for any number of
+    /// threads.
     fn collide(&mut self) {
-        for i in 0..self.x.len() {
-            if self.w[i] == 0.0 {
-                continue;
-            }
-            let thickness = self.thickness[i];
-            let mut contact_normal = None;
-            // A particle outside at the start of the substep can only be as
-            // deep as it moved: search that far, so fast motion (seams
-            // closing a tight waist) cannot tunnel through the body.
-            let reach = thickness + CONTACT_MARGIN + self.x[i].distance(self.prev[i]);
-            if let Some(body) = &self.collider
-                && let Some(c) = body.closest(self.x[i], reach)
-                && (self.x[i] - c.point).dot(c.normal) < thickness
-            {
-                self.x[i] = c.point + c.normal * thickness;
-                contact_normal = Some(c.normal);
-            }
-            if self.ground && self.x[i].y < thickness {
-                self.x[i].y = thickness;
-                contact_normal = Some(Vec3::Y);
-            }
-            if let Some(n) = contact_normal {
-                // Coulomb-like friction: remove part of the sliding motion.
-                let moved = self.x[i] - self.prev[i];
-                let tangential = moved - n * moved.dot(n);
-                self.x[i] -= tangential * self.friction[i];
-            }
-        }
+        let (w, thickness, friction) = (&self.w, &self.thickness, &self.friction);
+        let (collider, ground) = (self.collider.as_ref(), self.ground);
+        self.x
+            .par_iter_mut()
+            .zip(&self.prev)
+            .enumerate()
+            .with_min_len(64)
+            .for_each(|(i, (x, prev))| {
+                let (Some(w), Some(thickness), Some(friction)) =
+                    (w.get(i), thickness.get(i), friction.get(i))
+                else {
+                    return;
+                };
+                if *w == 0.0 {
+                    return;
+                }
+                let mut contact_normal = None;
+                // A particle outside at the start of the substep can only be
+                // as deep as it moved: search that far, so fast motion (seams
+                // closing a tight waist) cannot tunnel through the body.
+                let reach = thickness + CONTACT_MARGIN + x.distance(*prev);
+                if let Some(body) = collider
+                    && let Some(c) = body.closest(*x, reach)
+                    && (*x - c.point).dot(c.normal) < *thickness
+                {
+                    *x = c.point + c.normal * *thickness;
+                    contact_normal = Some(c.normal);
+                }
+                if ground && x.y < *thickness {
+                    x.y = *thickness;
+                    contact_normal = Some(Vec3::Y);
+                }
+                if let Some(n) = contact_normal {
+                    // Coulomb-like friction: remove part of the sliding motion.
+                    let moved = *x - *prev;
+                    let tangential = moved - n * moved.dot(n);
+                    *x -= tangential * *friction;
+                }
+            });
     }
 }
 

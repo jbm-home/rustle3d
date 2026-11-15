@@ -170,28 +170,32 @@ that flared pieces do not overlap before the seams close.
 
 ### Known issues
 
-- **Not yet real time for a whole garment.** At 30 substeps a step of the
-  three-piece skirt (1 700 particles) takes about 20 ms on one core, so the
-  simulation runs slightly slower than real time (late frames drop
-  simulated time). Next: rayon with graph colouring (§6). With damping set
-  to 0, kinetic + gravitational energy decreases steadily (checked at 15
-  and 60 substeps): the solver is stable; a sheet hung by two corners just
-  needs about ten seconds to come to rest.
+- **Real time with little headroom.** The three-piece skirt (1 700
+  particles, 30 substeps) steps in about 14 ms per 16.7 ms frame on an
+  Apple M-series laptop. Next speed-ups: the avatar SDF (§5, an O(1)
+  contact query instead of a triangle search), then fewer substeps once
+  convergence improves. With damping set to 0, kinetic + gravitational
+  energy decreases steadily: the solver is stable; a sheet hung by two
+  corners needs about ten seconds to come to rest.
 
 ## 6. Parallelism and determinism
 
-- Constraints are split into **independent sets by graph coloring** at
-  rebuild. Each color is solved in parallel with rayon (Gauss–Seidel across
-  colors, no write conflicts inside a color).
-- Contacts are solved Jacobi-style with averaged corrections, in a fixed
-  order.
-- **Deterministic mode** (tests, CLI `--deterministic`): fixed substeps, fixed
-  color order, no floating-point reductions whose order depends on thread
-  scheduling, and identical results for any thread count. Regression tests
-  compare positions against stored references with a tolerance.
-- Memory layout: struct-of-arrays (`Vec<Vec3>` for positions, predicted
+- **Contacts** (a closest-point search on the avatar per particle and per
+  substep, about 60 % of a step) are independent per particle and run in
+  parallel with rayon: one dispatch per substep, identical results for any
+  thread count (tested).
+- **Constraints** are solved serially (Gauss–Seidel, fixed order). Splitting
+  them into independent sets by graph colouring and solving each colour in
+  parallel was measured on the skirt (1 700 particles, 11 membrane + 20
+  hinge colours, 30 substeps): ≈ 1 000 parallel dispatches per frame of a
+  few tens of µs each made it twice slower than serial (45 vs 22 ms/frame).
+  It becomes worth revisiting for much larger meshes, or with one dispatch
+  per substep over a whole colour set (e.g. on the GPU).
+- **Deterministic**: fixed substeps and constraint order, no reductions
+  whose order depends on thread scheduling.
+- Memory layout: struct-of-arrays (`Vec<Vec3>` for positions, previous
   positions, velocities, inverse masses), constraints in flat arrays per
-  type, so that the inner loops can be auto-vectorized.
+  type.
 
 ## 7. Performance targets
 

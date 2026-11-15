@@ -36,6 +36,7 @@ r3d-mcp = { path = "crates/r3d-mcp" }
 assert_cmd = "2"
 bytemuck = { version = "1", features = ["derive"] }
 clap = { version = "4", features = ["derive"] }
+rayon = "1"
 glam = { version = "0.34", features = ["serde"] }
 pdf-writer = "0.15"
 png = "0.18"

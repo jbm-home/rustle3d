@@ -213,3 +213,20 @@ fn simulation_is_deterministic() {
     let b = run(make(), 0.5);
     assert_eq!(a.positions(), b.positions());
 }
+
+#[test]
+fn results_do_not_depend_on_the_thread_count() {
+    let make = || {
+        let mut scene = sheet(0.4, 0.4, 25, Vec2::Y, |r| Vec3::new(r.x, 0.6, r.y));
+        scene.collider = Some(sphere(Vec3::new(0.2, 0.4, 0.2), 0.15));
+        scene.ground = true;
+        scene
+    };
+    let one = rayon::ThreadPoolBuilder::new()
+        .num_threads(1)
+        .build()
+        .unwrap()
+        .install(|| run(make(), 0.5));
+    let many = run(make(), 0.5);
+    assert_eq!(one.positions(), many.positions());
+}
