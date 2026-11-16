@@ -18,12 +18,19 @@ fn run(s: &mut Session, v: Value) -> Value {
 fn drape(s: &Session, frames: u32) -> (f32, f32) {
     let form = Form::of_project(s.project()).unwrap().unwrap();
     let drape = build(s.project(), Some(&form), DEFAULT_SPACING_MM).unwrap();
+    let collider = drape.scene.collider.clone().unwrap();
     let mut solver = Solver::new(drape.scene);
     for _ in 0..frames {
         solver.step(1.0 / 60.0);
     }
     let p = solver.positions();
     assert!(p.iter().all(|v| v.is_finite()));
+    // No cloth inside the body.
+    let inside = p
+        .iter()
+        .filter(|q| collider.sample(**q).is_some_and(|c| c.distance < 0.0))
+        .count();
+    assert_eq!(inside, 0, "particles inside the body");
     let stats = solver.stats();
     assert!(stats.max_seam_gap < 0.005, "seams open: {stats:?}");
     let low = p.iter().map(|v| v.y).fold(f32::MAX, f32::min);
@@ -61,7 +68,8 @@ fn the_list_fills_sizes_from_the_avatar() {
     );
     let list = run(&mut s, json!({"type": "template.list"}));
     assert_eq!(list[0]["sizes"]["chest_cm"], 104.0);
-    assert_eq!(list[1]["sizes"]["waist_cm"], 90.0);
+    assert_eq!(list[1]["template"], "dress");
+    assert_eq!(list[2]["sizes"]["waist_cm"], 90.0);
 }
 
 #[test]
@@ -83,6 +91,17 @@ fn a_t_shirt_hangs_from_the_shoulders() {
     // to the shoulder tops), the hem above the knees.
     assert!(high > 1.35 && high < 1.50, "top at {high}");
     assert!(low > 0.7, "hem at {low}");
+}
+
+#[test]
+fn a_dress_hangs_from_the_shoulders() {
+    let s = draft("dress");
+    assert_eq!(s.project().panels().len(), 2);
+    assert_eq!(s.project().seams().len(), 6);
+    let (low, high) = drape(&s, 180);
+    eprintln!("dress: {low:.3}..{high:.3}");
+    assert!(high > 1.38 && high < 1.50, "top at {high}");
+    assert!(low > 0.45 && low < 0.7, "hem at {low}");
 }
 
 #[test]

@@ -1574,7 +1574,7 @@ Set the garment's colour as #RRGGBB, or clear it to use the fabric's usual colou
 
 ### `template.apply`
 
-Draft a starter garment (t_shirt, straight_skirt, a_line_skirt) from sizes in cm, the avatar's measurements filling in any left out: its pieces are drawn, sewn, placed around the body and given a fabric, ready to simulate and edit. A project without panels takes the template's name. Returns the panels, seams and notches.
+Draft a starter garment (t_shirt, dress, straight_skirt, a_line_skirt) from sizes in cm, the avatar's measurements filling in any left out: its pieces are drawn, sewn, placed around the body and given a fabric, ready to simulate and edit. A project without panels takes the template's name. Returns the panels, seams and notches.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -1653,6 +1653,11 @@ Draft a starter garment (t_shirt, straight_skirt, a_line_skirt) from sizes in cm
           "const": "t_shirt",
           "description": "A T-shirt: front, back and two short sleeves.",
           "type": "string"
+        },
+        {
+          "const": "dress",
+          "description": "A sleeveless dress: front and back from the neck to the knee,\nshaped at the waist, flared at the hem.",
+          "type": "string"
         }
       ]
     }
@@ -1668,7 +1673,7 @@ Draft a starter garment (t_shirt, straight_skirt, a_line_skirt) from sizes in cm
     },
     "template": {
       "$ref": "#/$defs/Template",
-      "description": "`t_shirt`, `straight_skirt` or `a_line_skirt`."
+      "description": "`t_shirt`, `dress`, `straight_skirt` or `a_line_skirt`."
     }
   },
   "required": [

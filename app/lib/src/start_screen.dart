@@ -23,6 +23,12 @@ const _templates = [
     Icons.checkroom_rounded,
   ),
   (
+    'dress',
+    'Dress',
+    'Sleeveless, gently shaped, knee length.',
+    Icons.dry_cleaning_rounded,
+  ),
+  (
     'straight_skirt',
     'Straight skirt',
     'Close over the hips, from the waist to the knee.',

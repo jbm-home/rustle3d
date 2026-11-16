@@ -97,11 +97,17 @@ impl BodyModel {
         };
         let base = model.positions(&BodyShape::default());
         model.landmarks = Landmarks::find(&base);
-        let apexes: Vec<Vec3> = model
-            .landmarks
+        // The nipples stand out on the feminine body: find them there (the
+        // topology is shared, so the same vertices are smoothed on every
+        // body).
+        let feminine = model.positions(&BodyShape {
+            masculinity: 0.0,
+            ..BodyShape::default()
+        });
+        let apexes: Vec<Vec3> = Landmarks::find(&feminine)
             .bust
             .iter()
-            .filter_map(|i| base.get(*i as usize).copied())
+            .filter_map(|i| feminine.get(*i as usize).copied())
             .collect();
         let mut neighbours = vec![Vec::new(); base.len()];
         for t in &model.pack.triangles {
@@ -116,7 +122,7 @@ impl BodyModel {
                 }
             }
         }
-        model.smoothed = base
+        model.smoothed = feminine
             .iter()
             .zip(neighbours)
             .enumerate()

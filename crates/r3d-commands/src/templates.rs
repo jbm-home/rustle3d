@@ -30,11 +30,15 @@ pub enum Template {
     ALineSkirt,
     /// A T-shirt: front, back and two short sleeves.
     TShirt,
+    /// A sleeveless dress: front and back from the neck to the knee,
+    /// shaped at the waist, flared at the hem.
+    Dress,
 }
 
 impl Template {
-    pub const ALL: [Template; 3] = [
+    pub const ALL: [Template; 4] = [
         Template::TShirt,
+        Template::Dress,
         Template::StraightSkirt,
         Template::ALineSkirt,
     ];
@@ -45,6 +49,7 @@ impl Template {
             Template::StraightSkirt => "straight_skirt",
             Template::ALineSkirt => "a_line_skirt",
             Template::TShirt => "t_shirt",
+            Template::Dress => "dress",
         }
     }
 
@@ -54,6 +59,7 @@ impl Template {
             Template::StraightSkirt => "Straight skirt",
             Template::ALineSkirt => "A-line skirt",
             Template::TShirt => "T-shirt",
+            Template::Dress => "Dress",
         }
     }
 
@@ -64,6 +70,7 @@ impl Template {
                 &["waist_cm", "hips_cm", "length_cm", "ease_cm"]
             }
             Template::TShirt => &["chest_cm", "length_cm", "sleeve_cm", "ease_cm"],
+            Template::Dress => &["chest_cm", "waist_cm", "hips_cm", "length_cm", "ease_cm"],
         }
     }
 }
@@ -105,7 +112,11 @@ const STANDARD: Body = Body {
 
 /// Garment proportions, as fractions of stature (general anthropometry
 /// for adults, in the base body's A pose).
-const NECK_HEIGHT: f64 = 0.83;
+const NECK_HEIGHT: f64 = 0.855;
+/// Tops start this much above the neck (cm): their shoulder seams then
+/// close over the shoulders and settle on them, instead of being pulled
+/// together through the shoulders and sliding off.
+const TOP_LIFT_CM: f64 = 4.0;
 const SHOULDER_HEIGHT: f64 = 0.80;
 const HIP_DEPTH: f64 = 0.115;
 
@@ -121,6 +132,7 @@ impl Sizes {
             Template::StraightSkirt => (0.33 * h, 2.0),
             Template::ALineSkirt => (0.36 * h, 2.0),
             Template::TShirt => (0.39 * h, 10.0),
+            Template::Dress => (0.55 * h, 8.0),
         };
         let all = Sizes {
             waist_cm: Some(self.waist_cm.unwrap_or(body.waist_cm)),
@@ -380,6 +392,7 @@ pub fn draft(
         Template::StraightSkirt => skirt(&mut d, &sizes, &body, 0.0)?,
         Template::ALineSkirt => skirt(&mut d, &sizes, &body, 0.2)?,
         Template::TShirt => t_shirt(&mut d, &sizes, &body)?,
+        Template::Dress => dress(&mut d, &sizes, &body)?,
     }
     let fabric = match template {
         Template::TShirt => Fabric::Jersey,
@@ -416,15 +429,13 @@ fn skirt(d: &mut Draft, s: &Sizes, body: &Body, flare: f64) -> Result<(), Comman
     let hip = p(b + flare * depth, len - depth);
     // Side seam, hem up to the waist: straight (or flared) to the hip line,
     // then curving in.
-    let side = |sign: f64| -> [DVec2; 2] {
-        let hem = p(sign * c, 0.0);
-        let hip = p(sign * hip.x, hip.y);
-        // Reaches the waist nearly upright, so the waistline stays a
-        // smooth ring where the panels meet.
-        [
-            hem.lerp(hip, 1.15),
-            p(sign * (a + 0.4 * (hip.x.abs() - a)), len - 0.3 * depth),
-        ]
+    let side = |sign: f64| {
+        side_curve(
+            p(sign * c, 0.0),
+            p(sign * hip.x, hip.y),
+            p(sign * a, len),
+            depth,
+        )
     };
     // The waist dips 8 mm at the centre, the hem stays straight.
     let waist_curve = |from: f64, to: f64| [p(from * 0.4, len - 8.0), p(to * 0.4, len - 8.0)];
@@ -472,6 +483,17 @@ fn skirt(d: &mut Draft, s: &Sizes, body: &Body, flare: f64) -> Result<(), Comman
     d.place(&back, Around::Body, 120.0, top)?;
     d.place(&right, Around::Body, 240.0, top)?;
     Ok(())
+}
+
+/// Control points of a side seam from the hem up to the waist: straight
+/// (or flared) up to the hip line, then curving in to reach the waist
+/// nearly upright, so the waistline stays a smooth ring where the panels
+/// meet. `depth` is the waist-to-hip distance (mm).
+fn side_curve(hem: DVec2, hip: DVec2, waist: DVec2, depth: f64) -> [DVec2; 2] {
+    [
+        hem.lerp(hip, 1.15),
+        p(waist.x + 0.4 * (hip.x - waist.x), waist.y - 0.3 * depth),
+    ]
 }
 
 fn reverse([c1, c2]: [DVec2; 2]) -> [DVec2; 2] {
@@ -578,9 +600,79 @@ fn t_shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
     d.sew(left.edge(1)?, left.edge(4)?)?;
     d.sew(right.edge(1)?, right.edge(4)?)?;
     let h = body.height_cm;
-    d.place(&front, Around::Body, 0.0, NECK_HEIGHT * h)?;
-    d.place(&back, Around::Body, 180.0, NECK_HEIGHT * h)?;
+    d.place(&front, Around::Body, 0.0, NECK_HEIGHT * h + TOP_LIFT_CM)?;
+    d.place(&back, Around::Body, 180.0, NECK_HEIGHT * h + TOP_LIFT_CM)?;
     d.place(&left, Around::LeftArm, 0.0, SHOULDER_HEIGHT * h)?;
     d.place(&right, Around::RightArm, 0.0, SHOULDER_HEIGHT * h)?;
+    Ok(())
+}
+
+/// A sleeveless dress: front and back whole, the T-shirt's neckline,
+/// shoulders and armholes, taken in at the waist, flared below the hips.
+fn dress(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
+    let chest = mm("chest_cm", s.chest_cm)?;
+    let waist = mm("waist_cm", s.waist_cm)?;
+    let hips = mm("hips_cm", s.hips_cm)?;
+    let len = mm("length_cm", s.length_cm)?;
+    let ease = s.ease_cm.unwrap_or_default() * 10.0;
+    let h = body.height_cm;
+    // Quarter widths: chest, waist (twice the ease: it hangs from the
+    // shoulders, gently shaped, not fitted), hips, hem.
+    let w = (chest + ease) / 4.0;
+    let a = (waist + 2.0 * ease) / 4.0;
+    let b = (hips + ease) / 4.0;
+    let shoulder = 0.21 * chest;
+    let neck = chest / 12.0;
+    let y_s = len - 40.0;
+    let y_a = len - (0.22 * chest + 20.0);
+    // Neck to waist on the body, then waist to hips.
+    let y_w = (len - (NECK_HEIGHT * h - waist_height_cm(d.tx.project())?) * 10.0).max(0.4 * len);
+    let depth = (HIP_DEPTH * h * 10.0).min(0.5 * y_w);
+    let flare = 0.12;
+    let c = b + flare * (y_w - depth);
+    let hip = p(b, y_w - depth);
+    let piece = |d: &mut Draft, name: &str, neck_depth: f64| {
+        let k = 4.0 / 3.0 * neck_depth;
+        let hole = |sign: f64| {
+            [
+                p(sign * (shoulder + 0.3 * (w - shoulder)), y_a),
+                p(sign * shoulder, y_a + 0.45 * (y_s - y_a)),
+            ]
+        };
+        let side = |sign: f64| {
+            side_curve(
+                p(sign * c, 0.0),
+                p(sign * hip.x, hip.y),
+                p(sign * a, y_w),
+                depth,
+            )
+        };
+        d.panel(
+            name,
+            &[
+                (p(-c, 0.0), None),
+                (p(c, 0.0), Some(side(1.0))),
+                (p(a, y_w), None),
+                (p(w, y_a), Some(hole(1.0))),
+                (p(shoulder, y_s), None),
+                (p(neck, len), Some([p(neck, len - k), p(-neck, len - k)])),
+                (p(-neck, len), None),
+                (p(-shoulder, y_s), Some(reverse(hole(-1.0)))),
+                (p(-w, y_a), None),
+                (p(-a, y_w), Some(reverse(side(-1.0)))),
+            ],
+        )
+    };
+    let front = piece(d, "Front", neck + 10.0)?;
+    let back = piece(d, "Back", 20.0)?;
+    // Edges: 0 hem, 1–2 right side (hips, waist to underarm), 3 right
+    // armhole, 4 right shoulder, 5 neckline, 6 left shoulder, 7 left
+    // armhole, 8–9 left side. The front's right is the body's left, the
+    // back's right the body's right.
+    for (f, b) in [(1, 9), (2, 8), (4, 6), (6, 4), (8, 2), (9, 1)] {
+        d.sew(front.edge(f)?, back.edge(b)?)?;
+    }
+    d.place(&front, Around::Body, 0.0, NECK_HEIGHT * h + TOP_LIFT_CM)?;
+    d.place(&back, Around::Body, 180.0, NECK_HEIGHT * h + TOP_LIFT_CM)?;
     Ok(())
 }

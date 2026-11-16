@@ -12,7 +12,7 @@ use crate::templates::{Sizes, Template, draft};
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct TemplateApply {
-    /// `t_shirt`, `straight_skirt` or `a_line_skirt`.
+    /// `t_shirt`, `dress`, `straight_skirt` or `a_line_skirt`.
     pub template: Template,
     /// Sizes in cm; any left out come from the avatar (see template.list).
     #[serde(default)]
@@ -20,7 +20,7 @@ pub struct TemplateApply {
 }
 
 impl Described for TemplateApply {
-    const SUMMARY: &'static str = "Draft a starter garment (t_shirt, straight_skirt, a_line_skirt) from sizes in cm, the avatar's measurements filling in any left out: its pieces are drawn, sewn, placed around the body and given a fabric, ready to simulate and edit. A project without panels takes the template's name. Returns the panels, seams and notches.";
+    const SUMMARY: &'static str = "Draft a starter garment (t_shirt, dress, straight_skirt, a_line_skirt) from sizes in cm, the avatar's measurements filling in any left out: its pieces are drawn, sewn, placed around the body and given a fabric, ready to simulate and edit. A project without panels takes the template's name. Returns the panels, seams and notches.";
 }
 
 impl CommandSpec for TemplateApply {
