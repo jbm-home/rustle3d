@@ -132,3 +132,12 @@ If `cargo` is not on `PATH`, run `source ~/.cargo/env` first.
   physics, specs, regenerate `docs/commands.md`), and provide a short demo
   script (CLI or MCP) that exercises the new feature.
 - Documentation and code are in English.
+- **User guide for the website**: `docs/user-guide.md` is the source of
+  the user documentation on rustle3d.com (plain words, for users, not
+  developers). Every user-visible change (tool, shortcut, menu, format,
+  limit) updates it in the same commit, and its "Last updated" line.
+- **End of a piece of work**: tell the user whether to go on in this
+  session or start a new one (a new one when the context is long or the
+  next task is unrelated). Before suggesting a new session, make sure
+  nothing would be lost: work committed and pushed, ROADMAP and docs up
+  to date, and anything worth remembering saved in memory.
