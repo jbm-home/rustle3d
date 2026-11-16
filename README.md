@@ -24,12 +24,31 @@ fully drivable by AI agents through an MCP server.
 
 ## Building
 
+The core is a Rust workspace; the desktop app is Flutter (`app/`) over it.
+
 ```sh
-cargo build
-cargo test
-cargo run -p r3d-app     # desktop app
-cargo run -p r3d-cli     # headless CLI
+cargo build && cargo test                  # core, CLI, MCP server
+cargo run -p r3d-cli -- --help             # headless CLI
+./scripts/check.sh                         # everything CI checks
+(cd app && flutter run -d macos)           # desktop app (or -d linux)
 ```
+
+Prerequisites: Rust stable (`rustup`), Flutter stable, and
+`cargo install flutter_rust_bridge_codegen --version 2.13.0` (to regenerate
+the Dart bindings). macOS needs Xcode.
+
+### Linux (and WSL2 on Windows)
+
+```sh
+sudo apt install build-essential clang cmake ninja-build pkg-config \
+  libgtk-3-dev mesa-vulkan-drivers libvulkan1
+(cd app && flutter run -d linux)
+```
+
+On Linux and Windows the views are rendered by the GPU and copied to the
+UI (shared textures are macOS-only for now). Under WSL2 the app runs
+through WSLg; the GPU is Mesa's Vulkan driver (or its software fallback),
+so expect lower frame rates than native.
 
 ## Documentation
 

@@ -29,7 +29,7 @@ the change log at the end. Sections marked **Open** are explicitly undecided.
 
 ```
                  ┌──────────┐   ┌──────────┐
-                 │ r3d-app  │   │ r3d-cli  │      front-ends (binaries)
+                 │ r3d-ffi  │   │ r3d-cli  │      front-ends (app bridge, CLI)
                  └──┬──┬──┬─┘   └─┬──┬──┬──┘
                     │  │  └───────┼──┼──┼───────┐
                     │  │   ┌──────┘  │  │       │
@@ -62,13 +62,13 @@ the change log at the end. Sections marked **Open** are explicitly undecided.
 | `r3d-render` | core, geom, `wgpu`, `image` | commands, GUI toolkit |
 | `r3d-mcp` | commands (render from M3), `rmcp`, `tokio` | GUI toolkit |
 | `r3d-cli` | commands, render, mcp, `clap` | GUI toolkit |
-| `r3d-app` | commands, render, mcp, GUI toolkit (open, see 7.1) | |
+| `r3d-ffi` | commands, render, avatar, `flutter_rust_bridge` (the Flutter app in `app/`, see 7.1) | |
 
 Changes to the split suggested in the brief:
 
 - **Added `r3d-render`.** The brief requires PNG renders of the 2D board and
   the 3D view for agents, from the CLI (headless) and the app. If rendering
-  lived in `r3d-app`, the CLI would have to depend on the whole GUI. A shared
+  lived in the app, the CLI would have to depend on the whole GUI. A shared
   renderer crate draws to the app viewports and to an offscreen
   texture in the CLI and MCP, with the same code and the same visuals.
 - **`r3d-sim` does not depend on `r3d-core`.** The solver works with a plain

@@ -10,7 +10,6 @@ members = [
     "crates/r3d-render",
     "crates/r3d-mcp",
     "crates/r3d-cli",
-    "crates/r3d-app",
     "crates/r3d-ffi",
     "xtask",
 ]

@@ -97,7 +97,6 @@ cargo test                                   # all tests
 cargo test -p r3d-core                       # one crate
 cargo clippy --all-targets -- -D warnings    # lints, as in CI
 cargo fmt --all                              # format
-cargo run -p r3d-app                         # desktop app (binary: rustle3d)
 cargo run -p r3d-cli -- --help               # headless CLI (binary: r3d)
 cargo xtask gen-docs                         # regenerate docs/commands.md (a test checks it)
 UPDATE_GOLDEN=1 cargo test -p r3d-core       # regenerate current-version golden files
@@ -124,7 +123,7 @@ If `cargo` is not on `PATH`, run `source ~/.cargo/env` first.
 | `r3d-render`   | wgpu renderers for the 2D board and 3D view, on-screen and offscreen |
 | `r3d-mcp`      | MCP server over the command layer (stdio or local socket)            |
 | `r3d-cli`      | `r3d` binary: scripts, simulate, export, render, `mcp`               |
-| `r3d-app`      | `rustle3d` binary: desktop app (GUI stack open, see architecture 7.1)  |
+| `r3d-ffi`      | Bridge for the Flutter desktop app (`app/`): engine, views, libraries |
 
 ## 5. Workflow
 
