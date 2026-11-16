@@ -623,5 +623,87 @@
   "errNotAProject": "This folder is not a Rustle3D project.",
   "errTooNew": "This project was made by a newer version of Rustle3D.",
   "errCorrupted": "This project file is damaged.",
-  "errAlreadyExists": "A project already exists there."
+  "errAlreadyExists": "A project already exists there.",
+  "photo": "Photo",
+  "photoTip": "Render a photorealistic image of the garment",
+  "photoTitle": "Render a photo",
+  "photoIntro": "A photorealistic image of the garment as the 3D view shows it now, in a photo studio.",
+  "photoQuality": "Quality",
+  "photoQuick": "Quick",
+  "photoQuickHint": "A first look in seconds",
+  "photoGood": "Good",
+  "photoGoodHint": "Clean enough to show",
+  "photoBest": "Best",
+  "photoBestHint": "For print and close-ups",
+  "photoLighting": "Lighting",
+  "lightStudio": "Studio",
+  "lightStudioHint": "Key, fill and rim lights on a light grey backdrop",
+  "lightSoft": "Soft",
+  "lightSoftHint": "Large soft lights on a white backdrop",
+  "lightDramatic": "Dramatic",
+  "lightDramaticHint": "One hard light on a dark backdrop",
+  "photoSize": "Size",
+  "photoSizeView": "As the 3D view",
+  "photoAdvanced": "Advanced",
+  "photoSamples": "Samples per pixel",
+  "photoBounces": "Light bounces",
+  "photoDenoise": "Remove noise",
+  "photoRender": "Render",
+  "photoRendering": "Rendering… {done} / {total} samples · {seconds} s",
+  "@photoRendering": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "seconds": {
+        "type": "String"
+      }
+    }
+  },
+  "photoDone": "Done in {seconds} s",
+  "@photoDone": {
+    "placeholders": {
+      "seconds": {
+        "type": "String"
+      }
+    }
+  },
+  "photoStopped": "Stopped at {done} samples",
+  "@photoStopped": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      }
+    }
+  },
+  "photoFailed": "The photo could not be rendered: {reason}",
+  "@photoFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "photoStop": "Stop",
+  "photoStopTip": "Stop refining and keep the image as it is",
+  "photoSave": "Save image…",
+  "photoClose": "Close",
+  "photoCloseTip": "Back to the live 3D view",
+  "photoSaved": "Saved {file}.",
+  "@photoSaved": {
+    "placeholders": {
+      "file": {
+        "type": "String"
+      }
+    }
+  },
+  "errPhotoTooLarge": "This image is too large. Choose a smaller size (at most 3840 × 2160).",
+  "errNoPhoto": "There is no photo to save.",
+  "learnPhoto": "Take a photo",
+  "learnPhotoHow": "A photorealistic image of the garment, to show a client or publish.",
+  "learnPhotoStop": "Photo",
+  "learnPhotoStopText": "Turn the 3D view to the angle you like, click the **camera** button, choose the quality and the lighting, then **Render**. The image gets cleaner in the 3D view; **Save image…** keeps it as a PNG file."
 }

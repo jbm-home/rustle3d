@@ -18,12 +18,14 @@ use crate::cloth::{
     Adjust, CORNER_PICK_PX, ClothHit, EDGE_PICK_MM, EDGE_PICK_PX, Held, Hit, PICK_PX, RESYNC_EVERY,
     SEAM_END, STROKE_STEP_MM, Sync, Tool, ray_triangle,
 };
+use crate::photo::{PhotoJob, Subject};
 use crate::sim::SimThread;
 use r3d_core::{Body, EdgeId, Fabric, Localizable, Message, PanelId, PointId};
 use r3d_render::board::BoardView;
+use r3d_render::photo::{Lighting, Quality, Settings, Surface};
 use r3d_render::theme::PIECE_COLORS;
 use r3d_render::{
-    BoardRenderer, BoardScene, Draw, Gpu, Material, Mesh, OrbitCamera, Target, Theme,
+    BoardRenderer, BoardScene, Draw, Gpu, ImageBlit, Material, Mesh, OrbitCamera, Target, Theme,
     ViewRenderer3d,
 };
 
@@ -102,6 +104,24 @@ fn offset_along(polyline: &[r3d_geom::DVec2], at: r3d_geom::DVec2) -> f64 {
         walked += len;
     }
     best.1
+}
+
+/// The cloth at `positions` (one per particle of `drape`): one mesh per
+/// piece, with normals.
+fn piece_meshes(drape: &Drape, positions: &[glam::Vec3]) -> Vec<(PanelId, Mesh)> {
+    drape
+        .pieces
+        .iter()
+        .filter_map(|piece| {
+            let mut mesh = Mesh {
+                positions: positions.get(piece.particles.clone())?.to_vec(),
+                normals: Vec::new(),
+                indices: piece.indices.clone(),
+            };
+            mesh.recompute_normals();
+            Some((piece.panel, mesh))
+        })
+        .collect()
 }
 
 /// Canvas colours as `0xAARRGGBB` (Flutter's `Color.toARGB32()`).
@@ -225,6 +245,8 @@ struct Graphics {
     theme: Theme,
     /// The fitted avatar mesh, for the body it was fitted to.
     avatar: Option<(Body, Mesh)>,
+    /// Draws the photo into the 3D view, made on first use.
+    blit: Option<ImageBlit>,
 }
 
 impl Graphics {
@@ -240,6 +262,7 @@ impl Graphics {
             camera: OrbitCamera::default(),
             theme: Theme::LIGHT,
             avatar: None,
+            blit: None,
         })
     }
 }
@@ -275,6 +298,50 @@ pub struct SimStatus {
     pub particles: u32,
     /// Largest opening of a seam (mm).
     pub max_seam_gap_mm: f64,
+}
+
+/// A photo to render (see `Engine::start_photo`).
+#[derive(Debug, Clone)]
+pub struct PhotoRequest {
+    /// `quick`, `good` or `best`.
+    pub quality: String,
+    /// `studio`, `soft` or `dramatic`.
+    pub lighting: String,
+    /// Image size in pixels; 0 takes the 3D view's size.
+    pub width: u32,
+    pub height: u32,
+    /// Samples per pixel and light bounces, instead of the quality's.
+    pub samples: Option<u32>,
+    pub bounces: Option<u32>,
+    pub denoise: bool,
+}
+
+/// How far a photo has come.
+#[derive(Debug, Clone)]
+pub struct PhotoStatus {
+    pub samples: u32,
+    pub total: u32,
+    pub width: u32,
+    pub height: u32,
+    /// No more samples will come: done, stopped or failed.
+    pub finished: bool,
+    pub seconds: f64,
+    /// Why it failed, if it did.
+    pub error: Option<String>,
+}
+
+impl From<crate::photo::Progress> for PhotoStatus {
+    fn from(p: crate::photo::Progress) -> Self {
+        Self {
+            samples: p.samples,
+            total: p.total,
+            width: p.width,
+            height: p.height,
+            finished: p.finished,
+            seconds: p.seconds,
+            error: p.error,
+        }
+    }
 }
 
 /// Whether AI agents can reach the open project (`r3d mcp --attach`).
@@ -318,6 +385,8 @@ pub struct Engine {
     held: Mutex<Option<Held>>,
     /// A line being drawn on the garment: its panel and pattern points (mm).
     stroke: Mutex<Option<(PanelId, Vec<r3d_geom::DVec2>)>>,
+    /// The photo shown in the 3D view instead of the live garment.
+    photo: Mutex<Option<PhotoJob>>,
 }
 
 fn poisoned() -> ApiError {
@@ -359,6 +428,7 @@ impl Engine {
             agents: Mutex::new(None),
             held: Mutex::new(None),
             stroke: Mutex::new(None),
+            photo: Mutex::new(None),
         })
     }
 
@@ -843,94 +913,16 @@ impl Engine {
                 g.board.render(&g.gpu, target, &scene, &board_view, &theme);
             }
             ViewKind::Garment => {
-                let body = project.avatar().map(|a| a.body);
-                if body != g.avatar.as_ref().map(|(b, _)| *b) {
-                    let form = self.form(project)?;
-                    g.avatar = form.as_ref().map(|(b, f)| {
-                        let mut mesh = Mesh {
-                            positions: f.positions.clone(),
-                            normals: Vec::new(),
-                            indices: f.triangles.iter().flatten().copied().collect(),
-                        };
-                        mesh.recompute_normals();
-                        (*b, mesh)
+                let photo = self.photo.lock().map_err(|_| poisoned())?;
+                if let Some(image) = photo.as_ref().and_then(PhotoJob::image) {
+                    let blit = g.blit.get_or_insert_with(|| {
+                        ImageBlit::new(&g.gpu, wgpu::TextureFormat::Bgra8Unorm)
                     });
+                    blit.draw(&g.gpu, target, &image, theme.sky_bottom);
+                } else {
+                    drop(photo);
+                    self.render_garment(g, project, &selected, view)?;
                 }
-                let garment = project
-                    .default_garment()
-                    .and_then(|id| project.garments().get(&id));
-                let fabric = Material::fabric(
-                    garment.map(|g| g.fabric).unwrap_or_default(),
-                    garment.and_then(|g| g.color.as_deref()),
-                );
-                let published = self
-                    .sim
-                    .lock()
-                    .map_err(|_| poisoned())?
-                    .as_ref()
-                    .map(SimThread::latest)
-                    .unwrap_or_default();
-                let cloth = self.cloth.lock().map_err(|_| poisoned())?;
-                let edge = *self.selected_edge.lock().map_err(|_| poisoned())?;
-                let (lines, edge_line) = cloth
-                    .as_ref()
-                    .map(|d| {
-                        let on = drape::LinesOnCloth::new(d, &published.positions);
-                        let lines: Vec<Mesh> = on
-                            .internal_lines(project)
-                            .iter()
-                            .map(|l| Mesh::ribbon(l, LINE_WIDTH_M, LINE_LIFT_M))
-                            .collect();
-                        let edge = edge
-                            .and_then(|e| on.edge(e))
-                            .map(|l| Mesh::ribbon(&l, EDGE_WIDTH_M, LINE_LIFT_M));
-                        (lines, edge)
-                    })
-                    .unwrap_or_default();
-                let pieces: Vec<(PanelId, Mesh)> = cloth
-                    .iter()
-                    .flat_map(|d| &d.pieces)
-                    .filter_map(|piece| {
-                        let positions = published.positions.get(piece.particles.clone())?;
-                        let mut mesh = Mesh {
-                            positions: positions.to_vec(),
-                            normals: Vec::new(),
-                            indices: piece.indices.clone(),
-                        };
-                        mesh.recompute_normals();
-                        Some((piece.panel, mesh))
-                    })
-                    .collect();
-                drop(cloth);
-                let mut draws = Vec::with_capacity(pieces.len() + 1);
-                if let Some((_, avatar)) = &g.avatar {
-                    draws.push(Draw {
-                        mesh: avatar,
-                        material: Material::mannequin(&theme),
-                    });
-                }
-                for (panel, mesh) in &pieces {
-                    let material = if selected.contains(panel) {
-                        fabric.tinted(theme.selection, 0.45)
-                    } else {
-                        fabric
-                    };
-                    draws.push(Draw { mesh, material });
-                }
-                let ink = |base: [f32; 4]| Material {
-                    base,
-                    sheen: base,
-                    sheen_amount: 0.0,
-                };
-                draws.extend(lines.iter().map(|mesh| Draw {
-                    mesh,
-                    material: ink(theme.panel_line),
-                }));
-                draws.extend(edge_line.iter().map(|mesh| Draw {
-                    mesh,
-                    material: ink(theme.selection),
-                }));
-                g.garment.render(&g.gpu, target, &g.camera, &draws, &theme);
             }
         }
         g.gpu
@@ -938,6 +930,260 @@ impl Engine {
             .poll(wgpu::PollType::wait_indefinitely())
             .map_err(|e| ApiError::new("gpu", e.to_string()))?;
         Ok(start.elapsed().as_secs_f64() * 1000.0)
+    }
+
+    /// The fitted avatar mesh for the project's measurements, refitted
+    /// when they change.
+    fn refresh_avatar(
+        &self,
+        g: &mut Graphics,
+        project: &r3d_core::Project,
+    ) -> Result<(), ApiError> {
+        let body = project.avatar().map(|a| a.body);
+        if body != g.avatar.as_ref().map(|(b, _)| *b) {
+            let form = self.form(project)?;
+            g.avatar = form.as_ref().map(|(b, f)| {
+                let mut mesh = Mesh {
+                    positions: f.positions.clone(),
+                    normals: Vec::new(),
+                    indices: f.triangles.iter().flatten().copied().collect(),
+                };
+                mesh.recompute_normals();
+                (*b, mesh)
+            });
+        }
+        Ok(())
+    }
+
+    /// Draw the live garment on the avatar into `view`.
+    fn render_garment(
+        &self,
+        g: &mut Graphics,
+        project: &r3d_core::Project,
+        selected: &[PanelId],
+        view: u32,
+    ) -> Result<(), ApiError> {
+        self.refresh_avatar(g, project)?;
+        let theme = g.theme;
+        let v = g
+            .views
+            .get(&view)
+            .ok_or_else(|| ApiError::new("no_view", format!("unknown view {view}")))?;
+        let target = Target {
+            view: &v.target,
+            width: v.width,
+            height: v.height,
+        };
+        let garment = project
+            .default_garment()
+            .and_then(|id| project.garments().get(&id));
+        let fabric = Material::fabric(
+            garment.map(|g| g.fabric).unwrap_or_default(),
+            garment.and_then(|g| g.color.as_deref()),
+        );
+        let published = self
+            .sim
+            .lock()
+            .map_err(|_| poisoned())?
+            .as_ref()
+            .map(SimThread::latest)
+            .unwrap_or_default();
+        let cloth = self.cloth.lock().map_err(|_| poisoned())?;
+        let edge = *self.selected_edge.lock().map_err(|_| poisoned())?;
+        let (lines, edge_line) = cloth
+            .as_ref()
+            .map(|d| {
+                let on = drape::LinesOnCloth::new(d, &published.positions);
+                let lines: Vec<Mesh> = on
+                    .internal_lines(project)
+                    .iter()
+                    .map(|l| Mesh::ribbon(l, LINE_WIDTH_M, LINE_LIFT_M))
+                    .collect();
+                let edge = edge
+                    .and_then(|e| on.edge(e))
+                    .map(|l| Mesh::ribbon(&l, EDGE_WIDTH_M, LINE_LIFT_M));
+                (lines, edge)
+            })
+            .unwrap_or_default();
+        let pieces = cloth
+            .as_ref()
+            .map(|d| piece_meshes(d, &published.positions))
+            .unwrap_or_default();
+        drop(cloth);
+        let mut draws = Vec::with_capacity(pieces.len() + 1);
+        if let Some((_, avatar)) = &g.avatar {
+            draws.push(Draw {
+                mesh: avatar,
+                material: Material::mannequin(&theme),
+            });
+        }
+        for (panel, mesh) in &pieces {
+            let material = if selected.contains(panel) {
+                fabric.tinted(theme.selection, 0.45)
+            } else {
+                fabric
+            };
+            draws.push(Draw { mesh, material });
+        }
+        let ink = |base: [f32; 4]| Material {
+            base,
+            sheen: base,
+            sheen_amount: 0.0,
+        };
+        draws.extend(lines.iter().map(|mesh| Draw {
+            mesh,
+            material: ink(theme.panel_line),
+        }));
+        draws.extend(edge_line.iter().map(|mesh| Draw {
+            mesh,
+            material: ink(theme.selection),
+        }));
+        g.garment.render(&g.gpu, target, &g.camera, &draws, &theme);
+        Ok(())
+    }
+
+    /// Start a photo of the garment as the 3D view shows it now (camera,
+    /// drape), replacing any other; the 3D view shows it while it
+    /// refines. A size of 0 takes the 3D view's size.
+    #[frb(sync)]
+    pub fn start_photo(&self, request: PhotoRequest) -> Result<PhotoStatus, ApiError> {
+        let malformed = |name: &str, detail: &str| {
+            ApiError::from(
+                Message::new("malformed", format!("malformed `{name}`: {detail}"))
+                    .arg("name", name)
+                    .arg("detail", detail),
+            )
+        };
+        let quality = Quality::from_name(&request.quality)
+            .ok_or_else(|| malformed("quality", "expected quick, good or best"))?;
+        let lighting = Lighting::from_name(&request.lighting)
+            .ok_or_else(|| malformed("lighting", "expected studio, soft or dramatic"))?;
+        let mut settings = Settings::new(quality, lighting);
+        if let Some(n) = request.samples {
+            settings.samples = n.clamp(1, r3d_render::photo::MAX_SAMPLES);
+        }
+        if let Some(n) = request.bounces {
+            settings.bounces = n.min(r3d_render::photo::MAX_BOUNCES);
+        }
+        settings.denoise = request.denoise;
+        // The previous photo goes first (its thread lets go of the GPU).
+        self.photo.lock().map_err(|_| poisoned())?.take();
+
+        let ws = self.workspace()?;
+        let project = ws.session().project();
+        let mut slot = self.graphics()?;
+        let g = slot
+            .as_mut()
+            .ok_or_else(|| ApiError::new("no_view", "no view attached"))?;
+        let (vw, vh) = g
+            .views
+            .values()
+            .filter(|v| v.kind == ViewKind::Garment)
+            .map(|v| (v.width, v.height))
+            .max_by_key(|(w, h)| u64::from(*w) * u64::from(*h))
+            .ok_or_else(|| ApiError::new("no_view", "no 3D view attached"))?;
+        let (width, height) = if request.width == 0 || request.height == 0 {
+            (vw, vh)
+        } else {
+            (request.width, request.height)
+        };
+        let pixels = u64::from(width) * u64::from(height);
+        if width > r3d_render::photo::MAX_SIDE
+            || height > r3d_render::photo::MAX_SIDE
+            || pixels > r3d_render::photo::MAX_PIXELS
+        {
+            return Err(ApiError::from(
+                Message::new(
+                    "photo_too_large",
+                    format!("a photo of {width} × {height} pixels is too large"),
+                )
+                .arg("width", width)
+                .arg("height", height),
+            ));
+        }
+        self.refresh_avatar(g, project)?;
+        let garment = project
+            .default_garment()
+            .and_then(|id| project.garments().get(&id));
+        let surface = Surface::fabric(
+            garment.map(|g| g.fabric).unwrap_or_default(),
+            garment.and_then(|g| g.color.as_deref()),
+        );
+        let published = self
+            .sim
+            .lock()
+            .map_err(|_| poisoned())?
+            .as_ref()
+            .map(SimThread::latest)
+            .unwrap_or_default();
+        let cloth = self
+            .cloth
+            .lock()
+            .map_err(|_| poisoned())?
+            .as_ref()
+            .map(|d| piece_meshes(d, &published.positions))
+            .unwrap_or_default();
+        let subject = Subject {
+            cloth: cloth.into_iter().map(|(_, m)| (m, surface)).collect(),
+            body: g.avatar.as_ref().map(|(_, m)| m.clone()),
+            camera: g.camera,
+        };
+        let job = PhotoJob::start(g.gpu.clone(), subject, settings, width, height)
+            .map_err(|e| ApiError::new("internal", e.to_string()))?;
+        let status = PhotoStatus::from(job.progress());
+        *self.photo.lock().map_err(|_| poisoned())? = Some(job);
+        Ok(status)
+    }
+
+    /// How the photo is coming along; `None` when the 3D view shows the
+    /// live garment.
+    #[frb(sync)]
+    pub fn photo_status(&self) -> Result<Option<PhotoStatus>, ApiError> {
+        let photo = self.photo.lock().map_err(|_| poisoned())?;
+        Ok(photo.as_ref().map(|j| PhotoStatus::from(j.progress())))
+    }
+
+    /// Stop refining the photo; it keeps the samples taken so far.
+    #[frb(sync)]
+    pub fn stop_photo(&self) -> Result<(), ApiError> {
+        if let Some(job) = self.photo.lock().map_err(|_| poisoned())?.as_ref() {
+            job.stop();
+        }
+        Ok(())
+    }
+
+    /// Put the photo away: the 3D view shows the live garment again.
+    #[frb(sync)]
+    pub fn close_photo(&self) -> Result<(), ApiError> {
+        self.photo.lock().map_err(|_| poisoned())?.take();
+        Ok(())
+    }
+
+    /// Save the photo as it is now as a PNG file at `path` (anywhere the
+    /// user chose).
+    pub fn save_photo(&self, path: String) -> Result<(), ApiError> {
+        let image = self
+            .photo
+            .lock()
+            .map_err(|_| poisoned())?
+            .as_ref()
+            .and_then(PhotoJob::image)
+            .ok_or_else(|| ApiError::new("no_photo", "there is no photo to save"))?;
+        let gpu = self
+            .graphics()?
+            .as_ref()
+            .map(|g| g.gpu.clone())
+            .ok_or_else(|| ApiError::new("no_view", "no view attached"))?;
+        let gpu_error = |e: r3d_render::RenderError| ApiError::new("gpu", e.to_string());
+        let pixels = r3d_render::offscreen::read_pixels(&gpu, &image).map_err(gpu_error)?;
+        let png = r3d_render::offscreen::encode_png(image.width(), image.height(), &pixels)
+            .map_err(gpu_error)?;
+        std::fs::write(&path, png).map_err(|e| {
+            ApiError::from(
+                Message::new("write_failed", format!("cannot write {path}: {e}"))
+                    .arg("path", &path),
+            )
+        })
     }
 
     /// A click at pixel (`x`, `y`) of a view. Updates the shared selection

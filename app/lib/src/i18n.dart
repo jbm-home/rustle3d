@@ -117,6 +117,8 @@ extension Messages on BuildContext {
       'file.too_new' || 'file.unsupported_version' => l.errTooNew,
       'file.corrupted' || 'file.json' => l.errCorrupted,
       'file.already_exists' => l.errAlreadyExists,
+      'photo_too_large' => l.errPhotoTooLarge,
+      'no_photo' => l.errNoPhoto,
       _ => e.text,
     };
   }

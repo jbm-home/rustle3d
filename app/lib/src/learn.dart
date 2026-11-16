@@ -24,6 +24,7 @@ enum Spot {
   body,
   sewTool,
   drawTool,
+  photo,
 }
 
 /// One coach mark of a card: where, a title, and how (`**bold**` marks
@@ -73,6 +74,9 @@ List<_Card> _cards(L l) => [
   _Card(Icons.threesixty_rounded, l.learnLook, l.learnLookHow, [
     (Spot.cameras, l.learnViews, l.learnViewsText),
     (Spot.garment, l.learnTurnZoom, l.learnTurnZoomText),
+  ]),
+  _Card(Icons.photo_camera_outlined, l.learnPhoto, l.learnPhotoHow, [
+    (Spot.photo, l.learnPhotoStop, l.learnPhotoStopText),
   ]),
   _Card(Icons.accessibility_new_rounded, l.learnBody, l.learnBodyHow, [
     (Spot.body, l.learnBodyStop, l.learnBodyStopText),

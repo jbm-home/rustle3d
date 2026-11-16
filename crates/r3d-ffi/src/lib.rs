@@ -7,6 +7,7 @@
 
 pub mod api;
 mod cloth;
+mod photo;
 mod sim;
 mod surface;
 

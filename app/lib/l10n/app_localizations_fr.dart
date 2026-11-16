@@ -1210,4 +1210,143 @@ class LFr extends L {
 
   @override
   String get errAlreadyExists => 'Un projet existe déjà à cet endroit.';
+
+  @override
+  String get photo => 'Photo';
+
+  @override
+  String get photoTip => 'Faire une image photoréaliste du vêtement';
+
+  @override
+  String get photoTitle => 'Faire une photo';
+
+  @override
+  String get photoIntro =>
+      'Une image photoréaliste du vêtement tel que la vue 3D le montre maintenant, dans un studio photo.';
+
+  @override
+  String get photoQuality => 'Qualité';
+
+  @override
+  String get photoQuick => 'Rapide';
+
+  @override
+  String get photoQuickHint => 'Un premier aperçu en quelques secondes';
+
+  @override
+  String get photoGood => 'Bonne';
+
+  @override
+  String get photoGoodHint => 'Assez nette pour être montrée';
+
+  @override
+  String get photoBest => 'Maximale';
+
+  @override
+  String get photoBestHint => 'Pour l\'impression et les gros plans';
+
+  @override
+  String get photoLighting => 'Éclairage';
+
+  @override
+  String get lightStudio => 'Studio';
+
+  @override
+  String get lightStudioHint =>
+      'Lumière principale, d\'appoint et de contre-jour sur fond gris clair';
+
+  @override
+  String get lightSoft => 'Doux';
+
+  @override
+  String get lightSoftHint => 'Grandes lumières douces sur fond blanc';
+
+  @override
+  String get lightDramatic => 'Contrasté';
+
+  @override
+  String get lightDramaticHint => 'Une lumière dure sur fond sombre';
+
+  @override
+  String get photoSize => 'Taille';
+
+  @override
+  String get photoSizeView => 'Comme la vue 3D';
+
+  @override
+  String get photoAdvanced => 'Avancé';
+
+  @override
+  String get photoSamples => 'Échantillons par pixel';
+
+  @override
+  String get photoBounces => 'Rebonds de lumière';
+
+  @override
+  String get photoDenoise => 'Retirer le bruit';
+
+  @override
+  String get photoRender => 'Lancer le rendu';
+
+  @override
+  String photoRendering(int done, int total, String seconds) {
+    return 'Rendu en cours… $done / $total échantillons · $seconds s';
+  }
+
+  @override
+  String photoDone(String seconds) {
+    return 'Terminé en $seconds s';
+  }
+
+  @override
+  String photoStopped(int done) {
+    return 'Arrêté à $done échantillons';
+  }
+
+  @override
+  String photoFailed(String reason) {
+    return 'La photo n\'a pas pu être rendue : $reason';
+  }
+
+  @override
+  String get photoStop => 'Arrêter';
+
+  @override
+  String get photoStopTip =>
+      'Arrêter d\'affiner et garder l\'image telle quelle';
+
+  @override
+  String get photoSave => 'Enregistrer l\'image…';
+
+  @override
+  String get photoClose => 'Fermer';
+
+  @override
+  String get photoCloseTip => 'Revenir à la vue 3D en direct';
+
+  @override
+  String photoSaved(String file) {
+    return '$file enregistré.';
+  }
+
+  @override
+  String get errPhotoTooLarge =>
+      'Cette image est trop grande. Choisissez une taille plus petite (3840 × 2160 au plus).';
+
+  @override
+  String get errNoPhoto => 'Il n\'y a pas de photo à enregistrer.';
+
+  @override
+  String get learnPhoto => 'Faire une photo';
+
+  @override
+  String get learnPhotoHow =>
+      'Une image photoréaliste du vêtement, à montrer à un client ou à publier.';
+
+  @override
+  String get learnPhotoStop => 'Photo';
+
+  @override
+  String get learnPhotoStopText =>
+      'Tournez la vue 3D sous l\'angle qui vous plaît, cliquez sur le bouton **appareil photo**, choisissez la qualité et l\'éclairage, puis **Lancer le rendu**. L\'image s\'affine dans la vue 3D ; **Enregistrer l\'image…** la garde en PNG.';
 }

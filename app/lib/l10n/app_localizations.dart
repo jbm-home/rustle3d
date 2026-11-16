@@ -2154,6 +2154,252 @@ abstract class L {
   /// In en, this message translates to:
   /// **'A project already exists there.'**
   String get errAlreadyExists;
+
+  /// No description provided for @photo.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo'**
+  String get photo;
+
+  /// No description provided for @photoTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Render a photorealistic image of the garment'**
+  String get photoTip;
+
+  /// No description provided for @photoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Render a photo'**
+  String get photoTitle;
+
+  /// No description provided for @photoIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'A photorealistic image of the garment as the 3D view shows it now, in a photo studio.'**
+  String get photoIntro;
+
+  /// No description provided for @photoQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'Quality'**
+  String get photoQuality;
+
+  /// No description provided for @photoQuick.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick'**
+  String get photoQuick;
+
+  /// No description provided for @photoQuickHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A first look in seconds'**
+  String get photoQuickHint;
+
+  /// No description provided for @photoGood.
+  ///
+  /// In en, this message translates to:
+  /// **'Good'**
+  String get photoGood;
+
+  /// No description provided for @photoGoodHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Clean enough to show'**
+  String get photoGoodHint;
+
+  /// No description provided for @photoBest.
+  ///
+  /// In en, this message translates to:
+  /// **'Best'**
+  String get photoBest;
+
+  /// No description provided for @photoBestHint.
+  ///
+  /// In en, this message translates to:
+  /// **'For print and close-ups'**
+  String get photoBestHint;
+
+  /// No description provided for @photoLighting.
+  ///
+  /// In en, this message translates to:
+  /// **'Lighting'**
+  String get photoLighting;
+
+  /// No description provided for @lightStudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Studio'**
+  String get lightStudio;
+
+  /// No description provided for @lightStudioHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Key, fill and rim lights on a light grey backdrop'**
+  String get lightStudioHint;
+
+  /// No description provided for @lightSoft.
+  ///
+  /// In en, this message translates to:
+  /// **'Soft'**
+  String get lightSoft;
+
+  /// No description provided for @lightSoftHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Large soft lights on a white backdrop'**
+  String get lightSoftHint;
+
+  /// No description provided for @lightDramatic.
+  ///
+  /// In en, this message translates to:
+  /// **'Dramatic'**
+  String get lightDramatic;
+
+  /// No description provided for @lightDramaticHint.
+  ///
+  /// In en, this message translates to:
+  /// **'One hard light on a dark backdrop'**
+  String get lightDramaticHint;
+
+  /// No description provided for @photoSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Size'**
+  String get photoSize;
+
+  /// No description provided for @photoSizeView.
+  ///
+  /// In en, this message translates to:
+  /// **'As the 3D view'**
+  String get photoSizeView;
+
+  /// No description provided for @photoAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced'**
+  String get photoAdvanced;
+
+  /// No description provided for @photoSamples.
+  ///
+  /// In en, this message translates to:
+  /// **'Samples per pixel'**
+  String get photoSamples;
+
+  /// No description provided for @photoBounces.
+  ///
+  /// In en, this message translates to:
+  /// **'Light bounces'**
+  String get photoBounces;
+
+  /// No description provided for @photoDenoise.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove noise'**
+  String get photoDenoise;
+
+  /// No description provided for @photoRender.
+  ///
+  /// In en, this message translates to:
+  /// **'Render'**
+  String get photoRender;
+
+  /// No description provided for @photoRendering.
+  ///
+  /// In en, this message translates to:
+  /// **'Rendering… {done} / {total} samples · {seconds} s'**
+  String photoRendering(int done, int total, String seconds);
+
+  /// No description provided for @photoDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done in {seconds} s'**
+  String photoDone(String seconds);
+
+  /// No description provided for @photoStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped at {done} samples'**
+  String photoStopped(int done);
+
+  /// No description provided for @photoFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The photo could not be rendered: {reason}'**
+  String photoFailed(String reason);
+
+  /// No description provided for @photoStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get photoStop;
+
+  /// No description provided for @photoStopTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop refining and keep the image as it is'**
+  String get photoStopTip;
+
+  /// No description provided for @photoSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save image…'**
+  String get photoSave;
+
+  /// No description provided for @photoClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get photoClose;
+
+  /// No description provided for @photoCloseTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the live 3D view'**
+  String get photoCloseTip;
+
+  /// No description provided for @photoSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved {file}.'**
+  String photoSaved(String file);
+
+  /// No description provided for @errPhotoTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'This image is too large. Choose a smaller size (at most 3840 × 2160).'**
+  String get errPhotoTooLarge;
+
+  /// No description provided for @errNoPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'There is no photo to save.'**
+  String get errNoPhoto;
+
+  /// No description provided for @learnPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Take a photo'**
+  String get learnPhoto;
+
+  /// No description provided for @learnPhotoHow.
+  ///
+  /// In en, this message translates to:
+  /// **'A photorealistic image of the garment, to show a client or publish.'**
+  String get learnPhotoHow;
+
+  /// No description provided for @learnPhotoStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo'**
+  String get learnPhotoStop;
+
+  /// No description provided for @learnPhotoStopText.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn the 3D view to the angle you like, click the **camera** button, choose the quality and the lighting, then **Render**. The image gets cleaner in the 3D view; **Save image…** keeps it as a PNG file.'**
+  String get learnPhotoStopText;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

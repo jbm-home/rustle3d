@@ -7,9 +7,9 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `adjust_by`, `cloth_hit`, `corner_at`, `edge_spot`, `edited`, `err`, `extend_stroke`, `forget_missing`, `form`, `frozen_board`, `graphics`, `new`, `new`, `offset_along`, `pick_cloth`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `resync_if_due`, `rgba`, `run_created`, `selected`, `sim`, `to_theme`, `workspace`
+// These functions are ignored because they are not marked as `pub`: `adjust_by`, `cloth_hit`, `corner_at`, `edge_spot`, `edited`, `err`, `extend_stroke`, `forget_missing`, `form`, `frozen_board`, `graphics`, `new`, `new`, `offset_along`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `resync_if_due`, `rgba`, `run_created`, `selected`, `sim`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Engine>>
 abstract class Engine implements RustOpaqueInterface {
@@ -64,6 +64,9 @@ abstract class Engine implements RustOpaqueInterface {
     required bool extend,
   });
 
+  /// Put the photo away: the 3D view shows the live garment again.
+  void closePhoto();
+
   /// Stop rendering into a view (its UI texture is about to go away).
   void detachView({required int view});
 
@@ -104,6 +107,10 @@ abstract class Engine implements RustOpaqueInterface {
   /// Open the project folder at `path`, creating it if it does not exist.
   static Engine open({required String path}) =>
       RustLib.instance.api.crateApiEngineEngineOpen(path: path);
+
+  /// How the photo is coming along; `None` when the 3D view shows the
+  /// live garment.
+  PhotoStatus? photoStatus();
 
   /// Pick the edge within `max_mm` of pattern point (`x_mm`, `y_mm`), as
   /// a click on it would (its piece selected). Returns the edge.
@@ -175,6 +182,10 @@ abstract class Engine implements RustOpaqueInterface {
   /// garment first.
   SimStatus runSimulation({required bool running});
 
+  /// Save the photo as it is now as a PNG file at `path` (anywhere the
+  /// user chose).
+  Future<void> savePhoto({required String path});
+
   /// Replace the shared selection with these panel ids; unknown ids are
   /// ignored. Returns the resulting selection.
   List<String> select({required List<String> panels});
@@ -195,6 +206,14 @@ abstract class Engine implements RustOpaqueInterface {
 
   /// The latest simulation state.
   SimStatus simulationStatus();
+
+  /// Start a photo of the garment as the 3D view shows it now (camera,
+  /// drape), replacing any other; the 3D view shows it while it
+  /// refines. A size of 0 takes the 3D view's size.
+  PhotoStatus startPhoto({required PhotoRequest request});
+
+  /// Stop refining the photo; it keeps the samples taken so far.
+  void stopPhoto();
 
   /// Finish the line: it becomes an internal line on the pattern
   /// (`internal_line.add`; a style line, a pocket placement…), on the
@@ -417,6 +436,105 @@ class PatternChange {
           runtimeType == other.runtimeType &&
           kind == other.kind &&
           mm == other.mm;
+}
+
+/// A photo to render (see `Engine::start_photo`).
+class PhotoRequest {
+  /// `quick`, `good` or `best`.
+  final String quality;
+
+  /// `studio`, `soft` or `dramatic`.
+  final String lighting;
+
+  /// Image size in pixels; 0 takes the 3D view's size.
+  final int width;
+  final int height;
+
+  /// Samples per pixel and light bounces, instead of the quality's.
+  final int? samples;
+  final int? bounces;
+  final bool denoise;
+
+  const PhotoRequest({
+    required this.quality,
+    required this.lighting,
+    required this.width,
+    required this.height,
+    this.samples,
+    this.bounces,
+    required this.denoise,
+  });
+
+  @override
+  int get hashCode =>
+      quality.hashCode ^
+      lighting.hashCode ^
+      width.hashCode ^
+      height.hashCode ^
+      samples.hashCode ^
+      bounces.hashCode ^
+      denoise.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PhotoRequest &&
+          runtimeType == other.runtimeType &&
+          quality == other.quality &&
+          lighting == other.lighting &&
+          width == other.width &&
+          height == other.height &&
+          samples == other.samples &&
+          bounces == other.bounces &&
+          denoise == other.denoise;
+}
+
+/// How far a photo has come.
+class PhotoStatus {
+  final int samples;
+  final int total;
+  final int width;
+  final int height;
+
+  /// No more samples will come: done, stopped or failed.
+  final bool finished;
+  final double seconds;
+
+  /// Why it failed, if it did.
+  final String? error;
+
+  const PhotoStatus({
+    required this.samples,
+    required this.total,
+    required this.width,
+    required this.height,
+    required this.finished,
+    required this.seconds,
+    this.error,
+  });
+
+  @override
+  int get hashCode =>
+      samples.hashCode ^
+      total.hashCode ^
+      width.hashCode ^
+      height.hashCode ^
+      finished.hashCode ^
+      seconds.hashCode ^
+      error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PhotoStatus &&
+          runtimeType == other.runtimeType &&
+          samples == other.samples &&
+          total == other.total &&
+          width == other.width &&
+          height == other.height &&
+          finished == other.finished &&
+          seconds == other.seconds &&
+          error == other.error;
 }
 
 /// A corner picked on the board, and where it is (mm).

@@ -1196,4 +1196,142 @@ class LEn extends L {
 
   @override
   String get errAlreadyExists => 'A project already exists there.';
+
+  @override
+  String get photo => 'Photo';
+
+  @override
+  String get photoTip => 'Render a photorealistic image of the garment';
+
+  @override
+  String get photoTitle => 'Render a photo';
+
+  @override
+  String get photoIntro =>
+      'A photorealistic image of the garment as the 3D view shows it now, in a photo studio.';
+
+  @override
+  String get photoQuality => 'Quality';
+
+  @override
+  String get photoQuick => 'Quick';
+
+  @override
+  String get photoQuickHint => 'A first look in seconds';
+
+  @override
+  String get photoGood => 'Good';
+
+  @override
+  String get photoGoodHint => 'Clean enough to show';
+
+  @override
+  String get photoBest => 'Best';
+
+  @override
+  String get photoBestHint => 'For print and close-ups';
+
+  @override
+  String get photoLighting => 'Lighting';
+
+  @override
+  String get lightStudio => 'Studio';
+
+  @override
+  String get lightStudioHint =>
+      'Key, fill and rim lights on a light grey backdrop';
+
+  @override
+  String get lightSoft => 'Soft';
+
+  @override
+  String get lightSoftHint => 'Large soft lights on a white backdrop';
+
+  @override
+  String get lightDramatic => 'Dramatic';
+
+  @override
+  String get lightDramaticHint => 'One hard light on a dark backdrop';
+
+  @override
+  String get photoSize => 'Size';
+
+  @override
+  String get photoSizeView => 'As the 3D view';
+
+  @override
+  String get photoAdvanced => 'Advanced';
+
+  @override
+  String get photoSamples => 'Samples per pixel';
+
+  @override
+  String get photoBounces => 'Light bounces';
+
+  @override
+  String get photoDenoise => 'Remove noise';
+
+  @override
+  String get photoRender => 'Render';
+
+  @override
+  String photoRendering(int done, int total, String seconds) {
+    return 'Rendering… $done / $total samples · $seconds s';
+  }
+
+  @override
+  String photoDone(String seconds) {
+    return 'Done in $seconds s';
+  }
+
+  @override
+  String photoStopped(int done) {
+    return 'Stopped at $done samples';
+  }
+
+  @override
+  String photoFailed(String reason) {
+    return 'The photo could not be rendered: $reason';
+  }
+
+  @override
+  String get photoStop => 'Stop';
+
+  @override
+  String get photoStopTip => 'Stop refining and keep the image as it is';
+
+  @override
+  String get photoSave => 'Save image…';
+
+  @override
+  String get photoClose => 'Close';
+
+  @override
+  String get photoCloseTip => 'Back to the live 3D view';
+
+  @override
+  String photoSaved(String file) {
+    return 'Saved $file.';
+  }
+
+  @override
+  String get errPhotoTooLarge =>
+      'This image is too large. Choose a smaller size (at most 3840 × 2160).';
+
+  @override
+  String get errNoPhoto => 'There is no photo to save.';
+
+  @override
+  String get learnPhoto => 'Take a photo';
+
+  @override
+  String get learnPhotoHow =>
+      'A photorealistic image of the garment, to show a client or publish.';
+
+  @override
+  String get learnPhotoStop => 'Photo';
+
+  @override
+  String get learnPhotoStopText =>
+      'Turn the 3D view to the angle you like, click the **camera** button, choose the quality and the lighting, then **Render**. The image gets cleaner in the 3D view; **Save image…** keeps it as a PNG file.';
 }

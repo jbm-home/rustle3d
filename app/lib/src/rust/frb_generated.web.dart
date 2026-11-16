@@ -69,6 +69,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PatternChange dco_decode_box_autoadd_pattern_change(dynamic raw);
 
   @protected
+  PhotoRequest dco_decode_box_autoadd_photo_request(dynamic raw);
+
+  @protected
+  PhotoStatus dco_decode_box_autoadd_photo_status(dynamic raw);
+
+  @protected
+  int dco_decode_box_autoadd_u_32(dynamic raw);
+
+  @protected
   BigInt dco_decode_box_autoadd_u_64(dynamic raw);
 
   @protected
@@ -120,6 +129,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PatternChange? dco_decode_opt_box_autoadd_pattern_change(dynamic raw);
 
   @protected
+  PhotoStatus? dco_decode_opt_box_autoadd_photo_status(dynamic raw);
+
+  @protected
+  int? dco_decode_opt_box_autoadd_u_32(dynamic raw);
+
+  @protected
   BigInt? dco_decode_opt_box_autoadd_u_64(dynamic raw);
 
   @protected
@@ -127,6 +142,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PatternChange dco_decode_pattern_change(dynamic raw);
+
+  @protected
+  PhotoRequest dco_decode_photo_request(dynamic raw);
+
+  @protected
+  PhotoStatus dco_decode_photo_status(dynamic raw);
 
   @protected
   PickedPoint dco_decode_picked_point(dynamic raw);
@@ -201,6 +222,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  PhotoRequest sse_decode_box_autoadd_photo_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PhotoStatus sse_decode_box_autoadd_photo_status(SseDeserializer deserializer);
+
+  @protected
+  int sse_decode_box_autoadd_u_32(SseDeserializer deserializer);
+
+  @protected
   BigInt sse_decode_box_autoadd_u_64(SseDeserializer deserializer);
 
   @protected
@@ -258,6 +290,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  PhotoStatus? sse_decode_opt_box_autoadd_photo_status(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  int? sse_decode_opt_box_autoadd_u_32(SseDeserializer deserializer);
+
+  @protected
   BigInt? sse_decode_opt_box_autoadd_u_64(SseDeserializer deserializer);
 
   @protected
@@ -267,6 +307,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PatternChange sse_decode_pattern_change(SseDeserializer deserializer);
+
+  @protected
+  PhotoRequest sse_decode_photo_request(SseDeserializer deserializer);
+
+  @protected
+  PhotoStatus sse_decode_photo_status(SseDeserializer deserializer);
 
   @protected
   PickedPoint sse_decode_picked_point(SseDeserializer deserializer);
@@ -349,6 +395,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_photo_request(
+    PhotoRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_photo_status(
+    PhotoStatus self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_u_32(int self, SseSerializer serializer);
+
+  @protected
   void sse_encode_box_autoadd_u_64(BigInt self, SseSerializer serializer);
 
   @protected
@@ -421,6 +482,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_photo_status(
+    PhotoStatus? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_u_32(int? self, SseSerializer serializer);
+
+  @protected
   void sse_encode_opt_box_autoadd_u_64(BigInt? self, SseSerializer serializer);
 
   @protected
@@ -431,6 +501,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_pattern_change(PatternChange self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_photo_request(PhotoRequest self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_photo_status(PhotoStatus self, SseSerializer serializer);
 
   @protected
   void sse_encode_picked_point(PickedPoint self, SseSerializer serializer);

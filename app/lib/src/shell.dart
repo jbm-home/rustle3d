@@ -12,6 +12,7 @@ import 'design/tokens.dart';
 import 'guide.dart';
 import 'i18n.dart';
 import 'learn.dart';
+import 'photo.dart';
 import 'tour.dart';
 import 'rust/api/engine.dart';
 import 'start_screen.dart' show Logo;
@@ -62,6 +63,12 @@ class _ShellState extends State<Shell> {
   int _frames = 0;
   double _fps = 0;
   SimStatus? _sim;
+
+  /// The photo shown in the 3D view (while it refines, and after).
+  PhotoStatus? _photo;
+
+  /// How the last photo was asked for.
+  PhotoChoice _photoChoice = const PhotoChoice();
   final _clock = Stopwatch()..start();
 
   /// AI agents: whether they may connect, and the changes they made (the
@@ -119,6 +126,7 @@ class _ShellState extends State<Shell> {
   // What Learn cards point at, besides the tour's areas.
   final _spotInspector = GlobalKey();
   final _spotSimulate = GlobalKey();
+  final _spotPhoto = GlobalKey();
   final _spotCameras = GlobalKey();
   final _spotBody = GlobalKey();
   final _spotTools = {'sew': GlobalKey(), 'draw': GlobalKey()};
@@ -155,6 +163,7 @@ class _ShellState extends State<Shell> {
             Spot.body => _spotBody,
             Spot.sewTool => _spotTools['sew']!,
             Spot.drawTool => _spotTools['draw']!,
+            Spot.photo => _spotPhoto,
           },
           title,
           text,
@@ -222,6 +231,16 @@ class _ShellState extends State<Shell> {
     }
     _garmentMs = _garmentMs * 0.9 + ms * 0.1;
     _frames++;
+    final photo = _photo;
+    if (photo != null && !photo.finished) {
+      final now = _guard(widget.engine.photoStatus);
+      if (now != null &&
+          (now.samples != photo.samples ||
+              now.finished ||
+              (now.seconds - photo.seconds).abs() >= 1)) {
+        setState(() => _photo = now);
+      }
+    }
     // An agent's change: show it at once.
     final changes = _guard(widget.engine.agentChanges);
     if (changes != null && changes != _agentChanges) {
@@ -262,6 +281,44 @@ class _ShellState extends State<Shell> {
         _sim = _guard(() => widget.engine.runSimulation(running: true));
       }
     });
+  }
+
+  /// Ask how to render a photo, then show it refining in the 3D view.
+  Future<void> _askPhoto() async {
+    final choice = await askPhoto(context, _photoChoice);
+    if (choice == null || !mounted) return;
+    _photoChoice = choice;
+    final status = _guard(
+      () => widget.engine.startPhoto(request: choice.request),
+    );
+    if (status != null) setState(() => _photo = status);
+  }
+
+  void _stopPhoto() => _guard(widget.engine.stopPhoto);
+
+  void _closePhoto() {
+    _guard(widget.engine.closePhoto);
+    setState(() => _photo = null);
+  }
+
+  /// Ask where to save the photo as it is now, and save it there (PNG).
+  Future<void> _savePhoto() async {
+    final l = context.l;
+    final name = (_summary['name'] as String?) ?? 'Rustle3D';
+    final location = await getSaveLocation(
+      suggestedName: '$name.png',
+      acceptedTypeGroups: [
+        const XTypeGroup(label: 'PNG', extensions: ['png']),
+      ],
+    );
+    if (location == null || !mounted) return;
+    try {
+      await widget.engine.savePhoto(path: location.path);
+      if (!mounted) return;
+      _toast(l.photoSaved(location.path.split(RegExp(r'[/\\]')).last));
+    } on ApiError catch (e) {
+      if (mounted) _toast(context.error(e));
+    }
   }
 
   /// The running drape follows the new fabric (the engine carries edits
@@ -966,21 +1023,46 @@ class _ShellState extends State<Shell> {
                       Expanded(
                         child: _ViewCard(
                           key: _tourGarment,
-                          title: '3D',
-                          icon: Icons.view_in_ar_outlined,
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _CameraBar(key: _spotCameras, onLook: _look),
-                              const SizedBox(width: Space.s),
-                              _SimControls(
-                                key: _spotSimulate,
-                                status: _sim,
-                                onRun: _setRunning,
-                                onRestart: _restart,
-                              ),
-                            ],
-                          ),
+                          title: _photo == null ? '3D' : l.photo,
+                          icon: _photo == null
+                              ? Icons.view_in_ar_outlined
+                              : Icons.photo_camera_outlined,
+                          trailing: _photo != null
+                              ? null
+                              : Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    _CameraBar(
+                                      key: _spotCameras,
+                                      onLook: _look,
+                                    ),
+                                    const SizedBox(width: Space.s),
+                                    _SimControls(
+                                      key: _spotSimulate,
+                                      status: _sim,
+                                      onRun: _setRunning,
+                                      onRestart: _restart,
+                                    ),
+                                    const SizedBox(width: Space.s),
+                                    _Pill(
+                                      key: _spotPhoto,
+                                      child: _IconAction(
+                                        key: const ValueKey('photoButton'),
+                                        icon: Icons.photo_camera_outlined,
+                                        tip: l.photoTip,
+                                        onTap: _askPhoto,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                          overlay: _photo == null
+                              ? null
+                              : PhotoBar(
+                                  status: _photo!,
+                                  onStop: _stopPhoto,
+                                  onSave: _savePhoto,
+                                  onClose: _closePhoto,
+                                ),
                           child: RustView(
                             engine: widget.engine,
                             kind: ViewKind.garment,
@@ -1347,6 +1429,7 @@ class _StepChip extends StatelessWidget {
 
 class _IconAction extends StatelessWidget {
   const _IconAction({
+    super.key,
     required this.icon,
     required this.tip,
     required this.onTap,
@@ -1699,12 +1782,16 @@ class _ViewCard extends StatelessWidget {
     required this.icon,
     required this.child,
     this.trailing,
+    this.overlay,
   });
 
   final String title;
   final IconData icon;
   final Widget child;
   final Widget? trailing;
+
+  /// Shown along the bottom; while it is, the view takes no input.
+  final Widget? overlay;
 
   @override
   Widget build(BuildContext context) {
@@ -1725,7 +1812,16 @@ class _ViewCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
-          Positioned.fill(child: child),
+          Positioned.fill(
+            child: AbsorbPointer(absorbing: overlay != null, child: child),
+          ),
+          if (overlay != null)
+            Positioned(
+              left: Space.m,
+              right: Space.m,
+              bottom: Space.m,
+              child: overlay!,
+            ),
           Positioned(
             left: Space.m,
             top: Space.m,
@@ -2518,6 +2614,27 @@ class _StatusBar extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// A rounded, translucent holder for buttons over a view.
+class _Pill extends StatelessWidget {
+  const _Pill({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: p.surface.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: p.border),
+      ),
+      child: child,
     );
   }
 }
