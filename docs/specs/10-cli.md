@@ -26,7 +26,10 @@ nothing is written. Scripts can refer to earlier results
 - `r3d render <project> --view board|3d --out file.png [--size WxH]`: the
   3D view shows the cached drape when it matches the document, otherwise
   the starting positions; the JSON output says which (`"drape"`).
-- `r3d mcp [--project path] [--attach]`: MCP server (see 09).
+- `r3d mcp --project path`: MCP server over a folder; `r3d mcp --attach
+  [--endpoint file]`: relay to the project open in the app (see 09).
+- `r3d export --format svg|pdf|glb|obj [--avatar]`: the pattern, or the
+  draped garment (see 15).
 - `r3d schema [command]`: print JSON schemas.
 - Output is machine-readable JSON by default when piped. Exit codes: 0 ok,
   1 user error, 2 internal error.

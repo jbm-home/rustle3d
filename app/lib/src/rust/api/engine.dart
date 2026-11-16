@@ -7,12 +7,23 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `adjust_by`, `cloth_hit`, `edited`, `err`, `extend_stroke`, `form`, `graphics`, `new`, `new`, `pick_cloth`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `resync_if_due`, `rgba`, `selected`, `sim`, `to_theme`, `workspace`
+// These functions are ignored because they are not marked as `pub`: `adjust_by`, `cloth_hit`, `edited`, `err`, `extend_stroke`, `forget_missing`, `form`, `graphics`, `new`, `new`, `pick_cloth`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `resync_if_due`, `rgba`, `selected`, `sim`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Engine>>
 abstract class Engine implements RustOpaqueInterface {
+  /// How many changes agents have made: the UI refreshes when it moves.
+  /// Cheap while nothing changed (asked every frame; the project is only
+  /// locked after a change, as an agent may hold it for a while).
+  BigInt agentChanges();
+
+  AgentStatus agentStatus();
+
+  /// Let AI agents reach this project (`r3d mcp --attach`), writing the
+  /// endpoint into `library_dir`; or stop, disconnecting any agent.
+  void allowAgents({required String libraryDir, required bool allow});
+
   /// Attach a view rendering into a UI texture (`surface`: platform handle
   /// from the UI side, an `IOSurfaceRef` pointer on macOS), or without
   /// one into a texture of its own, read back with `read_view`. Returns
@@ -30,6 +41,9 @@ abstract class Engine implements RustOpaqueInterface {
 
   /// Stop rendering into a view (its UI texture is about to go away).
   void detachView({required int view});
+
+  /// Close the connected agent's session; agents stay allowed.
+  void disconnectAgent();
 
   /// A drag of (`dx`, `dy`) pixels: orbit the 3D camera, pan the board.
   void drag({required int view, required double dx, required double dy});
@@ -162,6 +176,18 @@ abstract class Engine implements RustOpaqueInterface {
     required double y,
     required double amount,
   });
+}
+
+/// Whether AI agents can reach the open project (`r3d mcp --attach`).
+enum AgentStatus {
+  /// Not allowed: nothing listens.
+  off,
+
+  /// Allowed; no agent connected.
+  waiting,
+
+  /// An agent is connected.
+  connected,
 }
 
 /// A structured, translatable error (see `docs/architecture.md` §7.7).

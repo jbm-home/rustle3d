@@ -308,6 +308,27 @@ class LEn extends L {
   String get export => 'Export';
 
   @override
+  String get agents => 'Agents';
+
+  @override
+  String get agentsWaiting => 'Agents: waiting';
+
+  @override
+  String get agentConnected => 'Agent connected';
+
+  @override
+  String get agentsTip => 'AI agents: let one edit this project live';
+
+  @override
+  String get allowAgents => 'Allow AI agents';
+
+  @override
+  String get agentsHow => 'An agent connects with: r3d mcp --attach';
+
+  @override
+  String get disconnectAgent => 'Disconnect the agent';
+
+  @override
   String get exportSvg => 'Pattern, SVG at 1:1';
 
   @override

@@ -625,6 +625,48 @@ abstract class L {
   /// **'Export'**
   String get export;
 
+  /// No description provided for @agents.
+  ///
+  /// In en, this message translates to:
+  /// **'Agents'**
+  String get agents;
+
+  /// No description provided for @agentsWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Agents: waiting'**
+  String get agentsWaiting;
+
+  /// No description provided for @agentConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent connected'**
+  String get agentConnected;
+
+  /// No description provided for @agentsTip.
+  ///
+  /// In en, this message translates to:
+  /// **'AI agents: let one edit this project live'**
+  String get agentsTip;
+
+  /// No description provided for @allowAgents.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow AI agents'**
+  String get allowAgents;
+
+  /// No description provided for @agentsHow.
+  ///
+  /// In en, this message translates to:
+  /// **'An agent connects with: r3d mcp --attach'**
+  String get agentsHow;
+
+  /// No description provided for @disconnectAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect the agent'**
+  String get disconnectAgent;
+
   /// No description provided for @exportSvg.
   ///
   /// In en, this message translates to:

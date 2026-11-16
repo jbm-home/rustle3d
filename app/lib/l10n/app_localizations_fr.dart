@@ -311,6 +311,28 @@ class LFr extends L {
   String get export => 'Exporter';
 
   @override
+  String get agents => 'Agents';
+
+  @override
+  String get agentsWaiting => 'Agents : en attente';
+
+  @override
+  String get agentConnected => 'Agent connecté';
+
+  @override
+  String get agentsTip =>
+      'Agents IA : laisser un agent modifier ce projet en direct';
+
+  @override
+  String get allowAgents => 'Autoriser les agents IA';
+
+  @override
+  String get agentsHow => 'Un agent se connecte avec : r3d mcp --attach';
+
+  @override
+  String get disconnectAgent => 'Déconnecter l’agent';
+
+  @override
   String get exportSvg => 'Patron, SVG à l’échelle 1';
 
   @override

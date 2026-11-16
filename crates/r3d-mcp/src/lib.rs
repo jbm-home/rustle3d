@@ -7,13 +7,15 @@
 //! `history_redo` and `batch` complete the set, and `render_board` /
 //! `render_3d` return PNG images so the agent can look at its work.
 //!
-//! M2 serves one project folder over stdio (headless), saving it after
-//! every successful change. Attached mode (the desktop app hosting the same
-//! server on a local socket) comes in M8. See `docs/specs/09-mcp-connector.md`.
+//! Headless (M2): one project folder over stdio, saved after every
+//! successful change. Attached (M9, [`attach`]): the desktop app serves its
+//! open project the same way to one agent at a time, and shows each change
+//! live. See `docs/specs/09-mcp-connector.md`.
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
+pub mod attach;
 pub mod render;
 
 use base64::Engine as _;
@@ -36,7 +38,8 @@ IDs are strings such as \"panel:2\" or \"point:3\"; commands return the IDs they
 Use project_summary and panel_get to inspect, the panel_*/point_*/edge_*/notch_* tools to edit, \
 batch to apply several commands atomically, history_undo/history_redo to step back. \
 Every successful change is saved to the project folder. \
-export_pdf / export_svg write 1:1 patterns under exports/ (paths stay inside the project). \
+export_pdf / export_svg write 1:1 patterns under exports/ (paths stay inside the project); \
+export_gltf / export_obj write the draped garment (after simulate) for 3D tools and game engines. \
 To dress the avatar: avatar_set, panel_place each panel around the body, seam_add, garment_set_fabric, \
 then simulate (headless drape, cached) and render_3d to see the result; render_board shows the pattern. \
 Errors carry a stable `code`, `args` and an English `text`.";
@@ -48,6 +51,8 @@ pub enum ServeError {
     Runtime(std::io::Error),
     #[error("MCP transport error: {0}")]
     Transport(String),
+    #[error("Rustle3D is not open with agents allowed (looked for {looked:?})")]
+    NotAttached { looked: Vec<std::path::PathBuf> },
 }
 
 /// What a tool name maps to.
@@ -61,10 +66,14 @@ enum Target {
     Render(render::View),
 }
 
+/// Called after a tool changed the project (the app refreshes its views).
+pub type OnChange = Arc<dyn Fn() + Send + Sync>;
+
 /// The MCP server over one project folder.
 #[derive(Clone)]
 pub struct Server {
     ws: Arc<Mutex<Workspace>>,
+    on_change: Option<OnChange>,
     /// Created on the first render.
     gpu: Arc<Mutex<Option<Gpu>>>,
     tools: Arc<Vec<Tool>>,
@@ -188,9 +197,16 @@ fn error_result(message: &Message) -> CallToolResult {
 
 impl Server {
     pub fn new(ws: Workspace) -> Self {
+        Self::shared(Arc::new(Mutex::new(ws)), None)
+    }
+
+    /// A server over a project someone else holds too (the app), calling
+    /// `on_change` after each change it makes.
+    pub fn shared(ws: Arc<Mutex<Workspace>>, on_change: Option<OnChange>) -> Self {
         let (tools, targets) = catalog();
         Self {
-            ws: Arc::new(Mutex::new(ws)),
+            ws,
+            on_change,
             gpu: Arc::new(Mutex::new(None)),
             tools: Arc::new(tools),
             targets: Arc::new(targets),
@@ -288,8 +304,13 @@ impl Server {
             })
         })?;
         let value = ws.run_step(&step)?;
-        if ws.session().is_dirty() {
+        let changed = ws.session().is_dirty();
+        if changed {
             ws.save()?;
+        }
+        drop(ws);
+        if changed && let Some(notify) = &self.on_change {
+            notify();
         }
         Ok(value)
     }

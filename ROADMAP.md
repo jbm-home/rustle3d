@@ -23,7 +23,7 @@ can be tested through MCP as soon as they exist.
 | M7 | Materials, self-collision, grab/pin ✅ (T-shirt → M10) | 2–3 wk | The same T-shirt in jersey vs denim; pull it with the mouse |
 | M8 | 3D → 2D editing tools ✅ | 3 wk | Lengthen a hem and take in a seam directly in 3D; the pattern follows |
 | M10 | Templates, guided flow, polish → **v0.1** ✅ (released 2026-11-16) | 3–4 wk | A first-time user makes a T-shirt in < 10 minutes |
-| M9 | glTF export, attached MCP (moved after v0.1) | 2 wk | An agent edits the garment live in the open app; the result opens in a game engine |
+| M9 | glTF export, attached MCP ✅ | 2 wk | An agent edits the garment live in the open app; the result opens in a game engine |
 | M11 | Pattern drafting tools | 3–4 wk | Draw a bodice with the curve tool, set the distance between two points, gather a skirt into a waistband |
 | M12 | Pattern interchange: DXF, SVG and PDF | 2–3 wk | A pattern drawn elsewhere is imported from DXF-AAMA, SVG or PDF, edited, sewn and exported back |
 | M13 | Photorealistic rendering | 4–6 wk | A path-traced studio image of the draped garment |
@@ -147,13 +147,26 @@ selected edge drawn on the 3D garment; per-panel placement in the UI and
 dragging panels in 3D (M10); camera presets (M10); mismatch badges and
 seam direction arrows on the board (M10).
 
-## M9 — glTF export, attached MCP (next, after v0.1)
+## M9 — glTF export, attached MCP ✅
 - glTF 2.0/GLB garment export with pattern UVs and `KHR_materials_sheen`;
   OBJ; glTF validator in CI; checked imports in Blender and Godot.
 - Attached mode: app-hosted MCP over a local socket, `r3d mcp --attach`,
   agent indicator, disconnect button.
 - **Demo**: the agent changes the skirt length while the user watches it
   re-drape live.
+
+Built (2026-11-16), demo `./demos/m9/demo.sh`:
+- `export.gltf` (GLB) and `export.obj`, `r3d export --format glb|obj
+  [--avatar]`, and an Export menu in the app (pattern SVG/PDF, garment
+  GLB/OBJ as the 3D view shows it). One named node per piece, pattern
+  UVs, PBR + `KHR_materials_sheen`; every template passes the Khronos
+  glTF Validator (`scripts/validate-exports.sh`, in `check.sh` and CI).
+- Attached MCP: Agents menu in the app (opt-in), loopback TCP + token,
+  `r3d mcp --attach` relay, live refresh, undoable, "Agent connected"
+  and Disconnect. End-to-end tests: Rust (host + MCP session, CLI
+  relay) and the app (an agent creates a piece; the inspector counts it).
+- Still to check by hand: imports in Blender and Godot. `render_3d` in
+  attached mode shows the cached drape, not the live one.
 
 ## M10 — Templates, guided flow, polish → v0.1 ✅ (released 2026-11-16)
 - Parametric templates (skirts, T-shirt, dress, tote bag), guided flow step

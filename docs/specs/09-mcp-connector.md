@@ -2,6 +2,20 @@
 
 Provenance: maintainer's functional brief (2026-11-14); Model Context Protocol specification (open).
 
+## Status (2026-11-16)
+
+Implemented: headless (M2) and attached (M9). Attached: the app's Agents
+menu allows agents (off by default; nothing listens before); the app
+then listens on a loopback TCP port and writes the port and a secret
+token to `agent.json` in its support folder. `r3d mcp --attach
+[--endpoint file]` reads it, sends `R3D-ATTACH <token>` and relays stdio;
+a wrong token is refused. One agent at a time; its changes are saved,
+go into the app's undo history and show at once (pattern, inspector,
+live drape). The app shows "Agent connected" and can disconnect it.
+`render_3d` in attached mode still draws the cached or starting drape,
+not the app's live one; a long action (e.g. `simulate`) holds the project
+while it runs.
+
 ## User story
 As an AI agent, I can inspect, create and modify garments, run the simulation
 and look at the result, either headless or live in the user's open app.

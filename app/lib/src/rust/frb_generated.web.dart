@@ -54,6 +54,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String dco_decode_String(dynamic raw);
 
   @protected
+  AgentStatus dco_decode_agent_status(dynamic raw);
+
+  @protected
   ApiError dco_decode_api_error(dynamic raw);
 
   @protected
@@ -165,6 +168,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   String sse_decode_String(SseDeserializer deserializer);
+
+  @protected
+  AgentStatus sse_decode_agent_status(SseDeserializer deserializer);
 
   @protected
   ApiError sse_decode_api_error(SseDeserializer deserializer);
@@ -294,6 +300,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_String(String self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_agent_status(AgentStatus self, SseSerializer serializer);
 
   @protected
   void sse_encode_api_error(ApiError self, SseSerializer serializer);

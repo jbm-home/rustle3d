@@ -62,7 +62,7 @@ the change log at the end. Sections marked **Open** are explicitly undecided.
 | `r3d-render` | core, geom, `wgpu`, `image` | commands, GUI toolkit |
 | `r3d-mcp` | commands (render from M3), `rmcp`, `tokio` | GUI toolkit |
 | `r3d-cli` | commands, render, mcp, `clap` | GUI toolkit |
-| `r3d-ffi` | commands, render, avatar, `flutter_rust_bridge` (the Flutter app in `app/`, see 7.1) | |
+| `r3d-ffi` | commands, render, avatar, io (exports), mcp (attached agents), `flutter_rust_bridge` (the Flutter app in `app/`, see 7.1) | |
 
 Changes to the split suggested in the brief:
 
@@ -476,3 +476,4 @@ code stays **i18n-ready** for more:
 | 2026-11-16 | `r3d-app` skeleton removed; `r3d-ffi` is the app's bridge crate | The desktop app is the Flutter one (7.1); no dead code |
 | 2026-11-16 | UI catalog in ARB (Flutter gen-l10n, `intl`) instead of Fluent; French added, language chosen in the app | ARB is the Flutter stack's native format (7.7 said the format follows the GUI stack); keys and the `code` + `args` contract are unchanged |
 | 2026-11-16 | glTF (GLB) and OBJ written by `r3d-io` itself, not the `gltf`/`tobj` crates; fabric colours and sheen moved to `r3d-core` (`Fabric::appearance`) | Writing is simple (a JSON chunk and a binary chunk, a text file); the crates are mostly readers. The renderer and the exports must agree on a fabric's look, and `r3d-io` cannot depend on the GPU crate |
+| 2026-11-16 | Attached MCP over loopback TCP with a token in `agent.json` (support folder), opt-in from the app; `r3d mcp --attach` is a byte relay | Works the same on macOS, Linux and Windows (no Unix sockets or named pipes); the token keeps other local programs out; nothing listens unless the user allows it; the relay needs no MCP knowledge, so the app's server is the only one |

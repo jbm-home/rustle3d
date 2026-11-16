@@ -122,11 +122,19 @@ enum Cmd {
     },
     /// List every operation, or print the JSON schema of one.
     Schema { name: Option<String> },
-    /// Serve the project to AI agents over MCP (stdio). The project is
-    /// created if the folder does not exist. Changes are saved as they happen.
+    /// Serve a project to an AI agent over MCP (stdio). With --project, the
+    /// folder headless (created if missing; changes saved as they happen).
+    /// With --attach, the project open in the desktop app, live: allow
+    /// agents in the app first.
     Mcp {
+        #[arg(long, required_unless_present = "attach", conflicts_with = "attach")]
+        project: Option<PathBuf>,
+        /// Relay to the running app instead of serving a folder.
         #[arg(long)]
-        project: PathBuf,
+        attach: bool,
+        /// The app's endpoint file (default: where the app writes it).
+        #[arg(long, requires = "attach")]
+        endpoint: Option<PathBuf>,
     },
 }
 
@@ -354,7 +362,16 @@ fn main() -> ExitCode {
             size,
         } => cmd_render(&project, view, &out, size),
         Cmd::Schema { name } => cmd_schema(name.as_deref()),
-        Cmd::Mcp { project } => cmd_mcp(&project),
+        Cmd::Mcp {
+            project,
+            attach,
+            endpoint,
+        } => match (project, attach) {
+            (_, true) => r3d_mcp::attach::relay(endpoint.as_deref())
+                .map_err(|e| io_failure("mcp", e.to_string())),
+            (Some(project), false) => cmd_mcp(&project),
+            (None, false) => Err(io_failure("mcp", "--project or --attach is needed".into())),
+        },
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,

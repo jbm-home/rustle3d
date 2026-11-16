@@ -4,7 +4,8 @@
 
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::{Mutex, MutexGuard};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Instant;
 
 use flutter_rust_bridge::frb;
@@ -224,10 +225,22 @@ pub struct SimStatus {
     pub max_seam_gap_mm: f64,
 }
 
+/// Whether AI agents can reach the open project (`r3d mcp --attach`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AgentStatus {
+    /// Not allowed: nothing listens.
+    Off,
+    /// Allowed; no agent connected.
+    Waiting,
+    /// An agent is connected.
+    Connected,
+}
+
 /// A project opened by the UI.
 #[frb(opaque)]
 pub struct Engine {
-    ws: Mutex<Workspace>,
+    /// Shared with the agent's thread when agents are allowed.
+    ws: Arc<Mutex<Workspace>>,
     graphics: Mutex<Option<Graphics>>,
     /// Selection shared by every view (not saved, not undoable).
     selection: Mutex<Vec<PanelId>>,
@@ -240,7 +253,13 @@ pub struct Engine {
     /// The dress form for the current measurements.
     form: Mutex<Option<(Body, Form)>>,
     /// Edits not yet carried into the running simulation.
-    sync: Mutex<Sync>,
+    sync: Arc<Mutex<Sync>>,
+    /// Changes made by agents so far, for the UI to refresh on, and the
+    /// count the selection was last checked at.
+    agent_changes: Arc<AtomicU64>,
+    agent_changes_seen: AtomicU64,
+    /// Accepting agents, while allowed.
+    agents: Mutex<Option<r3d_mcp::attach::Host>>,
     /// The cloth under the pointer since it went down, if any.
     held: Mutex<Option<Held>>,
     /// A line being drawn on the garment: its panel and pattern points (mm).
@@ -272,14 +291,17 @@ impl Engine {
             Workspace::create(dir, &name).map_err(err)?
         };
         Ok(Engine {
-            ws: Mutex::new(ws),
+            ws: Arc::new(Mutex::new(ws)),
             graphics: Mutex::new(None),
             selection: Mutex::new(Vec::new()),
             selected_edge: Mutex::new(None),
             sim: Mutex::new(None),
             cloth: Mutex::new(None),
             form: Mutex::new(None),
-            sync: Mutex::new(Sync::default()),
+            sync: Arc::new(Mutex::new(Sync::default())),
+            agent_changes: Arc::new(AtomicU64::new(0)),
+            agent_changes_seen: AtomicU64::new(0),
+            agents: Mutex::new(None),
             held: Mutex::new(None),
             stroke: Mutex::new(None),
         })
@@ -439,13 +461,7 @@ impl Engine {
         if ws.session().is_dirty() {
             ws.save().map_err(err)?;
         }
-        // Forget selected panels that no longer exist (e.g. after undo).
-        let project = ws.session().project();
-        self.selected()?.retain(|id| project.panel(*id).is_some());
-        let mut edge = self.selected_edge.lock().map_err(|_| poisoned())?;
-        if edge.is_some_and(|e| project.edge(e).is_none()) {
-            *edge = None;
-        }
+        self.forget_missing(ws.session().project())?;
         Ok(result.to_string())
     }
 
@@ -462,6 +478,78 @@ impl Engine {
             ws.save().map_err(err)?;
         }
         Ok(serde_json::Value::Array(results).to_string())
+    }
+
+    /// Forget selected panels and edges that no longer exist (after an
+    /// undo, or an agent's change).
+    fn forget_missing(&self, project: &r3d_core::Project) -> Result<(), ApiError> {
+        self.selected()?.retain(|id| project.panel(*id).is_some());
+        let mut edge = self.selected_edge.lock().map_err(|_| poisoned())?;
+        if edge.is_some_and(|e| project.edge(e).is_none()) {
+            *edge = None;
+        }
+        Ok(())
+    }
+
+    /// Let AI agents reach this project (`r3d mcp --attach`), writing the
+    /// endpoint into `library_dir`; or stop, disconnecting any agent.
+    #[frb(sync)]
+    pub fn allow_agents(&self, library_dir: String, allow: bool) -> Result<(), ApiError> {
+        let mut agents = self.agents.lock().map_err(|_| poisoned())?;
+        if !allow {
+            *agents = None;
+            return Ok(());
+        }
+        if agents.is_some() {
+            return Ok(());
+        }
+        let name = self.workspace()?.session().project().name().to_owned();
+        let (sync, changes) = (self.sync.clone(), self.agent_changes.clone());
+        // An agent's change: carry it into the drape, and tell the UI.
+        let notify: r3d_mcp::OnChange = Arc::new(move || {
+            if let Ok(mut s) = sync.lock() {
+                s.pending = true;
+            }
+            changes.fetch_add(1, Ordering::SeqCst);
+        });
+        let server = r3d_mcp::Server::shared(self.ws.clone(), Some(notify));
+        let host = r3d_mcp::attach::Host::start(server, Path::new(&library_dir), &name)
+            .map_err(|e| ApiError::new("agents", e.to_string()))?;
+        *agents = Some(host);
+        Ok(())
+    }
+
+    #[frb(sync)]
+    pub fn agent_status(&self) -> Result<AgentStatus, ApiError> {
+        use r3d_mcp::attach::AgentState;
+        Ok(match self.agents.lock().map_err(|_| poisoned())?.as_ref() {
+            None => AgentStatus::Off,
+            Some(host) => match host.state() {
+                AgentState::Waiting => AgentStatus::Waiting,
+                AgentState::Connected => AgentStatus::Connected,
+            },
+        })
+    }
+
+    /// Close the connected agent's session; agents stay allowed.
+    #[frb(sync)]
+    pub fn disconnect_agent(&self) -> Result<(), ApiError> {
+        if let Some(host) = self.agents.lock().map_err(|_| poisoned())?.as_ref() {
+            host.disconnect();
+        }
+        Ok(())
+    }
+
+    /// How many changes agents have made: the UI refreshes when it moves.
+    /// Cheap while nothing changed (asked every frame; the project is only
+    /// locked after a change, as an agent may hold it for a while).
+    #[frb(sync)]
+    pub fn agent_changes(&self) -> Result<u64, ApiError> {
+        let changes = self.agent_changes.load(Ordering::SeqCst);
+        if self.agent_changes_seen.swap(changes, Ordering::SeqCst) != changes {
+            self.forget_missing(self.workspace()?.session().project())?;
+        }
+        Ok(changes)
     }
 
     /// Write an export to `path`, a file the user chose (anywhere): the

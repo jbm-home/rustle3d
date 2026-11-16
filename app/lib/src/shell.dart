@@ -64,6 +64,11 @@ class _ShellState extends State<Shell> {
   SimStatus? _sim;
   final _clock = Stopwatch()..start();
 
+  /// AI agents: whether they may connect, and the changes they made (the
+  /// views refresh when it moves).
+  AgentStatus _agent = AgentStatus.off;
+  BigInt _agentChanges = BigInt.zero;
+
   /// The guided flow's current step, and whether the guide is shown.
   late GuideStep _step;
   bool _guide = true;
@@ -216,11 +221,18 @@ class _ShellState extends State<Shell> {
     }
     _garmentMs = _garmentMs * 0.9 + ms * 0.1;
     _frames++;
+    // An agent's change: show it at once.
+    final changes = _guard(widget.engine.agentChanges);
+    if (changes != null && changes != _agentChanges) {
+      _agentChanges = changes;
+      _refresh();
+    }
     final elapsed = _clock.elapsedMilliseconds;
     if (elapsed >= 500) {
       setState(() {
         _fps = _frames * 1000 / elapsed;
         _sim = _guard(widget.engine.simulationStatus);
+        _agent = _guard(widget.engine.agentStatus) ?? AgentStatus.off;
       });
       _frames = 0;
       _clock.reset();
@@ -338,6 +350,18 @@ class _ShellState extends State<Shell> {
     }
   }
 
+  void _allowAgents(bool allow) {
+    _guard(
+      () => widget.engine.allowAgents(
+        libraryDir: widget.libraryDir,
+        allow: allow,
+      ),
+    );
+    setState(
+      () => _agent = _guard(widget.engine.agentStatus) ?? AgentStatus.off,
+    );
+  }
+
   void _undo() {
     _run({'type': 'history.undo'});
     _refresh();
@@ -436,6 +460,9 @@ class _ShellState extends State<Shell> {
                 onRedo: _redo,
                 onBody: _showBody,
                 onExport: _export,
+                agent: _agent,
+                onAllowAgents: _allowAgents,
+                onDisconnectAgent: () => _guard(widget.engine.disconnectAgent),
                 bodyKey: _spotBody,
                 onLearn: () => _scaffold.currentState?.openEndDrawer(),
                 onHome: widget.onHome,
@@ -588,6 +615,9 @@ class _TopBar extends StatelessWidget {
     required this.onRedo,
     required this.onBody,
     required this.onExport,
+    required this.agent,
+    required this.onAllowAgents,
+    required this.onDisconnectAgent,
     required this.bodyKey,
     required this.onLearn,
     required this.onHome,
@@ -607,6 +637,11 @@ class _TopBar extends StatelessWidget {
 
   /// Export in a format (with the avatar, for 3D formats).
   final void Function(ExportFormat format, bool avatar) onExport;
+
+  /// AI agents: allowed or not, connected or not.
+  final AgentStatus agent;
+  final ValueChanged<bool> onAllowAgents;
+  final VoidCallback onDisconnectAgent;
 
   /// The Body button, for Learn to point at.
   final GlobalKey bodyKey;
@@ -660,25 +695,38 @@ class _TopBar extends StatelessWidget {
               ),
             ),
             const SizedBox(width: Space.xl),
-            for (var i = 0; i < steps.length; i++) ...[
-              _StepChip(
-                index: i + 1,
-                label: steps[i].label(l),
-                active: guide && steps[i] == step,
-                done: steps[i].index < step.index,
-                onTap: () => onStep(steps[i]),
-              ),
-              if (i < steps.length - 1)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: Space.xs),
-                  child: Icon(
-                    Icons.chevron_right,
-                    size: 16,
-                    color: p.textMuted,
-                  ),
+            // The steps take the room left, and scroll when the window is
+            // too narrow for them.
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (var i = 0; i < steps.length; i++) ...[
+                      _StepChip(
+                        index: i + 1,
+                        label: steps[i].label(l),
+                        active: guide && steps[i] == step,
+                        done: steps[i].index < step.index,
+                        onTap: () => onStep(steps[i]),
+                      ),
+                      if (i < steps.length - 1)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: Space.xs,
+                          ),
+                          child: Icon(
+                            Icons.chevron_right,
+                            size: 16,
+                            color: p.textMuted,
+                          ),
+                        ),
+                    ],
+                  ],
                 ),
-            ],
-            const Spacer(),
+              ),
+            ),
+            const SizedBox(width: Space.s),
             TextButton.icon(
               onPressed: onLearn,
               icon: const Icon(Icons.school_outlined, size: 18),
@@ -689,6 +737,11 @@ class _TopBar extends StatelessWidget {
               onPressed: onBody,
               icon: const Icon(Icons.accessibility_new_rounded, size: 18),
               label: Text(l.body),
+            ),
+            _AgentButton(
+              status: agent,
+              onAllow: onAllowAgents,
+              onDisconnect: onDisconnectAgent,
             ),
             PopupMenuButton<(ExportFormat, bool)>(
               tooltip: l.export,
@@ -2121,4 +2174,78 @@ class _EdgeLengthState extends State<_EdgeLength> {
     fieldKey: const Key('edge-length'),
     onChanged: (cm) => widget.onCm((cm * 10).roundToDouble() / 10),
   );
+}
+
+/// AI agents: let one connect (`r3d mcp --attach`), see whether one is,
+/// disconnect it.
+class _AgentButton extends StatelessWidget {
+  const _AgentButton({
+    required this.status,
+    required this.onAllow,
+    required this.onDisconnect,
+  });
+
+  final AgentStatus status;
+  final ValueChanged<bool> onAllow;
+  final VoidCallback onDisconnect;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final l = context.l;
+    final connected = status == AgentStatus.connected;
+    final label = switch (status) {
+      AgentStatus.off => l.agents,
+      AgentStatus.waiting => l.agentsWaiting,
+      AgentStatus.connected => l.agentConnected,
+    };
+    final color = status == AgentStatus.off ? p.textMuted : p.accent;
+    return PopupMenuButton<String>(
+      tooltip: l.agentsTip,
+      onSelected: (choice) => switch (choice) {
+        'allow' => onAllow(status == AgentStatus.off),
+        'disconnect' => onDisconnect(),
+        _ => null,
+      },
+      itemBuilder: (_) => [
+        CheckedPopupMenuItem(
+          value: 'allow',
+          checked: status != AgentStatus.off,
+          child: Text(l.allowAgents),
+        ),
+        PopupMenuItem(
+          enabled: false,
+          child: Text(
+            l.agentsHow,
+            style: ts(fontSize: 12.5, color: p.textMuted),
+          ),
+        ),
+        if (connected)
+          PopupMenuItem(value: 'disconnect', child: Text(l.disconnectAgent)),
+      ],
+      child: AnimatedContainer(
+        duration: Motion.fast,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: connected ? p.accentSoft : Colors.transparent,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.smart_toy_outlined, size: 18, color: color),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: ts(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
