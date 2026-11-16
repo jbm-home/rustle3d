@@ -214,6 +214,12 @@ fn poisoned() -> ApiError {
     ApiError::new("internal", "engine lock poisoned")
 }
 
+/// Width of the pattern lines drawn on the garment, and how far they sit
+/// off the cloth (m).
+const LINE_WIDTH_M: f32 = 0.003;
+const EDGE_WIDTH_M: f32 = 0.006;
+const LINE_LIFT_M: f32 = 0.0015;
+
 impl Engine {
     /// Open the project folder at `path`, creating it if it does not exist.
     #[frb(sync)]
@@ -567,6 +573,22 @@ impl Engine {
                     .map(SimThread::latest)
                     .unwrap_or_default();
                 let cloth = self.cloth.lock().map_err(|_| poisoned())?;
+                let edge = *self.selected_edge.lock().map_err(|_| poisoned())?;
+                let (lines, edge_line) = cloth
+                    .as_ref()
+                    .map(|d| {
+                        let on = drape::LinesOnCloth::new(d, &published.positions);
+                        let lines: Vec<Mesh> = on
+                            .internal_lines(project)
+                            .iter()
+                            .map(|l| Mesh::ribbon(l, LINE_WIDTH_M, LINE_LIFT_M))
+                            .collect();
+                        let edge = edge
+                            .and_then(|e| on.edge(e))
+                            .map(|l| Mesh::ribbon(&l, EDGE_WIDTH_M, LINE_LIFT_M));
+                        (lines, edge)
+                    })
+                    .unwrap_or_default();
                 let pieces: Vec<(PanelId, Mesh)> = cloth
                     .iter()
                     .flat_map(|d| &d.pieces)
@@ -597,6 +619,19 @@ impl Engine {
                     };
                     draws.push(Draw { mesh, material });
                 }
+                let ink = |base: [f32; 4]| Material {
+                    base,
+                    sheen: base,
+                    sheen_amount: 0.0,
+                };
+                draws.extend(lines.iter().map(|mesh| Draw {
+                    mesh,
+                    material: ink(theme.panel_line),
+                }));
+                draws.extend(edge_line.iter().map(|mesh| Draw {
+                    mesh,
+                    material: ink(theme.selection),
+                }));
                 g.garment.render(&g.gpu, target, &g.camera, &draws, &theme);
             }
         }

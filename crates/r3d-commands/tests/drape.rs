@@ -203,3 +203,32 @@ fn a_skirt_made_from_scratch_sews_arranges_and_drapes() {
     assert!(out.stats.max_seam_gap < 0.005, "{:?}", out.stats);
     assert!(top > 0.95, "slid down: {top}");
 }
+
+#[test]
+fn style_lines_and_edges_follow_the_cloth() {
+    let mut s = Session::new(Project::new("t"));
+    common::women_m(&mut s);
+    let front = common::a_line_skirt(&mut s);
+    let line = serde_json::json!({"type": "internal_line.add", "panel": front.panel,
+        "start": [100, 300], "segments": [{"kind": "line", "to": [600, 300]}]});
+    s.run_step(&Step::from_value(line).unwrap()).unwrap();
+    let form = Form::of_project(s.project()).unwrap().unwrap();
+    let drape = build(s.project(), Some(&form), DEFAULT_SPACING_MM).unwrap();
+    let positions: Vec<glam::Vec3> = drape.scene.particles.iter().map(|p| p.position).collect();
+    let on = r3d_commands::drape::LinesOnCloth::new(&drape, &positions);
+    let lines = on.internal_lines(s.project());
+    assert_eq!(lines.len(), 1);
+    // Sampled every 10 mm along the 500 mm line, all on the front piece, at
+    // the same height (it is horizontal on the pattern and the start pose
+    // keeps heights), each with a unit normal.
+    let line = &lines[0];
+    assert!(line.len() > 40, "{}", line.len());
+    let y0 = line[0].0.y;
+    assert!(
+        line.iter()
+            .all(|(p, n)| (p.y - y0).abs() < 1e-3 && (n.length() - 1.0).abs() < 1e-4)
+    );
+    let hem: r3d_core::EdgeId = front.edges[0].as_str().unwrap().parse().unwrap();
+    let edge = on.edge(hem).unwrap();
+    assert!(edge.len() > 10);
+}

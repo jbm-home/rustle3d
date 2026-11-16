@@ -620,6 +620,181 @@ pub fn prepare(project: &Project, form: Option<&Form>) -> Result<Drape, CommandE
     build(project, form, DEFAULT_SPACING_MM)
 }
 
+/// Where pattern points lie in a drape: for a point of a panel (pattern
+/// coordinates, m), the triangle of its piece that contains it, or the
+/// nearest one outside, and its barycentric weights there. A drape's 3D
+/// position of the point is then the weighted sum of the corners.
+#[derive(Debug)]
+pub struct Locator<'a> {
+    rest: Vec<Vec2>,
+    pieces: Vec<(&'a Piece, PieceGrid)>,
+}
+
+/// A piece's triangles (global particle indices), binned by their pattern
+/// bounding box so a point inside the shape only tests a few.
+#[derive(Debug)]
+struct PieceGrid {
+    corners: Vec<[usize; 3]>,
+    grid: HashMap<[i32; 2], Vec<usize>>,
+}
+
+fn cell(p: Vec2) -> [i32; 2] {
+    (p / CARRY_CELL_M).floor().as_ivec2().to_array()
+}
+
+impl<'a> Locator<'a> {
+    pub fn new(drape: &'a Drape) -> Self {
+        let rest: Vec<Vec2> = drape.scene.particles.iter().map(|p| p.rest).collect();
+        let pieces = drape
+            .pieces
+            .iter()
+            .map(|piece| {
+                let corners: Vec<[usize; 3]> = piece
+                    .indices
+                    .as_chunks::<3>()
+                    .0
+                    .iter()
+                    .map(|t| t.map(|i| piece.particles.start + i as usize))
+                    .collect();
+                let mut grid: HashMap<[i32; 2], Vec<usize>> = HashMap::new();
+                for (k, t) in corners.iter().enumerate() {
+                    let pts: Vec<Vec2> = t.iter().filter_map(|i| rest.get(*i).copied()).collect();
+                    let lo = pts.iter().fold(Vec2::MAX, |a, b| a.min(*b));
+                    let hi = pts.iter().fold(Vec2::MIN, |a, b| a.max(*b));
+                    let (a, b) = (cell(lo), cell(hi));
+                    for x in a[0]..=b[0] {
+                        for y in a[1]..=b[1] {
+                            grid.entry([x, y]).or_default().push(k);
+                        }
+                    }
+                }
+                (piece, PieceGrid { corners, grid })
+            })
+            .collect();
+        Self { rest, pieces }
+    }
+
+    /// The triangle of `panel`'s piece holding pattern point `p` (m), and
+    /// the point's weights in it; `None` if the panel is not simulated.
+    pub fn locate(&self, panel: PanelId, p: Vec2) -> Option<([usize; 3], Vec3)> {
+        let (_, g) = self.pieces.iter().find(|(piece, _)| piece.panel == panel)?;
+        let weights = |t: &[usize; 3]| {
+            let [a, b, c] = t.map(|k| self.rest.get(k).copied());
+            barycentric(p, a?, b?, c?)
+        };
+        // The triangle whose smallest weight is largest: the one containing
+        // the point, or the closest one outside.
+        let best_of = |candidates: &mut dyn Iterator<Item = &[usize; 3]>| {
+            candidates
+                .filter_map(|t| Some((*t, weights(t)?)))
+                .max_by(|x, y| x.1.min_element().total_cmp(&y.1.min_element()))
+        };
+        let near = g.grid.get(&cell(p)).map(Vec::as_slice).unwrap_or_default();
+        best_of(&mut near.iter().filter_map(|k| g.corners.get(*k)))
+            .filter(|(_, w)| w.min_element() >= -1e-4)
+            .or_else(|| best_of(&mut g.corners.iter()))
+    }
+
+    /// Where pattern point `p` of `panel` is in 3D, for the drape's
+    /// particle `positions`.
+    pub fn position(&self, panel: PanelId, p: Vec2, positions: &[Vec3]) -> Option<Vec3> {
+        let (t, w) = self.locate(panel, p)?;
+        let [a, b, c] = t.map(|k| positions.get(k).copied());
+        Some(a? * w.x + b? * w.y + c? * w.z)
+    }
+}
+
+/// Internal lines are sampled this often along the pattern (mm).
+const LINE_STEP_MM: f64 = 10.0;
+
+/// A line on the draped cloth: points with the cloth's normal there.
+pub type ClothLine = Vec<(Vec3, Vec3)>;
+
+/// Pattern lines where they are on a drape (style lines, the selected
+/// edge), for drawing them on the garment.
+#[derive(Debug)]
+pub struct LinesOnCloth<'a> {
+    drape: &'a Drape,
+    locator: Locator<'a>,
+    positions: &'a [Vec3],
+    /// Cloth normal per particle.
+    normals: Vec<Vec3>,
+}
+
+impl<'a> LinesOnCloth<'a> {
+    /// For `drape` with its particles at `positions`.
+    pub fn new(drape: &'a Drape, positions: &'a [Vec3]) -> Self {
+        let mut normals = vec![Vec3::ZERO; positions.len()];
+        for piece in &drape.pieces {
+            for t in piece.indices.as_chunks::<3>().0 {
+                let [a, b, c] = t.map(|i| piece.particles.start + i as usize);
+                if let (Some(pa), Some(pb), Some(pc)) =
+                    (positions.get(a), positions.get(b), positions.get(c))
+                {
+                    let n = (*pb - *pa).cross(*pc - *pa);
+                    for i in [a, b, c] {
+                        if let Some(slot) = normals.get_mut(i) {
+                            *slot += n;
+                        }
+                    }
+                }
+            }
+        }
+        for n in &mut normals {
+            *n = n.normalize_or(Vec3::Y);
+        }
+        Self {
+            drape,
+            locator: Locator::new(drape),
+            positions,
+            normals,
+        }
+    }
+
+    fn normal(&self, i: usize) -> Vec3 {
+        self.normals.get(i).copied().unwrap_or(Vec3::Y)
+    }
+
+    /// Every internal line of the simulated panels.
+    pub fn internal_lines(&self, project: &Project) -> Vec<ClothLine> {
+        project
+            .internal_lines()
+            .iter()
+            .filter_map(|(id, line)| {
+                let polyline = project.internal_line_polyline(*id)?;
+                let mut points = Vec::new();
+                for (a, b) in polyline.iter().zip(polyline.iter().skip(1)) {
+                    let steps = ((a.distance(*b) / LINE_STEP_MM).ceil() as usize).max(1);
+                    points.extend((0..steps).map(|k| a.lerp(*b, k as f64 / steps as f64)));
+                }
+                points.extend(polyline.last());
+                let on: ClothLine = points
+                    .iter()
+                    .filter_map(|p| {
+                        let (t, w) = self.locator.locate(line.panel, (*p / 1000.0).as_vec2())?;
+                        let [a, b, c] = t.map(|k| self.positions.get(k).copied());
+                        let at = a? * w.x + b? * w.y + c? * w.z;
+                        let [na, nb, nc] = t.map(|k| self.normal(k));
+                        Some((at, (na * w.x + nb * w.y + nc * w.z).normalize_or(Vec3::Y)))
+                    })
+                    .collect();
+                (on.len() > 1).then_some(on)
+            })
+            .collect()
+    }
+
+    /// A contour edge of a simulated panel.
+    pub fn edge(&self, edge: EdgeId) -> Option<ClothLine> {
+        let particles = self.drape.edges.get(&edge)?;
+        Some(
+            particles
+                .iter()
+                .filter_map(|i| Some((*self.positions.get(*i)?, self.normal(*i))))
+                .collect(),
+        )
+    }
+}
+
 /// Start `new` where `old` is now (`positions`): each particle takes the
 /// position of the same pattern point in the old drape, interpolated in
 /// the old triangle that contains it, or extrapolated from the nearest one
@@ -627,45 +802,8 @@ pub fn prepare(project: &Project, form: Option<&Form>) -> Result<Drape, CommandE
 /// their own start. This is how pattern edits reach a running simulation
 /// without a jump (architecture §7.8).
 pub fn carry_over(old: &Drape, positions: &[Vec3], new: &mut Drape) {
-    let rest_old: Vec<Vec2> = old.scene.particles.iter().map(|p| p.rest).collect();
-    let rest = |k: usize| rest_old.get(k).copied();
+    let locator = Locator::new(old);
     for piece in &new.pieces {
-        let Some(before) = old.pieces.iter().find(|p| p.panel == piece.panel) else {
-            continue;
-        };
-        let corners: Vec<[usize; 3]> = before
-            .indices
-            .as_chunks::<3>()
-            .0
-            .iter()
-            .map(|t| t.map(|i| before.particles.start + i as usize))
-            .collect();
-        // Old triangles binned by their pattern bounding box, so a point
-        // inside the old shape only tests a few.
-        let cell = |p: Vec2| (p / CARRY_CELL_M).floor().as_ivec2().to_array();
-        let mut grid: HashMap<[i32; 2], Vec<usize>> = HashMap::new();
-        for (k, t) in corners.iter().enumerate() {
-            let pts: Vec<Vec2> = t.iter().filter_map(|i| rest(*i)).collect();
-            let lo = pts.iter().fold(Vec2::MAX, |a, b| a.min(*b));
-            let hi = pts.iter().fold(Vec2::MIN, |a, b| a.max(*b));
-            let (a, b) = (cell(lo), cell(hi));
-            for x in a[0]..=b[0] {
-                for y in a[1]..=b[1] {
-                    grid.entry([x, y]).or_default().push(k);
-                }
-            }
-        }
-        let weights = |p: Vec2, t: &[usize; 3]| {
-            let [a, b, c] = t.map(rest);
-            barycentric(p, a?, b?, c?)
-        };
-        // The triangle whose smallest weight is largest: the one containing
-        // the point, or the closest one outside.
-        let best_of = |p: Vec2, candidates: &mut dyn Iterator<Item = &[usize; 3]>| {
-            candidates
-                .filter_map(|t| Some((weights(p, t)?, *t)))
-                .max_by(|x, y| x.0.min_element().total_cmp(&y.0.min_element()))
-        };
         for i in piece.particles.clone() {
             let Some(p) = new.scene.particles.get_mut(i) else {
                 continue;
@@ -673,17 +811,8 @@ pub fn carry_over(old: &Drape, positions: &[Vec3], new: &mut Drape) {
             if p.pinned {
                 continue;
             }
-            let near = grid
-                .get(&cell(p.rest))
-                .map(Vec::as_slice)
-                .unwrap_or_default();
-            let inside = best_of(p.rest, &mut near.iter().filter_map(|k| corners.get(*k)))
-                .filter(|(w, _)| w.min_element() >= -1e-4);
-            let best = inside.or_else(|| best_of(p.rest, &mut corners.iter()));
-            if let Some((w, t)) = best
-                && let [Some(a), Some(b), Some(c)] = t.map(|k| positions.get(k).copied())
-            {
-                p.position = a * w.x + b * w.y + c * w.z;
+            if let Some(at) = locator.position(piece.panel, p.rest, positions) {
+                p.position = at;
             }
         }
     }

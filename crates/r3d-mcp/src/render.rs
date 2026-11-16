@@ -24,6 +24,11 @@ pub enum View {
     Garment,
 }
 
+/// Width of style lines drawn on the garment, and their lift off the
+/// cloth (m), as in the app.
+const LINE_WIDTH_M: f32 = 0.003;
+const LINE_LIFT_M: f32 = 0.0015;
+
 /// Smallest and largest image side (pixels).
 pub const SIZE_RANGE: std::ops::RangeInclusive<u32> = 16..=4096;
 
@@ -129,6 +134,11 @@ pub fn render(
                     ))
                 })
                 .collect();
+            let lines: Vec<Mesh> = drape::LinesOnCloth::new(&built, &positions)
+                .internal_lines(project)
+                .iter()
+                .map(|l| Mesh::ribbon(l, LINE_WIDTH_M, LINE_LIFT_M))
+                .collect();
             let mut draws: Vec<Draw<'_>> = Vec::with_capacity(pieces.len() + 1);
             if let Some(a) = &avatar {
                 draws.push(Draw {
@@ -139,6 +149,14 @@ pub fn render(
             draws.extend(pieces.iter().map(|m| Draw {
                 mesh: m,
                 material: fabric,
+            }));
+            draws.extend(lines.iter().map(|mesh| Draw {
+                mesh,
+                material: Material {
+                    base: theme.panel_line,
+                    sheen: theme.panel_line,
+                    sheen_amount: 0.0,
+                },
             }));
             let camera = OrbitCamera::default();
             let mut renderer = ViewRenderer3d::new(gpu, PNG_FORMAT);
