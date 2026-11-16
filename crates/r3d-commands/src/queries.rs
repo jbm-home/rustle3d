@@ -210,6 +210,9 @@ struct PanelOut {
     summary: PanelSummary,
     grain_angle_deg: f64,
     seam_allowance_mm: f64,
+    /// Where it sits around the body for the simulation; null when the
+    /// panel is not simulated.
+    placement: Option<r3d_core::Placement>,
     /// Present on linked mirror copies, which cannot be edited directly.
     #[serde(skip_serializing_if = "Option::is_none")]
     mirror_of: Option<MirrorOut>,
@@ -290,6 +293,7 @@ impl QuerySpec for PanelGet {
             summary: summarize(p, self.panel)?,
             grain_angle_deg: panel.grain_angle_deg,
             seam_allowance_mm: panel.seam_allowance_mm,
+            placement: panel.placement,
             mirror_of: panel.mirror_of.as_ref().map(|l| MirrorOut {
                 source: l.source,
                 axis_origin: r3v(l.origin),

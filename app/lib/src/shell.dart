@@ -481,6 +481,9 @@ class _ShellState extends State<Shell> {
                           run: (step) {
                             _run(step);
                             _refresh();
+                            // A new placement starts the drape again from
+                            // around the body.
+                            if (step['type'] == 'panel.place') _restart();
                           },
                           onDelete: _deleteSelected,
                         ),
@@ -1265,6 +1268,11 @@ class _PanelInspector extends StatelessWidget {
           }),
         ),
         const SizedBox(height: Space.xl),
+        _PlacementCard(
+          placement: panel['placement'] as Map<String, dynamic>?,
+          place: (place) => run({'type': 'panel.place', 'panel': id, ...place}),
+        ),
+        const SizedBox(height: Space.xl),
         Row(
           children: [
             Expanded(
@@ -1286,6 +1294,114 @@ class _PanelInspector extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Where the piece sits for the simulation: around the body, an arm, or
+/// flat; at which angle and height.
+class _PlacementCard extends StatelessWidget {
+  const _PlacementCard({required this.placement, required this.place});
+
+  final Map<String, dynamic>? placement;
+
+  /// Run `panel.place` with these fields.
+  final ValueChanged<Map<String, Object?>> place;
+
+  static const _around = [
+    ('body', 'Body'),
+    ('left_arm', 'Left arm'),
+    ('right_arm', 'Right arm'),
+    ('flat', 'Flat'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final current = placement;
+    final header = Text(
+      'On the body',
+      style: ts(fontSize: 13, fontWeight: FontWeight.w600, color: p.text),
+    );
+    if (current == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          header,
+          const SizedBox(height: Space.xs),
+          Text(
+            'Not simulated yet: place it to see it in 3D.',
+            style: ts(fontSize: 12, color: p.textMuted),
+          ),
+          const SizedBox(height: Space.s),
+          OutlinedButton.icon(
+            onPressed: () =>
+                place({'around': 'body', 'angle_deg': 0, 'top_cm': 110}),
+            icon: const Icon(Icons.accessibility_new_rounded, size: 16),
+            label: const Text('Place on the body'),
+          ),
+        ],
+      );
+    }
+    final around = current['around'] as String;
+    final angle = (current['angle_deg'] as num).toDouble();
+    final top = (current['top_cm'] as num).toDouble();
+    final offset = (current['offset_mm'] as num).toDouble();
+    // Flat pieces are measured from the body's axis, the others from its
+    // surface: switching between them takes a sensible distance.
+    void update({String? to, double? angleDeg, double? topCm}) {
+      final next = to ?? around;
+      place({
+        'around': next,
+        'angle_deg': (angleDeg ?? angle).roundToDouble(),
+        'top_cm': (topCm ?? top).roundToDouble(),
+        'offset_mm': (next == 'flat') == (around == 'flat')
+            ? offset
+            : (next == 'flat' ? 420 : 30),
+      });
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        header,
+        const SizedBox(height: Space.s),
+        SegmentedButton<String>(
+          showSelectedIcon: false,
+          style: SegmentedButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            textStyle: ts(fontSize: 11.5, fontWeight: FontWeight.w600),
+          ),
+          segments: [
+            for (final (value, label) in _around)
+              ButtonSegment(value: value, label: Text(label)),
+          ],
+          selected: {around},
+          onSelectionChanged: (s) => update(to: s.first),
+        ),
+        const SizedBox(height: Space.l),
+        _SliderRow(
+          label: around == 'body' || around == 'flat'
+              ? 'Around (0 = front)'
+              : 'Around the arm (0 = outside)',
+          value: angle.clamp(0, 359),
+          min: 0,
+          max: 359,
+          unit: '°',
+          enabled: true,
+          onChanged: (v) => update(angleDeg: v),
+        ),
+        const SizedBox(height: Space.l),
+        _SliderRow(
+          label: 'Top height',
+          value: top.clamp(40, 200),
+          min: 40,
+          max: 200,
+          unit: 'cm',
+          enabled: true,
+          onChanged: (v) => update(topCm: v),
         ),
       ],
     );
