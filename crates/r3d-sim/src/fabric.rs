@@ -44,15 +44,18 @@ impl FabricPreset {
     ];
 
     /// Initial estimates from general textile knowledge (fabric weights,
-    /// typical bending rigidities); to be calibrated (docs/physics.md §3).
+    /// typical bending and shear rigidities); to be calibrated
+    /// (docs/physics.md §3). Shear is an order below tension, as in
+    /// wovens: stiffer shear kept the triangles from bending smoothly and
+    /// the cloth set in crumples.
     pub fn params(self) -> FabricParams {
         // (g/m², mm, warp N/m, weft N/m, shear N/m, bending µN·m, friction)
         let (gsm, mm, warp, weft, shear, bend, friction) = match self {
-            FabricPreset::Cotton => (120.0, 0.30, 8000.0, 6000.0, 400.0, 10.0, 0.40),
-            FabricPreset::Denim => (400.0, 0.80, 20000.0, 15000.0, 1500.0, 60.0, 0.50),
-            FabricPreset::Jersey => (180.0, 0.60, 300.0, 150.0, 100.0, 4.0, 0.50),
-            FabricPreset::Silk => (80.0, 0.15, 5000.0, 4000.0, 150.0, 1.5, 0.25),
-            FabricPreset::Wool => (260.0, 0.60, 10000.0, 8000.0, 600.0, 20.0, 0.45),
+            FabricPreset::Cotton => (120.0, 0.30, 8000.0, 6000.0, 40.0, 30.0, 0.40),
+            FabricPreset::Denim => (400.0, 0.80, 20000.0, 15000.0, 150.0, 60.0, 0.50),
+            FabricPreset::Jersey => (180.0, 0.60, 300.0, 150.0, 10.0, 4.0, 0.50),
+            FabricPreset::Silk => (80.0, 0.15, 5000.0, 4000.0, 15.0, 1.5, 0.25),
+            FabricPreset::Wool => (260.0, 0.60, 10000.0, 8000.0, 60.0, 20.0, 0.45),
         };
         FabricParams {
             density: gsm / 1000.0,

@@ -110,11 +110,21 @@ measurement-based calibration on the roadmap.
 
 | Preset | ρ g/m² | h mm | k_u / k_v N/m | k_s N/m | ε_max | B_u / B_v µN·m | μ_b |
 |---|---|---|---|---|---|---|---|
-| Cotton (poplin) | 120 | 0.30 | 8000 / 6000 | 400 | 3 % | 10 / 7 | 0.40 |
-| Denim | 400 | 0.80 | 20000 / 15000 | 1500 | 2 % | 60 / 40 | 0.50 |
-| Jersey (knit) | 180 | 0.60 | 300 / 150 | 100 | – | 4 / 3 | 0.50 |
-| Silk (charmeuse) | 80 | 0.15 | 5000 / 4000 | 150 | 3 % | 1.5 / 1.2 | 0.25 |
-| Wool (suiting) | 260 | 0.60 | 10000 / 8000 | 600 | 3 % | 20 / 15 | 0.45 |
+| Cotton (poplin) | 120 | 0.30 | 8000 / 6000 | 40 | 3 % | 30 / 21 | 0.40 |
+| Denim | 400 | 0.80 | 20000 / 15000 | 150 | 2 % | 60 / 40 | 0.50 |
+| Jersey (knit) | 180 | 0.60 | 300 / 150 | 10 | – | 4 / 3 | 0.50 |
+| Silk (charmeuse) | 80 | 0.15 | 5000 / 4000 | 15 | 3 % | 1.5 / 1.2 | 0.25 |
+| Wool (suiting) | 260 | 0.60 | 10000 / 8000 | 60 | 3 % | 20 / 15 | 0.45 |
+
+Shear k_s is an order of magnitude below tension, as measured on wovens
+(Kawabata shear rigidity ≈ 0.5–2 gf/cm/° ≈ 30–110 N/m for shirtings and
+suitings [16]). The first presets had it at 1/20–1/7 of tension: the
+linear triangles, kept from shearing, could not bend smoothly between
+vertices and the back of a dress set in crumples a few triangles wide
+(mean dihedral angle 8.7° against 4.5° now). Cotton's bending was raised
+from 10 to 30 µN·m (a firm cotton): at 25 mm spacing the mesh cannot
+show folds finer than a few centimetres anyway. Measured on the dress
+after 4 s; the skirt still holds at the waist.
 
 ## 4. Time integration
 
