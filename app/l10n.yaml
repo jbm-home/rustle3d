@@ -1,0 +1,7 @@
+# Flutter's message catalog (docs/architecture.md §7.7): English is the
+# template, other languages translate its keys.
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+output-class: L
+nullable-getter: false

@@ -6,49 +6,44 @@
 import 'package:material_ui/material_ui.dart';
 
 import 'design/tokens.dart';
+import 'i18n.dart';
 
 enum GuideStep {
-  measurements(
-    'Measurements',
-    'Check the body the garment is made for: its size and measurements.',
-    'Open Body',
-    null,
-  ),
-  pattern(
-    'Pattern',
-    'Shape the pieces: drag their points on the pattern, or ⇧-drag a hem or a seam on the garment.',
-    'Add a piece',
-    'select',
-  ),
-  sew(
-    'Sew',
-    'Join the pieces: click an edge on the pattern, then the edge to sew it to.',
-    'Sew tool',
-    'sew',
-  ),
-  fabric(
-    'Fabric',
-    'Choose what the garment is made of, in the panel on the right.',
-    null,
-    null,
-  ),
-  drape(
-    'Drape',
-    'Watch it drape on the body. Then drag the cloth, or ⌥-click to pin it.',
-    'Simulate',
-    null,
-  );
+  measurements(null),
+  pattern('select'),
+  sew('sew'),
+  fabric(null),
+  drape(null);
 
-  const GuideStep(this.label, this.goal, this.action, this.tool);
-
-  final String label;
-  final String goal;
-
-  /// The banner's main button, if the step has one.
-  final String? action;
+  const GuideStep(this.tool);
 
   /// The tool rail entry the step uses.
   final String? tool;
+
+  String label(L l) => switch (this) {
+    measurements => l.stepMeasurements,
+    pattern => l.stepPattern,
+    sew => l.stepSew,
+    fabric => l.stepFabric,
+    drape => l.stepDrape,
+  };
+
+  String goal(L l) => switch (this) {
+    measurements => l.stepMeasurementsGoal,
+    pattern => l.stepPatternGoal,
+    sew => l.stepSewGoal,
+    fabric => l.stepFabricGoal,
+    drape => l.stepDrapeGoal,
+  };
+
+  /// The banner's main button, if the step has one.
+  String? action(L l) => switch (this) {
+    measurements => l.stepMeasurementsAction,
+    pattern => l.stepPatternAction,
+    sew => l.stepSewAction,
+    fabric => null,
+    drape => l.simulate,
+  };
 
   GuideStep? get next => index + 1 < values.length ? values[index + 1] : null;
 
@@ -85,7 +80,10 @@ class GuideBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
-    final action = step == GuideStep.drape && running ? 'Pause' : step.action;
+    final l = context.l;
+    final action = step == GuideStep.drape && running
+        ? l.pause
+        : step.action(l);
     return AnimatedSize(
       duration: Motion.normal,
       curve: Motion.curve,
@@ -115,7 +113,7 @@ class GuideBanner extends StatelessWidget {
                       Icon(Icons.flag_rounded, size: 16, color: p.accent),
                       const SizedBox(width: Space.s),
                       Text(
-                        'Step ${step.index + 1} of ${GuideStep.values.length}',
+                        l.stepOf(step.index + 1, GuideStep.values.length),
                         style: ts(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w600,
@@ -125,7 +123,7 @@ class GuideBanner extends StatelessWidget {
                       const SizedBox(width: Space.m),
                       Expanded(
                         child: Text(
-                          step.goal,
+                          step.goal(l),
                           style: ts(fontSize: 13, color: p.text),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -147,12 +145,11 @@ class GuideBanner extends StatelessWidget {
                           style: TextButton.styleFrom(
                             visualDensity: VisualDensity.compact,
                           ),
-                          child: const Text('Next  →'),
+                          child: Text(l.guideNext),
                         ),
                       ],
                       IconButton(
-                        tooltip:
-                            'Hide the guide (click a step to bring it back)',
+                        tooltip: l.guideHide,
                         onPressed: onClose,
                         visualDensity: VisualDensity.compact,
                         icon: Icon(

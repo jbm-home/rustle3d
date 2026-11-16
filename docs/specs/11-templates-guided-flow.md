@@ -9,7 +9,9 @@ Rust recipes in `r3d_commands::templates` (`template.apply`,
 `template.list`; sizes in cm, filled in from the avatar); the start screen
 with rendered thumbnails and a sizes sheet per body; the step bar with a
 goal, an action and a highlighted tool per step; the Learn panel (task
-cards; "Show me" plays on the open project through ordinary commands);
+cards; "Show me" points at the views, tools and panels involved with
+the tour's coach marks, and never changes the project; keys and button
+names in bold);
 a first-launch tour. Not yet: sizes on a body silhouette (plain fields for
 now). Templates are recipes in code
 rather than data files: the drafts compute curves and lengths (e.g. the
@@ -27,7 +29,8 @@ knowing pattern making, and I learn along the way.
 - **Guided flow** for new garments: a step bar *Measurements → Pattern → Sew →
   Fabric → Drape*. Each step highlights its tools and shows a one-line goal.
   Steps can be skipped, and the flow can be closed at any time.
-- **Learn panel**: short task cards that can play as demos (scripted
+- **Learn panel**: short task cards that show where each action happens
+(coach marks over the window), without touching the project (no scripted
   commands).
 - Templates are plain data (a recipe file plus code), so the community can add
   more.

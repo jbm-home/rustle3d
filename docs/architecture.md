@@ -376,24 +376,28 @@ document. Clippy denies `unwrap`/`expect`/`panic` outside tests.
 
 ### 7.7 Internationalisation — current choice
 
-English is the default UI language. Other languages come later, but the code
-must be **i18n-ready from day one**:
+English is the default UI language; French is the second one (the user
+picks the language in the app, remembered in their library folder). The
+code stays **i18n-ready** for more:
 
 - **No user-facing prose is built in the core crates.** Errors and messages
   from `r3d-core` / `r3d-commands` are structured: a stable `code`
   (`"entity_not_found"`) plus named `args` (`{"id": "panel:3"}`). The English
   `Display` text is only a fallback for logs and the CLI. Front-ends translate
   from `code` + `args`.
-- **Front-end strings** go through a message catalog keyed by stable ids
-  (Fluent `.ftl` files, `en` first). The format follows the GUI stack (7.1),
-  but the keys and the `code` + `args` contract do not change.
+- **Front-end strings** go through a message catalog keyed by stable ids:
+  Flutter's ARB files (`app/lib/l10n/app_en.arb` is the template,
+  `app_fr.arb` translates it; `flutter gen-l10n` generates the `L` class).
+  Core errors are translated in `app/lib/src/i18n.dart` from `code` +
+  `args`; a code without a translation shows the English `text`.
 - **Not translated**: command names, query names, JSON schemas and file
   formats. They are part of the agent/scripting API and stay in English.
 - **Locale-aware formatting** for numbers and units in the UI (decimal
   separator). Stored data stays locale-independent (mm, `.` decimals).
 - User data such as panel names is never translated. Default names created by
-  commands ("Panel 1") come from an `en` default and can later take a locale
-  parameter.
+  commands ("Panel 1") come from an `en` default; the app names new pieces
+  in the UI language (it passes `name`, and renames a template's pieces
+  right after drafting, before the history starts).
 
 ### 7.8 2D ↔ 3D editing (pattern = single source of truth)
 
@@ -466,3 +470,4 @@ must be **i18n-ready from day one**:
 | 2026-11-16 | The user's library (body presets) is outside the project engine in the FFI | The start screen needs it before a project is open |
 | 2026-11-16 | Views without a shared texture render into their own and are read back (Linux, Windows) | The app must run on Linux/WSL2 now; zero-copy dma-buf/D3D12 sharing can replace it later |
 | 2026-11-16 | `r3d-app` skeleton removed; `r3d-ffi` is the app's bridge crate | The desktop app is the Flutter one (7.1); no dead code |
+| 2026-11-16 | UI catalog in ARB (Flutter gen-l10n, `intl`) instead of Fluent; French added, language chosen in the app | ARB is the Flutter stack's native format (7.7 said the format follows the GUI stack); keys and the `code` + `args` contract are unchanged |

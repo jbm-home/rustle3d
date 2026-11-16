@@ -5,61 +5,45 @@
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'design/tokens.dart';
+import 'i18n.dart';
 import 'projects.dart';
 import 'rust/api/engine.dart';
 import 'rust/api/library.dart';
 import 'rust/api/templates.dart';
 
-/// What the start screen offers, in order. Titles and blurbs are UI text;
-/// the ids are the `template.apply` values.
+/// What the start screen offers, in order: the `template.apply` ids.
 const _templates = [
-  (
-    't_shirt',
-    'T-shirt',
-    'Front, back and short sleeves, in jersey.',
-    Icons.checkroom_rounded,
-  ),
-  (
-    'dress',
-    'Dress',
-    'Sleeveless, gently shaped, knee length.',
-    Icons.dry_cleaning_rounded,
-  ),
-  (
-    'straight_skirt',
-    'Straight skirt',
-    'Close over the hips, from the waist to the knee.',
-    Icons.straighten_rounded,
-  ),
-  (
-    'a_line_skirt',
-    'A-line skirt',
-    'Flares gently from the hips to the hem.',
-    Icons.change_history_rounded,
-  ),
-  (
-    'tote_bag',
-    'Tote bag',
-    'Two pieces and four seams: the easiest start.',
-    Icons.shopping_bag_outlined,
-  ),
+  ('t_shirt', Icons.checkroom_rounded),
+  ('dress', Icons.dry_cleaning_rounded),
+  ('straight_skirt', Icons.straighten_rounded),
+  ('a_line_skirt', Icons.change_history_rounded),
+  ('tote_bag', Icons.shopping_bag_outlined),
 ];
 
-/// The sizes a template reads, with their labels and hints.
-const _sizeLabels = {
-  'chest_cm': ('Chest', 'Around the fullest part of the chest'),
-  'waist_cm': ('Waist', 'Around the narrowest part'),
-  'hips_cm': ('Hips', 'Around the fullest part'),
-  'length_cm': (
-    'Length',
-    'Neck to hem for tops, waist to hem for skirts, height of a bag',
-  ),
-  'sleeve_cm': ('Sleeve', 'From the top of the shoulder'),
-  'width_cm': ('Width', 'Across the bag'),
-  'ease_cm': ('Ease', 'Room added to the body'),
+/// A template's title and blurb.
+(String, String) _templateText(L l, String id) => switch (id) {
+  't_shirt' => (l.templateTShirt, l.templateTShirtBlurb),
+  'dress' => (l.templateDress, l.templateDressBlurb),
+  'straight_skirt' => (l.templateStraightSkirt, l.templateStraightSkirtBlurb),
+  'a_line_skirt' => (l.templateALineSkirt, l.templateALineSkirtBlurb),
+  'tote_bag' => (l.templateToteBag, l.templateToteBagBlurb),
+  _ => (id, ''),
+};
+
+/// A size a template reads: its label and hint.
+(String, String) _sizeText(L l, String key) => switch (key) {
+  'chest_cm' => (l.sizeChest, l.sizeChestHint),
+  'waist_cm' => (l.sizeWaist, l.sizeWaistHint),
+  'hips_cm' => (l.sizeHips, l.sizeHipsHint),
+  'length_cm' => (l.sizeLength, l.sizeLengthHint),
+  'sleeve_cm' => (l.sizeSleeve, l.sizeSleeveHint),
+  'width_cm' => (l.sizeWidth, l.sizeWidthHint),
+  'ease_cm' => (l.sizeEase, l.sizeEaseHint),
+  _ => (key, ''),
 };
 
 class StartScreen extends StatefulWidget {
@@ -68,12 +52,18 @@ class StartScreen extends StatefulWidget {
     required this.store,
     required this.dark,
     required this.onToggleTheme,
+    required this.language,
+    required this.onLanguage,
     required this.onOpen,
   });
 
   final ProjectStore store;
   final bool dark;
   final VoidCallback onToggleTheme;
+
+  /// The UI language's code, and how to change it.
+  final String language;
+  final ValueChanged<String> onLanguage;
 
   /// Open the project folder at this path.
   final ValueChanged<String> onOpen;
@@ -121,18 +111,19 @@ class _StartScreenState extends State<StartScreen> {
   Future<void> _blank() async {
     try {
       final path = widget.store.create(
-        name: 'Untitled',
+        name: context.l.untitled,
         body: widget.store.standardBody(),
       );
       widget.onOpen(path);
     } on ApiError catch (e) {
-      _toast(e.text);
+      _toast(context.error(e));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
+    final l = context.l;
     return Scaffold(
       body: Column(
         children: [
@@ -153,8 +144,12 @@ class _StartScreenState extends State<StartScreen> {
                     ),
                   ),
                   const Spacer(),
+                  LanguageButton(
+                    current: widget.language,
+                    onChanged: widget.onLanguage,
+                  ),
                   IconButton(
-                    tooltip: widget.dark ? 'Light theme' : 'Dark theme',
+                    tooltip: widget.dark ? l.themeLight : l.themeDark,
                     onPressed: () {
                       widget.onToggleTheme();
                       setState(() {});
@@ -186,7 +181,7 @@ class _StartScreenState extends State<StartScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'What will you make?',
+                        l.startTitle,
                         style: ts(
                           fontSize: 30,
                           fontWeight: FontWeight.w700,
@@ -196,7 +191,7 @@ class _StartScreenState extends State<StartScreen> {
                       ),
                       const SizedBox(height: Space.s),
                       Text(
-                        'Start from a garment drafted to your measurements, then shape it on the pattern or on the body.',
+                        l.startSubtitle,
                         style: ts(
                           fontSize: 15,
                           color: p.textMuted,
@@ -208,20 +203,24 @@ class _StartScreenState extends State<StartScreen> {
                         spacing: Space.l,
                         runSpacing: Space.l,
                         children: [
-                          for (final (id, title, blurb, icon) in _templates)
-                            _TemplateCard(
-                              title: title,
-                              blurb: blurb,
-                              icon: icon,
-                              thumb: _thumb(id),
-                              onTap: () => _newGarment(id, title),
-                            ),
+                          for (final (id, icon) in _templates)
+                            if (_templateText(l, id) case (
+                              final title,
+                              final blurb,
+                            ))
+                              _TemplateCard(
+                                title: title,
+                                blurb: blurb,
+                                icon: icon,
+                                thumb: _thumb(id),
+                                onTap: () => _newGarment(id, title),
+                              ),
                           _BlankCard(onTap: _blank),
                         ],
                       ),
                       const SizedBox(height: Space.xl * 1.5),
                       Text(
-                        'Recent',
+                        l.recent,
                         style: ts(
                           fontSize: 17,
                           fontWeight: FontWeight.w600,
@@ -231,7 +230,7 @@ class _StartScreenState extends State<StartScreen> {
                       const SizedBox(height: Space.m),
                       if (_recent.isEmpty)
                         Text(
-                          'Your projects will appear here. They are saved as you work, in Documents › Rustle3D.',
+                          l.recentEmpty,
                           style: ts(fontSize: 13, color: p.textMuted),
                         )
                       else
@@ -441,12 +440,12 @@ class _BlankCard extends StatelessWidget {
           ),
           const SizedBox(height: Space.m),
           Text(
-            'Blank project',
+            context.l.blankProject,
             style: ts(fontSize: 15, fontWeight: FontWeight.w600, color: p.text),
           ),
           const SizedBox(height: 6),
           Text(
-            'Draw your own pieces.',
+            context.l.blankProjectBlurb,
             style: ts(fontSize: 12.5, color: p.textMuted),
           ),
         ],
@@ -465,14 +464,15 @@ class _RecentRow extends StatefulWidget {
   State<_RecentRow> createState() => _RecentRowState();
 }
 
-String _ago(DateTime t) {
+String _ago(BuildContext context, DateTime t) {
+  final l = context.l;
   final d = DateTime.now().difference(t);
-  if (d.inMinutes < 1) return 'just now';
-  if (d.inHours < 1) return '${d.inMinutes} min ago';
-  if (d.inDays < 1) return '${d.inHours} h ago';
-  if (d.inDays == 1) return 'yesterday';
-  if (d.inDays < 30) return '${d.inDays} days ago';
-  return '${t.year}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')}';
+  if (d.inMinutes < 1) return l.agoJustNow;
+  if (d.inHours < 1) return l.agoMinutes(d.inMinutes);
+  if (d.inDays < 1) return l.agoHours(d.inHours);
+  if (d.inDays == 1) return l.agoYesterday;
+  if (d.inDays < 30) return l.agoDays(d.inDays);
+  return DateFormat.yMMMd(Localizations.localeOf(context).toString()).format(t);
 }
 
 class _RecentRowState extends State<_RecentRow> {
@@ -511,7 +511,7 @@ class _RecentRowState extends State<_RecentRow> {
               ),
               const Spacer(),
               Text(
-                _ago(widget.project.modified),
+                _ago(context, widget.project.modified),
                 style: ts(fontSize: 12.5, color: p.textMuted),
               ),
             ],
@@ -590,8 +590,9 @@ class _NewGarmentDialogState extends State<_NewGarmentDialog> {
       final v = double.tryParse(e.value.text.replaceAll(',', '.'));
       if (v == null || v <= 0) {
         setState(
-          () => _error =
-              '${_sizeLabels[e.key]?.$1 ?? e.key} must be a positive number of cm.',
+          () => _error = context.l.sizeMustBePositive(
+            _sizeText(context.l, e.key).$1,
+          ),
         );
         return;
       }
@@ -604,16 +605,18 @@ class _NewGarmentDialogState extends State<_NewGarmentDialog> {
         body: _body,
         template: widget.template,
         sizes: sizes,
+        pieceNames: pieceNames(context.l),
       );
       Navigator.pop(context, path);
     } on ApiError catch (e) {
-      setState(() => _error = e.text);
+      setState(() => _error = context.error(e));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
+    final l = context.l;
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(kRadius * 1.4),
@@ -629,7 +632,7 @@ class _NewGarmentDialogState extends State<_NewGarmentDialog> {
               Row(
                 children: [
                   Text(
-                    'New ${widget.title.toLowerCase()}',
+                    l.newGarmentTitle(widget.title),
                     style: ts(fontSize: 20, fontWeight: FontWeight.w700),
                   ),
                   const Spacer(),
@@ -640,30 +643,33 @@ class _NewGarmentDialogState extends State<_NewGarmentDialog> {
                 ],
               ),
               Text(
-                'Drafted to the body\'s measurements. You can change everything later.',
+                l.newGarmentSubtitle,
                 style: ts(fontSize: 13, color: p.textMuted, height: 1.4),
               ),
               const SizedBox(height: Space.l),
               TextField(
                 controller: _name,
-                decoration: const InputDecoration(
-                  labelText: 'Name',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l.fieldName,
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: Space.l),
               DropdownButtonFormField<String>(
                 initialValue: _body['name'] as String,
-                decoration: const InputDecoration(
-                  labelText: 'Body',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.accessibility_new_rounded, size: 18),
+                decoration: InputDecoration(
+                  labelText: l.fieldBody,
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(
+                    Icons.accessibility_new_rounded,
+                    size: 18,
+                  ),
                 ),
                 items: [
                   for (final x in _presets)
                     DropdownMenuItem(
                       value: x['name'] as String,
-                      child: Text(x['name'] as String),
+                      child: Text(context.presetName(x)),
                     ),
                 ],
                 onChanged: (name) => setState(() {
@@ -680,7 +686,7 @@ class _NewGarmentDialogState extends State<_NewGarmentDialog> {
                     SizedBox(
                       width: 224,
                       child: Tooltip(
-                        message: _sizeLabels[e.key]?.$2 ?? '',
+                        message: _sizeText(l, e.key).$2,
                         child: TextField(
                           controller: e.value,
                           keyboardType: const TextInputType.numberWithOptions(
@@ -693,8 +699,8 @@ class _NewGarmentDialogState extends State<_NewGarmentDialog> {
                           ],
                           onSubmitted: (_) => _create(),
                           decoration: InputDecoration(
-                            labelText: _sizeLabels[e.key]?.$1 ?? e.key,
-                            suffixText: 'cm',
+                            labelText: _sizeText(l, e.key).$1,
+                            suffixText: l.cm,
                             border: const OutlineInputBorder(),
                           ),
                         ),
@@ -712,13 +718,13 @@ class _NewGarmentDialogState extends State<_NewGarmentDialog> {
                   const Spacer(),
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel'),
+                    child: Text(l.cancel),
                   ),
                   const SizedBox(width: Space.s),
                   FilledButton.icon(
                     onPressed: _create,
                     icon: const Icon(Icons.auto_awesome_rounded, size: 18),
-                    label: const Text('Create'),
+                    label: Text(l.create),
                   ),
                 ],
               ),

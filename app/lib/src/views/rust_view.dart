@@ -13,6 +13,7 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../design/tokens.dart';
+import '../i18n.dart';
 import '../rust/api/engine.dart';
 
 const _channel = MethodChannel('dev.rustle3d/texture');
@@ -286,7 +287,7 @@ class _RustViewState extends State<RustView>
               } on ApiError catch (error) {
                 ScaffoldMessenger.maybeOf(context)?.showSnackBar(
                   SnackBar(
-                    content: Text(error.text),
+                    content: Text(context.error(error)),
                     behavior: SnackBarBehavior.floating,
                   ),
                 );
@@ -370,12 +371,13 @@ class _ChangeLabel extends StatelessWidget {
 
   final PatternChange change;
 
-  String get _text {
+  String _text(BuildContext context) {
+    final l = context.l;
     final mm = change.mm;
-    final amount = '${mm.abs().toStringAsFixed(0)} mm';
+    final amount = context.number(mm.abs());
     return switch (change.kind) {
-      'fit' => mm >= 0 ? 'Taken in $amount' : 'Let out $amount',
-      _ => mm >= 0 ? 'Longer $amount' : 'Shorter $amount',
+      'fit' => mm >= 0 ? l.changeTakenIn(amount) : l.changeLetOut(amount),
+      _ => mm >= 0 ? l.changeLonger(amount) : l.changeShorter(amount),
     };
   }
 
@@ -390,7 +392,7 @@ class _ChangeLabel extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
         ),
         child: Text(
-          _text,
+          _text(context),
           style: ts(
             fontSize: 12.5,
             fontWeight: FontWeight.w600,

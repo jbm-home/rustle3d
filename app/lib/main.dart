@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:material_ui/material_ui.dart';
 
 import 'src/design/tokens.dart';
+import 'src/i18n.dart';
 import 'src/projects.dart';
 import 'src/rust/api/engine.dart';
 import 'src/rust/frb_generated.dart';
@@ -57,6 +58,13 @@ class Rustle3dApp extends StatefulWidget {
 class _Rustle3dAppState extends State<Rustle3dApp> {
   bool _dark = const bool.fromEnvironment('R3D_DARK');
   late Engine? _engine = widget.engine;
+  late final _languageMemory = LanguageMemory(widget.store.libraryDir);
+  late String _language = _languageMemory.code;
+
+  void _setLanguage(String code) {
+    _languageMemory.code = code;
+    setState(() => _language = code);
+  }
 
   @override
   void initState() {
@@ -83,8 +91,12 @@ class _Rustle3dAppState extends State<Rustle3dApp> {
       _prepare(engine);
       setState(() => _engine = engine);
     } on ApiError catch (e) {
-      _messenger.currentState?.showSnackBar(
-        SnackBar(content: Text(e.text), behavior: SnackBarBehavior.floating),
+      final messenger = _messenger.currentState;
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text(messenger.context.error(e)),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
     }
   }
@@ -109,6 +121,12 @@ class _Rustle3dAppState extends State<Rustle3dApp> {
         debugShowCheckedModeBanner: false,
         scaffoldMessengerKey: _messenger,
         theme: buildTheme(_dark),
+        locale: Locale(_language),
+        localizationsDelegates: const [
+          L.delegate,
+          ...GlobalMaterialLocalizations.delegates,
+        ],
+        supportedLocales: L.supportedLocales,
         home: AnimatedSwitcher(
           duration: Motion.normal,
           child: engine == null
@@ -117,6 +135,8 @@ class _Rustle3dAppState extends State<Rustle3dApp> {
                   store: widget.store,
                   dark: _dark,
                   onToggleTheme: _toggleTheme,
+                  language: _language,
+                  onLanguage: _setLanguage,
                   onOpen: _open,
                 )
               : Shell(
@@ -125,6 +145,8 @@ class _Rustle3dAppState extends State<Rustle3dApp> {
                   libraryDir: widget.store.libraryDir,
                   dark: _dark,
                   onToggleTheme: _toggleTheme,
+                  language: _language,
+                  onLanguage: _setLanguage,
                   onHome: _home,
                 ),
         ),

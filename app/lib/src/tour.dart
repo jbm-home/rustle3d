@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:material_ui/material_ui.dart';
 
 import 'design/tokens.dart';
+import 'i18n.dart';
 
 /// One stop of the tour: the area it points at and what it says.
 class TourStop {
@@ -36,14 +37,37 @@ class TourMemory {
   }
 }
 
-/// Show [stops] one after the other over the window.
-Future<void> showTour(BuildContext context, List<TourStop> stops) {
+/// [text] with `**…**` runs in bold, in [strong] (keys, button names).
+TextSpan marked(String text, TextStyle style, Color strong) {
+  final parts = text.split('**');
+  return TextSpan(
+    style: style,
+    children: [
+      for (var i = 0; i < parts.length; i++)
+        TextSpan(
+          text: parts[i],
+          style: i.isOdd
+              ? TextStyle(fontWeight: FontWeight.w700, color: strong)
+              : null,
+        ),
+    ],
+  );
+}
+
+/// Show [stops] one after the other over the window; the last stop's
+/// button says [done] (default: Start). Stop texts may mark keys in
+/// `**bold**`.
+Future<void> showTour(
+  BuildContext context,
+  List<TourStop> stops, {
+  String? done,
+}) {
   return Navigator.of(context).push(
     PageRouteBuilder<void>(
       opaque: false,
       barrierDismissible: false,
       transitionDuration: Motion.normal,
-      pageBuilder: (_, _, _) => _Tour(stops: stops),
+      pageBuilder: (_, _, _) => _Tour(stops: stops, done: done),
       transitionsBuilder: (_, animation, _, child) =>
           FadeTransition(opacity: animation, child: child),
     ),
@@ -51,9 +75,10 @@ Future<void> showTour(BuildContext context, List<TourStop> stops) {
 }
 
 class _Tour extends StatefulWidget {
-  const _Tour({required this.stops});
+  const _Tour({required this.stops, required this.done});
 
   final List<TourStop> stops;
+  final String? done;
 
   @override
   State<_Tour> createState() => _TourState();
@@ -134,9 +159,12 @@ class _TourState extends State<_Tour> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Text(
-                    stop.text,
-                    style: ts(fontSize: 13, color: p.textMuted, height: 1.4),
+                  Text.rich(
+                    marked(
+                      stop.text,
+                      ts(fontSize: 13, color: p.textMuted, height: 1.4),
+                      p.text,
+                    ),
                   ),
                   const SizedBox(height: Space.m),
                   Row(
@@ -146,15 +174,18 @@ class _TourState extends State<_Tour> {
                         style: ts(fontSize: 12, color: p.textMuted),
                       ),
                       const Spacer(),
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Skip'),
-                      ),
+                      if (_at + 1 < widget.stops.length)
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text(context.l.skip),
+                        ),
                       const SizedBox(width: Space.xs),
                       FilledButton(
                         onPressed: _next,
                         child: Text(
-                          _at + 1 < widget.stops.length ? 'Next' : 'Start',
+                          _at + 1 < widget.stops.length
+                              ? context.l.next
+                              : widget.done ?? context.l.start,
                         ),
                       ),
                     ],

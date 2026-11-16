@@ -172,8 +172,8 @@ Built (2026-11-16), demo `./demos/m10/demo.sh`:
 - App: start screen (template cards with rendered thumbnails, sizes sheet
   per body, blank project, recent projects in Documents/Rustle3D, saved
   after every change), live step bar Measurements → Pattern → Sew → Fabric
-  → Drape (goal, action, highlighted tool), Learn panel (task cards, some
-  playing on the project), first-launch tour.
+  → Drape (goal, action, highlighted tool), Learn panel (task cards whose
+  "Show me" points at where things are), first-launch tour.
 - From the M8 leftovers: style lines and the selected edge drawn on the 3D
   garment (also in agents' renders); seam direction chevrons and red
   mismatched seams on the board; camera views (keys 1–4); per-piece
@@ -182,8 +182,15 @@ Built (2026-11-16), demo `./demos/m10/demo.sh`:
   textures are macOS-only); `scripts/release.sh` and a manual "Release
   builds" workflow (unsigned packages).
 
-Before v0.1: the 10-minute test with first-time users (docs/ux.md §5),
-fixes from it, then version 0.1.0. After v0.1: picking points and notches
+First-time user test (2026-11-16): conclusive, partly passed; the app
+stays simple, with detail UX fixes to make. Fixed from it: lengthening
+was hard to find (now also from the inspector, for an edge picked on the
+pattern or the garment: Shorter / Longer, Take in / Let out by a typed
+amount); Learn's demos changed the project (now they point at where
+things are); slider values can be typed. Also: the UI in French
+(language picker in the top bar and on the start screen, English by
+default).
+Before v0.1: the remaining detail fixes, then version 0.1.0. After v0.1: picking points and notches
 in 3D (needs point selection, in 2D too), zero-copy textures on Linux and
 Windows, signed packages.
 Known: XPBD creep lets a skirt slide a few cm below the waist before it

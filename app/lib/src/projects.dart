@@ -83,14 +83,15 @@ class ProjectStore {
   }
 
   /// Make a project called [name] for [body] (a preset entry: `{name,
-  /// body}`), drafted from [template] with [sizes] if given, and return its
-  /// folder. The project is then opened fresh, so its history starts
+  /// body}`), drafted from [template] with [sizes] if given, its pieces
+  /// renamed by [pieceNames], and return its folder. The project is then opened fresh, so its history starts
   /// empty.
   String create({
     required String name,
     required Map<String, dynamic> body,
     String? template,
     Map<String, double> sizes = const {},
+    Map<String, String> pieceNames = const {},
   }) {
     final path = freePath(name);
     final engine = Engine.open(path: path);
@@ -110,6 +111,22 @@ class ProjectStore {
             'sizes': sizes,
           }),
         );
+        // The template names its pieces in English: give them their names
+        // in the UI language.
+        final summary = jsonDecode(
+          engine.run(stepJson: jsonEncode({'type': 'project.summary'})),
+        );
+        for (final panel in (summary['panels'] as List? ?? const [])) {
+          final name = pieceNames[panel['name']];
+          if (name == null || name == panel['name']) continue;
+          engine.run(
+            stepJson: jsonEncode({
+              'type': 'panel.rename',
+              'panel': panel['id'],
+              'name': name,
+            }),
+          );
+        }
       }
       engine.run(
         stepJson: jsonEncode({'type': 'project.rename', 'name': name}),

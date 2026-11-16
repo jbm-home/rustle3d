@@ -9,6 +9,7 @@ import 'package:material_ui/material_ui.dart';
 import 'body_panel.dart';
 import 'design/tokens.dart';
 import 'guide.dart';
+import 'i18n.dart';
 import 'learn.dart';
 import 'tour.dart';
 import 'rust/api/engine.dart';
@@ -22,6 +23,8 @@ class Shell extends StatefulWidget {
     required this.libraryDir,
     required this.dark,
     required this.onToggleTheme,
+    required this.language,
+    required this.onLanguage,
     required this.onHome,
   });
 
@@ -31,6 +34,10 @@ class Shell extends StatefulWidget {
   final String libraryDir;
   final bool dark;
   final VoidCallback onToggleTheme;
+
+  /// The UI language's code, and how to change it.
+  final String language;
+  final ValueChanged<String> onLanguage;
 
   /// Back to the start screen.
   final VoidCallback onHome;
@@ -103,52 +110,51 @@ class _ShellState extends State<Shell> {
   final _tourPattern = GlobalKey();
   final _tourGarment = GlobalKey();
 
+  // What Learn cards point at, besides the tour's areas.
+  final _spotInspector = GlobalKey();
+  final _spotSimulate = GlobalKey();
+  final _spotCameras = GlobalKey();
+  final _spotBody = GlobalKey();
+  final _spotTools = {'sew': GlobalKey(), 'draw': GlobalKey()};
+
   void _maybeTour() {
     final memory = TourMemory(widget.libraryDir);
     if (memory.seen) return;
     memory.markSeen();
+    final l = context.l;
     showTour(context, [
-      TourStop(
-        _tourPattern,
-        'Your pattern',
-        'The flat pieces, full size. Drag their points to reshape them; R adds a piece.',
-      ),
-      TourStop(
-        _tourGarment,
-        'The garment on the body',
-        'Simulate drapes it. Drag to turn around; ⇧-drag a hem or a seam to change the pattern from here.',
-      ),
-      TourStop(
-        _tourGuide,
-        'One step at a time',
-        'The guide says what to do next. Click a step at the top to jump to it, or close the guide.',
-      ),
-      TourStop(
-        _tourTop,
-        'Help is always here',
-        'Learn has short how-tos that play on your project; Body changes the measurements. ⌘Z undoes anything.',
-      ),
+      TourStop(_tourPattern, l.tourPatternTitle, l.tourPatternText),
+      TourStop(_tourGarment, l.tourGarmentTitle, l.tourGarmentText),
+      TourStop(_tourGuide, l.tourGuideTitle, l.tourGuideText),
+      TourStop(_tourTop, l.tourHelpTitle, l.tourHelpText),
     ]);
   }
 
-  LearnActions _learnActions() => LearnActions(
-    run: (step) {
-      final out = _run(step);
+  /// A Learn card's coach marks. Only the selection may change: the
+  /// garment's own settings (fabric, pins) show with nothing selected.
+  void _showLearn(List<LearnStop> stops) {
+    if (stops.any((s) => s.$1 == Spot.garmentInspector)) {
+      _guard(() => widget.engine.select(panels: const []));
       _refresh();
-      return out;
-    },
-    query: _run,
-    setTool: _setTool,
-    simulate: _setRunning,
-    showBody: _showBody,
-    look: (side) => _look(switch (side) {
-      'side' => CameraSide.left,
-      'back' => CameraSide.back,
-      'three_quarter' => CameraSide.threeQuarter,
-      _ => CameraSide.front,
-    }),
-    toast: _toast,
-  );
+    }
+    showTour(context, [
+      for (final (spot, title, text) in stops)
+        TourStop(
+          switch (spot) {
+            Spot.pattern => _tourPattern,
+            Spot.garment => _tourGarment,
+            Spot.inspector || Spot.garmentInspector => _spotInspector,
+            Spot.simulate => _spotSimulate,
+            Spot.cameras => _spotCameras,
+            Spot.body => _spotBody,
+            Spot.sewTool => _spotTools['sew']!,
+            Spot.drawTool => _spotTools['draw']!,
+          },
+          title,
+          text,
+        ),
+    ], done: context.l.gotIt);
+  }
 
   void _look(CameraSide side) =>
       _guard(() => widget.engine.lookFrom(side: side));
@@ -173,7 +179,7 @@ class _ShellState extends State<Shell> {
     try {
       return jsonDecode(widget.engine.run(stepJson: jsonEncode(step)));
     } on ApiError catch (e) {
-      _toast(e.text);
+      _toast(context.error(e));
       return null;
     }
   }
@@ -224,7 +230,7 @@ class _ShellState extends State<Shell> {
     try {
       return call();
     } on ApiError catch (e) {
-      _toast(e.text);
+      _toast(context.error(e));
       return null;
     }
   }
@@ -280,7 +286,7 @@ class _ShellState extends State<Shell> {
     setState(() => _sewFrom = null);
     _refresh();
     if (out != null) {
-      _toast('Sewn. Flip it in the inspector if it looks twisted.');
+      _toast(context.l.toastSewn);
     }
   }
 
@@ -293,6 +299,7 @@ class _ShellState extends State<Shell> {
     }
     _run({
       'type': 'panel.create_rect',
+      'name': context.l.pieceNew(panels.length + 1),
       'origin': [right + 60, 0],
       'width': 300,
       'height': 400,
@@ -316,16 +323,16 @@ class _ShellState extends State<Shell> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Delete “${panel['name']}”?'),
-        content: const Text('You can undo this with ⌘Z.'),
+        title: Text(context.l.deleteTitle(panel['name'] as String)),
+        content: Text(context.l.deleteUndo),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.l.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
+            child: Text(context.l.delete),
           ),
         ],
       ),
@@ -339,12 +346,16 @@ class _ShellState extends State<Shell> {
   String _simStats() {
     final s = _sim;
     if (s == null || !s.loaded) return '';
-    return 'Cloth ${s.particles} points · step ${s.stepMs.toStringAsFixed(1)} ms · '
-        '${s.timeS.toStringAsFixed(1)} s · ';
+    return context.l.statsSim(
+      s.particles,
+      context.number(s.stepMs, 1),
+      context.number(s.timeS, 1),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final l = context.l;
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.keyZ, meta: true): _undo,
@@ -371,7 +382,7 @@ class _ShellState extends State<Shell> {
         autofocus: true,
         child: Scaffold(
           key: _scaffold,
-          endDrawer: LearnPanel(actions: _learnActions()),
+          endDrawer: LearnPanel(onShow: _showLearn),
           body: Column(
             children: [
               _TopBar(
@@ -379,9 +390,12 @@ class _ShellState extends State<Shell> {
                 projectName: (_summary['name'] as String?) ?? '',
                 dark: widget.dark,
                 onToggleTheme: widget.onToggleTheme,
+                language: widget.language,
+                onLanguage: widget.onLanguage,
                 onUndo: _undo,
                 onRedo: _redo,
                 onBody: _showBody,
+                bodyKey: _spotBody,
                 onLearn: () => _scaffold.currentState?.openEndDrawer(),
                 onHome: widget.onHome,
                 step: _step,
@@ -406,6 +420,7 @@ class _ShellState extends State<Shell> {
                       _ToolRail(
                         active: _tool,
                         highlight: _guide ? _step.tool : null,
+                        keys: _spotTools,
                         onSelect: (tool) {
                           if (tool == 'rectangle') {
                             _addRectangle();
@@ -417,7 +432,7 @@ class _ShellState extends State<Shell> {
                       Expanded(
                         child: _ViewCard(
                           key: _tourPattern,
-                          title: 'Pattern',
+                          title: l.viewPattern,
                           icon: Icons.architecture_outlined,
                           child: RustView(
                             engine: widget.engine,
@@ -437,9 +452,10 @@ class _ShellState extends State<Shell> {
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              _CameraBar(onLook: _look),
+                              _CameraBar(key: _spotCameras, onLook: _look),
                               const SizedBox(width: Space.s),
                               _SimControls(
+                                key: _spotSimulate,
                                 status: _sim,
                                 onRun: _setRunning,
                                 onRestart: _restart,
@@ -453,12 +469,12 @@ class _ShellState extends State<Shell> {
                             onFrameTime: (ms) => _onFrame(false, ms),
                             onPinned: (_) {
                               _refresh();
-                              _toast('Pinned. Remove it in the inspector.');
+                              _toast(l.toastPinned);
                             },
                             drawing: _tool == 'draw',
                             onDrawn: (_) {
                               _refresh();
-                              _toast('Line added to the pattern.');
+                              _toast(l.toastLineAdded);
                             },
                           ),
                         ),
@@ -467,6 +483,7 @@ class _ShellState extends State<Shell> {
                       SizedBox(
                         width: 264,
                         child: _Inspector(
+                          key: _spotInspector,
                           selection: _selection,
                           panel: _panel,
                           summary: _summary,
@@ -494,16 +511,19 @@ class _ShellState extends State<Shell> {
               ),
               _StatusBar(
                 hint: switch (_tool) {
-                  'sew' when _sewFrom == null =>
-                    'Sew: click the first edge on the pattern · V to stop',
-                  'sew' => 'Sew: now click the edge to sew it to · V to stop',
-                  'draw' => 'Draw: drag on the 3D garment; the line goes on the pattern · V to stop',
-                  _ when _selection.isEmpty => 'In 3D: drag to pull the cloth · ⇧-drag a hem to lengthen, a seam to take in · ⌘-drag to move a piece · ⌥-click to pin',
-                  _ => 'Adjust the selection in the inspector · ⌫ deletes · ⌘Z undoes',
+                  'sew' when _sewFrom == null => l.hintSewFirst,
+                  'sew' => l.hintSewSecond,
+                  'draw' => l.hintDraw,
+                  _ when _selection.isEmpty => l.hintIdle,
+                  _ => l.hintSelection,
                 },
                 stats:
-                    '${_simStats()}Rust render · pattern ${_boardMs.toStringAsFixed(1)} ms · '
-                    '3D ${_garmentMs.toStringAsFixed(1)} ms · ${_fps.toStringAsFixed(0)} fps',
+                    _simStats() +
+                    l.statsRender(
+                      context.number(_boardMs, 1),
+                      context.number(_garmentMs, 1),
+                      context.number(_fps),
+                    ),
               ),
             ],
           ),
@@ -519,9 +539,12 @@ class _TopBar extends StatelessWidget {
     required this.projectName,
     required this.dark,
     required this.onToggleTheme,
+    required this.language,
+    required this.onLanguage,
     required this.onUndo,
     required this.onRedo,
     required this.onBody,
+    required this.bodyKey,
     required this.onLearn,
     required this.onHome,
     required this.step,
@@ -532,9 +555,14 @@ class _TopBar extends StatelessWidget {
   final String projectName;
   final bool dark;
   final VoidCallback onToggleTheme;
+  final String language;
+  final ValueChanged<String> onLanguage;
   final VoidCallback onUndo;
   final VoidCallback onRedo;
   final VoidCallback onBody;
+
+  /// The Body button, for Learn to point at.
+  final GlobalKey bodyKey;
   final VoidCallback onLearn;
   final VoidCallback onHome;
   final GuideStep step;
@@ -546,6 +574,7 @@ class _TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
+    final l = context.l;
     const steps = GuideStep.values;
     return SizedBox(
       height: 56,
@@ -555,7 +584,7 @@ class _TopBar extends StatelessWidget {
         child: Row(
           children: [
             Tooltip(
-              message: 'All projects',
+              message: l.allProjects,
               child: InkWell(
                 onTap: onHome,
                 borderRadius: BorderRadius.circular(8),
@@ -587,7 +616,7 @@ class _TopBar extends StatelessWidget {
             for (var i = 0; i < steps.length; i++) ...[
               _StepChip(
                 index: i + 1,
-                label: steps[i].label,
+                label: steps[i].label(l),
                 active: guide && steps[i] == step,
                 done: steps[i].index < step.index,
                 onTap: () => onStep(steps[i]),
@@ -606,28 +635,30 @@ class _TopBar extends StatelessWidget {
             TextButton.icon(
               onPressed: onLearn,
               icon: const Icon(Icons.school_outlined, size: 18),
-              label: const Text('Learn'),
+              label: Text(l.learn),
             ),
             TextButton.icon(
+              key: bodyKey,
               onPressed: onBody,
               icon: const Icon(Icons.accessibility_new_rounded, size: 18),
-              label: const Text('Body'),
+              label: Text(l.body),
             ),
             const SizedBox(width: Space.s),
             _IconAction(
               icon: Icons.undo_rounded,
-              tip: 'Undo  ⌘Z',
+              tip: l.undoTip,
               onTap: onUndo,
             ),
             _IconAction(
               icon: Icons.redo_rounded,
-              tip: 'Redo  ⇧⌘Z',
+              tip: l.redoTip,
               onTap: onRedo,
             ),
             const SizedBox(width: Space.s),
+            LanguageButton(current: language, onChanged: onLanguage),
             _IconAction(
               icon: dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-              tip: dark ? 'Light theme' : 'Dark theme',
+              tip: dark ? l.themeLight : l.themeDark,
               onTap: onToggleTheme,
             ),
           ],
@@ -741,41 +772,40 @@ class _ToolRail extends StatelessWidget {
   const _ToolRail({
     required this.active,
     required this.highlight,
+    required this.keys,
     required this.onSelect,
   });
 
   final String active;
 
+  /// Buttons Learn points at, by tool.
+  final Map<String, GlobalKey> keys;
+
   /// The tool the guided flow's current step uses, ringed.
   final String? highlight;
   final ValueChanged<String> onSelect;
 
-  static const _tools = [
-    (
-      'select',
-      Icons.near_me_outlined,
-      'Select',
-      'V',
-      'Click a panel or point; drag to move',
-    ),
+  /// id, icon, name, key, hint.
+  static List<(String, IconData, String, String, String)> _tools(L l) => [
+    ('select', Icons.near_me_outlined, l.toolSelect, 'V', l.toolSelectHint),
     (
       'rectangle',
       Icons.crop_square_rounded,
-      'Rectangle',
+      l.toolRectangle,
       'R',
-      'Add a rectangular panel',
+      l.toolRectangleHint,
     ),
-    ('polygon', Icons.pentagon_outlined, 'Polygon', 'P', 'Coming soon'),
-    ('curve', Icons.gesture_rounded, 'Curve', 'C', 'Coming soon'),
+    ('polygon', Icons.pentagon_outlined, l.toolPolygon, 'P', l.comingSoon),
+    ('curve', Icons.gesture_rounded, l.toolCurve, 'C', l.comingSoon),
+    ('draw', Icons.brush_rounded, l.toolDraw, 'D', l.toolDrawHint),
     (
-      'draw',
-      Icons.brush_rounded,
-      'Draw on garment',
-      'D',
-      'Drag on the 3D garment: the line goes on the pattern',
+      'notch',
+      Icons.vertical_align_center_rounded,
+      l.toolNotch,
+      'N',
+      l.comingSoon,
     ),
-    ('notch', Icons.vertical_align_center_rounded, 'Notch', 'N', 'Coming soon'),
-    ('sew', Icons.link_rounded, 'Sew', 'S', 'Click two edges on the pattern'),
+    ('sew', Icons.link_rounded, l.toolSew, 'S', l.toolSewHint),
   ];
 
   @override
@@ -792,7 +822,7 @@ class _ToolRail extends StatelessWidget {
       ),
       child: Column(
         children: [
-          for (final (id, icon, name, key, hint) in _tools)
+          for (final (id, icon, name, key, hint) in _tools(context.l))
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 2),
               child: Tooltip(
@@ -811,6 +841,7 @@ class _ToolRail extends StatelessWidget {
                 ),
                 preferBelow: false,
                 child: _RailButton(
+                  key: keys[id],
                   icon: icon,
                   active: id == active,
                   highlight: id == highlight,
@@ -826,6 +857,7 @@ class _ToolRail extends StatelessWidget {
 
 class _RailButton extends StatefulWidget {
   const _RailButton({
+    super.key,
     required this.icon,
     required this.active,
     required this.highlight,
@@ -953,6 +985,7 @@ class _ViewCard extends StatelessWidget {
 
 class _Inspector extends StatelessWidget {
   const _Inspector({
+    super.key,
     required this.selection,
     required this.panel,
     required this.summary,
@@ -1031,11 +1064,12 @@ class _EmptyInspector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
-    final count = summary['counts']?['panels'] ?? 0;
+    final l = context.l;
+    final count = (summary['counts']?['panels'] as int?) ?? 0;
     return ListView(
       children: [
         Text(
-          'Inspector',
+          l.inspector,
           style: ts(fontSize: 19, fontWeight: FontWeight.w600, color: p.text),
         ),
         const SizedBox(height: Space.xl),
@@ -1053,14 +1087,14 @@ class _EmptyInspector extends StatelessWidget {
         const SizedBox(height: Space.l),
         Center(
           child: Text(
-            'Select a panel',
+            l.selectPanel,
             style: ts(fontSize: 14, fontWeight: FontWeight.w600, color: p.text),
           ),
         ),
         const SizedBox(height: Space.xs),
         Center(
           child: Text(
-            'Click a piece on the pattern or the garment\nto adjust it here. $count pieces in this project.',
+            l.selectPanelHint(count),
             textAlign: TextAlign.center,
             style: ts(fontSize: 12.5, height: 1.45, color: p.textMuted),
           ),
@@ -1080,11 +1114,11 @@ class _EmptyInspector extends StatelessWidget {
         OutlinedButton.icon(
           onPressed: onArrange,
           icon: const Icon(Icons.threesixty_rounded, size: 18),
-          label: const Text('Arrange around the body'),
+          label: Text(l.arrange),
         ),
         const SizedBox(height: Space.xs),
         Text(
-          'Places every piece around the body in seam order, at the waist.',
+          l.arrangeHint,
           style: ts(fontSize: 12, height: 1.4, color: p.textMuted),
         ),
         const SizedBox(height: Space.l),
@@ -1110,14 +1144,12 @@ class _PinList extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Pins',
+          context.l.pins,
           style: ts(fontSize: 14, fontWeight: FontWeight.w600, color: p.text),
         ),
         const SizedBox(height: Space.xs),
         Text(
-          pins.isEmpty
-              ? '⌥-click the cloth in 3D to hold it in place.'
-              : '⌥-click the cloth in 3D to add one.',
+          pins.isEmpty ? context.l.pinsEmpty : context.l.pinsAdd,
           style: ts(fontSize: 12.5, height: 1.45, color: p.textMuted),
         ),
         for (final pin in pins)
@@ -1136,7 +1168,7 @@ class _PinList extends StatelessWidget {
                 ),
                 _IconAction(
                   icon: Icons.close_rounded,
-                  tip: 'Remove this pin',
+                  tip: context.l.removePin,
                   onTap: () => onUnpin(pin['id'] as String),
                 ),
               ],
@@ -1159,12 +1191,12 @@ class _MultiInspector extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Whole garment',
+          context.l.wholeGarment,
           style: ts(fontSize: 15, fontWeight: FontWeight.w600, color: p.text),
         ),
         const SizedBox(height: Space.s),
         Text(
-          '$count pieces selected. Click one piece on the pattern to edit it.',
+          context.l.piecesSelected(count),
           style: ts(fontSize: 12.5, height: 1.45, color: p.textMuted),
         ),
       ],
@@ -1196,9 +1228,10 @@ class _PanelInspector extends StatelessWidget {
     final perimeter = (panel['perimeter_mm'] as num) / 10;
     final allowance = (panel['seam_allowance_mm'] as num).toDouble();
     final grain = (panel['grain_angle_deg'] as num).toDouble();
+    final l = context.l;
     return ListView(
       children: [
-        Text('Piece', style: ts(fontSize: 12, color: p.textMuted)),
+        Text(l.piece, style: ts(fontSize: 12, color: p.textMuted)),
         const SizedBox(height: Space.xs),
         Text(
           panel['name'] as String,
@@ -1208,8 +1241,8 @@ class _PanelInspector extends StatelessWidget {
           const SizedBox(height: Space.s),
           _Badge(
             icon: Icons.flip_rounded,
-            text: 'Mirror copy — follows its source',
-            action: 'Unlink',
+            text: l.mirrorCopy,
+            action: l.unlink,
             onAction: () => run({'type': 'panel.unlink', 'panel': id}),
           ),
         ],
@@ -1226,22 +1259,22 @@ class _PanelInspector extends StatelessWidget {
           children: [
             Expanded(
               child: _Stat(
-                label: 'Area',
-                value: '${area.toStringAsFixed(3)} m²',
+                label: l.area,
+                value: '${context.number(area, 3)} m²',
               ),
             ),
             const SizedBox(width: Space.s),
             Expanded(
               child: _Stat(
-                label: 'Perimeter',
-                value: '${perimeter.toStringAsFixed(1)} cm',
+                label: l.perimeter,
+                value: '${context.number(perimeter, 1)} ${l.cm}',
               ),
             ),
           ],
         ),
         const SizedBox(height: Space.xl),
         _SliderRow(
-          label: 'Seam allowance',
+          label: l.seamAllowance,
           value: allowance,
           min: 0,
           max: 30,
@@ -1255,7 +1288,7 @@ class _PanelInspector extends StatelessWidget {
         ),
         const SizedBox(height: Space.l),
         _SliderRow(
-          label: 'Grainline',
+          label: l.grainline,
           value: grain.clamp(0, 180),
           min: 0,
           max: 180,
@@ -1279,9 +1312,13 @@ class _PanelInspector extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: linked
                     ? null
-                    : () => run({'type': 'panel.mirror', 'panel': id}),
+                    : () => run({
+                        'type': 'panel.mirror',
+                        'panel': id,
+                        'name': l.pieceMirror(panel['name'] as String),
+                      }),
                 icon: const Icon(Icons.flip_rounded, size: 16),
-                label: const Text('Mirror'),
+                label: Text(l.mirror),
               ),
             ),
             const SizedBox(width: Space.s),
@@ -1290,7 +1327,7 @@ class _PanelInspector extends StatelessWidget {
                 onPressed: onDelete,
                 style: OutlinedButton.styleFrom(foregroundColor: p.danger),
                 icon: const Icon(Icons.delete_outline_rounded, size: 16),
-                label: const Text('Delete'),
+                label: Text(l.delete),
               ),
             ),
           ],
@@ -1310,19 +1347,20 @@ class _PlacementCard extends StatelessWidget {
   /// Run `panel.place` with these fields.
   final ValueChanged<Map<String, Object?>> place;
 
-  static const _around = [
-    ('body', 'Body'),
-    ('left_arm', 'Left arm'),
-    ('right_arm', 'Right arm'),
-    ('flat', 'Flat'),
+  static List<(String, String)> _around(L l) => [
+    ('body', l.aroundBody),
+    ('left_arm', l.aroundLeftArm),
+    ('right_arm', l.aroundRightArm),
+    ('flat', l.aroundFlat),
   ];
 
   @override
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
     final current = placement;
+    final l = context.l;
     final header = Text(
-      'On the body',
+      l.onTheBody,
       style: ts(fontSize: 13, fontWeight: FontWeight.w600, color: p.text),
     );
     if (current == null) {
@@ -1331,16 +1369,13 @@ class _PlacementCard extends StatelessWidget {
         children: [
           header,
           const SizedBox(height: Space.xs),
-          Text(
-            'Not simulated yet: place it to see it in 3D.',
-            style: ts(fontSize: 12, color: p.textMuted),
-          ),
+          Text(l.notSimulated, style: ts(fontSize: 12, color: p.textMuted)),
           const SizedBox(height: Space.s),
           OutlinedButton.icon(
             onPressed: () =>
                 place({'around': 'body', 'angle_deg': 0, 'top_cm': 110}),
             icon: const Icon(Icons.accessibility_new_rounded, size: 16),
-            label: const Text('Place on the body'),
+            label: Text(l.placeOnBody),
           ),
         ],
       );
@@ -1375,7 +1410,7 @@ class _PlacementCard extends StatelessWidget {
             textStyle: ts(fontSize: 11.5, fontWeight: FontWeight.w600),
           ),
           segments: [
-            for (final (value, label) in _around)
+            for (final (value, label) in _around(l))
               ButtonSegment(value: value, label: Text(label)),
           ],
           selected: {around},
@@ -1384,8 +1419,8 @@ class _PlacementCard extends StatelessWidget {
         const SizedBox(height: Space.l),
         _SliderRow(
           label: around == 'body' || around == 'flat'
-              ? 'Around (0 = front)'
-              : 'Around the arm (0 = outside)',
+              ? l.aroundAngle
+              : l.aroundArmAngle,
           value: angle.clamp(0, 359),
           min: 0,
           max: 359,
@@ -1395,11 +1430,11 @@ class _PlacementCard extends StatelessWidget {
         ),
         const SizedBox(height: Space.l),
         _SliderRow(
-          label: 'Top height',
+          label: l.topHeight,
           value: top.clamp(40, 200),
           min: 40,
           max: 200,
-          unit: 'cm',
+          unit: l.cm,
           enabled: true,
           onChanged: (v) => update(topCm: v),
         ),
@@ -1443,7 +1478,8 @@ class _Stat extends StatelessWidget {
   }
 }
 
-class _SliderRow extends StatelessWidget {
+/// A slider whose value can also be typed.
+class _SliderRow extends StatefulWidget {
   const _SliderRow({
     required this.label,
     required this.value,
@@ -1463,6 +1499,49 @@ class _SliderRow extends StatelessWidget {
   final ValueChanged<double> onChanged;
 
   @override
+  State<_SliderRow> createState() => _SliderRowState();
+}
+
+class _SliderRowState extends State<_SliderRow> {
+  late final _text = TextEditingController(text: _shown(widget.value));
+  final _focus = FocusNode();
+
+  static String _shown(double v) => v.toStringAsFixed(0);
+
+  @override
+  void initState() {
+    super.initState();
+    // Leaving the field applies what was typed.
+    _focus.addListener(() {
+      if (!_focus.hasFocus) _submit();
+    });
+  }
+
+  @override
+  void didUpdateWidget(_SliderRow old) {
+    super.didUpdateWidget(old);
+    if (!_focus.hasFocus) _text.text = _shown(widget.value);
+  }
+
+  @override
+  void dispose() {
+    _text.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final typed = _parseNumber(_text.text);
+    if (typed == null) {
+      _text.text = _shown(widget.value);
+      return;
+    }
+    final v = typed.clamp(widget.min, widget.max).toDouble();
+    _text.text = _shown(v);
+    if (v != widget.value) widget.onChanged(v);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
     return Column(
@@ -1470,28 +1549,99 @@ class _SliderRow extends StatelessWidget {
       children: [
         Row(
           children: [
-            Text(
-              label,
-              style: ts(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: p.text,
+            Expanded(
+              child: Text(
+                widget.label,
+                style: ts(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: p.text,
+                ),
               ),
             ),
-            const Spacer(),
-            Text(
-              '${value.toStringAsFixed(0)} $unit',
-              style: ts(fontSize: 13, color: p.textMuted, tabular: true),
+            SizedBox(
+              width: 76,
+              child: _NumberField(
+                controller: _text,
+                focus: _focus,
+                unit: widget.unit,
+                enabled: widget.enabled,
+                onSubmitted: _submit,
+              ),
             ),
           ],
         ),
         Slider(
-          value: value,
-          min: min,
-          max: max,
-          onChanged: enabled ? onChanged : null,
+          value: widget.value,
+          min: widget.min,
+          max: widget.max,
+          onChanged: widget.enabled ? widget.onChanged : null,
         ),
       ],
+    );
+  }
+}
+
+/// A number typed by the user, with a decimal point or comma.
+double? _parseNumber(String text) =>
+    double.tryParse(text.trim().replaceAll(',', '.'));
+
+/// A compact field for a number, with its unit after it.
+class _NumberField extends StatelessWidget {
+  const _NumberField({
+    required this.controller,
+    required this.unit,
+    this.onSubmitted,
+    this.focus,
+    this.enabled = true,
+  });
+
+  final TextEditingController controller;
+  final FocusNode? focus;
+  final String unit;
+  final bool enabled;
+  final VoidCallback? onSubmitted;
+
+  /// Typed characters go to the field, not to the window's one-key
+  /// shortcuts (1–4 would turn the camera, R add a piece).
+  static KeyEventResult _keepTyping(FocusNode _, KeyEvent event) {
+    final keys = HardwareKeyboard.instance;
+    return event.character != null &&
+            !keys.isMetaPressed &&
+            !keys.isControlPressed
+        ? KeyEventResult.skipRemainingHandlers
+        : KeyEventResult.ignored;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      onKeyEvent: _keepTyping,
+      child: TextField(
+        controller: controller,
+        focusNode: focus,
+        enabled: enabled,
+        textAlign: TextAlign.right,
+        style: ts(fontSize: 13, color: p.text, tabular: true),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: [
+          FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+        ],
+        onSubmitted: (_) => onSubmitted?.call(),
+        decoration: InputDecoration(
+          isDense: true,
+          suffixText: unit,
+          suffixStyle: ts(fontSize: 12, color: p.textMuted),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 8,
+            vertical: 7,
+          ),
+          border: const OutlineInputBorder(),
+        ),
+      ),
     );
   }
 }
@@ -1568,15 +1718,15 @@ class _StatusBar extends StatelessWidget {
 
 /// Look at the body from the front, the side, the back or three quarters.
 class _CameraBar extends StatelessWidget {
-  const _CameraBar({required this.onLook});
+  const _CameraBar({super.key, required this.onLook});
 
   final ValueChanged<CameraSide> onLook;
 
-  static const _sides = [
-    (CameraSide.front, 'Front', '1'),
-    (CameraSide.left, 'Side', '2'),
-    (CameraSide.back, 'Back', '3'),
-    (CameraSide.threeQuarter, '¾', '4'),
+  static List<(CameraSide, String, String)> _sides(L l) => [
+    (CameraSide.front, l.camFront, l.camFrontTip),
+    (CameraSide.left, l.camSide, l.camSideTip),
+    (CameraSide.back, l.camBack, l.camBackTip),
+    (CameraSide.threeQuarter, '¾', l.camThreeQuarterTip),
   ];
 
   @override
@@ -1592,10 +1742,9 @@ class _CameraBar extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          for (final (side, label, key) in _sides)
+          for (final (side, label, tip) in _sides(context.l))
             Tooltip(
-              message:
-                  'View from the ${label == '¾' ? 'three-quarter angle' : label.toLowerCase()}  $key',
+              message: tip,
               child: TextButton(
                 onPressed: () => onLook(side),
                 style: TextButton.styleFrom(
@@ -1620,6 +1769,7 @@ class _CameraBar extends StatelessWidget {
 /// Simulate / pause and restart, over the 3D view.
 class _SimControls extends StatelessWidget {
   const _SimControls({
+    super.key,
     required this.status,
     required this.onRun,
     required this.onRestart,
@@ -1644,7 +1794,7 @@ class _SimControls extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Tooltip(
-            message: running ? 'Pause  Space' : 'Drape the garment  Space',
+            message: running ? context.l.pauseTip : context.l.simulateTip,
             child: FilledButton.icon(
               onPressed: () => onRun(!running),
               style: FilledButton.styleFrom(
@@ -1655,13 +1805,13 @@ class _SimControls extends StatelessWidget {
                 running ? Icons.pause_rounded : Icons.play_arrow_rounded,
                 size: 18,
               ),
-              label: Text(running ? 'Pause' : 'Simulate'),
+              label: Text(running ? context.l.pause : context.l.simulate),
             ),
           ),
           const SizedBox(width: 2),
           _IconAction(
             icon: Icons.restart_alt_rounded,
-            tip: 'Start again from the pattern',
+            tip: context.l.restartTip,
             onTap: onRestart,
           ),
         ],
@@ -1677,32 +1827,31 @@ class _FabricPicker extends StatelessWidget {
   final String current;
   final ValueChanged<String> onPick;
 
-  static const _blurbs = {
-    'cotton': 'Crisp and breathable',
-    'denim': 'Heavy, holds its shape',
-    'jersey': 'Stretchy knit',
-    'silk': 'Light and fluid',
-    'wool': 'Soft, with body',
+  /// A fabric's name and blurb.
+  static (String, String) _text(L l, String id) => switch (id) {
+    'cotton' => (l.fabricCotton, l.fabricCottonBlurb),
+    'denim' => (l.fabricDenim, l.fabricDenimBlurb),
+    'jersey' => (l.fabricJersey, l.fabricJerseyBlurb),
+    'silk' => (l.fabricSilk, l.fabricSilkBlurb),
+    'wool' => (l.fabricWool, l.fabricWoolBlurb),
+    _ => (id, ''),
   };
-
-  static String _label(String id) => id[0].toUpperCase() + id.substring(1);
 
   @override
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
     final swatches = Engine.fabrics();
+    final l = context.l;
+    final (name, blurb) = _text(l, current);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Fabric',
+          l.fabric,
           style: ts(fontSize: 14, fontWeight: FontWeight.w600, color: p.text),
         ),
         const SizedBox(height: Space.xs),
-        Text(
-          '${_label(current)} · ${_blurbs[current] ?? ''}',
-          style: ts(fontSize: 12.5, color: p.textMuted),
-        ),
+        Text('$name · $blurb', style: ts(fontSize: 12.5, color: p.textMuted)),
         const SizedBox(height: Space.m),
         Wrap(
           spacing: Space.s,
@@ -1710,7 +1859,7 @@ class _FabricPicker extends StatelessWidget {
           children: [
             for (final f in swatches)
               Tooltip(
-                message: _label(f.id),
+                message: _text(l, f.id).$1,
                 child: InkWell(
                   onTap: () => onPick(f.id),
                   customBorder: const CircleBorder(),
@@ -1753,6 +1902,7 @@ class _EdgeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
+    final l = context.l;
     final id = edge['id'] as String;
     final length = (edge['length_mm'] as num) / 10;
     final seam = seams.firstWhere(
@@ -1776,7 +1926,7 @@ class _EdgeCard extends StatelessWidget {
               Icon(Icons.timeline_rounded, size: 16, color: p.accent),
               const SizedBox(width: Space.s),
               Text(
-                'Edge · ${length.toStringAsFixed(1)} cm',
+                l.edgeLength(context.number(length, 1)),
                 style: ts(
                   fontSize: 13.5,
                   fontWeight: FontWeight.w600,
@@ -1788,29 +1938,144 @@ class _EdgeCard extends StatelessWidget {
           const SizedBox(height: Space.xs),
           Text(
             other == null
-                ? 'Open edge (a hem or an opening). ⇧-drag it in 3D to lengthen.'
-                : 'Sewn to ${other['panel_name'] ?? other['panel']} · '
-                      '${(seam['mismatch_mm'] as num).toStringAsFixed(1)} mm difference. '
-                      '⇧-drag it in 3D to take in.',
+                ? l.edgeOpen
+                : l.edgeSewn(
+                    '${other['panel_name'] ?? other['panel']}',
+                    context.number(seam['mismatch_mm'] as num, 1),
+                  ),
             style: ts(fontSize: 12.5, height: 1.45, color: p.textMuted),
           ),
-          if (seam != null)
+          const SizedBox(height: Space.s),
+          if (seam == null)
+            _AmountRow(
+              less: l.shorter,
+              more: l.longer,
+              lessIcon: Icons.north_rounded,
+              moreIcon: Icons.south_rounded,
+              onMm: (mm) =>
+                  run({'type': 'edge.lengthen', 'edge': id, 'mm': mm}),
+            )
+          else ...[
+            _AmountRow(
+              less: l.letOut,
+              more: l.takeIn,
+              lessIcon: Icons.unfold_more_rounded,
+              moreIcon: Icons.unfold_less_rounded,
+              onMm: (mm) =>
+                  run({'type': 'seam.take_in', 'seam': seam['id'], 'mm': mm}),
+            ),
             Row(
               children: [
                 TextButton(
                   onPressed: () =>
                       run({'type': 'seam.flip', 'seam': seam['id']}),
-                  child: const Text('Flip seam'),
+                  child: Text(l.flipSeam),
                 ),
                 TextButton(
                   onPressed: () =>
                       run({'type': 'seam.remove', 'seam': seam['id']}),
-                  child: const Text('Unpick'),
+                  child: Text(l.unpick),
                 ),
               ],
             ),
+          ],
         ],
       ),
+    );
+  }
+}
+
+/// How much (cm, typed) and two buttons: [more] by that amount, or [less]
+/// by it. [onMm] gets millimetres, negative for [less].
+class _AmountRow extends StatefulWidget {
+  const _AmountRow({
+    required this.less,
+    required this.more,
+    required this.lessIcon,
+    required this.moreIcon,
+    required this.onMm,
+  });
+
+  final String less;
+  final String more;
+  final IconData lessIcon;
+  final IconData moreIcon;
+  final ValueChanged<double> onMm;
+
+  @override
+  State<_AmountRow> createState() => _AmountRowState();
+}
+
+class _AmountRowState extends State<_AmountRow> {
+  final _cm = TextEditingController(text: '1');
+
+  @override
+  void initState() {
+    super.initState();
+    // The buttons are enabled while the amount is a positive number.
+    _cm.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _cm.dispose();
+    super.dispose();
+  }
+
+  /// The typed amount in millimetres, if it is a positive number.
+  double? get _mm => switch (_parseNumber(_cm.text)) {
+    final cm? when cm > 0 => cm * 10,
+    _ => null,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final mm = _mm;
+    final style = OutlinedButton.styleFrom(
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      textStyle: ts(fontSize: 12.5, fontWeight: FontWeight.w600),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Text(
+              context.l.amountBy,
+              style: ts(fontSize: 12.5, color: p.textMuted),
+            ),
+            const SizedBox(width: Space.s),
+            SizedBox(
+              width: 76,
+              child: _NumberField(controller: _cm, unit: context.l.cm),
+            ),
+          ],
+        ),
+        const SizedBox(height: Space.s),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: mm == null ? null : () => widget.onMm(-mm),
+                style: style,
+                icon: Icon(widget.lessIcon, size: 15),
+                label: Text(widget.less),
+              ),
+            ),
+            const SizedBox(width: Space.s),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: mm == null ? null : () => widget.onMm(mm),
+                style: style,
+                icon: Icon(widget.moreIcon, size: 15),
+                label: Text(widget.more),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

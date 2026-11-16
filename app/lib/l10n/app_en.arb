@@ -1,0 +1,494 @@
+{
+  "@@locale": "en",
+  "languageTooltip": "Language",
+  "themeLight": "Light theme",
+  "themeDark": "Dark theme",
+  "cancel": "Cancel",
+  "create": "Create",
+  "save": "Save",
+  "apply": "Apply",
+  "delete": "Delete",
+  "next": "Next",
+  "skip": "Skip",
+  "start": "Start",
+  "gotIt": "Got it",
+  "cm": "cm",
+  "startTitle": "What will you make?",
+  "startSubtitle": "Start from a garment drafted to your measurements, then shape it on the pattern or on the body.",
+  "templateTShirt": "T-shirt",
+  "templateTShirtBlurb": "Front, back and short sleeves, in jersey.",
+  "templateDress": "Dress",
+  "templateDressBlurb": "Sleeveless, gently shaped, knee length.",
+  "templateStraightSkirt": "Straight skirt",
+  "templateStraightSkirtBlurb": "Close over the hips, from the waist to the knee.",
+  "templateALineSkirt": "A-line skirt",
+  "templateALineSkirtBlurb": "Flares gently from the hips to the hem.",
+  "templateToteBag": "Tote bag",
+  "templateToteBagBlurb": "Two pieces and four seams: the easiest start.",
+  "blankProject": "Blank project",
+  "blankProjectBlurb": "Draw your own pieces.",
+  "untitled": "Untitled",
+  "recent": "Recent",
+  "recentEmpty": "Your projects will appear here. They are saved as you work, in Documents › Rustle3D.",
+  "agoJustNow": "just now",
+  "agoMinutes": "{count} min ago",
+  "@agoMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "agoHours": "{count} h ago",
+  "@agoHours": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "agoYesterday": "yesterday",
+  "agoDays": "{count} days ago",
+  "@agoDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "newGarmentTitle": "New: {garment}",
+  "@newGarmentTitle": {
+    "placeholders": {
+      "garment": {
+        "type": "String"
+      }
+    }
+  },
+  "newGarmentSubtitle": "Drafted to the body’s measurements. You can change everything later.",
+  "fieldName": "Name",
+  "fieldBody": "Body",
+  "sizeMustBePositive": "{size} must be a positive number of cm.",
+  "@sizeMustBePositive": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "sizeChest": "Chest",
+  "sizeChestHint": "Around the fullest part of the chest",
+  "sizeWaist": "Waist",
+  "sizeWaistHint": "Around the narrowest part",
+  "sizeHips": "Hips",
+  "sizeHipsHint": "Around the fullest part",
+  "sizeLength": "Length",
+  "sizeLengthHint": "Neck to hem for tops, waist to hem for skirts, height of a bag",
+  "sizeSleeve": "Sleeve",
+  "sizeSleeveHint": "From the top of the shoulder",
+  "sizeWidth": "Width",
+  "sizeWidthHint": "Across the bag",
+  "sizeEase": "Ease",
+  "sizeEaseHint": "Room added to the body",
+  "pieceFront": "Front",
+  "pieceBack": "Back",
+  "pieceBackLeft": "Back left",
+  "pieceBackRight": "Back right",
+  "pieceSleeveLeft": "Sleeve left",
+  "pieceSleeveRight": "Sleeve right",
+  "pieceNew": "Panel {number}",
+  "@pieceNew": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "pieceMirror": "{name} (mirror)",
+  "@pieceMirror": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "body": "Body",
+  "bodySubtitle": "The 3D body is fitted to these measurements. Start from a size, then adjust.",
+  "bodyPreset": "Preset",
+  "presetWomen": "Women {size}",
+  "@presetWomen": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "presetMen": "Men {size}",
+  "@presetMen": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "bodyFeminine": "Feminine body",
+  "bodyMasculine": "Masculine body",
+  "measHeight": "Height",
+  "measBust": "Bust / chest",
+  "measBetween": "{measure} must be between {min} and {max} cm.",
+  "@measBetween": {
+    "placeholders": {
+      "measure": {
+        "type": "String"
+      },
+      "min": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "presetName": "Preset name",
+  "saveAsPreset": "Save as preset",
+  "deletePreset": "Delete preset",
+  "fittedBody": "Fitted body: height {height} · bust {bust} · waist {waist} · hips {hips}",
+  "@fittedBody": {
+    "placeholders": {
+      "height": {
+        "type": "String"
+      },
+      "bust": {
+        "type": "String"
+      },
+      "waist": {
+        "type": "String"
+      },
+      "hips": {
+        "type": "String"
+      }
+    }
+  },
+  "allProjects": "All projects",
+  "learn": "Learn",
+  "undoTip": "Undo  ⌘Z",
+  "redoTip": "Redo  ⇧⌘Z",
+  "tourPatternTitle": "Your pattern",
+  "tourPatternText": "The flat pieces, full size. Drag their points to reshape them; **R** adds a piece.",
+  "tourGarmentTitle": "The garment on the body",
+  "tourGarmentText": "**Simulate** drapes it. Drag to turn around; **⇧-drag** a hem or a seam to change the pattern from here.",
+  "tourGuideTitle": "One step at a time",
+  "tourGuideText": "The guide says what to do next. Click a step at the top to jump to it, or close the guide.",
+  "tourHelpTitle": "Help is always here",
+  "tourHelpText": "**Learn** has short how-tos and shows where things are; **Body** changes the measurements. **⌘Z** undoes anything.",
+  "stepMeasurements": "Measurements",
+  "stepMeasurementsGoal": "Check the body the garment is made for: its size and measurements.",
+  "stepMeasurementsAction": "Open Body",
+  "stepPattern": "Pattern",
+  "stepPatternGoal": "Shape the pieces: drag their points, or click a hem or a seam to lengthen or take it in.",
+  "stepPatternAction": "Add a piece",
+  "stepSew": "Sew",
+  "stepSewGoal": "Join the pieces: click an edge on the pattern, then the edge to sew it to.",
+  "stepSewAction": "Sew tool",
+  "stepFabric": "Fabric",
+  "stepFabricGoal": "Choose what the garment is made of, in the panel on the right.",
+  "stepDrape": "Drape",
+  "stepDrapeGoal": "Watch it drape on the body. Then drag the cloth, or ⌥-click to pin it.",
+  "stepOf": "Step {step} of {total}",
+  "@stepOf": {
+    "placeholders": {
+      "step": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "guideNext": "Next  →",
+  "guideHide": "Hide the guide (click a step to bring it back)",
+  "toolSelect": "Select",
+  "toolSelectHint": "Click a panel or point; drag to move",
+  "toolRectangle": "Rectangle",
+  "toolRectangleHint": "Add a rectangular panel",
+  "toolPolygon": "Polygon",
+  "toolCurve": "Curve",
+  "toolDraw": "Draw on garment",
+  "toolDrawHint": "Drag on the 3D garment: the line goes on the pattern",
+  "toolNotch": "Notch",
+  "toolSew": "Sew",
+  "toolSewHint": "Click two edges on the pattern",
+  "comingSoon": "Coming soon",
+  "viewPattern": "Pattern",
+  "view3d": "3D",
+  "hintSewFirst": "Sew: click the first edge on the pattern · V to stop",
+  "hintSewSecond": "Sew: now click the edge to sew it to · V to stop",
+  "hintDraw": "Draw: drag on the 3D garment; the line goes on the pattern · V to stop",
+  "hintIdle": "Click a hem or a seam to lengthen or take it in · in 3D: drag to pull the cloth · ⇧-drag a hem or a seam · ⌘-drag to move a piece · ⌥-click to pin",
+  "hintSelection": "Adjust the selection in the inspector · ⌫ deletes · ⌘Z undoes",
+  "statsSim": "Cloth {points} points · step {stepMs} ms · {time} s · ",
+  "@statsSim": {
+    "placeholders": {
+      "points": {
+        "type": "int"
+      },
+      "stepMs": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "statsRender": "Rust render · pattern {boardMs} ms · 3D {garmentMs} ms · {fps} fps",
+  "@statsRender": {
+    "placeholders": {
+      "boardMs": {
+        "type": "String"
+      },
+      "garmentMs": {
+        "type": "String"
+      },
+      "fps": {
+        "type": "String"
+      }
+    }
+  },
+  "toastSewn": "Sewn. Flip it in the inspector if it looks twisted.",
+  "toastPinned": "Pinned. Remove it in the inspector.",
+  "toastLineAdded": "Line added to the pattern.",
+  "deleteTitle": "Delete “{name}”?",
+  "@deleteTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteUndo": "You can undo this with ⌘Z.",
+  "camFront": "Front",
+  "camSide": "Side",
+  "camBack": "Back",
+  "camFrontTip": "View from the front  1",
+  "camSideTip": "View from the side  2",
+  "camBackTip": "View from the back  3",
+  "camThreeQuarterTip": "View from the three-quarter angle  4",
+  "simulate": "Simulate",
+  "pause": "Pause",
+  "simulateTip": "Drape the garment  Space",
+  "pauseTip": "Pause  Space",
+  "restartTip": "Start again from the pattern",
+  "inspector": "Inspector",
+  "selectPanel": "Select a panel",
+  "selectPanelHint": "Click a piece on the pattern or the garment\nto adjust it here. {count, plural, =1{1 piece} other{{count} pieces}} in this project.",
+  "@selectPanelHint": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "arrange": "Arrange around the body",
+  "arrangeHint": "Places every piece around the body in seam order, at the waist.",
+  "pins": "Pins",
+  "pinsEmpty": "⌥-click the cloth in 3D to hold it in place.",
+  "pinsAdd": "⌥-click the cloth in 3D to add one.",
+  "removePin": "Remove this pin",
+  "wholeGarment": "Whole garment",
+  "piecesSelected": "{count} pieces selected. Click one piece on the pattern to edit it.",
+  "@piecesSelected": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "piece": "Piece",
+  "mirrorCopy": "Mirror copy — follows its source",
+  "unlink": "Unlink",
+  "area": "Area",
+  "perimeter": "Perimeter",
+  "seamAllowance": "Seam allowance",
+  "grainline": "Grainline",
+  "mirror": "Mirror",
+  "onTheBody": "On the body",
+  "notSimulated": "Not simulated yet: place it to see it in 3D.",
+  "placeOnBody": "Place on the body",
+  "aroundBody": "Body",
+  "aroundLeftArm": "Left arm",
+  "aroundRightArm": "Right arm",
+  "aroundFlat": "Flat",
+  "aroundAngle": "Around (0 = front)",
+  "aroundArmAngle": "Around the arm (0 = outside)",
+  "topHeight": "Top height",
+  "fabric": "Fabric",
+  "fabricCotton": "Cotton",
+  "fabricCottonBlurb": "Crisp and breathable",
+  "fabricDenim": "Denim",
+  "fabricDenimBlurb": "Heavy, holds its shape",
+  "fabricJersey": "Jersey",
+  "fabricJerseyBlurb": "Stretchy knit",
+  "fabricSilk": "Silk",
+  "fabricSilkBlurb": "Light and fluid",
+  "fabricWool": "Wool",
+  "fabricWoolBlurb": "Soft, with body",
+  "edgeLength": "Edge · {length} cm",
+  "@edgeLength": {
+    "placeholders": {
+      "length": {
+        "type": "String"
+      }
+    }
+  },
+  "edgeOpen": "Open edge (a hem or an opening). Change it here, or ⇧-drag it in 3D.",
+  "edgeSewn": "Sewn to {piece} · {mismatch} mm difference. Take it in here, or ⇧-drag it in 3D.",
+  "@edgeSewn": {
+    "placeholders": {
+      "piece": {
+        "type": "String"
+      },
+      "mismatch": {
+        "type": "String"
+      }
+    }
+  },
+  "flipSeam": "Flip seam",
+  "unpick": "Unpick",
+  "amountBy": "By",
+  "shorter": "Shorter",
+  "longer": "Longer",
+  "letOut": "Let out",
+  "takeIn": "Take in",
+  "changeTakenIn": "Taken in {amount} mm",
+  "@changeTakenIn": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "changeLetOut": "Let out {amount} mm",
+  "@changeLetOut": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "changeLonger": "Longer {amount} mm",
+  "@changeLonger": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "changeShorter": "Shorter {amount} mm",
+  "@changeShorter": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "learnIntro": "Short how-tos. “Show me” points at where it happens; your project is not changed.",
+  "showMe": "Show me",
+  "learnDrape": "Drape the garment",
+  "learnDrapeHow": "Press **Simulate** (**Space**): the pieces close their seams and fall onto the body.",
+  "learnFabric": "Try another fabric",
+  "learnFabricHow": "With nothing selected, pick a swatch under **Fabric**. Fabric changes how the garment hangs.",
+  "learnLength": "Lengthen or shorten",
+  "learnLengthHow": "Click the hem, type how much, then **Shorter** or **Longer**. Or hold **⇧** and drag the hem on the garment.",
+  "learnFit": "Take in a seam",
+  "learnFitHow": "Click a seam, type how much, then **Take in** or **Let out**. Or hold **⇧** and drag the seam on the garment.",
+  "learnSew": "Sew two pieces",
+  "learnSewHow": "With **Sew** (**S**), click an edge on the pattern, then the edge to sew it to.",
+  "learnDraw": "Draw a style line",
+  "learnDrawHow": "With **Draw on garment** (**D**), drag across the 3D garment: the line lands on the pattern.",
+  "learnMove": "Move a piece around the body",
+  "learnMoveHow": "Hold **⌘** (**Ctrl** on Linux and Windows) and drag a piece on the garment, or set it in the inspector.",
+  "learnPin": "Pull and pin the cloth",
+  "learnPinHow": "Drag the cloth in 3D to pull it. **⌥-click** pins it where it is.",
+  "learnLook": "Look around",
+  "learnLookHow": "Drag to turn around the body, scroll to zoom. Keys **1**–**4**: front, side, back, three quarters.",
+  "learnBody": "Dress another body",
+  "learnBodyHow": "Open **Body**: choose a size or enter measurements, and the garment drapes on it.",
+  "learnDrapeStop": "Simulate",
+  "learnDrapeStopText": "Press **Simulate** (**Space**) to drape the garment, again to pause. The arrow next to it starts again from the pattern.",
+  "learnFabricStop": "Fabric",
+  "learnFabricStopText": "With nothing selected, the panel on the right shows the garment: pick a swatch under **Fabric**. The drape follows.",
+  "learnPickHem": "Pick the hem",
+  "learnPickHemText": "Click the hem on the pattern, or on the garment.",
+  "learnShorterLonger": "Shorter or longer",
+  "learnShorterLongerText": "Type how much, then **Shorter** or **Longer**. The whole hemline moves and the seams stay matched.",
+  "learnDragHem": "Or drag it",
+  "learnDragHemText": "Hold **⇧** and drag the hem on the garment: down lengthens, up shortens.",
+  "learnPickSeam": "Pick the seam",
+  "learnPickSeamText": "Click a sewn edge on the pattern, or a seam on the garment.",
+  "learnTakeInLetOut": "Take in or let out",
+  "learnTakeInLetOutText": "Type how much, then **Take in** or **Let out**. Both sides move, so the seam stays matched.",
+  "learnDragSeam": "Or drag it",
+  "learnDragSeamText": "Hold **⇧** and drag a seam on the garment: towards the body takes it in, away lets it out. Near one end, only that end moves.",
+  "learnSewTool": "Sew tool",
+  "learnSewToolText": "Pick **Sew** here, or press **S**.",
+  "learnTwoEdges": "Click two edges",
+  "learnTwoEdgesText": "Click an edge, then the edge to sew it to. Matching arrows show how they join.",
+  "learnDrawTool": "Draw on garment",
+  "learnDrawToolText": "Pick **Draw on garment** here, or press **D**.",
+  "learnDrawAcross": "Drag across the garment",
+  "learnDrawAcrossText": "The line lands on the pattern, for a yoke or a pocket.",
+  "learnDragPiece": "Drag a piece",
+  "learnDragPieceText": "Hold **⌘** (**Ctrl** on Linux and Windows) and drag a piece: sideways turns it around the body, up and down changes its height.",
+  "learnSetPlacement": "Or set it here",
+  "learnSetPlacementText": "Select the piece: **On the body** has the same settings, as numbers you can type.",
+  "learnPullPin": "Pull and pin",
+  "learnPullPinText": "Drag the cloth to pull it. **⌥-click** pins it where it is.",
+  "learnYourPins": "Your pins",
+  "learnYourPinsText": "With nothing selected, pins are listed under **Pins**; **×** removes one.",
+  "learnViews": "Views",
+  "learnViewsText": "**Front**, **Side**, **Back** and **¾**, or the keys **1**–**4**.",
+  "learnTurnZoom": "Turn and zoom",
+  "learnTurnZoomText": "Drag around the body to turn, scroll to zoom.",
+  "learnBodyStop": "Body",
+  "learnBodyStopText": "Choose a size or enter measurements: the body is refitted and the garment drapes on it.",
+  "errNotFound": "{id} does not exist.",
+  "@errNotFound": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "errLinkedMirror": "{panel} is a linked mirror copy: edit its source, or unlink it first.",
+  "@errLinkedMirror": {
+    "placeholders": {
+      "panel": {
+        "type": "String"
+      }
+    }
+  },
+  "errSewn": "This edge is sewn: unpick the seam first.",
+  "errNothingToUndo": "Nothing to undo.",
+  "errNothingToRedo": "Nothing to redo.",
+  "errNothingToSimulate": "Nothing to simulate: place at least one piece on the body.",
+  "errInverted": "That would turn a piece inside out.",
+  "errRange": "The value must be between {min} and {max}.",
+  "@errRange": {
+    "placeholders": {
+      "min": {
+        "type": "String"
+      },
+      "max": {
+        "type": "String"
+      }
+    }
+  },
+  "errNotPositive": "The value must be greater than zero.",
+  "errNegative": "The value must not be negative.",
+  "errEmpty": "The name must not be empty.",
+  "errNotSimple": "The outline must not cross itself.",
+  "errFileIo": "Could not read or write the project files.",
+  "errNotAProject": "This folder is not a Rustle3D project.",
+  "errTooNew": "This project was made by a newer version of Rustle3D.",
+  "errCorrupted": "This project file is damaged.",
+  "errAlreadyExists": "A project already exists there."
+}

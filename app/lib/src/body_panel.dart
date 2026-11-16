@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'design/tokens.dart';
+import 'i18n.dart';
 import 'rust/api/engine.dart';
 import 'rust/api/library.dart';
 
@@ -18,11 +19,12 @@ const _ranges = {
   'hips_cm': (60.0, 180.0),
 };
 
-const _labels = {
-  'height_cm': 'Height',
-  'bust_cm': 'Bust / chest',
-  'waist_cm': 'Waist',
-  'hips_cm': 'Hips',
+String _label(L l, String key) => switch (key) {
+  'height_cm' => l.measHeight,
+  'bust_cm' => l.measBust,
+  'waist_cm' => l.sizeWaist,
+  'hips_cm' => l.sizeHips,
+  _ => key,
 };
 
 Future<void> showBodyPanel(
@@ -116,8 +118,11 @@ class _BodyPanelState extends State<_BodyPanel> {
       final (min, max) = _ranges[e.key]!;
       if (v == null || v < min || v > max) {
         setState(
-          () => _error =
-              '${_labels[e.key]} must be between ${min.round()} and ${max.round()} cm.',
+          () => _error = context.l.measBetween(
+            _label(context.l, e.key),
+            min.round(),
+            max.round(),
+          ),
         );
         return null;
       }
@@ -146,7 +151,7 @@ class _BodyPanelState extends State<_BodyPanel> {
       });
       widget.onChanged();
     } on ApiError catch (e) {
-      setState(() => _error = e.text);
+      setState(() => _error = context.error(e));
     }
   }
 
@@ -177,7 +182,7 @@ class _BodyPanelState extends State<_BodyPanel> {
       });
       _apply();
     } on ApiError catch (e) {
-      setState(() => _error = e.text);
+      setState(() => _error = context.error(e));
     }
   }
 
@@ -197,6 +202,7 @@ class _BodyPanelState extends State<_BodyPanel> {
   @override
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
+    final l = context.l;
     final builtin = _presets.where((x) => x['builtin'] == true);
     final mine = _presets.where((x) => x['builtin'] == false);
     return Padding(
@@ -210,7 +216,7 @@ class _BodyPanelState extends State<_BodyPanel> {
               Icon(Icons.accessibility_new_rounded, color: p.accent),
               const SizedBox(width: Space.s),
               Text(
-                'Body',
+                l.body,
                 style: ts(fontSize: 20, fontWeight: FontWeight.w700),
               ),
               const Spacer(),
@@ -221,7 +227,7 @@ class _BodyPanelState extends State<_BodyPanel> {
             ],
           ),
           Text(
-            'The 3D body is fitted to these measurements. Start from a size, then adjust.',
+            l.bodySubtitle,
             style: ts(fontSize: 13, color: p.textMuted, height: 1.4),
           ),
           const SizedBox(height: Space.l),
@@ -229,15 +235,15 @@ class _BodyPanelState extends State<_BodyPanel> {
             initialValue: _presets.any((x) => x['name'] == _preset)
                 ? _preset
                 : null,
-            decoration: const InputDecoration(
-              labelText: 'Preset',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: l.bodyPreset,
+              border: const OutlineInputBorder(),
             ),
             items: [
               for (final x in builtin)
                 DropdownMenuItem(
                   value: x['name'] as String,
-                  child: Text(x['name'] as String),
+                  child: Text(context.presetName(x)),
                 ),
               for (final x in mine)
                 DropdownMenuItem(
@@ -259,9 +265,9 @@ class _BodyPanelState extends State<_BodyPanel> {
           ),
           const SizedBox(height: Space.l),
           SegmentedButton<double>(
-            segments: const [
-              ButtonSegment(value: 0, label: Text('Feminine body')),
-              ButtonSegment(value: 1, label: Text('Masculine body')),
+            segments: [
+              ButtonSegment(value: 0, label: Text(l.bodyFeminine)),
+              ButtonSegment(value: 1, label: Text(l.bodyMasculine)),
             ],
             selected: {_masculinity < 0.5 ? 0 : 1},
             onSelectionChanged: (s) => setState(() {
@@ -288,8 +294,8 @@ class _BodyPanelState extends State<_BodyPanel> {
                     onChanged: (_) => setState(() => _preset = null),
                     onSubmitted: (_) => _apply(),
                     decoration: InputDecoration(
-                      labelText: _labels[e.key],
-                      suffixText: 'cm',
+                      labelText: _label(l, e.key),
+                      suffixText: l.cm,
                       border: const OutlineInputBorder(),
                     ),
                   ),
@@ -313,14 +319,14 @@ class _BodyPanelState extends State<_BodyPanel> {
                     controller: _name,
                     autofocus: true,
                     onSubmitted: (_) => _savePreset(),
-                    decoration: const InputDecoration(
-                      labelText: 'Preset name',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l.presetName,
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                 ),
                 const SizedBox(width: Space.s),
-                FilledButton(onPressed: _savePreset, child: const Text('Save')),
+                FilledButton(onPressed: _savePreset, child: Text(l.save)),
               ],
             )
           else
@@ -329,17 +335,17 @@ class _BodyPanelState extends State<_BodyPanel> {
                 TextButton.icon(
                   onPressed: () => setState(() => _naming = true),
                   icon: const Icon(Icons.bookmark_add_outlined, size: 18),
-                  label: const Text('Save as preset'),
+                  label: Text(l.saveAsPreset),
                 ),
                 if (_isCustom)
                   TextButton.icon(
                     onPressed: _deletePreset,
                     style: TextButton.styleFrom(foregroundColor: p.danger),
                     icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                    label: const Text('Delete preset'),
+                    label: Text(l.deletePreset),
                   ),
                 const Spacer(),
-                FilledButton(onPressed: _apply, child: const Text('Apply')),
+                FilledButton(onPressed: _apply, child: Text(l.apply)),
               ],
             ),
         ],
@@ -357,7 +363,8 @@ class _Achieved extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
-    String v(String k) => '${(achieved[k] as num).toStringAsFixed(1)} cm';
+    String v(String k) =>
+        '${context.number(achieved[k] as num, 1)} ${context.l.cm}';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(Space.m),
@@ -366,8 +373,12 @@ class _Achieved extends StatelessWidget {
         borderRadius: BorderRadius.circular(kRadius * 0.75),
       ),
       child: Text(
-        'Fitted body: height ${v('height_cm')} · bust ${v('bust_cm')} · '
-        'waist ${v('waist_cm')} · hips ${v('hips_cm')}',
+        context.l.fittedBody(
+          v('height_cm'),
+          v('bust_cm'),
+          v('waist_cm'),
+          v('hips_cm'),
+        ),
         style: ts(fontSize: 12.5, color: p.textMuted, tabular: true),
       ),
     );
