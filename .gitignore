@@ -4,3 +4,4 @@
 # Local scratch projects
 /scratch/
 *.r3d/exports/
+/dist/

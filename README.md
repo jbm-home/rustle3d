@@ -50,6 +50,13 @@ UI (shared textures are macOS-only for now). Under WSL2 the app runs
 through WSLg; the GPU is Mesa's Vulkan driver (or its software fallback),
 so expect lower frame rates than native.
 
+### Release packages
+
+`./scripts/release.sh` builds the app and the CLI in release mode for the
+current OS and packages them in `dist/` (unsigned: a zip of `Rustle3D.app`
+on macOS, a tarball of the app bundle on Linux, a zip on Windows from Git
+Bash). The manual GitHub workflow "Release builds" runs it on all three.
+
 ## Documentation
 
 - [`docs/architecture.md`](docs/architecture.md): crates, data flow, threading.
