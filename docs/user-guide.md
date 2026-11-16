@@ -116,10 +116,22 @@ app.)
   waist.
 
 ## Export
-**Export** in the top bar:
-- the pattern as **SVG** or **PDF** (1:1 scale, tiled on pages to print),
-- the draped garment as **GLB** (glTF) or **OBJ**, with or without the
-  body, for Blender, game engines and other 3D tools.
+**Export** in the top bar, then choose where to save:
+- **Pattern, SVG at 1:1**: one drawing at real size, for vector editors
+  and cutting machines.
+- **Pattern, PDF on A4 pages**: to print at home. Each page is labelled
+  (A1, A2… row by row) and overlaps its neighbours by 1 cm, with dashed
+  guides to line the pages up before taping them together.
+- **Pattern, PDF on one page**: one large page, for a plotter or a print
+  shop.
+- **Garment, GLB** (glTF) or **OBJ**, with or without the body, as the 3D
+  view shows it, for Blender, game engines and other 3D tools.
+
+Every pattern export shows the cutting line, the sewing line (dashed,
+when the piece has a seam allowance), notches, internal lines, the
+grainline and the piece name, plus a **100 mm test square**. Print at
+100 % ("actual size", never "fit to page") and measure the square before
+cutting.
 
 ## AI agents
 Rustle3D can be driven by an AI agent through MCP (Model Context
@@ -132,8 +144,8 @@ Protocol):
 Everything the app does is a command that an agent can run too.
 
 ## Files
-Projects are saved as you work, in Documents › Rustle3D. They are folders with plain JSON files, so they work with version
-control. Patterns go out as SVG and PDF, garments as glTF and OBJ: open
+Projects are saved as you work, in Documents › Rustle3D. They are
+folders with plain JSON files, so they work with version control. Patterns go out as SVG and PDF, garments as glTF and OBJ: open
 formats only.
 
 ## Known limits
