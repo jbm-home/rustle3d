@@ -625,6 +625,84 @@ abstract class L {
   /// **'Export'**
   String get export;
 
+  /// No description provided for @importPattern.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get importPattern;
+
+  /// No description provided for @importTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Import a pattern drawn elsewhere: DXF-AAMA, DXF, SVG or PDF'**
+  String get importTip;
+
+  /// No description provided for @importFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Patterns'**
+  String get importFiles;
+
+  /// No description provided for @imported.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 piece imported} other{{count} pieces imported}}.'**
+  String imported(int count);
+
+  /// No description provided for @importIgnored.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 shape was not part of a piece.} other{{count} shapes were not part of a piece.}}'**
+  String importIgnored(int count);
+
+  /// No description provided for @importUnitsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What unit was this drawn in?'**
+  String get importUnitsTitle;
+
+  /// No description provided for @importUnitsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The file does not give its scale, so the pieces may be the wrong size. Choose the unit it was drawn in, or keep them as they are.'**
+  String get importUnitsBody;
+
+  /// No description provided for @importKeep.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep as is'**
+  String get importKeep;
+
+  /// No description provided for @unitMm.
+  ///
+  /// In en, this message translates to:
+  /// **'Millimetres'**
+  String get unitMm;
+
+  /// No description provided for @unitCm.
+  ///
+  /// In en, this message translates to:
+  /// **'Centimetres'**
+  String get unitCm;
+
+  /// No description provided for @unitIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Inches'**
+  String get unitIn;
+
+  /// No description provided for @unitPt.
+  ///
+  /// In en, this message translates to:
+  /// **'Points (1/72 inch)'**
+  String get unitPt;
+
+  /// No description provided for @unitPx.
+  ///
+  /// In en, this message translates to:
+  /// **'Pixels (1/96 inch)'**
+  String get unitPx;
+
   /// No description provided for @agents.
   ///
   /// In en, this message translates to:
@@ -702,6 +780,12 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Garment in 3D, OBJ'**
   String get exportObj;
+
+  /// No description provided for @exportDxf.
+  ///
+  /// In en, this message translates to:
+  /// **'Pattern, DXF-AAMA (pattern software)'**
+  String get exportDxf;
 
   /// No description provided for @exported.
   ///
@@ -2010,6 +2094,42 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Could not read or write the project files.'**
   String get errFileIo;
+
+  /// No description provided for @errImportMalformed.
+  ///
+  /// In en, this message translates to:
+  /// **'This file cannot be read as {format}.'**
+  String errImportMalformed(String format);
+
+  /// No description provided for @errImportBinaryDxf.
+  ///
+  /// In en, this message translates to:
+  /// **'Binary DXF files cannot be read: save the file as ASCII DXF.'**
+  String get errImportBinaryDxf;
+
+  /// No description provided for @errImportNoPieces.
+  ///
+  /// In en, this message translates to:
+  /// **'No pattern piece found: the drawing has no closed outline.'**
+  String get errImportNoPieces;
+
+  /// No description provided for @errImportPagesDiffer.
+  ///
+  /// In en, this message translates to:
+  /// **'The pages of this PDF do not repeat one drawing, so they cannot be put back together.'**
+  String get errImportPagesDiffer;
+
+  /// No description provided for @errImportEncrypted.
+  ///
+  /// In en, this message translates to:
+  /// **'This PDF is protected and cannot be read.'**
+  String get errImportEncrypted;
+
+  /// No description provided for @errReadFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read this file.'**
+  String get errReadFile;
 
   /// No description provided for @errNotAProject.
   ///

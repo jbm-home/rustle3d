@@ -7,7 +7,7 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-16 (M12).
+Last updated: 2026-11-16 (M13).
 -->
 
 Rustle3D is a free, open-source desktop app for making clothes: draw the
@@ -124,6 +124,10 @@ app.)
   guides to line the pages up before taping them together.
 - **Pattern, PDF on one page**: one large page, for a plotter or a print
   shop.
+- **Pattern, DXF-AAMA (pattern software)**: the industry exchange format
+  read by pattern-making, grading and cutting programs, in millimetres:
+  each piece with its cutting and sewing lines, notches, grainline,
+  internal lines and name.
 - **Garment, GLB** (glTF) or **OBJ**, with or without the body, as the 3D
   view shows it, for Blender, game engines and other 3D tools.
 
@@ -132,6 +136,29 @@ when the piece has a seam allowance), notches, internal lines, the
 grainline and the piece name, plus a **100 mm test square**. Print at
 100 % ("actual size", never "fit to page") and measure the square before
 cutting.
+
+## Import
+**Import** in the top bar brings in a pattern drawn in another program:
+a **DXF-AAMA** or plain **DXF** file, an **SVG**, or a **PDF** (a pattern
+printed on several pages is put back together, as long as each page shows
+part of the same drawing).
+- Each closed outline becomes a piece. A second outline just inside it,
+  at the same distance all around (usually dashed), is read as the
+  sewing line, and that distance as the seam allowance. Short marks across the edge become notches, a line with
+  arrowheads the grainline, other lines inside the piece internal lines,
+  and the largest text inside the piece its name. A test square is left
+  out.
+- Curves drawn as many small straight segments are turned back into
+  smooth curves you can edit with the usual tools.
+- The new pieces appear to the right of the ones already on the board.
+  They are not sewn yet: sew them with **Sew** (S). One **⌘Z** removes the
+  whole import.
+- A message says how many pieces came in, and how many shapes were left
+  out (outside every piece).
+- If the file does not give its scale (some DXF and SVG files), Rustle3D
+  asks which unit it was drawn in: millimetres, centimetres, inches,
+  points or pixels. **Keep as is** keeps the first reading.
+- A copy of the file is kept in the project, in its `imports` folder.
 
 ## AI agents
 Rustle3D can be driven by an AI agent through MCP (Model Context
@@ -145,11 +172,16 @@ Everything the app does is a command that an agent can run too.
 
 ## Files
 Projects are saved as you work, in Documents › Rustle3D. They are
-folders with plain JSON files, so they work with version control. Patterns go out as SVG and PDF, garments as glTF and OBJ: open
-formats only.
+folders with plain JSON files, so they work with version control.
+Patterns come in from DXF, SVG and PDF and go out as SVG, PDF and
+DXF-AAMA; garments go out as glTF and OBJ: open formats only.
 
 ## Known limits
 - On the men's body presets, a heavy skirt (denim) can slide off the hips
   during the drape.
 - A point's handles cannot be edited after it is drawn yet; use Bend on
   the edge.
+- Import: a PDF whose pages each hold a different part of the pattern
+  (rather than the same drawing shifted) cannot be put back together;
+  binary DXF files and protected PDFs cannot be read. Grading rules are
+  not read: pieces come in at the size they are drawn.

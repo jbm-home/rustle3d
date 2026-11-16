@@ -311,6 +311,63 @@ class LFr extends L {
   String get export => 'Exporter';
 
   @override
+  String get importPattern => 'Importer';
+
+  @override
+  String get importTip =>
+      'Importer un patron dessiné ailleurs : DXF-AAMA, DXF, SVG ou PDF';
+
+  @override
+  String get importFiles => 'Patrons';
+
+  @override
+  String imported(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count pièces importées',
+      one: '1 pièce importée',
+    );
+    return '$_temp0.';
+  }
+
+  @override
+  String importIgnored(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tracés ne faisaient partie d’aucune pièce.',
+      one: '1 tracé ne faisait partie d’aucune pièce.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get importUnitsTitle => 'Dans quelle unité ce patron est-il dessiné ?';
+
+  @override
+  String get importUnitsBody =>
+      'Le fichier n’indique pas son échelle : les pièces n’ont peut-être pas la bonne taille. Choisissez l’unité du dessin, ou gardez-les telles quelles.';
+
+  @override
+  String get importKeep => 'Garder tel quel';
+
+  @override
+  String get unitMm => 'Millimètres';
+
+  @override
+  String get unitCm => 'Centimètres';
+
+  @override
+  String get unitIn => 'Pouces';
+
+  @override
+  String get unitPt => 'Points (1/72 de pouce)';
+
+  @override
+  String get unitPx => 'Pixels (1/96 de pouce)';
+
+  @override
   String get agents => 'Agents';
 
   @override
@@ -349,6 +406,9 @@ class LFr extends L {
 
   @override
   String get exportObj => 'Vêtement en 3D, OBJ';
+
+  @override
+  String get exportDxf => 'Patron, DXF-AAMA (logiciels de patronage)';
 
   @override
   String exported(String file) {
@@ -1114,6 +1174,29 @@ class LFr extends L {
   @override
   String get errFileIo =>
       'Impossible de lire ou d’écrire les fichiers du projet.';
+
+  @override
+  String errImportMalformed(String format) {
+    return 'Ce fichier ne peut pas être lu comme un $format.';
+  }
+
+  @override
+  String get errImportBinaryDxf =>
+      'Les fichiers DXF binaires ne peuvent pas être lus : enregistrez le fichier en DXF ASCII.';
+
+  @override
+  String get errImportNoPieces =>
+      'Aucune pièce de patron : le dessin n’a pas de contour fermé.';
+
+  @override
+  String get errImportPagesDiffer =>
+      'Les pages de ce PDF ne reprennent pas un même dessin : elles ne peuvent pas être réassemblées.';
+
+  @override
+  String get errImportEncrypted => 'Ce PDF est protégé et ne peut pas être lu.';
+
+  @override
+  String get errReadFile => 'Impossible de lire ce fichier.';
 
   @override
   String get errNotAProject => 'Ce dossier n’est pas un projet Rustle3D.';

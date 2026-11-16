@@ -657,6 +657,7 @@ class _ShellState extends State<Shell> {
       ExportFormat.pdfA4 || ExportFormat.pdfSingle => 'pdf',
       ExportFormat.glb => 'glb',
       ExportFormat.obj => 'obj',
+      ExportFormat.dxf => 'dxf',
     };
     final name = (_summary['name'] as String?) ?? 'Rustle3D';
     final l = context.l;
@@ -677,6 +678,84 @@ class _ShellState extends State<Shell> {
     } on ApiError catch (e) {
       _toast(context.error(e));
     }
+  }
+
+  /// Ask for a pattern file and import its pieces. When the file does not
+  /// say how big its units are, ask which unit it was drawn in and import
+  /// it again in that unit (the first import is undone).
+  Future<void> _importPattern() async {
+    final l = context.l;
+    final file = await openFile(
+      acceptedTypeGroups: [
+        XTypeGroup(
+          label: l.importFiles,
+          extensions: const ['dxf', 'svg', 'pdf'],
+        ),
+      ],
+    );
+    if (file == null || !mounted) return;
+    Map<String, dynamic>? result = _importFile(file.path, null);
+    if (result == null) return;
+    if (result['scale'] == 'assumed') {
+      final unit = await _askUnits();
+      if (unit != null && mounted) {
+        _run({'type': 'history.undo'});
+        result = _importFile(file.path, unit) ?? result;
+      }
+    }
+    if (!mounted) return;
+    _refresh();
+    final pieces = (result['panels'] as List<dynamic>).length;
+    final ignored = result['ignored'] as int? ?? 0;
+    _toast(
+      [l.imported(pieces), if (ignored > 0) l.importIgnored(ignored)].join(' '),
+    );
+  }
+
+  Map<String, dynamic>? _importFile(String path, String? units) {
+    try {
+      return jsonDecode(widget.engine.importPattern(path: path, units: units))
+          as Map<String, dynamic>;
+    } on ApiError catch (e) {
+      _toast(context.error(e));
+      return null;
+    }
+  }
+
+  Future<String?> _askUnits() {
+    final l = context.l;
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l.importUnitsTitle),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l.importUnitsBody),
+            const SizedBox(height: Space.s),
+            for (final (unit, label) in [
+              ('mm', l.unitMm),
+              ('cm', l.unitCm),
+              ('in', l.unitIn),
+              ('pt', l.unitPt),
+              ('px', l.unitPx),
+            ])
+              ListTile(
+                dense: true,
+                title: Text(label),
+                onTap: () => Navigator.pop(context, unit),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l.importKeep),
+          ),
+        ],
+      ),
+    );
   }
 
   void _allowAgents(bool allow) {
@@ -804,6 +883,7 @@ class _ShellState extends State<Shell> {
                 onRedo: _redo,
                 onBody: _showBody,
                 onExport: _export,
+                onImport: _importPattern,
                 agent: _agent,
                 onAllowAgents: _allowAgents,
                 onDisconnectAgent: () => _guard(widget.engine.disconnectAgent),
@@ -992,6 +1072,7 @@ class _TopBar extends StatelessWidget {
     required this.onRedo,
     required this.onBody,
     required this.onExport,
+    required this.onImport,
     required this.agent,
     required this.onAllowAgents,
     required this.onDisconnectAgent,
@@ -1014,6 +1095,9 @@ class _TopBar extends StatelessWidget {
 
   /// Export in a format (with the avatar, for 3D formats).
   final void Function(ExportFormat format, bool avatar) onExport;
+
+  /// Import a pattern drawn elsewhere.
+  final VoidCallback onImport;
 
   /// AI agents: allowed or not, connected or not.
   final AgentStatus agent;
@@ -1120,6 +1204,14 @@ class _TopBar extends StatelessWidget {
               onAllow: onAllowAgents,
               onDisconnect: onDisconnectAgent,
             ),
+            Tooltip(
+              message: l.importTip,
+              child: TextButton.icon(
+                onPressed: onImport,
+                icon: const Icon(Icons.file_open_outlined, size: 18),
+                label: Text(l.importPattern),
+              ),
+            ),
             PopupMenuButton<(ExportFormat, bool)>(
               tooltip: l.export,
               onSelected: (choice) => onExport(choice.$1, choice.$2),
@@ -1128,6 +1220,7 @@ class _TopBar extends StatelessWidget {
                   (ExportFormat.svg, false, l.exportSvg),
                   (ExportFormat.pdfA4, false, l.exportPdfA4),
                   (ExportFormat.pdfSingle, false, l.exportPdfSingle),
+                  (ExportFormat.dxf, false, l.exportDxf),
                   (ExportFormat.glb, false, l.exportGlb),
                   (ExportFormat.glb, true, l.exportGlbAvatar),
                   (ExportFormat.obj, false, l.exportObj),

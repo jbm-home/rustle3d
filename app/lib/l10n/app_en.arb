@@ -201,6 +201,33 @@
   },
   "allProjects": "All projects",
   "export": "Export",
+  "importPattern": "Import",
+  "importTip": "Import a pattern drawn elsewhere: DXF-AAMA, DXF, SVG or PDF",
+  "importFiles": "Patterns",
+  "imported": "{count, plural, =1{1 piece imported} other{{count} pieces imported}}.",
+  "@imported": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "importIgnored": "{count, plural, =1{1 shape was not part of a piece.} other{{count} shapes were not part of a piece.}}",
+  "@importIgnored": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "importUnitsTitle": "What unit was this drawn in?",
+  "importUnitsBody": "The file does not give its scale, so the pieces may be the wrong size. Choose the unit it was drawn in, or keep them as they are.",
+  "importKeep": "Keep as is",
+  "unitMm": "Millimetres",
+  "unitCm": "Centimetres",
+  "unitIn": "Inches",
+  "unitPt": "Points (1/72 inch)",
+  "unitPx": "Pixels (1/96 inch)",
   "agents": "Agents",
   "agentsWaiting": "Agents: waiting",
   "agentConnected": "Agent connected",
@@ -214,6 +241,7 @@
   "exportGlb": "Garment in 3D, glTF (.glb)",
   "exportGlbAvatar": "Garment and body in 3D, glTF (.glb)",
   "exportObj": "Garment in 3D, OBJ",
+  "exportDxf": "Pattern, DXF-AAMA (pattern software)",
   "exported": "Exported {file}.",
   "@exported": {
     "placeholders": {
@@ -579,6 +607,19 @@
   "errNotAcross": "The cut must cross one piece from side to side: start and end outside it.",
   "errMirrored": "This piece has a linked mirror copy: unlink the copy first.",
   "errFileIo": "Could not read or write the project files.",
+  "errImportMalformed": "This file cannot be read as {format}.",
+  "@errImportMalformed": {
+    "placeholders": {
+      "format": {
+        "type": "String"
+      }
+    }
+  },
+  "errImportBinaryDxf": "Binary DXF files cannot be read: save the file as ASCII DXF.",
+  "errImportNoPieces": "No pattern piece found: the drawing has no closed outline.",
+  "errImportPagesDiffer": "The pages of this PDF do not repeat one drawing, so they cannot be put back together.",
+  "errImportEncrypted": "This PDF is protected and cannot be read.",
+  "errReadFile": "Could not read this file.",
   "errNotAProject": "This folder is not a Rustle3D project.",
   "errTooNew": "This project was made by a newer version of Rustle3D.",
   "errCorrupted": "This project file is damaged.",

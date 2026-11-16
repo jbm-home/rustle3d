@@ -180,6 +180,8 @@ pub enum ExportFormat {
     Glb,
     /// The garment as the 3D view shows it, Wavefront OBJ.
     Obj,
+    /// The pattern as DXF-AAMA, for pattern and cutting software.
+    Dxf,
 }
 
 /// Where the 3D view looks at the body from.
@@ -625,6 +627,7 @@ impl Engine {
                 }
                 ExportFormat::PdfA4 => to_pdf(&r3d_io::pattern_drawing(project), Paper::A4),
                 ExportFormat::PdfSingle => to_pdf(&r3d_io::pattern_drawing(project), Paper::Single),
+                ExportFormat::Dxf => r3d_io::dxf::to_dxf(project).into_bytes(),
                 ExportFormat::Glb | ExportFormat::Obj => {
                     // Locks in the engine's usual order: the simulation
                     // before the cloth.
@@ -664,6 +667,30 @@ impl Engine {
                     .arg("path", &path),
             )
         })
+    }
+
+    /// Import the pieces of a pattern from a file the user chose
+    /// (anywhere; DXF, SVG or PDF): the file is copied into the project's
+    /// `imports/` folder, then read, as one undo step. `units` (`mm`, `cm`,
+    /// `in`, `px`…) overrides what the file says. Returns the JSON result
+    /// of `import.pattern`: `panels`, `ignored`, and `scale` (`assumed`
+    /// when the file did not say how big a unit is).
+    #[frb(sync)]
+    pub fn import_pattern(&self, path: String, units: Option<String>) -> Result<String, ApiError> {
+        let mut ws = self.workspace()?;
+        let rel = ws.adopt(std::path::Path::new(&path)).map_err(err)?;
+        let mut step = serde_json::json!({ "type": "import.pattern", "path": rel });
+        if let Some(u) = units {
+            step["units"] = serde_json::Value::from(u);
+        }
+        let step = Step::from_value(step).map_err(err)?;
+        let result = ws.run_step(&step).map_err(err)?;
+        self.edited()?;
+        if ws.session().is_dirty() {
+            ws.save().map_err(err)?;
+        }
+        self.forget_missing(ws.session().project())?;
+        Ok(result.to_string())
     }
 
     /// The fabrics the UI offers, with the colour each one renders with by

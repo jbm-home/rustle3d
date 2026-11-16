@@ -90,6 +90,14 @@ abstract class Engine implements RustOpaqueInterface {
   /// Fit the board to the pattern again.
   void fitBoard({required int view});
 
+  /// Import the pieces of a pattern from a file the user chose
+  /// (anywhere; DXF, SVG or PDF): the file is copied into the project's
+  /// `imports/` folder, then read, as one undo step. `units` (`mm`, `cm`,
+  /// `in`, `px`…) overrides what the file says. Returns the JSON result
+  /// of `import.pattern`: `panels`, `ignored`, and `scale` (`assumed`
+  /// when the file did not say how big a unit is).
+  String importPattern({required String path, String? units});
+
   /// Look at the body from one side, framed head to toe.
   void lookFrom({required CameraSide side});
 
@@ -351,6 +359,9 @@ enum ExportFormat {
 
   /// The garment as the 3D view shows it, Wavefront OBJ.
   obj,
+
+  /// The pattern as DXF-AAMA, for pattern and cutting software.
+  dxf,
 }
 
 /// A fabric choice for the UI.

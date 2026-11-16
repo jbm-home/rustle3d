@@ -308,6 +308,63 @@ class LEn extends L {
   String get export => 'Export';
 
   @override
+  String get importPattern => 'Import';
+
+  @override
+  String get importTip =>
+      'Import a pattern drawn elsewhere: DXF-AAMA, DXF, SVG or PDF';
+
+  @override
+  String get importFiles => 'Patterns';
+
+  @override
+  String imported(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count pieces imported',
+      one: '1 piece imported',
+    );
+    return '$_temp0.';
+  }
+
+  @override
+  String importIgnored(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count shapes were not part of a piece.',
+      one: '1 shape was not part of a piece.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get importUnitsTitle => 'What unit was this drawn in?';
+
+  @override
+  String get importUnitsBody =>
+      'The file does not give its scale, so the pieces may be the wrong size. Choose the unit it was drawn in, or keep them as they are.';
+
+  @override
+  String get importKeep => 'Keep as is';
+
+  @override
+  String get unitMm => 'Millimetres';
+
+  @override
+  String get unitCm => 'Centimetres';
+
+  @override
+  String get unitIn => 'Inches';
+
+  @override
+  String get unitPt => 'Points (1/72 inch)';
+
+  @override
+  String get unitPx => 'Pixels (1/96 inch)';
+
+  @override
   String get agents => 'Agents';
 
   @override
@@ -345,6 +402,9 @@ class LEn extends L {
 
   @override
   String get exportObj => 'Garment in 3D, OBJ';
+
+  @override
+  String get exportDxf => 'Pattern, DXF-AAMA (pattern software)';
 
   @override
   String exported(String file) {
@@ -1100,6 +1160,29 @@ class LEn extends L {
 
   @override
   String get errFileIo => 'Could not read or write the project files.';
+
+  @override
+  String errImportMalformed(String format) {
+    return 'This file cannot be read as $format.';
+  }
+
+  @override
+  String get errImportBinaryDxf =>
+      'Binary DXF files cannot be read: save the file as ASCII DXF.';
+
+  @override
+  String get errImportNoPieces =>
+      'No pattern piece found: the drawing has no closed outline.';
+
+  @override
+  String get errImportPagesDiffer =>
+      'The pages of this PDF do not repeat one drawing, so they cannot be put back together.';
+
+  @override
+  String get errImportEncrypted => 'This PDF is protected and cannot be read.';
+
+  @override
+  String get errReadFile => 'Could not read this file.';
 
   @override
   String get errNotAProject => 'This folder is not a Rustle3D project.';
