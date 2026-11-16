@@ -90,18 +90,46 @@ pub enum Fabric {
     Wool,
 }
 
+/// How a fabric looks: shared by the 3D view, the photorealistic renderer
+/// and the 3D exports, so they agree.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FabricLook {
+    /// Usual colour (sRGB, `0xRRGGBB`).
+    pub rgb: u32,
+    /// Strength of the sheen, the fibres' colour at grazing angles (0 =
+    /// matte, 1.6 = silk): strong for silk, a soft halo for wool, faint
+    /// for denim.
+    pub sheen: f32,
+    /// How spread the sheen is (0–1): low for smooth filaments (silk),
+    /// high for fuzzy fibres (wool).
+    pub sheen_roughness: f32,
+    /// Roughness of the surface's specular reflection (0–1).
+    pub roughness: f32,
+    /// Strength of that specular reflection (0–1): fibres are a poor
+    /// mirror, except smooth silk.
+    pub specular: f32,
+    /// Share of the light a single layer lets through (0–1): thin silk
+    /// and cotton glow against the light, denim does not.
+    pub translucency: f32,
+}
+
 impl Fabric {
-    /// The fabric's usual colour (sRGB, `0xRRGGBB`) and the strength of its
-    /// sheen, the fibres' colour at grazing angles (0 = matte): strong for
-    /// silk, a soft halo for wool, faint for denim. Shared by the renderer
-    /// and the 3D exports.
-    pub const fn appearance(self) -> (u32, f32) {
-        match self {
-            Fabric::Cotton => (0xE4DCCD, 0.6),
-            Fabric::Denim => (0x3E5677, 0.3),
-            Fabric::Jersey => (0x9A5A6A, 0.5),
-            Fabric::Silk => (0xC9A46C, 1.6),
-            Fabric::Wool => (0x5F5B58, 0.9),
+    /// The fabric's look.
+    pub const fn look(self) -> FabricLook {
+        let (rgb, sheen, sheen_roughness, roughness, specular, translucency) = match self {
+            Fabric::Cotton => (0xE4DCCD, 0.6, 0.6, 0.85, 0.25, 0.2),
+            Fabric::Denim => (0x3E5677, 0.3, 0.7, 0.9, 0.2, 0.03),
+            Fabric::Jersey => (0x9A5A6A, 0.5, 0.5, 0.8, 0.25, 0.12),
+            Fabric::Silk => (0xC9A46C, 1.6, 0.3, 0.3, 0.9, 0.25),
+            Fabric::Wool => (0x5F5B58, 0.9, 0.9, 0.95, 0.1, 0.05),
+        };
+        FabricLook {
+            rgb,
+            sheen,
+            sheen_roughness,
+            roughness,
+            specular,
+            translucency,
         }
     }
 }
@@ -115,7 +143,7 @@ impl Garment {
             .and_then(|c| c.strip_prefix('#'))
             .filter(|d| d.len() == 6)
             .and_then(|d| u32::from_str_radix(d, 16).ok())
-            .unwrap_or(self.fabric.appearance().0)
+            .unwrap_or(self.fabric.look().rgb)
     }
 }
 

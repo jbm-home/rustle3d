@@ -36,8 +36,9 @@ impl Material {
     /// is the fibres' colour at grazing angles: strong for silk, a soft halo
     /// for wool, faint for denim.
     pub fn fabric(fabric: Fabric, color: Option<&str>) -> Self {
-        let (usual, sheen_amount) = fabric.appearance();
-        let base = color.and_then(parse_hex).unwrap_or_else(|| hex(usual));
+        let look = fabric.look();
+        let sheen_amount = look.sheen;
+        let base = color.and_then(parse_hex).unwrap_or_else(|| hex(look.rgb));
         let lighter = |c: f32| c + (1.0 - c) * 0.6;
         Self {
             base,

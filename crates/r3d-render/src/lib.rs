@@ -1,4 +1,5 @@
-//! Shared wgpu renderers for the 2D pattern board and the 3D view.
+//! Shared wgpu renderers for the 2D pattern board, the 3D view and
+//! path-traced photos ([`photo`], see `docs/rendering.md`).
 //!
 //! The same code draws into the desktop app (a GPU texture shown by the UI)
 //! and into offscreen textures saved as PNG for the CLI and MCP, so agents
@@ -8,16 +9,19 @@
 //! Shaders write sRGB-encoded colours into non-sRGB targets (`Bgra8Unorm`
 //! for the UI texture, `Rgba8Unorm` for PNG), so both look identical.
 
+pub mod blit;
 pub mod board;
 pub mod camera;
 pub mod gpu;
 pub mod mesh;
 pub mod offscreen;
+pub mod photo;
 pub mod theme;
 pub mod view3d;
 
 mod targets;
 
+pub use blit::ImageBlit;
 pub use board::{BoardRenderer, BoardScene};
 pub use camera::OrbitCamera;
 pub use gpu::{Gpu, RenderError};

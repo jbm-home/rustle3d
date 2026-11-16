@@ -29,7 +29,11 @@ pub fn render_png(
     });
     draw(&texture.create_view(&wgpu::TextureViewDescriptor::default()));
     let pixels = read_pixels(gpu, &texture)?;
+    encode_png(width, height, &pixels)
+}
 
+/// Encode RGBA pixels (row after row, no padding) as PNG.
+pub fn encode_png(width: u32, height: u32, pixels: &[u8]) -> Result<Vec<u8>, RenderError> {
     let mut png_bytes = Vec::new();
     let mut encoder = png::Encoder::new(&mut png_bytes, width, height);
     encoder.set_color(png::ColorType::Rgba);
@@ -38,7 +42,7 @@ pub fn render_png(
         .write_header()
         .map_err(|e| RenderError::Png(e.to_string()))?;
     writer
-        .write_image_data(&pixels)
+        .write_image_data(pixels)
         .map_err(|e| RenderError::Png(e.to_string()))?;
     writer
         .finish()

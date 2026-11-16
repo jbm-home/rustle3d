@@ -91,5 +91,9 @@ opt-level = 2
 [profile.dev.package.r3d-commands]
 opt-level = 2
 
+# The photo renderer builds its hierarchy and curved triangles on the CPU.
+[profile.dev.package.r3d-render]
+opt-level = 2
+
 [profile.release]
 lto = "thin"

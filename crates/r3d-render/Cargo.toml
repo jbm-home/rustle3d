@@ -1,6 +1,6 @@
 [package]
 name = "r3d-render"
-description = "Shared wgpu renderers (2D board, 3D view), on-screen and offscreen"
+description = "Shared wgpu renderers (2D board, 3D view, path-traced photos), on-screen and offscreen"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

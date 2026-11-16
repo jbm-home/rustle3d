@@ -137,7 +137,7 @@ pub fn to_glb(scene: &Scene3d) -> Vec<u8> {
                 material["extensions"] = json!({
                     "KHR_materials_sheen": {
                         "sheenColorFactor": [tint(r), tint(g), tint(bl)],
-                        "sheenRoughnessFactor": 0.5,
+                        "sheenRoughnessFactor": m.sheen_roughness,
                     },
                 });
             }
@@ -213,6 +213,7 @@ pub(crate) mod tests {
                     name: "Cotton".into(),
                     rgb: 0xE4DCCD,
                     sheen: 0.6,
+                    sheen_roughness: 0.6,
                     roughness: 0.85,
                     double_sided: true,
                 },
@@ -220,6 +221,7 @@ pub(crate) mod tests {
                     name: "Avatar".into(),
                     rgb: 0xC8C8C8,
                     sheen: 0.0,
+                    sheen_roughness: 0.0,
                     roughness: 0.7,
                     double_sided: false,
                 },

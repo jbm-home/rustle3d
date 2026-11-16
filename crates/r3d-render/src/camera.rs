@@ -39,6 +39,19 @@ impl OrbitCamera {
         }
     }
 
+    /// Looking from `yaw` (as in [`Self::facing`]) at the box `lo`–`hi`,
+    /// close enough for it to fill the view's shorter side, with a margin.
+    pub fn framing(lo: Vec3, hi: Vec3, yaw: f32) -> Self {
+        let defaults = Self::facing(yaw);
+        let radius = ((hi - lo).length() * 0.5).max(0.05);
+        Self {
+            target: (lo + hi) * 0.5,
+            pitch: 0.12,
+            distance: (radius * 1.08 / (defaults.fov_y * 0.5).sin()).clamp(0.3, 20.0),
+            ..defaults
+        }
+    }
+
     pub fn eye(&self) -> Vec3 {
         let pitch = self.pitch.clamp(-1.4, 1.4);
         self.target
@@ -123,6 +136,22 @@ mod tests {
         assert!(front.z > 3.0 && front.x.abs() < 1e-5);
         let left = OrbitCamera::facing(std::f32::consts::FRAC_PI_2).eye();
         assert!(left.x > 3.0);
+    }
+
+    #[test]
+    fn framing_shows_the_whole_box() {
+        let (lo, hi) = (Vec3::new(-0.3, 0.8, -0.15), Vec3::new(0.3, 1.5, 0.15));
+        let c = OrbitCamera::framing(lo, hi, 0.4);
+        for corner in 0..8 {
+            let p = Vec3::new(
+                if corner & 1 == 0 { lo.x } else { hi.x },
+                if corner & 2 == 0 { lo.y } else { hi.y },
+                if corner & 4 == 0 { lo.z } else { hi.z },
+            );
+            let (px, _) = c.project(p, 800, 600).unwrap();
+            assert!(px.x > 0.0 && px.x < 800.0 && px.y > 0.0 && px.y < 600.0);
+        }
+        assert!(c.distance < OrbitCamera::default().distance);
     }
 
     #[test]

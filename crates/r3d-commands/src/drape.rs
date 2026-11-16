@@ -967,12 +967,14 @@ pub fn scene3d(
         .default_garment()
         .and_then(|id| project.garments().get(&id));
     let fabric = garment.map(|g| g.fabric).unwrap_or_default();
-    let rgb = garment.map_or(fabric.appearance().0, |g| g.rgb());
+    let look = fabric.look();
+    let rgb = garment.map_or(look.rgb, |g| g.rgb());
     let mut materials = vec![Material3d {
         name: format!("{fabric:?}"),
         rgb,
-        sheen: fabric.appearance().1,
-        roughness: 0.85,
+        sheen: look.sheen,
+        sheen_roughness: look.sheen_roughness,
+        roughness: look.roughness,
         double_sided: true,
     }];
     let pieces = drape
@@ -997,6 +999,7 @@ pub fn scene3d(
             name: "Avatar".into(),
             rgb: 0xC9C6C1,
             sheen: 0.0,
+            sheen_roughness: 0.0,
             roughness: 0.7,
             double_sided: false,
         });

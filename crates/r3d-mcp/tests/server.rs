@@ -29,7 +29,7 @@ fn tools_mirror_the_registries() {
     let (_tmp, s) = server();
     let names = s.tool_names();
     let expected =
-        Command::registry().len() + Query::registry().len() + Action::registry().len() + 5;
+        Command::registry().len() + Query::registry().len() + Action::registry().len() + 6;
     assert_eq!(names.len(), expected);
     for n in &names {
         assert!(
@@ -40,6 +40,7 @@ fn tools_mirror_the_registries() {
     }
     assert!(names.contains(&"panel_create_rect".to_owned()));
     assert!(names.contains(&"export_pdf".to_owned()));
+    assert!(names.contains(&"render_photo".to_owned()));
 }
 
 #[test]
@@ -144,7 +145,36 @@ fn agents_simulate_and_look_at_the_garment() {
     let info: Value = serde_json::from_str(result["content"][1]["text"].as_str().unwrap()).unwrap();
     assert_eq!(info["drape"], "simulated");
 
+    let photo = serde_json::to_value(s.call(
+        "render_photo",
+        Some(Map::from_iter([
+            ("width".into(), json!(64)),
+            ("height".into(), json!(48)),
+            ("quality".into(), json!("quick")),
+            ("lighting".into(), json!("soft")),
+            ("camera".into(), json!("back")),
+            ("samples".into(), json!(2)),
+        ])),
+    ))
+    .unwrap();
+    assert_eq!(photo["content"][0]["type"], "image", "{photo}");
+    let info: Value = serde_json::from_str(photo["content"][1]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(info["view"], "photo");
+    assert_eq!(info["samples"], 2);
+    assert_eq!(info["lighting"], "soft");
+    assert_eq!(info["drape"], "simulated");
+
     let (err, body) = call(&s, "render_board", json!({ "width": 8 }));
     assert!(err);
     assert_eq!(body["error"]["code"], "invalid.range");
+    let (err, body) = call(&s, "render_photo", json!({ "quality": "superb" }));
+    assert!(err);
+    assert_eq!(body["error"]["code"], "malformed");
+    assert_eq!(body["error"]["args"]["name"], "quality");
+    let (err, body) = call(&s, "render_photo", json!({ "width": 4096, "height": 4096 }));
+    assert!(err);
+    assert_eq!(body["error"]["code"], "invalid.range");
+    let (err, body) = call(&s, "render_3d", json!({ "quality": "good" }));
+    assert!(err);
+    assert_eq!(body["error"]["args"]["name"], "quality");
 }

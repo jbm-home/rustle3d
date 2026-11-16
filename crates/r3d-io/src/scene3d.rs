@@ -25,6 +25,8 @@ pub struct Material3d {
     pub rgb: u32,
     /// Sheen strength as the app renders it (0 = matte, 1.6 = silk).
     pub sheen: f32,
+    /// How spread the sheen is, 0–1.
+    pub sheen_roughness: f32,
     /// Microfacet roughness, 0–1.
     pub roughness: f32,
     /// Cloth is a single layer seen from both sides.

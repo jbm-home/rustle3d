@@ -4,8 +4,9 @@
 //! command, query and action registries (one source of truth with the CLI
 //! and `docs/commands.md`): `panel.create_rect` becomes the tool
 //! `panel_create_rect`, with the same JSON schema. `history_undo`,
-//! `history_redo` and `batch` complete the set, and `render_board` /
-//! `render_3d` return PNG images so the agent can look at its work.
+//! `history_redo` and `batch` complete the set, and `render_board`,
+//! `render_3d` and `render_photo` return PNG images so the agent can look
+//! at its work.
 //!
 //! Headless (M2): one project folder over stdio, saved after every
 //! successful change. Attached (M9, [`attach`]): the desktop app serves its
@@ -25,6 +26,7 @@ use r3d_commands::{
 };
 use r3d_core::{Localizable, Message};
 use r3d_render::Gpu;
+use r3d_render::photo;
 use rmcp::model::{
     CallToolRequestParams, CallToolResponse, CallToolResult, ContentBlock, Implementation,
     ListToolsResult, PaginatedRequestParams, ServerCapabilities, ServerConfig, Tool,
@@ -41,7 +43,8 @@ Every successful change is saved to the project folder. \
 export_pdf / export_svg write 1:1 patterns under exports/ (paths stay inside the project); \
 export_gltf / export_obj write the draped garment (after simulate) for 3D tools and game engines. \
 To dress the avatar: avatar_set, panel_place each panel around the body, seam_add, garment_set_fabric, \
-then simulate (headless drape, cached) and render_3d to see the result; render_board shows the pattern. \
+then simulate (headless drape, cached) and render_3d to see the result; render_board shows the pattern; \
+render_photo makes a photorealistic studio image of the draped garment (quality quick for a first look). \
 Errors carry a stable `code`, `args` and an English `text`.";
 
 /// Errors starting or running the server.
@@ -187,6 +190,49 @@ fn catalog() -> (Vec<Tool>, BTreeMap<String, Target>) {
         size_schema(),
         Target::Render(render::View::Garment),
     );
+    let photo_schema = {
+        let names = |all: &[&str]| json!(all);
+        object(json!({
+            "type": "object",
+            "properties": {
+                "width": { "type": "integer", "minimum": 16, "maximum": 4096, "default": 1024 },
+                "height": { "type": "integer", "minimum": 16, "maximum": 4096, "default": 768 },
+                "quality": {
+                    "enum": names(&photo::Quality::ALL.map(photo::Quality::name)),
+                    "default": "good",
+                    "description": "quick: 16 samples per pixel (seconds); good: 128; best: 512"
+                },
+                "lighting": {
+                    "enum": names(&photo::Lighting::ALL.map(photo::Lighting::name)),
+                    "default": "studio",
+                    "description": "studio: key, fill and rim lights on a light grey backdrop; soft: large soft boxes, white backdrop; dramatic: one hard light on a dark backdrop"
+                },
+                "camera": {
+                    "enum": names(&render::CameraAngle::ALL.map(render::CameraAngle::name)),
+                    "default": "three_quarter"
+                },
+                "frame": {
+                    "enum": ["garment", "body"],
+                    "default": "garment",
+                    "description": "Fill the image with the garment, or show the whole body"
+                },
+                "samples": { "type": "integer", "minimum": 1, "maximum": photo::MAX_SAMPLES, "description": "Overrides the quality's samples per pixel" },
+                "bounces": { "type": "integer", "minimum": 0, "maximum": photo::MAX_BOUNCES, "description": "Overrides the quality's light bounces" },
+                "denoise": { "type": "boolean", "default": true }
+            },
+            "additionalProperties": false
+        }))
+    };
+    add(
+        "render_photo".into(),
+        "Render a photorealistic PNG of the garment on the avatar in a photo studio (path \
+         traced, denoised): the last `simulate` result if the project has not changed since, \
+         otherwise the panels where the simulation starts. Takes seconds (quick) to minutes \
+         (best) depending on the GPU and the size; the text result gives the time taken."
+            .into(),
+        photo_schema,
+        Target::Render(render::View::Photo(render::PhotoOptions::default())),
+    );
     (tools, targets)
 }
 
@@ -267,10 +313,22 @@ impl Server {
                     .map_err(Into::into),
             }
         };
-        if let Some(key) = args.keys().find(|k| *k != "width" && *k != "height") {
+        let (view, extra): (render::View, &[&str]) = match view {
+            render::View::Photo(_) => (
+                render::View::Photo(render::PhotoOptions::from_args(args)?),
+                &render::PhotoOptions::KEYS,
+            ),
+            other => (other, &[]),
+        };
+        if let Some(key) = args
+            .keys()
+            .find(|k| *k != "width" && *k != "height" && !extra.contains(&k.as_str()))
+        {
+            let mut expected = vec!["width", "height"];
+            expected.extend_from_slice(extra);
             return Err(CommandError::Malformed {
                 name: key.clone(),
-                detail: "unknown parameter (expected width, height)".into(),
+                detail: format!("unknown parameter (expected {})", expected.join(", ")),
             }
             .into());
         }

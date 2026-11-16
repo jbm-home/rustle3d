@@ -339,6 +339,40 @@ fn simulate_caches_a_drape_that_render_uses() {
     if render.status.success() {
         assert_eq!(json_of(&render.stdout)["drape"], "start");
     }
+
+    // A photo, quick and small.
+    let photo = r3d()
+        .args([
+            "render",
+            "--view",
+            "photo",
+            "--size",
+            "48x36",
+            "--quality",
+            "quick",
+        ])
+        .args([
+            "--samples",
+            "2",
+            "--lighting",
+            "dramatic",
+            "--camera",
+            "side",
+            "--out",
+        ])
+        .arg(&png)
+        .arg(&dir)
+        .output()
+        .unwrap();
+    if photo.status.success() {
+        let info = json_of(&photo.stdout);
+        assert_eq!(info["view"], "photo");
+        assert_eq!(info["samples"], 2);
+        assert_eq!(info["lighting"], "dramatic");
+        assert!(std::fs::read(&png).unwrap().starts_with(b"\x89PNG"));
+    } else {
+        assert_eq!(json_of(&photo.stderr)["error"]["code"], "gpu");
+    }
 }
 
 #[test]

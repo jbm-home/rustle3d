@@ -66,6 +66,101 @@ enum ViewArg {
     /// The garment on the avatar (the cached drape if it is up to date).
     #[value(name = "3d")]
     Garment,
+    /// A path-traced photo of the garment on the avatar.
+    Photo,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum QualityArg {
+    Quick,
+    Good,
+    Best,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum LightingArg {
+    Studio,
+    Soft,
+    Dramatic,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum CameraArg {
+    Front,
+    ThreeQuarter,
+    Side,
+    Back,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum FrameArg {
+    Garment,
+    Body,
+}
+
+/// Options of `render --view photo`.
+#[derive(clap::Args)]
+struct PhotoArgs {
+    /// Photo: samples per pixel and bounces (quick 16, good 128, best 512).
+    #[arg(long, value_enum, default_value = "good")]
+    quality: QualityArg,
+    /// Photo: studio setup.
+    #[arg(long, value_enum, default_value = "studio")]
+    lighting: LightingArg,
+    /// Photo: where the camera stands.
+    #[arg(long, value_enum, default_value = "three-quarter")]
+    camera: CameraArg,
+    /// Photo: fill the image with the garment or show the whole body.
+    #[arg(long, value_enum, default_value = "garment")]
+    frame: FrameArg,
+    /// Photo: samples per pixel (overrides --quality).
+    #[arg(long)]
+    samples: Option<u32>,
+    /// Photo: light bounces (overrides --quality).
+    #[arg(long)]
+    bounces: Option<u32>,
+    /// Photo: keep the raw samples, without denoising.
+    #[arg(long)]
+    no_denoise: bool,
+}
+
+impl PhotoArgs {
+    fn options(&self) -> Result<render::PhotoOptions, Failure> {
+        // The MCP tool's names, so both front-ends parse the same way.
+        let quality = match self.quality {
+            QualityArg::Quick => "quick",
+            QualityArg::Good => "good",
+            QualityArg::Best => "best",
+        };
+        let lighting = match self.lighting {
+            LightingArg::Studio => "studio",
+            LightingArg::Soft => "soft",
+            LightingArg::Dramatic => "dramatic",
+        };
+        let camera = match self.camera {
+            CameraArg::Front => render::CameraAngle::Front,
+            CameraArg::ThreeQuarter => render::CameraAngle::ThreeQuarter,
+            CameraArg::Side => render::CameraAngle::Side,
+            CameraArg::Back => render::CameraAngle::Back,
+        };
+        let frame = match self.frame {
+            FrameArg::Garment => "garment",
+            FrameArg::Body => "body",
+        };
+        let mut args = serde_json::Map::new();
+        args.insert("quality".into(), quality.into());
+        args.insert("lighting".into(), lighting.into());
+        args.insert("camera".into(), camera.name().into());
+        args.insert("frame".into(), frame.into());
+        if let Some(n) = self.samples {
+            args.insert("samples".into(), n.into());
+        }
+        if let Some(n) = self.bounces {
+            args.insert("bounces".into(), n.into());
+        }
+        args.insert("denoise".into(), (!self.no_denoise).into());
+        Ok(render::PhotoOptions::from_args(&args)?)
+    }
 }
 
 #[derive(Subcommand)]
@@ -139,8 +234,8 @@ enum Cmd {
         #[arg(long, default_value_t = 300)]
         frames: u32,
     },
-    /// Render the pattern (`board`) or the garment on the avatar (`3d`) to
-    /// a PNG file.
+    /// Render the pattern (`board`), the garment on the avatar (`3d`) or a
+    /// photorealistic studio image of it (`photo`) to a PNG file.
     Render {
         project: PathBuf,
         #[arg(long, value_enum)]
@@ -151,6 +246,8 @@ enum Cmd {
         /// Image size, e.g. 1200x900.
         #[arg(long, default_value = "1200x900", value_parser = parse_size)]
         size: (u32, u32),
+        #[command(flatten)]
+        photo: PhotoArgs,
     },
     /// List every operation, or print the JSON schema of one.
     Schema { name: Option<String> },
@@ -340,11 +437,18 @@ fn parse_size(s: &str) -> Result<(u32, u32), String> {
     Ok((parse(w)?, parse(h)?))
 }
 
-fn cmd_render(project: &Path, view: ViewArg, out: &Path, size: (u32, u32)) -> Result<(), Failure> {
+fn cmd_render(
+    project: &Path,
+    view: ViewArg,
+    out: &Path,
+    size: (u32, u32),
+    photo: &PhotoArgs,
+) -> Result<(), Failure> {
     let ws = Workspace::open(project)?;
     let view = match view {
         ViewArg::Board => render::View::Board,
         ViewArg::Garment => render::View::Garment,
+        ViewArg::Photo => render::View::Photo(photo.options()?),
     };
     let gpu = render::headless_gpu()?;
     let (png, mut info) = render::render(&gpu, &ws, view, size.0, size.1)?;
@@ -431,7 +535,8 @@ fn main() -> ExitCode {
             view,
             out,
             size,
-        } => cmd_render(&project, view, &out, size),
+            photo,
+        } => cmd_render(&project, view, &out, size, &photo),
         Cmd::Schema { name } => cmd_schema(name.as_deref()),
         Cmd::Mcp {
             project,

@@ -11,6 +11,8 @@ pub enum RenderError {
     Readback(String),
     #[error("cannot encode PNG: {0}")]
     Png(String),
+    #[error("an image of {width} × {height} pixels is too large")]
+    TooLarge { width: u32, height: u32 },
 }
 
 /// A device and its queue, shared by every renderer.
