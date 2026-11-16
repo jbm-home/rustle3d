@@ -4,12 +4,14 @@ Provenance: maintainer's functional brief (2026-11-14); general garment-making k
 
 ## Status (2026-11-16)
 
-Implemented: T-shirt, straight skirt, A-line skirt as Rust recipes in
-`r3d_commands::templates` (`template.apply`, `template.list`; sizes in cm,
-filled in from the avatar); the start screen with rendered thumbnails and a
-sizes sheet per body; the step bar with a goal, an action and a
-highlighted tool per step. Not yet: dress, tote bag, Learn panel, sizes on
-a body silhouette (plain fields for now). Templates are recipes in code
+Implemented: T-shirt, dress, straight skirt, A-line skirt and tote bag as
+Rust recipes in `r3d_commands::templates` (`template.apply`,
+`template.list`; sizes in cm, filled in from the avatar); the start screen
+with rendered thumbnails and a sizes sheet per body; the step bar with a
+goal, an action and a highlighted tool per step; the Learn panel (task
+cards; "Show me" plays on the open project through ordinary commands);
+a first-launch tour. Not yet: sizes on a body silhouette (plain fields for
+now). Templates are recipes in code
 rather than data files: the drafts compute curves and lengths (e.g. the
 sleeve cap is solved to the armhole's length).
 

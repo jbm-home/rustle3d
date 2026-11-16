@@ -16,8 +16,10 @@ waist. Panels start wrapped at the larger of the body's and the garment's
 own radius. Since 2026-11-16 a placement can wrap a panel around the left
 or right upper arm instead (sleeves; `panel.place` `around`), its top on
 the arm's axis at the given height; `garment.arrange` keeps such
-placements. Not yet: legs, per-panel placement in the UI, dragging panels
-in 3D.
+placements; or lay it flat, facing outward at a distance from the body's
+axis (`flat`: a bag hanging from pins). The inspector sets a piece's
+placement, and ⌘-drag in 3D moves a piece around the body. Not yet: legs,
+arrangement points shown in 3D.
 
 ## Behavior
 - The avatar has **arrangement points**: front torso, back torso, left/right

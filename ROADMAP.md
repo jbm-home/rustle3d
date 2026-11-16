@@ -23,7 +23,7 @@ can be tested through MCP as soon as they exist.
 | M7 | Materials, self-collision, grab/pin ✅ (T-shirt → M10) | 2–3 wk | The same T-shirt in jersey vs denim; pull it with the mouse |
 | M8 | 3D → 2D editing tools ✅ | 3 wk | Lengthen a hem and take in a seam directly in 3D; the pattern follows |
 | M9 | glTF export, attached MCP | 2 wk | An agent edits the garment live in the open app; the result opens in a game engine |
-| M10 | Templates, guided flow, polish → **v0.1** | 3–4 wk | A first-time user makes a T-shirt in < 10 minutes |
+| M10 | Templates, guided flow, polish → **v0.1** (built; user test pending) | 3–4 wk | A first-time user makes a T-shirt in < 10 minutes |
 | M11 | Photorealistic rendering | 4–6 wk | A path-traced studio image of the draped garment |
 | M12 | Game-ready export | 3–4 wk | LODs + baked wrinkle normal maps, imported in Godot/Unity/Unreal |
 
@@ -152,36 +152,43 @@ seam direction arrows on the board (M10).
 - **Demo**: the agent changes the skirt length while the user watches it
   re-drape live.
 
-## M10 — Templates, guided flow, polish → v0.1 (in progress)
+## M10 — Templates, guided flow, polish → v0.1 (built; user test pending)
 - Parametric templates (skirts, T-shirt, dress, tote bag), guided flow step
   bar, Learn panel, first-launch tour.
 - Usability pass and the 10-minute test with first-time users.
 - Autosave/recovery, release builds for macOS, Windows and Linux.
 - **Demo**: a first-time user makes a T-shirt in under 10 minutes.
 
-Done so far (2026-11-16), demo `./demos/m10/demo.sh`:
-- `template.apply` / `template.list`: T-shirt, straight skirt and A-line
-  skirt drafted from sizes (the avatar's by default), sewn, placed and
-  given a fabric through ordinary commands; each drapes in a test.
-- Sleeves: schema v6 placements wrap a panel around the body or an arm
-  (the dress form finds its upper arms). Gravity ramps in while seams
-  close. The dress form's bust is smoothed; skirts hang from the measured
-  waist height.
+Built (2026-11-16), demo `./demos/m10/demo.sh`:
+- `template.apply` / `template.list`: T-shirt, dress, straight skirt,
+  A-line skirt and tote bag drafted from sizes (the avatar's by default),
+  sewn, placed and given a fabric through ordinary commands; each drapes
+  in a test with no cloth inside the body.
+- Placements (schema v6) wrap a panel around the body or an arm (sleeves;
+  the dress form finds its upper arms), or lay it flat (the tote bag,
+  hung from two pins). Gravity ramps in while seams close; tops start
+  above the shoulders; skirts hang from the measured waist; the dress
+  form's bust is smoothed.
 - App: start screen (template cards with rendered thumbnails, sizes sheet
-  per body, blank project, recent projects in Documents/Rustle3D, saved as
-  you work), back to projects, live step bar Measurements → Pattern → Sew →
-  Fabric → Drape with a goal, an action and a highlighted tool per step.
+  per body, blank project, recent projects in Documents/Rustle3D, saved
+  after every change), live step bar Measurements → Pattern → Sew → Fabric
+  → Drape (goal, action, highlighted tool), Learn panel (task cards, some
+  playing on the project), first-launch tour.
 - From the M8 leftovers: style lines and the selected edge drawn on the 3D
   garment (also in agents' renders); seam direction chevrons and red
-  mismatched seams on the board; camera views (front, side, back, ¾; keys
-  1–4).
+  mismatched seams on the board; camera views (keys 1–4); per-piece
+  placement in the inspector; ⌘-drag moves a piece around the body.
+- Linux and Windows runners, with a copied-pixels view path (shared
+  textures are macOS-only); `scripts/release.sh` and a manual "Release
+  builds" workflow (unsigned packages).
 
-Still to do: dress and tote bag templates, Learn panel and first-launch
-tour, the 10-minute test with first-time users, release builds; picking
-points and notches in 3D, per-panel placement and dragging panels in 3D.
+Before v0.1: the 10-minute test with first-time users (docs/ux.md §5),
+fixes from it, then version 0.1.0. After v0.1: picking points and notches
+in 3D (needs point selection, in 2D too), zero-copy textures on Linux and
+Windows, signed packages.
 Known: XPBD creep lets a skirt slide a few cm below the waist before it
-settles (physics.md §7 convergence); a speck of the body can show at the
-bust through a tight top.
+settles (physics.md §7 convergence); a tight top can show a speck of the
+body at the bust.
 
 ---
 

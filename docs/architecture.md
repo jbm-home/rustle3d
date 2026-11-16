@@ -464,3 +464,5 @@ must be **i18n-ready from day one**:
 | 2026-11-16 | Schema v6: `Placement.around` (body, left or right arm) | Sleeves start wrapped around the arm they dress |
 | 2026-11-16 | Gravity ramps in during the sewing phase | Pieces fell before closing; skirts slid off the waist |
 | 2026-11-16 | The user's library (body presets) is outside the project engine in the FFI | The start screen needs it before a project is open |
+| 2026-11-16 | Views without a shared texture render into their own and are read back (Linux, Windows) | The app must run on Linux/WSL2 now; zero-copy dma-buf/D3D12 sharing can replace it later |
+| 2026-11-16 | `r3d-app` skeleton removed; `r3d-ffi` is the app's bridge crate | The desktop app is the Flutter one (7.1); no dead code |
