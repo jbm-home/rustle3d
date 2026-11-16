@@ -80,6 +80,13 @@ extension Messages on BuildContext {
         decimalDigits: digits,
       ).format(value);
 
+  /// [value] for a field the user edits: like [number], without digit
+  /// grouping, so it reads back.
+  String decimal(num value, int digits) => (NumberFormat.decimalPatternDigits(
+    locale: Localizations.localeOf(this).toString(),
+    decimalDigits: digits,
+  )..turnOffGrouping()).format(value);
+
   /// An error from the core, in the UI language.
   String error(ApiError e) {
     final l = this.l;

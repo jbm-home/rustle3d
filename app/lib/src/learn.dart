@@ -47,13 +47,11 @@ List<_Card> _cards(L l) => [
     (Spot.garmentInspector, l.learnFabricStop, l.learnFabricStopText),
   ]),
   _Card(Icons.height_rounded, l.learnLength, l.learnLengthHow, [
-    (Spot.pattern, l.learnPickHem, l.learnPickHemText),
-    (Spot.inspector, l.learnShorterLonger, l.learnShorterLongerText),
+    (Spot.pattern, l.learnPickEdge, l.learnPickEdgeText),
+    (Spot.inspector, l.learnEdgeLength, l.learnEdgeLengthText),
     (Spot.garment, l.learnDragHem, l.learnDragHemText),
   ]),
   _Card(Icons.compress_rounded, l.learnFit, l.learnFitHow, [
-    (Spot.pattern, l.learnPickSeam, l.learnPickSeamText),
-    (Spot.inspector, l.learnTakeInLetOut, l.learnTakeInLetOutText),
     (Spot.garment, l.learnDragSeam, l.learnDragSeamText),
   ]),
   _Card(Icons.link_rounded, l.learnSew, l.learnSewHow, [

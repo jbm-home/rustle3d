@@ -5,8 +5,10 @@
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
+import 'package:file_selector/file_selector.dart';
 import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'design/tokens.dart';
 import 'i18n.dart';
@@ -72,29 +74,64 @@ class StartScreen extends StatefulWidget {
   State<StartScreen> createState() => _StartScreenState();
 }
 
-class _StartScreenState extends State<StartScreen> {
-  late List<RecentProject> _recent = widget.store.recent();
-  final Map<(String, bool), Future<Uint8List>> _thumbs = {};
+/// How many projects the start screen shows; the others are on the
+/// "All projects" page.
+const _recentCount = 4;
 
-  Future<Uint8List> _thumb(String template) {
-    return _thumbs.putIfAbsent(
-      (template, widget.dark),
-      () => templateThumbnail(
-        template: template,
-        width: 480,
-        height: 300,
-        colors: (widget.dark ? Palette.dark : Palette.light).toCanvas(),
-      ),
+/// Where updates and news are published.
+final _website = Uri.parse('https://rustle3d.com');
+
+/// Pictures of patterns (templates and projects), cached per theme.
+class _Thumbs {
+  final Map<(String, bool), Future<Uint8List>> _cache = {};
+
+  static CanvasColors _colors(bool dark) =>
+      (dark ? Palette.dark : Palette.light).toCanvas();
+
+  Future<Uint8List> template(String id, bool dark) => _cache.putIfAbsent(
+    ('template:$id', dark),
+    () => templateThumbnail(
+      template: id,
+      width: 480,
+      height: 300,
+      colors: _colors(dark),
+    ),
+  );
+
+  /// Redrawn when the project changes.
+  Future<Uint8List> project(RecentProject p, bool dark) => _cache.putIfAbsent(
+    ('project:${p.path}:${p.modified.millisecondsSinceEpoch}', dark),
+    () => projectThumbnail(
+      path: p.path,
+      width: 480,
+      height: 300,
+      colors: _colors(dark),
+    ),
+  );
+}
+
+void _toast(BuildContext context, String text) {
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(content: Text(text), behavior: SnackBarBehavior.floating),
     );
-  }
+}
 
-  void _toast(String text) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(content: Text(text), behavior: SnackBarBehavior.floating),
-      );
-  }
+/// Show [target] (a folder or a web page) with the system.
+Future<void> _launch(BuildContext context, Uri target) async {
+  final failed = context.l.cannotOpen(target.toString());
+  final ok = await launchUrl(target);
+  if (!ok && context.mounted) _toast(context, failed);
+}
+
+/// Ask for a project folder (`.r3d`) anywhere on disk.
+Future<String?> _pickProject(BuildContext context) =>
+    getDirectoryPath(confirmButtonText: context.l.open);
+
+class _StartScreenState extends State<StartScreen> {
+  late List<RecentProject> _projects = widget.store.all();
+  final _thumbs = _Thumbs();
 
   Future<void> _newGarment(String template, String title) async {
     final path = await showDialog<String>(
@@ -116,8 +153,29 @@ class _StartScreenState extends State<StartScreen> {
       );
       widget.onOpen(path);
     } on ApiError catch (e) {
-      _toast(context.error(e));
+      _toast(context, context.error(e));
     }
+  }
+
+  Future<void> _openFromDisk() async {
+    final path = await _pickProject(context);
+    if (path != null) widget.onOpen(path);
+  }
+
+  void _allProjects() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _AllProjectsPage(
+          store: widget.store,
+          thumbs: _thumbs,
+          dark: widget.dark,
+          onOpen: (path) {
+            Navigator.of(context).pop();
+            widget.onOpen(path);
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -189,16 +247,41 @@ class _StartScreenState extends State<StartScreen> {
                           letterSpacing: -0.5,
                         ),
                       ),
-                      const SizedBox(height: Space.s),
-                      Text(
-                        l.startSubtitle,
-                        style: ts(
-                          fontSize: 15,
-                          color: p.textMuted,
-                          height: 1.4,
-                        ),
+                      _SectionTitle(
+                        l.recent,
+                        actions: [
+                          TextButton.icon(
+                            onPressed: _openFromDisk,
+                            icon: const Icon(
+                              Icons.folder_open_outlined,
+                              size: 18,
+                            ),
+                            label: Text(l.openFromDisk),
+                          ),
+                          if (_projects.length > _recentCount)
+                            TextButton.icon(
+                              onPressed: _allProjects,
+                              icon: const Icon(
+                                Icons.grid_view_rounded,
+                                size: 18,
+                              ),
+                              label: Text(l.allProjectsCount(_projects.length)),
+                            ),
+                        ],
                       ),
-                      const SizedBox(height: Space.xl),
+                      if (_projects.isEmpty)
+                        Text(
+                          l.recentEmpty,
+                          style: ts(fontSize: 13, color: p.textMuted),
+                        )
+                      else
+                        _ProjectGrid(
+                          projects: _projects.take(_recentCount),
+                          thumbs: _thumbs,
+                          dark: widget.dark,
+                          onOpen: widget.onOpen,
+                        ),
+                      _SectionTitle(l.sectionNew),
                       Wrap(
                         spacing: Space.l,
                         runSpacing: Space.l,
@@ -208,37 +291,45 @@ class _StartScreenState extends State<StartScreen> {
                               final title,
                               final blurb,
                             ))
-                              _TemplateCard(
+                              _PictureCard(
                                 title: title,
-                                blurb: blurb,
+                                subtitle: blurb,
                                 icon: icon,
-                                thumb: _thumb(id),
+                                picture: _thumbs.template(id, widget.dark),
                                 onTap: () => _newGarment(id, title),
                               ),
                           _BlankCard(onTap: _blank),
                         ],
                       ),
-                      const SizedBox(height: Space.xl * 1.5),
-                      Text(
-                        l.recent,
-                        style: ts(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w600,
-                          color: p.text,
-                        ),
-                      ),
-                      const SizedBox(height: Space.m),
-                      if (_recent.isEmpty)
-                        Text(
-                          l.recentEmpty,
-                          style: ts(fontSize: 13, color: p.textMuted),
-                        )
-                      else
-                        for (final r in _recent.take(8))
-                          _RecentRow(
-                            project: r,
-                            onTap: () => widget.onOpen(r.path),
+                      _SectionTitle('Rustle3D'),
+                      Wrap(
+                        spacing: Space.s,
+                        runSpacing: Space.s,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            l.appVersion(appVersion()),
+                            style: ts(fontSize: 13, color: p.textMuted),
                           ),
+                          const SizedBox(width: Space.s),
+                          TextButton.icon(
+                            onPressed: () => _launch(context, _website),
+                            icon: const Icon(
+                              Icons.open_in_new_rounded,
+                              size: 16,
+                            ),
+                            label: Text(l.updatesLink),
+                          ),
+                          TextButton.icon(
+                            onPressed: () => _launch(
+                              context,
+                              Uri.directory(widget.store.projectsDir),
+                            ),
+                            icon: const Icon(Icons.folder_outlined, size: 16),
+                            label: Text(l.projectsFolder),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -253,7 +344,156 @@ class _StartScreenState extends State<StartScreen> {
   @override
   void didUpdateWidget(StartScreen old) {
     super.didUpdateWidget(old);
-    _recent = widget.store.recent();
+    _projects = widget.store.all();
+  }
+}
+
+/// A section's title, with its actions on the right.
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.title, {this.actions = const []});
+
+  final String title;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: Space.xl * 1.5, bottom: Space.m),
+      child: Row(
+        children: [
+          Text(
+            title,
+            style: ts(fontSize: 17, fontWeight: FontWeight.w600, color: p.text),
+          ),
+          const Spacer(),
+          ...actions,
+        ],
+      ),
+    );
+  }
+}
+
+/// Projects as cards: a picture of the pattern, the name, when it changed.
+class _ProjectGrid extends StatelessWidget {
+  const _ProjectGrid({
+    required this.projects,
+    required this.thumbs,
+    required this.dark,
+    required this.onOpen,
+  });
+
+  final Iterable<RecentProject> projects;
+  final _Thumbs thumbs;
+  final bool dark;
+  final ValueChanged<String> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: Space.l,
+      runSpacing: Space.l,
+      children: [
+        for (final project in projects)
+          _PictureCard(
+            title: project.name,
+            subtitle: _ago(context, project.modified),
+            icon: Icons.folder_outlined,
+            picture: thumbs.project(project, dark),
+            onTap: () => onOpen(project.path),
+          ),
+      ],
+    );
+  }
+}
+
+/// Every project, with opening one from anywhere on disk.
+class _AllProjectsPage extends StatelessWidget {
+  const _AllProjectsPage({
+    required this.store,
+    required this.thumbs,
+    required this.dark,
+    required this.onOpen,
+  });
+
+  final ProjectStore store;
+  final _Thumbs thumbs;
+  final bool dark;
+  final ValueChanged<String> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final l = context.l;
+    final projects = store.all();
+    return Scaffold(
+      body: Column(
+        children: [
+          SizedBox(
+            height: 56,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 84, right: Space.m),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: Icon(Icons.arrow_back_rounded, color: p.textMuted),
+                  ),
+                  const SizedBox(width: Space.s),
+                  Text(
+                    l.allProjects,
+                    style: ts(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: p.text,
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () async {
+                      final path = await _pickProject(context);
+                      if (path != null) onOpen(path);
+                    },
+                    icon: const Icon(Icons.folder_open_outlined, size: 18),
+                    label: Text(l.openFromDisk),
+                  ),
+                  TextButton.icon(
+                    onPressed: () =>
+                        _launch(context, Uri.directory(store.projectsDir)),
+                    icon: const Icon(Icons.folder_outlined, size: 18),
+                    label: Text(l.projectsFolder),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(Space.xl * 2),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1080),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: projects.isEmpty
+                        ? Text(
+                            l.recentEmpty,
+                            style: ts(fontSize: 13, color: p.textMuted),
+                          )
+                        : _ProjectGrid(
+                            projects: projects,
+                            thumbs: thumbs,
+                            dark: dark,
+                            onOpen: onOpen,
+                          ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -316,7 +556,9 @@ class _CardState extends State<_Card> {
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(
-          duration: Motion.fast,
+          // Eases in, but leaves at once: moving from one card to the next
+          // never shows two highlighted.
+          duration: _hover ? Motion.fast : Duration.zero,
           curve: Motion.curve,
           width: 248,
           height: 268,
@@ -344,19 +586,20 @@ class _CardState extends State<_Card> {
   }
 }
 
-class _TemplateCard extends StatelessWidget {
-  const _TemplateCard({
+/// A card with a picture of a pattern, a title and a line under it.
+class _PictureCard extends StatelessWidget {
+  const _PictureCard({
     required this.title,
-    required this.blurb,
+    required this.subtitle,
     required this.icon,
-    required this.thumb,
+    required this.picture,
     required this.onTap,
   });
 
   final String title;
-  final String blurb;
+  final String subtitle;
   final IconData icon;
-  final Future<Uint8List> thumb;
+  final Future<Uint8List> picture;
   final VoidCallback onTap;
 
   @override
@@ -372,7 +615,7 @@ class _TemplateCard extends StatelessWidget {
             width: double.infinity,
             color: p.board,
             child: FutureBuilder<Uint8List>(
-              future: thumb,
+              future: picture,
               builder: (context, snap) => AnimatedOpacity(
                 opacity: snap.hasData ? 1 : 0,
                 duration: Motion.normal,
@@ -391,19 +634,24 @@ class _TemplateCard extends StatelessWidget {
                   children: [
                     Icon(icon, size: 18, color: p.accent),
                     const SizedBox(width: Space.s),
-                    Text(
-                      title,
-                      style: ts(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: p.text,
+                    Expanded(
+                      child: Text(
+                        title,
+                        overflow: TextOverflow.ellipsis,
+                        style: ts(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: p.text,
+                        ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  blurb,
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: ts(fontSize: 12.5, color: p.textMuted, height: 1.35),
                 ),
               ],
@@ -454,16 +702,6 @@ class _BlankCard extends StatelessWidget {
   }
 }
 
-class _RecentRow extends StatefulWidget {
-  const _RecentRow({required this.project, required this.onTap});
-
-  final RecentProject project;
-  final VoidCallback onTap;
-
-  @override
-  State<_RecentRow> createState() => _RecentRowState();
-}
-
 String _ago(BuildContext context, DateTime t) {
   final l = context.l;
   final d = DateTime.now().difference(t);
@@ -473,53 +711,6 @@ String _ago(BuildContext context, DateTime t) {
   if (d.inDays == 1) return l.agoYesterday;
   if (d.inDays < 30) return l.agoDays(d.inDays);
   return DateFormat.yMMMd(Localizations.localeOf(context).toString()).format(t);
-}
-
-class _RecentRowState extends State<_RecentRow> {
-  bool _hover = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = Tokens.of(context);
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: Motion.fast,
-          padding: const EdgeInsets.symmetric(
-            horizontal: Space.m,
-            vertical: Space.m,
-          ),
-          decoration: BoxDecoration(
-            color: _hover ? p.surfaceMuted : Colors.transparent,
-            borderRadius: BorderRadius.circular(kRadius * 0.6),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.folder_outlined, size: 18, color: p.textMuted),
-              const SizedBox(width: Space.m),
-              Text(
-                widget.project.name,
-                style: ts(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: p.text,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                _ago(context, widget.project.modified),
-                style: ts(fontSize: 12.5, color: p.textMuted),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 /// Name the garment, pick the body, check the sizes, create.
@@ -642,11 +833,7 @@ class _NewGarmentDialogState extends State<_NewGarmentDialog> {
                   ),
                 ],
               ),
-              Text(
-                l.newGarmentSubtitle,
-                style: ts(fontSize: 13, color: p.textMuted, height: 1.4),
-              ),
-              const SizedBox(height: Space.l),
+              const SizedBox(height: Space.m),
               TextField(
                 controller: _name,
                 decoration: InputDecoration(

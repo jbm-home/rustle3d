@@ -1,0 +1,73 @@
+// The pattern edited on the board: dragging an edge reshapes its piece,
+// as one undo step.
+
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/gestures.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:integration_test/integration_test.dart';
+import 'package:rustle3d/main.dart';
+import 'package:rustle3d/src/projects.dart';
+import 'package:rustle3d/src/rust/api/engine.dart';
+import 'package:rustle3d/src/rust/frb_generated.dart';
+import 'package:rustle3d/src/views/rust_view.dart';
+
+void main() {
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async => await RustLib.init());
+
+  testWidgets('dragging an edge on the board reshapes the piece', (
+    tester,
+  ) async {
+    final dir = Directory.systemTemp.createTempSync('r3d').path;
+    final store = ProjectStore(projectsDir: dir, libraryDir: dir);
+    File('$dir/tour-seen').createSync();
+    final path = store.create(
+      name: 'Skirt',
+      body: store.standardBody(),
+      template: 'a_line_skirt',
+    );
+    final engine = Engine.open(path: path);
+    await tester.pumpWidget(Rustle3dApp(store: store, engine: engine));
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    String outlines() => jsonEncode(
+      (jsonDecode(engine.run(stepJson: '{"type":"project.summary"}'))['panels']
+              as List)
+          .map((p) => p['area_mm2'])
+          .toList(),
+    );
+    final before = outlines();
+    final board = tester.getRect(
+      find.byWidgetPredicate((w) => w is RustView && w.kind == ViewKind.board),
+    );
+
+    // Across the middle of the board a click lands on a side seam
+    // somewhere (it selects the edge); drag it sideways from there.
+    var at = Offset(board.left + 10, board.center.dy);
+    while (engine.selectedEdge() == null && at.dx < board.right) {
+      at += const Offset(2, 0);
+      await tester.tapAt(at);
+      await tester.pump();
+    }
+    expect(engine.selectedEdge(), isNotNull);
+    final gesture = await tester.startGesture(
+      at,
+      kind: PointerDeviceKind.mouse,
+    );
+    for (var i = 0; i < 6; i++) {
+      await gesture.moveBy(const Offset(5, 0));
+      await tester.pump();
+    }
+    await gesture.up();
+    await tester.pump();
+    final changed = outlines() != before;
+    expect(changed, isTrue);
+    expect(engine.selection(), hasLength(1));
+
+    engine.run(stepJson: '{"type":"history.undo"}');
+    expect(outlines(), before);
+  });
+}

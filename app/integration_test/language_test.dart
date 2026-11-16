@@ -1,6 +1,6 @@
 // The UI language: French when chosen (and remembered), pieces named in
-// it, errors translated from their code; the hem changed from the
-// inspector by a typed amount.
+// it, errors translated from their code; the hem's length typed in the
+// inspector.
 
 import 'dart:convert';
 import 'dart:io';
@@ -47,8 +47,7 @@ void main() {
     }
     expect(find.text('Inspecteur'), findsOneWidget);
 
-    // Pick the hem in 3D, then make the skirt 2 cm longer from the
-    // inspector.
+    // Pick the hem in 3D, then type a hem 4 cm wider in the inspector.
     final centre = tester.getCenter(
       find.byWidgetPredicate(
         (w) => w is RustView && w.kind == ViewKind.garment,
@@ -63,8 +62,17 @@ void main() {
     final before = jsonDecode(
       engine.run(stepJson: '{"type":"project.summary"}'),
     );
-    await tester.enterText(find.widgetWithText(TextField, '1'), '2');
-    await tester.tap(find.text('Rallonger'));
+    final field = find.descendant(
+      of: find.byKey(const Key('edge-length')),
+      matching: find.byType(TextField),
+    );
+    final typed = tester.widget<TextField>(field).controller!.text;
+    final wider = double.parse(typed.replaceAll(',', '.')) + 4;
+    await tester.enterText(
+      field,
+      wider.toStringAsFixed(1).replaceAll('.', ','),
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pump();
     final after = jsonDecode(
       engine.run(stepJson: '{"type":"project.summary"}'),
@@ -76,7 +84,7 @@ void main() {
     expect(area(after), greaterThan(area(before)));
 
     // An error from the core is shown in French.
-    final context = tester.element(find.text('Rallonger'));
+    final context = tester.element(find.text('Longueur'));
     expect(
       context.error(
         const ApiError(code: 'nothing_to_redo', args: {}, text: 'x'),
@@ -95,8 +103,8 @@ void main() {
     await settle();
     await tester.tap(find.text('English').last);
     await settle();
-    expect(find.text('Rallonger'), findsNothing);
-    expect(find.text('Longer'), findsOneWidget);
+    expect(find.text('Longueur'), findsNothing);
+    expect(find.text('Length'), findsOneWidget);
     expect(LanguageMemory(dir).code, 'en');
   });
 }

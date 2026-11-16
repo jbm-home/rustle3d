@@ -4,6 +4,7 @@
 use std::time::{Duration, Instant};
 
 use r3d_core::{EdgeId, PanelId, PointId, SeamId};
+use r3d_geom::DVec2;
 
 /// Pattern edits not yet carried into the running simulation.
 pub(crate) struct Sync {
@@ -58,7 +59,24 @@ pub(crate) enum Tool {
         from: r3d_core::Placement,
         running: bool,
     },
+    /// On the board: move a corner (`point.move`) from where it was; `grab`
+    /// is where the pointer pressed (mm).
+    Corner {
+        point: PointId,
+        from: DVec2,
+        grab: DVec2,
+    },
+    /// On the board: move an edge (`edge.move`), `applied` mm so far.
+    Edge {
+        edge: EdgeId,
+        grab: DVec2,
+        applied: DVec2,
+    },
 }
+
+/// On the board, corners within this distance of the pointer are picked
+/// before edges (px).
+pub(crate) const CORNER_PICK_PX: f64 = 10.0;
 
 /// What ⇧-dragging a particle on a contour edge adjusts.
 #[derive(Clone, Copy)]

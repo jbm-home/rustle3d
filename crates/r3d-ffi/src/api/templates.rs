@@ -1,8 +1,11 @@
-//! The starter garments, for the start screen: their sizes for a body, and
-//! a picture of their pattern drawn by our renderer.
+//! What the start screen shows: the starter garments (their sizes for a
+//! body) and pictures of patterns, of templates and of the user's
+//! projects, drawn by our renderer.
+
+use std::path::Path;
 
 use flutter_rust_bridge::frb;
-use r3d_commands::{Query, Session, Step};
+use r3d_commands::{Query, Session, Step, Workspace};
 use r3d_core::{Body, Project};
 use r3d_render::board::BoardView;
 use r3d_render::offscreen::{PNG_FORMAT, render_png};
@@ -20,6 +23,12 @@ fn session_for(body: Body) -> Result<Session, ApiError> {
         Step::from_value(serde_json::json!({ "type": "avatar.set", "body": body })).map_err(err)?;
     s.run_step(&step).map_err(err)?;
     Ok(s)
+}
+
+/// The version of Rustle3D (the workspace's).
+#[frb(sync)]
+pub fn app_version() -> String {
+    env!("CARGO_PKG_VERSION").to_owned()
 }
 
 /// The templates and their default sizes for `body_json` (a `Body`), as
@@ -41,14 +50,35 @@ pub fn template_thumbnail(
     height: u32,
     colors: CanvasColors,
 ) -> Result<Vec<u8>, ApiError> {
-    let theme = colors.to_theme()?;
     let mut s = Session::new(Project::new("Preview"));
     let step =
         Step::from_value(serde_json::json!({ "type": "template.apply", "template": template }))
             .map_err(err)?;
     s.run_step(&step).map_err(err)?;
+    pattern_png(s.project(), width, height, &colors)
+}
+
+/// A PNG picture of the pattern of the project folder at `path` (read
+/// only), on the board colours of `colors`.
+pub fn project_thumbnail(
+    path: String,
+    width: u32,
+    height: u32,
+    colors: CanvasColors,
+) -> Result<Vec<u8>, ApiError> {
+    let ws = Workspace::open(Path::new(&path)).map_err(err)?;
+    pattern_png(ws.session().project(), width, height, &colors)
+}
+
+fn pattern_png(
+    project: &Project,
+    width: u32,
+    height: u32,
+    colors: &CanvasColors,
+) -> Result<Vec<u8>, ApiError> {
+    let theme = colors.to_theme()?;
     let gpu = Gpu::headless().map_err(|e| ApiError::new("gpu", e.to_string()))?;
-    let scene = BoardScene::from_project(s.project(), &[]);
+    let scene = BoardScene::from_project(project, &[]);
     let view = BoardView::fit(scene.bounds(), width, height);
     let mut renderer = BoardRenderer::new(&gpu, PNG_FORMAT);
     render_png(&gpu, width, height, |target| {

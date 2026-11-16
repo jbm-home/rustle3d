@@ -8,7 +8,10 @@ import 'engine.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `body_of`, `session_for`
+// These functions are ignored because they are not marked as `pub`: `body_of`, `pattern_png`, `session_for`
+
+/// The version of Rustle3D (the workspace's).
+String appVersion() => RustLib.instance.api.crateApiTemplatesAppVersion();
 
 /// The templates and their default sizes for `body_json` (a `Body`), as
 /// the `template.list` query returns them.
@@ -24,6 +27,20 @@ Future<Uint8List> templateThumbnail({
   required CanvasColors colors,
 }) => RustLib.instance.api.crateApiTemplatesTemplateThumbnail(
   template: template,
+  width: width,
+  height: height,
+  colors: colors,
+);
+
+/// A PNG picture of the pattern of the project folder at `path` (read
+/// only), on the board colours of `colors`.
+Future<Uint8List> projectThumbnail({
+  required String path,
+  required int width,
+  required int height,
+  required CanvasColors colors,
+}) => RustLib.instance.api.crateApiTemplatesProjectThumbnail(
+  path: path,
   width: width,
   height: height,
   colors: colors,

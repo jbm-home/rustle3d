@@ -38,28 +38,60 @@ class ProjectStore {
     return ProjectStore(projectsDir: projects.path, libraryDir: support.path);
   }
 
-  /// Project folders, most recently changed first.
-  List<RecentProject> recent() {
+  File get _recentFile => File('$libraryDir/recent-projects.json');
+
+  /// The paths of the projects opened, most recent first.
+  List<String> _openedPaths() {
+    try {
+      return (jsonDecode(_recentFile.readAsStringSync()) as List)
+          .cast<String>();
+    } on Object {
+      return const [];
+    }
+  }
+
+  /// Remember that the project at [path] was opened.
+  void remember(String path) {
+    final paths = [path, ..._openedPaths().where((p) => p != path)];
+    try {
+      _recentFile
+        ..createSync(recursive: true)
+        ..writeAsStringSync(jsonEncode(paths.take(50).toList()));
+    } on FileSystemException {
+      // Not remembered: it is still listed if it is in the projects folder.
+    }
+  }
+
+  /// The project in the folder at [path], if it reads as one.
+  static RecentProject? read(String path) {
+    final file = File('$path/project.json');
+    try {
+      final json = jsonDecode(file.readAsStringSync());
+      return RecentProject(
+        path: path,
+        name: json['project']['name'] as String,
+        modified: file.lastModifiedSync(),
+      );
+    } on Object {
+      // Missing or not readable as a project: not listed (opening it
+      // would say why).
+      return null;
+    }
+  }
+
+  /// Every project: those in the projects folder and those opened from
+  /// elsewhere, most recently changed first.
+  List<RecentProject> all() {
+    final paths = {..._openedPaths()};
     final dir = Directory(projectsDir);
-    if (!dir.existsSync()) return const [];
-    final found = <RecentProject>[];
-    for (final entry in dir.listSync()) {
-      if (entry is! Directory || !entry.path.endsWith('.r3d')) continue;
-      final file = File('${entry.path}/project.json');
-      if (!file.existsSync()) continue;
-      try {
-        final json = jsonDecode(file.readAsStringSync());
-        found.add(
-          RecentProject(
-            path: entry.path,
-            name: json['project']['name'] as String,
-            modified: file.lastModifiedSync(),
-          ),
-        );
-      } on Object {
-        // Not readable as a project: not listed (opening it would say why).
+    if (dir.existsSync()) {
+      for (final entry in dir.listSync()) {
+        if (entry is Directory && entry.path.endsWith('.r3d')) {
+          paths.add(entry.path);
+        }
       }
     }
+    final found = [for (final path in paths) ?read(path)];
     found.sort((a, b) => b.modified.compareTo(a.modified));
     return found;
   }

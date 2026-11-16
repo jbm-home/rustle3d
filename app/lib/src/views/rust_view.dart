@@ -28,6 +28,7 @@ class RustView extends StatefulWidget {
     this.onPinned,
     this.drawing = false,
     this.onDrawn,
+    this.holding = true,
   });
 
   final Engine engine;
@@ -47,6 +48,10 @@ class RustView extends StatefulWidget {
 
   /// Called with the new internal line's id after a stroke.
   final ValueChanged<String>? onDrawn;
+
+  /// A press may hold what is under the pointer to drag it (on the board:
+  /// a corner or an edge). Off, drags only pan or turn the view.
+  final bool holding;
 
   @override
   State<RustView> createState() => _RustViewState();
@@ -230,6 +235,7 @@ class _RustViewState extends State<RustView>
             }
             _holding =
                 view != null &&
+                widget.holding &&
                 widget.engine.press(
                   view: view,
                   x: e.localPosition.dx * _ratio,
@@ -364,7 +370,7 @@ class _RustViewState extends State<RustView>
   }
 }
 
-/// "Longer 30 mm", "Taken in 12 mm"… next to the cursor while changing
+/// "Longer 30 mm", "Taken in 12 mm", "Moved 8 mm"… next to the cursor while changing
 /// the pattern in 3D.
 class _ChangeLabel extends StatelessWidget {
   const _ChangeLabel({required this.change});
@@ -377,6 +383,7 @@ class _ChangeLabel extends StatelessWidget {
     final amount = context.number(mm.abs());
     return switch (change.kind) {
       'fit' => mm >= 0 ? l.changeTakenIn(amount) : l.changeLetOut(amount),
+      'move' => l.changeMoved(amount),
       _ => mm >= 0 ? l.changeLonger(amount) : l.changeShorter(amount),
     };
   }

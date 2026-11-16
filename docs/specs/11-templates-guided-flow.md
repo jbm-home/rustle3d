@@ -36,8 +36,12 @@ knowing pattern making, and I learn along the way.
   more.
 
 ## UX
-- The start screen shows template cards with thumbnails generated offscreen by
-  our renderer.
+- The start screen has three sections: Recent (the last four projects, as
+  cards with a picture of their pattern; "Open…" for a project anywhere on
+  disk, and "All projects" for the rest), New (template cards with
+  thumbnails generated offscreen by our renderer, and a blank project),
+  and Rustle3D (the version, updates and news on rustle3d.com, the
+  projects folder).
 - Measurements are entered on a body silhouette with labelled fields and
   sensible defaults per size (S/M/L).
 

@@ -88,6 +88,7 @@ class _Rustle3dAppState extends State<Rustle3dApp> {
   void _open(String path) {
     try {
       final engine = Engine.open(path: path);
+      widget.store.remember(path);
       _prepare(engine);
       setState(() => _engine = engine);
     } on ApiError catch (e) {

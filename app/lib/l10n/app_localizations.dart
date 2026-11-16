@@ -205,12 +205,6 @@ abstract class L {
   /// **'What will you make?'**
   String get startTitle;
 
-  /// No description provided for @startSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Start from a garment drafted to your measurements, then shape it on the pattern or on the body.'**
-  String get startSubtitle;
-
   /// No description provided for @templateTShirt.
   ///
   /// In en, this message translates to:
@@ -270,6 +264,54 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Two pieces and four seams: the easiest start.'**
   String get templateToteBagBlurb;
+
+  /// No description provided for @sectionNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New'**
+  String get sectionNew;
+
+  /// No description provided for @openFromDisk.
+  ///
+  /// In en, this message translates to:
+  /// **'Open…'**
+  String get openFromDisk;
+
+  /// No description provided for @open.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get open;
+
+  /// No description provided for @allProjectsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'All projects ({count})'**
+  String allProjectsCount(int count);
+
+  /// No description provided for @projectsFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Projects folder'**
+  String get projectsFolder;
+
+  /// No description provided for @appVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version}'**
+  String appVersion(String version);
+
+  /// No description provided for @updatesLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Updates and news on rustle3d.com'**
+  String get updatesLink;
+
+  /// No description provided for @cannotOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open {target}.'**
+  String cannotOpen(String target);
 
   /// No description provided for @blankProject.
   ///
@@ -336,12 +378,6 @@ abstract class L {
   /// In en, this message translates to:
   /// **'New: {garment}'**
   String newGarmentTitle(String garment);
-
-  /// No description provided for @newGarmentSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Drafted to the body’s measurements. You can change everything later.'**
-  String get newGarmentSubtitle;
 
   /// No description provided for @fieldName.
   ///
@@ -610,7 +646,7 @@ abstract class L {
   /// No description provided for @tourPatternText.
   ///
   /// In en, this message translates to:
-  /// **'The flat pieces, full size. Drag their points to reshape them; **R** adds a piece.'**
+  /// **'The flat pieces, full size. Drag a corner or an edge to reshape them; **R** adds a piece.'**
   String get tourPatternText;
 
   /// No description provided for @tourGarmentTitle.
@@ -676,7 +712,7 @@ abstract class L {
   /// No description provided for @stepPatternGoal.
   ///
   /// In en, this message translates to:
-  /// **'Shape the pieces: drag their points, or click a hem or a seam to lengthen or take it in.'**
+  /// **'Shape the pieces: drag a corner or an edge, or click an edge to type its length.'**
   String get stepPatternGoal;
 
   /// No description provided for @stepPatternAction.
@@ -754,7 +790,7 @@ abstract class L {
   /// No description provided for @toolSelectHint.
   ///
   /// In en, this message translates to:
-  /// **'Click a panel or point; drag to move'**
+  /// **'Click a piece; drag a corner or an edge to reshape it'**
   String get toolSelectHint;
 
   /// No description provided for @toolRectangle.
@@ -850,7 +886,7 @@ abstract class L {
   /// No description provided for @hintIdle.
   ///
   /// In en, this message translates to:
-  /// **'Click a hem or a seam to lengthen or take it in · in 3D: drag to pull the cloth · ⇧-drag a hem or a seam · ⌘-drag to move a piece · ⌥-click to pin'**
+  /// **'Pattern: drag a corner or an edge, click an edge for its length · 3D: drag to pull the cloth · ⇧-drag a hem or a seam · ⌘-drag to move a piece · ⌥-click to pin'**
   String get hintIdle;
 
   /// No description provided for @hintSelection.
@@ -1222,13 +1258,19 @@ abstract class L {
   /// No description provided for @edgeOpen.
   ///
   /// In en, this message translates to:
-  /// **'Open edge (a hem or an opening). Change it here, or ⇧-drag it in 3D.'**
+  /// **'Open edge (a hem or an opening). In 3D, ⇧-drag it to lengthen the garment.'**
   String get edgeOpen;
+
+  /// No description provided for @edgeLengthLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Length'**
+  String get edgeLengthLabel;
 
   /// No description provided for @edgeSewn.
   ///
   /// In en, this message translates to:
-  /// **'Sewn to {piece} · {mismatch} mm difference. Take it in here, or ⇧-drag it in 3D.'**
+  /// **'Sewn to {piece} · {mismatch} mm difference. Its length changes on both sides. In 3D, ⇧-drag it to take it in.'**
   String edgeSewn(String piece, String mismatch);
 
   /// No description provided for @flipSeam.
@@ -1242,36 +1284,6 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Unpick'**
   String get unpick;
-
-  /// No description provided for @amountBy.
-  ///
-  /// In en, this message translates to:
-  /// **'By'**
-  String get amountBy;
-
-  /// No description provided for @shorter.
-  ///
-  /// In en, this message translates to:
-  /// **'Shorter'**
-  String get shorter;
-
-  /// No description provided for @longer.
-  ///
-  /// In en, this message translates to:
-  /// **'Longer'**
-  String get longer;
-
-  /// No description provided for @letOut.
-  ///
-  /// In en, this message translates to:
-  /// **'Let out'**
-  String get letOut;
-
-  /// No description provided for @takeIn.
-  ///
-  /// In en, this message translates to:
-  /// **'Take in'**
-  String get takeIn;
 
   /// No description provided for @changeTakenIn.
   ///
@@ -1290,6 +1302,12 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Longer {amount} mm'**
   String changeLonger(String amount);
+
+  /// No description provided for @changeMoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Moved {amount} mm'**
+  String changeMoved(String amount);
 
   /// No description provided for @changeShorter.
   ///
@@ -1336,13 +1354,13 @@ abstract class L {
   /// No description provided for @learnLength.
   ///
   /// In en, this message translates to:
-  /// **'Lengthen or shorten'**
+  /// **'Change a length'**
   String get learnLength;
 
   /// No description provided for @learnLengthHow.
   ///
   /// In en, this message translates to:
-  /// **'Click the hem, type how much, then **Shorter** or **Longer**. Or hold **⇧** and drag the hem on the garment.'**
+  /// **'Click an edge (a side seam to lengthen, a hem to widen), then type its **Length** or drag the slider. Or hold **⇧** and drag the hem on the garment.'**
   String get learnLengthHow;
 
   /// No description provided for @learnFit.
@@ -1354,7 +1372,7 @@ abstract class L {
   /// No description provided for @learnFitHow.
   ///
   /// In en, this message translates to:
-  /// **'Click a seam, type how much, then **Take in** or **Let out**. Or hold **⇧** and drag the seam on the garment.'**
+  /// **'Hold **⇧** and drag a seam on the garment: towards the body takes it in, away lets it out.'**
   String get learnFitHow;
 
   /// No description provided for @learnSew.
@@ -1453,29 +1471,29 @@ abstract class L {
   /// **'With nothing selected, the panel on the right shows the garment: pick a swatch under **Fabric**. The drape follows.'**
   String get learnFabricStopText;
 
-  /// No description provided for @learnPickHem.
+  /// No description provided for @learnPickEdge.
   ///
   /// In en, this message translates to:
-  /// **'Pick the hem'**
-  String get learnPickHem;
+  /// **'Pick an edge'**
+  String get learnPickEdge;
 
-  /// No description provided for @learnPickHemText.
+  /// No description provided for @learnPickEdgeText.
   ///
   /// In en, this message translates to:
-  /// **'Click the hem on the pattern, or on the garment.'**
-  String get learnPickHemText;
+  /// **'Click an edge on the pattern, or on the garment.'**
+  String get learnPickEdgeText;
 
-  /// No description provided for @learnShorterLonger.
+  /// No description provided for @learnEdgeLength.
   ///
   /// In en, this message translates to:
-  /// **'Shorter or longer'**
-  String get learnShorterLonger;
+  /// **'Its length'**
+  String get learnEdgeLength;
 
-  /// No description provided for @learnShorterLongerText.
+  /// No description provided for @learnEdgeLengthText.
   ///
   /// In en, this message translates to:
-  /// **'Type how much, then **Shorter** or **Longer**. The whole hemline moves and the seams stay matched.'**
-  String get learnShorterLongerText;
+  /// **'Type the new **Length** and press **Enter**, or drag the slider. A sewn edge’s other side follows, so seams stay matched.'**
+  String get learnEdgeLengthText;
 
   /// No description provided for @learnDragHem.
   ///
@@ -1488,30 +1506,6 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Hold **⇧** and drag the hem on the garment: down lengthens, up shortens.'**
   String get learnDragHemText;
-
-  /// No description provided for @learnPickSeam.
-  ///
-  /// In en, this message translates to:
-  /// **'Pick the seam'**
-  String get learnPickSeam;
-
-  /// No description provided for @learnPickSeamText.
-  ///
-  /// In en, this message translates to:
-  /// **'Click a sewn edge on the pattern, or a seam on the garment.'**
-  String get learnPickSeamText;
-
-  /// No description provided for @learnTakeInLetOut.
-  ///
-  /// In en, this message translates to:
-  /// **'Take in or let out'**
-  String get learnTakeInLetOut;
-
-  /// No description provided for @learnTakeInLetOutText.
-  ///
-  /// In en, this message translates to:
-  /// **'Type how much, then **Take in** or **Let out**. Both sides move, so the seam stays matched.'**
-  String get learnTakeInLetOutText;
 
   /// No description provided for @learnDragSeam.
   ///

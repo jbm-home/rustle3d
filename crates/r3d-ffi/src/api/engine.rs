@@ -14,8 +14,8 @@ use r3d_commands::{Script, Step, Workspace};
 use r3d_sim::Solver;
 
 use crate::cloth::{
-    Adjust, ClothHit, EDGE_PICK_MM, EDGE_PICK_PX, Held, Hit, PICK_PX, RESYNC_EVERY, SEAM_END,
-    STROKE_STEP_MM, Sync, Tool, ray_triangle,
+    Adjust, CORNER_PICK_PX, ClothHit, EDGE_PICK_MM, EDGE_PICK_PX, Held, Hit, PICK_PX, RESYNC_EVERY,
+    SEAM_END, STROKE_STEP_MM, Sync, Tool, ray_triangle,
 };
 use crate::sim::SimThread;
 use r3d_core::{Body, EdgeId, Fabric, Localizable, Message, PanelId};
@@ -984,8 +984,10 @@ impl Engine {
         let Some(v) = slot.as_ref().and_then(|g| g.views.get(&view)) else {
             return Ok(false);
         };
-        if v.kind != ViewKind::Garment {
-            return Ok(false);
+        if v.kind == ViewKind::Board {
+            let (board_view, width, height) = (v.board_view, v.width, v.height);
+            drop(slot);
+            return self.press_board(view, board_view, width, height, x, y);
         }
         let only = |i: usize| !adjust || open.contains_key(&i);
         let Some(hit) = self.pick_cloth(v, &slot, x, y, &only)? else {
@@ -1049,6 +1051,9 @@ impl Engine {
         let Some(held) = *self.held.lock().map_err(|_| poisoned())? else {
             return Ok(None);
         };
+        if let Tool::Corner { .. } | Tool::Edge { .. } = held.tool {
+            return self.pull_board(view, held.tool, x, y);
+        }
         let anchor = held.anchor;
         let slot = self.graphics()?;
         let (Some(g), Some(v)) = (
@@ -1097,6 +1102,8 @@ impl Engine {
                     applied: self.adjust_by(step, applied, total),
                 }
             }
+            // Board tools are handled above.
+            Tool::Corner { .. } | Tool::Edge { .. } => held.tool,
             Tool::Move { panel, from, .. } => {
                 // Around the vertical axis by the angle swept, up or down
                 // by the height dragged; the pieces start again there.
@@ -1125,8 +1132,144 @@ impl Engine {
         Ok(match tool {
             Tool::Length { applied, .. } => Some(change("length", applied)),
             Tool::Fit { applied, .. } => Some(change("fit", applied)),
-            Tool::Pull { .. } | Tool::Move { .. } => None,
+            Tool::Pull { .. } | Tool::Move { .. } | Tool::Corner { .. } | Tool::Edge { .. } => None,
         })
+    }
+
+    /// A press at pixel (`x`, `y`) of a board: hold the corner or else the
+    /// edge under the pointer, to drag it, and select its piece. Pieces
+    /// that are linked mirror copies follow their source and are not held.
+    /// The board stops fitting the pattern while it changes under the
+    /// pointer.
+    fn press_board(
+        &self,
+        view: u32,
+        board_view: Option<BoardView>,
+        width: u32,
+        height: u32,
+        x: f64,
+        y: f64,
+    ) -> Result<bool, ApiError> {
+        let ws = self.workspace()?;
+        let project = ws.session().project();
+        let scene = BoardScene::from_project(project, &[]);
+        let bv = board_view.unwrap_or_else(|| BoardView::fit(scene.bounds(), width, height));
+        let at = bv.to_board(x, y, width, height);
+        let editable = |panel: PanelId| project.panel(panel).is_some_and(|p| p.mirror_of.is_none());
+        let corner = project
+            .panels()
+            .iter()
+            .filter(|(id, _)| editable(**id))
+            .flat_map(|(id, p)| {
+                p.contour
+                    .iter()
+                    .filter_map(move |e| Some((*id, project.edge(*e)?.start)))
+            })
+            .filter_map(|(panel, point)| Some((panel, point, project.point(point)?.pos)))
+            .filter(|(.., pos)| pos.distance(at) <= CORNER_PICK_PX * bv.mm_per_px)
+            .min_by(|a, b| a.2.distance(at).total_cmp(&b.2.distance(at)));
+        let (panel, edge, tool) = match corner {
+            Some((panel, point, from)) => (
+                panel,
+                None,
+                Tool::Corner {
+                    point,
+                    from,
+                    grab: at,
+                },
+            ),
+            None => match scene
+                .edge_at(at, EDGE_PICK_PX * bv.mm_per_px)
+                .filter(|e| editable(e.panel))
+            {
+                Some(e) => (
+                    e.panel,
+                    Some(e.id),
+                    Tool::Edge {
+                        edge: e.id,
+                        grab: at,
+                        applied: r3d_geom::DVec2::ZERO,
+                    },
+                ),
+                None => return Ok(false),
+            },
+        };
+        drop(ws);
+        if let Some(v) = self
+            .graphics()?
+            .as_mut()
+            .and_then(|g| g.views.get_mut(&view))
+        {
+            v.board_view = Some(bv);
+        }
+        *self.selected()? = vec![panel];
+        *self.selected_edge.lock().map_err(|_| poisoned())? = edge;
+        *self.held.lock().map_err(|_| poisoned())? = Some(Held {
+            particle: 0,
+            anchor: glam::Vec3::ZERO,
+            tool,
+        });
+        Ok(true)
+    }
+
+    /// Pointer moved to (`x`, `y`) on the board while holding a corner or
+    /// an edge: move it by the distance dragged, in whole mm (one undo
+    /// step for the whole drag). Returns the distance moved so far.
+    fn pull_board(
+        &self,
+        view: u32,
+        tool: Tool,
+        x: f64,
+        y: f64,
+    ) -> Result<Option<PatternChange>, ApiError> {
+        let Some(at) = self
+            .graphics()?
+            .as_ref()
+            .and_then(|g| g.views.get(&view))
+            .and_then(|v| Some(v.board_view?.to_board(x, y, v.width, v.height)))
+        else {
+            return Ok(None);
+        };
+        let (step, next, moved) = match tool {
+            Tool::Corner { point, from, grab } => {
+                let d = (at - grab).round();
+                let to = from + d;
+                let step = serde_json::json!({
+                    "type": "point.move", "point": point, "to": [to.x, to.y],
+                });
+                (step, tool, d)
+            }
+            Tool::Edge {
+                edge,
+                grab,
+                applied,
+            } => {
+                let d = (at - grab).round();
+                let by = d - applied;
+                let step = serde_json::json!({
+                    "type": "edge.move", "edge": edge, "by": [by.x, by.y],
+                });
+                (
+                    step,
+                    Tool::Edge {
+                        edge,
+                        grab,
+                        applied: d,
+                    },
+                    d,
+                )
+            }
+            _ => return Ok(None),
+        };
+        // A move the pattern refuses leaves the hold where it was.
+        let moved_ok = self.run(step.to_string()).is_ok();
+        if let (true, Some(h)) = (moved_ok, self.held.lock().map_err(|_| poisoned())?.as_mut()) {
+            h.tool = next;
+        }
+        Ok(Some(PatternChange {
+            kind: "move".into(),
+            mm: moved.length(),
+        }))
     }
 
     /// Run `step` with `"mm"` = `total - applied` and return the new total

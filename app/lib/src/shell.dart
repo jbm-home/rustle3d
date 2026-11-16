@@ -446,6 +446,8 @@ class _ShellState extends State<Shell> {
                           child: RustView(
                             engine: widget.engine,
                             kind: ViewKind.board,
+                            // Corners and edges are dragged with Select.
+                            holding: _tool == 'select',
                             onSelection: (_) =>
                                 _tool == 'sew' ? _sewClick() : _refresh(),
                             onFrameTime: (ms) => _onFrame(true, ms),
@@ -1412,18 +1414,19 @@ class _PlacementCard extends StatelessWidget {
       children: [
         header,
         const SizedBox(height: Space.s),
-        SegmentedButton<String>(
-          showSelectedIcon: false,
-          style: SegmentedButton.styleFrom(
-            visualDensity: VisualDensity.compact,
-            textStyle: ts(fontSize: 11.5, fontWeight: FontWeight.w600),
+        // A menu rather than segments: the names fit in any language.
+        DropdownButtonFormField<String>(
+          initialValue: around,
+          isDense: true,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            isDense: true,
           ),
-          segments: [
+          items: [
             for (final (value, label) in _around(l))
-              ButtonSegment(value: value, label: Text(label)),
+              DropdownMenuItem(value: value, child: Text(label)),
           ],
-          selected: {around},
-          onSelectionChanged: (s) => update(to: s.first),
+          onChanged: (to) => update(to: to),
         ),
         const SizedBox(height: Space.l),
         _SliderRow(
@@ -1497,6 +1500,10 @@ class _SliderRow extends StatefulWidget {
     required this.unit,
     required this.enabled,
     required this.onChanged,
+    this.digits = 0,
+    this.typedMin,
+    this.typedMax,
+    this.fieldKey,
   });
 
   final String label;
@@ -1507,6 +1514,14 @@ class _SliderRow extends StatefulWidget {
   final bool enabled;
   final ValueChanged<double> onChanged;
 
+  /// Decimals shown and kept.
+  final int digits;
+
+  /// What can be typed, if wider than the slider's range.
+  final double? typedMin;
+  final double? typedMax;
+  final Key? fieldKey;
+
   @override
   State<_SliderRow> createState() => _SliderRowState();
 }
@@ -1515,7 +1530,7 @@ class _SliderRowState extends State<_SliderRow> {
   late final _text = TextEditingController(text: _shown(widget.value));
   final _focus = FocusNode();
 
-  static String _shown(double v) => v.toStringAsFixed(0);
+  String _shown(double v) => context.decimal(v, widget.digits);
 
   @override
   void initState() {
@@ -1545,7 +1560,9 @@ class _SliderRowState extends State<_SliderRow> {
       _text.text = _shown(widget.value);
       return;
     }
-    final v = typed.clamp(widget.min, widget.max).toDouble();
+    final v = typed
+        .clamp(widget.typedMin ?? widget.min, widget.typedMax ?? widget.max)
+        .toDouble();
     _text.text = _shown(v);
     if (v != widget.value) widget.onChanged(v);
   }
@@ -1571,6 +1588,7 @@ class _SliderRowState extends State<_SliderRow> {
             SizedBox(
               width: 76,
               child: _NumberField(
+                key: widget.fieldKey,
                 controller: _text,
                 focus: _focus,
                 unit: widget.unit,
@@ -1581,7 +1599,7 @@ class _SliderRowState extends State<_SliderRow> {
           ],
         ),
         Slider(
-          value: widget.value,
+          value: widget.value.clamp(widget.min, widget.max),
           min: widget.min,
           max: widget.max,
           onChanged: widget.enabled ? widget.onChanged : null,
@@ -1598,6 +1616,7 @@ double? _parseNumber(String text) =>
 /// A compact field for a number, with its unit after it.
 class _NumberField extends StatelessWidget {
   const _NumberField({
+    super.key,
     required this.controller,
     required this.unit,
     this.onSubmitted,
@@ -1956,26 +1975,18 @@ class _EdgeCard extends StatelessWidget {
             ),
             style: ts(fontSize: 12.5, height: 1.45, color: p.textMuted),
           ),
-          const SizedBox(height: Space.s),
-          if (seam == null)
-            _AmountRow(
-              less: l.shorter,
-              more: l.longer,
-              lessIcon: Icons.north_rounded,
-              moreIcon: Icons.south_rounded,
-              onMm: (mm) =>
-                  run({'type': 'edge.lengthen', 'edge': id, 'mm': mm}),
-            )
-          else ...[
-            _AmountRow(
-              less: l.letOut,
-              more: l.takeIn,
-              lessIcon: Icons.unfold_more_rounded,
-              moreIcon: Icons.unfold_less_rounded,
-              onMm: (mm) =>
-                  run({'type': 'seam.take_in', 'seam': seam['id'], 'mm': mm}),
-            ),
-            Row(
+          const SizedBox(height: Space.m),
+          _EdgeLength(
+            key: ValueKey(id),
+            cm: length,
+            onCm: (cm) => run({
+              'type': 'edge.set_length',
+              'edge': id,
+              'length_mm': cm * 10,
+            }),
+          ),
+          if (seam != null)
+            Wrap(
               children: [
                 TextButton(
                   onPressed: () =>
@@ -1989,104 +2000,40 @@ class _EdgeCard extends StatelessWidget {
                 ),
               ],
             ),
-          ],
         ],
       ),
     );
   }
 }
 
-/// How much (cm, typed) and two buttons: [more] by that amount, or [less]
-/// by it. [onMm] gets millimetres, negative for [less].
-class _AmountRow extends StatefulWidget {
-  const _AmountRow({
-    required this.less,
-    required this.more,
-    required this.lessIcon,
-    required this.moreIcon,
-    required this.onMm,
-  });
+/// An edge's length, typed or set with a slider (half to one and a half
+/// times what it was when picked).
+class _EdgeLength extends StatefulWidget {
+  const _EdgeLength({super.key, required this.cm, required this.onCm});
 
-  final String less;
-  final String more;
-  final IconData lessIcon;
-  final IconData moreIcon;
-  final ValueChanged<double> onMm;
+  final double cm;
+  final ValueChanged<double> onCm;
 
   @override
-  State<_AmountRow> createState() => _AmountRowState();
+  State<_EdgeLength> createState() => _EdgeLengthState();
 }
 
-class _AmountRowState extends State<_AmountRow> {
-  final _cm = TextEditingController(text: '1');
+class _EdgeLengthState extends State<_EdgeLength> {
+  /// The slider's range stays put while it is dragged.
+  late final double _picked = widget.cm;
 
   @override
-  void initState() {
-    super.initState();
-    // The buttons are enabled while the amount is a positive number.
-    _cm.addListener(() => setState(() {}));
-  }
-
-  @override
-  void dispose() {
-    _cm.dispose();
-    super.dispose();
-  }
-
-  /// The typed amount in millimetres, if it is a positive number.
-  double? get _mm => switch (_parseNumber(_cm.text)) {
-    final cm? when cm > 0 => cm * 10,
-    _ => null,
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final p = Tokens.of(context);
-    final mm = _mm;
-    final style = OutlinedButton.styleFrom(
-      visualDensity: VisualDensity.compact,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      textStyle: ts(fontSize: 12.5, fontWeight: FontWeight.w600),
-    );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Text(
-              context.l.amountBy,
-              style: ts(fontSize: 12.5, color: p.textMuted),
-            ),
-            const SizedBox(width: Space.s),
-            SizedBox(
-              width: 76,
-              child: _NumberField(controller: _cm, unit: context.l.cm),
-            ),
-          ],
-        ),
-        const SizedBox(height: Space.s),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: mm == null ? null : () => widget.onMm(-mm),
-                style: style,
-                icon: Icon(widget.lessIcon, size: 15),
-                label: Text(widget.less),
-              ),
-            ),
-            const SizedBox(width: Space.s),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: mm == null ? null : () => widget.onMm(mm),
-                style: style,
-                icon: Icon(widget.moreIcon, size: 15),
-                label: Text(widget.more),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => _SliderRow(
+    label: context.l.edgeLengthLabel,
+    value: widget.cm,
+    min: (_picked * 0.5).floorToDouble(),
+    max: (_picked * 1.5).ceilToDouble(),
+    typedMin: 0.1,
+    typedMax: 1000,
+    unit: context.l.cm,
+    digits: 1,
+    enabled: true,
+    fieldKey: const Key('edge-length'),
+    onChanged: (cm) => widget.onCm((cm * 10).roundToDouble() / 10),
+  );
 }

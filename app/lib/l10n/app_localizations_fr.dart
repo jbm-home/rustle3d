@@ -64,10 +64,6 @@ class LFr extends L {
   String get startTitle => 'Que voulez-vous créer ?';
 
   @override
-  String get startSubtitle =>
-      'Partez d’un vêtement tracé à vos mesures, puis ajustez-le sur le patron ou sur le corps.';
-
-  @override
   String get templateTShirt => 'T-shirt';
 
   @override
@@ -101,6 +97,36 @@ class LFr extends L {
   @override
   String get templateToteBagBlurb =>
       'Deux pièces et quatre coutures : le plus simple pour commencer.';
+
+  @override
+  String get sectionNew => 'Nouveau';
+
+  @override
+  String get openFromDisk => 'Ouvrir…';
+
+  @override
+  String get open => 'Ouvrir';
+
+  @override
+  String allProjectsCount(int count) {
+    return 'Tous les projets ($count)';
+  }
+
+  @override
+  String get projectsFolder => 'Dossier des projets';
+
+  @override
+  String appVersion(String version) {
+    return 'Version $version';
+  }
+
+  @override
+  String get updatesLink => 'Mises à jour et actualités sur rustle3d.com';
+
+  @override
+  String cannotOpen(String target) {
+    return 'Impossible d’ouvrir $target.';
+  }
 
   @override
   String get blankProject => 'Projet vierge';
@@ -143,10 +169,6 @@ class LFr extends L {
   String newGarmentTitle(String garment) {
     return 'Nouveau : $garment';
   }
-
-  @override
-  String get newGarmentSubtitle =>
-      'Tracé aux mesures du corps. Tout reste modifiable ensuite.';
 
   @override
   String get fieldName => 'Nom';
@@ -299,7 +321,7 @@ class LFr extends L {
 
   @override
   String get tourPatternText =>
-      'Les pièces à plat, en taille réelle. Faites glisser leurs points pour les modifier ; **R** ajoute une pièce.';
+      'Les pièces à plat, en taille réelle. Faites glisser un coin ou un bord pour les modifier ; **R** ajoute une pièce.';
 
   @override
   String get tourGarmentTitle => 'Le vêtement sur le corps';
@@ -337,7 +359,7 @@ class LFr extends L {
 
   @override
   String get stepPatternGoal =>
-      'Façonnez les pièces : faites glisser leurs points, ou cliquez un ourlet ou une couture pour rallonger ou reprendre.';
+      'Façonnez les pièces : faites glisser un coin ou un bord, ou cliquez un bord pour taper sa longueur.';
 
   @override
   String get stepPatternAction => 'Ajouter une pièce';
@@ -383,7 +405,7 @@ class LFr extends L {
 
   @override
   String get toolSelectHint =>
-      'Cliquez une pièce ou un point ; faites glisser pour déplacer';
+      'Cliquez une pièce ; faites glisser un coin ou un bord pour la modifier';
 
   @override
   String get toolRectangle => 'Rectangle';
@@ -436,7 +458,7 @@ class LFr extends L {
 
   @override
   String get hintIdle =>
-      'Cliquez un ourlet ou une couture pour rallonger ou reprendre · en 3D : glissez pour tirer le tissu · ⇧-glisser un ourlet ou une couture · ⌘-glisser pour déplacer une pièce · ⌥-clic pour épingler';
+      'Patron : glissez un coin ou un bord, cliquez un bord pour sa longueur · 3D : glissez pour tirer le tissu · ⇧-glisser un ourlet ou une couture · ⌘-glisser pour déplacer une pièce · ⌥-clic pour épingler';
 
   @override
   String get hintSelection =>
@@ -647,11 +669,14 @@ class LFr extends L {
 
   @override
   String get edgeOpen =>
-      'Bord libre (un ourlet ou une ouverture). Modifiez-le ici, ou ⇧-glissez-le en 3D.';
+      'Bord libre (un ourlet ou une ouverture). En 3D, ⇧-glissez-le pour rallonger le vêtement.';
+
+  @override
+  String get edgeLengthLabel => 'Longueur';
 
   @override
   String edgeSewn(String piece, String mismatch) {
-    return 'Cousu à $piece · $mismatch mm d’écart. Reprenez-le ici, ou ⇧-glissez-le en 3D.';
+    return 'Cousu à $piece · $mismatch mm d’écart. Sa longueur change des deux côtés. En 3D, ⇧-glissez-le pour le reprendre.';
   }
 
   @override
@@ -659,21 +684,6 @@ class LFr extends L {
 
   @override
   String get unpick => 'Découdre';
-
-  @override
-  String get amountBy => 'De';
-
-  @override
-  String get shorter => 'Raccourcir';
-
-  @override
-  String get longer => 'Rallonger';
-
-  @override
-  String get letOut => 'Relâcher';
-
-  @override
-  String get takeIn => 'Reprendre';
 
   @override
   String changeTakenIn(String amount) {
@@ -688,6 +698,11 @@ class LFr extends L {
   @override
   String changeLonger(String amount) {
     return 'Rallongé de $amount mm';
+  }
+
+  @override
+  String changeMoved(String amount) {
+    return 'Déplacé de $amount mm';
   }
 
   @override
@@ -717,18 +732,18 @@ class LFr extends L {
       'Sans rien sélectionner, choisissez un échantillon sous **Tissu**. Le tissu change le tombé du vêtement.';
 
   @override
-  String get learnLength => 'Rallonger ou raccourcir';
+  String get learnLength => 'Changer une longueur';
 
   @override
   String get learnLengthHow =>
-      'Cliquez l’ourlet, tapez de combien, puis **Raccourcir** ou **Rallonger**. Ou maintenez **⇧** et faites glisser l’ourlet sur le vêtement.';
+      'Cliquez un bord (une couture de côté pour rallonger, un ourlet pour élargir), puis tapez sa **Longueur** ou faites glisser le curseur. Ou maintenez **⇧** et faites glisser l’ourlet sur le vêtement.';
 
   @override
   String get learnFit => 'Reprendre une couture';
 
   @override
   String get learnFitHow =>
-      'Cliquez une couture, tapez de combien, puis **Reprendre** ou **Relâcher**. Ou maintenez **⇧** et faites glisser la couture sur le vêtement.';
+      'Maintenez **⇧** et faites glisser une couture sur le vêtement : vers le corps la reprend, vers l’extérieur la relâche.';
 
   @override
   String get learnSew => 'Coudre deux pièces';
@@ -787,18 +802,18 @@ class LFr extends L {
       'Sans rien sélectionner, le panneau de droite montre le vêtement : choisissez un échantillon sous **Tissu**. Le tombé suit.';
 
   @override
-  String get learnPickHem => 'Choisir l’ourlet';
+  String get learnPickEdge => 'Choisir un bord';
 
   @override
-  String get learnPickHemText =>
-      'Cliquez l’ourlet sur le patron, ou sur le vêtement.';
+  String get learnPickEdgeText =>
+      'Cliquez un bord sur le patron, ou sur le vêtement.';
 
   @override
-  String get learnShorterLonger => 'Raccourcir ou rallonger';
+  String get learnEdgeLength => 'Sa longueur';
 
   @override
-  String get learnShorterLongerText =>
-      'Tapez de combien, puis **Raccourcir** ou **Rallonger**. Tout l’ourlet se déplace et les coutures restent alignées.';
+  String get learnEdgeLengthText =>
+      'Tapez la nouvelle **Longueur** puis **Entrée**, ou faites glisser le curseur. L’autre côté d’un bord cousu suit, les coutures restent alignées.';
 
   @override
   String get learnDragHem => 'Ou faites-le glisser';
@@ -806,20 +821,6 @@ class LFr extends L {
   @override
   String get learnDragHemText =>
       'Maintenez **⇧** et faites glisser l’ourlet sur le vêtement : vers le bas rallonge, vers le haut raccourcit.';
-
-  @override
-  String get learnPickSeam => 'Choisir la couture';
-
-  @override
-  String get learnPickSeamText =>
-      'Cliquez un bord cousu sur le patron, ou une couture sur le vêtement.';
-
-  @override
-  String get learnTakeInLetOut => 'Reprendre ou relâcher';
-
-  @override
-  String get learnTakeInLetOutText =>
-      'Tapez de combien, puis **Reprendre** ou **Relâcher**. Les deux côtés bougent, la couture reste alignée.';
 
   @override
   String get learnDragSeam => 'Ou faites-la glisser';

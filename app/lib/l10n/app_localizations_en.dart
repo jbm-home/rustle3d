@@ -64,10 +64,6 @@ class LEn extends L {
   String get startTitle => 'What will you make?';
 
   @override
-  String get startSubtitle =>
-      'Start from a garment drafted to your measurements, then shape it on the pattern or on the body.';
-
-  @override
   String get templateTShirt => 'T-shirt';
 
   @override
@@ -99,6 +95,36 @@ class LEn extends L {
   @override
   String get templateToteBagBlurb =>
       'Two pieces and four seams: the easiest start.';
+
+  @override
+  String get sectionNew => 'New';
+
+  @override
+  String get openFromDisk => 'Open…';
+
+  @override
+  String get open => 'Open';
+
+  @override
+  String allProjectsCount(int count) {
+    return 'All projects ($count)';
+  }
+
+  @override
+  String get projectsFolder => 'Projects folder';
+
+  @override
+  String appVersion(String version) {
+    return 'Version $version';
+  }
+
+  @override
+  String get updatesLink => 'Updates and news on rustle3d.com';
+
+  @override
+  String cannotOpen(String target) {
+    return 'Could not open $target.';
+  }
 
   @override
   String get blankProject => 'Blank project';
@@ -141,10 +167,6 @@ class LEn extends L {
   String newGarmentTitle(String garment) {
     return 'New: $garment';
   }
-
-  @override
-  String get newGarmentSubtitle =>
-      'Drafted to the body’s measurements. You can change everything later.';
 
   @override
   String get fieldName => 'Name';
@@ -296,7 +318,7 @@ class LEn extends L {
 
   @override
   String get tourPatternText =>
-      'The flat pieces, full size. Drag their points to reshape them; **R** adds a piece.';
+      'The flat pieces, full size. Drag a corner or an edge to reshape them; **R** adds a piece.';
 
   @override
   String get tourGarmentTitle => 'The garment on the body';
@@ -334,7 +356,7 @@ class LEn extends L {
 
   @override
   String get stepPatternGoal =>
-      'Shape the pieces: drag their points, or click a hem or a seam to lengthen or take it in.';
+      'Shape the pieces: drag a corner or an edge, or click an edge to type its length.';
 
   @override
   String get stepPatternAction => 'Add a piece';
@@ -378,7 +400,8 @@ class LEn extends L {
   String get toolSelect => 'Select';
 
   @override
-  String get toolSelectHint => 'Click a panel or point; drag to move';
+  String get toolSelectHint =>
+      'Click a piece; drag a corner or an edge to reshape it';
 
   @override
   String get toolRectangle => 'Rectangle';
@@ -431,7 +454,7 @@ class LEn extends L {
 
   @override
   String get hintIdle =>
-      'Click a hem or a seam to lengthen or take it in · in 3D: drag to pull the cloth · ⇧-drag a hem or a seam · ⌘-drag to move a piece · ⌥-click to pin';
+      'Pattern: drag a corner or an edge, click an edge for its length · 3D: drag to pull the cloth · ⇧-drag a hem or a seam · ⌘-drag to move a piece · ⌥-click to pin';
 
   @override
   String get hintSelection =>
@@ -638,11 +661,14 @@ class LEn extends L {
 
   @override
   String get edgeOpen =>
-      'Open edge (a hem or an opening). Change it here, or ⇧-drag it in 3D.';
+      'Open edge (a hem or an opening). In 3D, ⇧-drag it to lengthen the garment.';
+
+  @override
+  String get edgeLengthLabel => 'Length';
 
   @override
   String edgeSewn(String piece, String mismatch) {
-    return 'Sewn to $piece · $mismatch mm difference. Take it in here, or ⇧-drag it in 3D.';
+    return 'Sewn to $piece · $mismatch mm difference. Its length changes on both sides. In 3D, ⇧-drag it to take it in.';
   }
 
   @override
@@ -650,21 +676,6 @@ class LEn extends L {
 
   @override
   String get unpick => 'Unpick';
-
-  @override
-  String get amountBy => 'By';
-
-  @override
-  String get shorter => 'Shorter';
-
-  @override
-  String get longer => 'Longer';
-
-  @override
-  String get letOut => 'Let out';
-
-  @override
-  String get takeIn => 'Take in';
 
   @override
   String changeTakenIn(String amount) {
@@ -679,6 +690,11 @@ class LEn extends L {
   @override
   String changeLonger(String amount) {
     return 'Longer $amount mm';
+  }
+
+  @override
+  String changeMoved(String amount) {
+    return 'Moved $amount mm';
   }
 
   @override
@@ -708,18 +724,18 @@ class LEn extends L {
       'With nothing selected, pick a swatch under **Fabric**. Fabric changes how the garment hangs.';
 
   @override
-  String get learnLength => 'Lengthen or shorten';
+  String get learnLength => 'Change a length';
 
   @override
   String get learnLengthHow =>
-      'Click the hem, type how much, then **Shorter** or **Longer**. Or hold **⇧** and drag the hem on the garment.';
+      'Click an edge (a side seam to lengthen, a hem to widen), then type its **Length** or drag the slider. Or hold **⇧** and drag the hem on the garment.';
 
   @override
   String get learnFit => 'Take in a seam';
 
   @override
   String get learnFitHow =>
-      'Click a seam, type how much, then **Take in** or **Let out**. Or hold **⇧** and drag the seam on the garment.';
+      'Hold **⇧** and drag a seam on the garment: towards the body takes it in, away lets it out.';
 
   @override
   String get learnSew => 'Sew two pieces';
@@ -778,18 +794,18 @@ class LEn extends L {
       'With nothing selected, the panel on the right shows the garment: pick a swatch under **Fabric**. The drape follows.';
 
   @override
-  String get learnPickHem => 'Pick the hem';
+  String get learnPickEdge => 'Pick an edge';
 
   @override
-  String get learnPickHemText =>
-      'Click the hem on the pattern, or on the garment.';
+  String get learnPickEdgeText =>
+      'Click an edge on the pattern, or on the garment.';
 
   @override
-  String get learnShorterLonger => 'Shorter or longer';
+  String get learnEdgeLength => 'Its length';
 
   @override
-  String get learnShorterLongerText =>
-      'Type how much, then **Shorter** or **Longer**. The whole hemline moves and the seams stay matched.';
+  String get learnEdgeLengthText =>
+      'Type the new **Length** and press **Enter**, or drag the slider. A sewn edge’s other side follows, so seams stay matched.';
 
   @override
   String get learnDragHem => 'Or drag it';
@@ -797,20 +813,6 @@ class LEn extends L {
   @override
   String get learnDragHemText =>
       'Hold **⇧** and drag the hem on the garment: down lengthens, up shortens.';
-
-  @override
-  String get learnPickSeam => 'Pick the seam';
-
-  @override
-  String get learnPickSeamText =>
-      'Click a sewn edge on the pattern, or a seam on the garment.';
-
-  @override
-  String get learnTakeInLetOut => 'Take in or let out';
-
-  @override
-  String get learnTakeInLetOutText =>
-      'Type how much, then **Take in** or **Let out**. Both sides move, so the seam stays matched.';
 
   @override
   String get learnDragSeam => 'Or drag it';
