@@ -1273,6 +1273,12 @@ abstract class L {
   /// **'Sewn to {piece} · {mismatch} mm difference. Its length changes on both sides. In 3D, ⇧-drag it to take it in.'**
   String edgeSewn(String piece, String mismatch);
 
+  /// No description provided for @matchOtherSide.
+  ///
+  /// In en, this message translates to:
+  /// **'Make the other side this length'**
+  String get matchOtherSide;
+
   /// No description provided for @flipSeam.
   ///
   /// In en, this message translates to:

@@ -89,6 +89,7 @@ fn every_command_round_trips() {
     let seam = seam.created[0].to_string();
     h.round_trip(json!({"type": "seam.flip", "seam": seam}));
     h.round_trip(json!({"type": "seam.take_in", "seam": seam, "mm": 6}));
+    h.round_trip(json!({"type": "seam.match_length", "seam": seam, "keep": poly_edge}));
     h.round_trip(json!({"type": "garment.arrange"}));
     h.round_trip(json!({"type": "template.apply", "template": "t_shirt",
         "sizes": {"chest_cm": 100}}));

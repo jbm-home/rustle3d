@@ -196,6 +196,7 @@
   "edgeOpen": "Bord libre (un ourlet ou une ouverture). En 3D, ⇧-glissez-le pour rallonger le vêtement.",
   "edgeLengthLabel": "Longueur",
   "edgeSewn": "Cousu à {piece} · {mismatch} mm d’écart. Sa longueur change des deux côtés. En 3D, ⇧-glissez-le pour le reprendre.",
+  "matchOtherSide": "Mettre l’autre côté à cette longueur",
   "flipSeam": "Inverser la couture",
   "unpick": "Découdre",
   "changeTakenIn": "Repris de {amount} mm",

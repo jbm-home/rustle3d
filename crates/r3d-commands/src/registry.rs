@@ -146,6 +146,7 @@ command_registry! {
     "edge.lengthen" => EdgeLengthen,
     "edge.set_length" => EdgeSetLength,
     "seam.take_in" => SeamTakeIn,
+    "seam.match_length" => SeamMatchLength,
     "pin.add" => PinAdd,
     "pin.remove" => PinRemove,
     "garment.set_fabric" => GarmentSetFabric,

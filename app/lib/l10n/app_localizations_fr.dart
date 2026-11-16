@@ -680,6 +680,9 @@ class LFr extends L {
   }
 
   @override
+  String get matchOtherSide => 'Mettre l’autre côté à cette longueur';
+
+  @override
   String get flipSeam => 'Inverser la couture';
 
   @override

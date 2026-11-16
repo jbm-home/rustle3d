@@ -1985,6 +1985,19 @@ class _EdgeCard extends StatelessWidget {
               'length_mm': cm * 10,
             }),
           ),
+          if (seam != null && (seam['mismatch_mm'] as num) >= 0.5)
+            Padding(
+              padding: const EdgeInsets.only(top: Space.xs),
+              child: OutlinedButton.icon(
+                onPressed: () => run({
+                  'type': 'seam.match_length',
+                  'seam': seam['id'],
+                  'keep': id,
+                }),
+                icon: const Icon(Icons.straighten_rounded, size: 16),
+                label: Text(l.matchOtherSide),
+              ),
+            ),
           if (seam != null)
             Wrap(
               children: [

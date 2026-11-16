@@ -36,6 +36,8 @@ pub enum Invalid {
     Inverted,
     #[error("must be an end point of the seam")]
     NotSeamEnd,
+    #[error("must be one of the seam's two edges")]
+    NotSeamSide,
 }
 
 impl Invalid {
@@ -56,6 +58,7 @@ impl Invalid {
             Invalid::Format => "invalid.format",
             Invalid::Inverted => "invalid.inverted",
             Invalid::NotSeamEnd => "invalid.not_seam_end",
+            Invalid::NotSeamSide => "invalid.not_seam_side",
         }
     }
 }

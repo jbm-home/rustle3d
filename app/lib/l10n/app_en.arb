@@ -383,6 +383,7 @@
       }
     }
   },
+  "matchOtherSide": "Make the other side this length",
   "flipSeam": "Flip seam",
   "unpick": "Unpick",
   "changeTakenIn": "Taken in {amount} mm",

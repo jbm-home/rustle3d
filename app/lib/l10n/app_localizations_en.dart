@@ -672,6 +672,9 @@ class LEn extends L {
   }
 
   @override
+  String get matchOtherSide => 'Make the other side this length';
+
+  @override
   String get flipSeam => 'Flip seam';
 
   @override

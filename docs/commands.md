@@ -1443,6 +1443,49 @@ Take in (mm > 0) or let out (mm < 0) a seam: both sides move inward by half of m
 
 </details>
 
+### `seam.match_length`
+
+Make the two sides of a seam the same length: the side other than `keep` is scaled about its middle to `keep`'s length (on a linked mirror copy, its source is). Afterwards `edge.set_length` keeps them equal.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "EdgeId": {
+      "description": "Identifier of a edge, e.g. `edge:1`.",
+      "pattern": "^edge:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "SeamId": {
+      "description": "Identifier of a seam, e.g. `seam:1`.",
+      "pattern": "^seam:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Make a seam's other side as long as `keep`.",
+  "properties": {
+    "keep": {
+      "$ref": "#/$defs/EdgeId",
+      "description": "The side that keeps its length: one of the seam's two edges."
+    },
+    "seam": {
+      "$ref": "#/$defs/SeamId"
+    }
+  },
+  "required": [
+    "seam",
+    "keep"
+  ],
+  "title": "SeamMatchLength",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `pin.add`
 
 Pin the cloth: the panel's cloth within 3 cm of `at` (pattern mm) is held still at `position` (3D metres) during the simulation. Returns the pin.

@@ -93,3 +93,63 @@ fn dragging_an_edge_is_one_undo_step() {
     s.undo().unwrap();
     assert_eq!(s.project(), &start);
 }
+
+#[test]
+fn a_seam_gets_both_sides_the_same_length() {
+    let mut s = Session::new(Project::new("t"));
+    let front = common::a_line_skirt(&mut s);
+    let side = front.edges[1].clone();
+    // Make the front's side longer than the back's.
+    run(
+        &mut s,
+        json!({"type": "edge.move", "edge": front.edges[0], "by": [0, -30]}),
+    )
+    .unwrap();
+    let seams = run(&mut s, json!({"type": "seam.list"})).unwrap();
+    let seam = seams
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|x| x["a"]["edge"] == side || x["b"]["edge"] == side)
+        .unwrap()
+        .clone();
+    assert!(seam["mismatch_mm"].as_f64().unwrap() > 10.0, "{seam}");
+    let kept = length(&s, &side);
+
+    run(
+        &mut s,
+        json!({"type": "seam.match_length", "seam": seam["id"], "keep": side}),
+    )
+    .unwrap();
+    assert!((length(&s, &side) - kept).abs() < 1e-9);
+    let after = run(&mut s, json!({"type": "seam.list"})).unwrap();
+    let same = after
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|x| x["id"] == seam["id"])
+        .unwrap();
+    assert!(same["mismatch_mm"].as_f64().unwrap() < 0.01, "{same}");
+
+    // Then a new length keeps both sides equal.
+    run(
+        &mut s,
+        json!({"type": "edge.set_length", "edge": side, "length_mm": kept + 20.0}),
+    )
+    .unwrap();
+    let after = run(&mut s, json!({"type": "seam.list"})).unwrap();
+    let same = after
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|x| x["id"] == seam["id"])
+        .unwrap();
+    assert!(same["mismatch_mm"].as_f64().unwrap() < 0.01, "{same}");
+
+    let err = run(
+        &mut s,
+        json!({"type": "seam.match_length", "seam": seam["id"], "keep": front.edges[0]}),
+    )
+    .unwrap_err();
+    assert_eq!(err.message().code, "invalid.not_seam_side");
+}

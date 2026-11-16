@@ -41,6 +41,10 @@ point to move.
     and the mirrored seams follow, so seams stay matched). It replaced
     typed Shorter / Longer and Take in / Let out buttons, which first-time
     users found unclear (user test, 2026-11-16).
+  - **Same length on both sides** (implemented): when a seam's sides
+    differ, the picked edge's card offers to give the other side its
+    length (`seam.match_length`); from then on a new length keeps them
+    equal.
   - **On the board** (implemented): with Select, dragging a corner moves
     it (`point.move`), dragging an edge moves both its ends
     (`edge.move`); one drag is one undo step; a drag elsewhere pans.
