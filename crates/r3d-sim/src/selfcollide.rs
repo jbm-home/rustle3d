@@ -8,6 +8,10 @@
 //! radii, through seams too) are never candidates: they touch because the
 //! cloth is folding, and repelling them would resist ordinary folds.
 //!
+//! Particles sewn together (seam partners, transitively) that have closed
+//! to within a radius of each other move as one when pushed: pushing one
+//! side alone would reopen the seam, since contacts are solved after it.
+//!
 //! Candidate pairs are gathered once per frame with a margin and resolved
 //! at every substep. They are sorted, so results are deterministic.
 
@@ -27,6 +31,9 @@ pub(crate) struct SelfCollision {
     radius: f32,
     /// For each particle, the particles near it on the cloth (sorted).
     excluded: Vec<Vec<u32>>,
+    /// For each particle, the others sewn to it (its seam group, empty
+    /// for most particles).
+    sewn: Vec<Vec<u32>>,
     pairs: Vec<[u32; 2]>,
 }
 
@@ -107,8 +114,47 @@ impl SelfCollision {
         Self {
             radius,
             excluded,
+            sewn: seam_groups(n, seams),
             pairs: Vec::new(),
         }
+    }
+
+    /// The particles that move with `i` when it is pushed: itself and the
+    /// particles sewn to it that are within a radius (the seam has closed).
+    fn welded<'a>(&'a self, x: &'a [Vec3], i: usize) -> impl Iterator<Item = usize> + 'a {
+        let r2 = self.radius * self.radius;
+        let partners = self.sewn.get(i).map(Vec::as_slice).unwrap_or_default();
+        std::iter::once(i).chain(
+            partners
+                .iter()
+                .map(|j| *j as usize)
+                .filter(move |j| x[*j].distance_squared(x[i]) <= r2),
+        )
+    }
+
+    /// Inverse mass of `i` with what is welded to it (0 if any is pinned).
+    fn welded_w(&self, x: &[Vec3], w: &[f32], i: usize) -> f32 {
+        let mut mass = 0.0;
+        for j in self.welded(x, i) {
+            if w[j] == 0.0 {
+                return 0.0;
+            }
+            mass += 1.0 / w[j];
+        }
+        1.0 / mass
+    }
+
+    /// Move `i` and what is welded to it by `delta`.
+    fn shift(&self, x: &mut [Vec3], i: usize, delta: Vec3) {
+        let partners = self.sewn.get(i).map(Vec::as_slice).unwrap_or_default();
+        let r2 = self.radius * self.radius;
+        let at = x[i];
+        for j in partners.iter().map(|j| *j as usize) {
+            if x[j].distance_squared(at) <= r2 {
+                x[j] += delta;
+            }
+        }
+        x[i] += delta;
     }
 
     /// Gather the pairs that may touch during the next frame.
@@ -156,13 +202,16 @@ impl SelfCollision {
             let (a, b) = (*a as usize, *b as usize);
             let d = x[b] - x[a];
             let len = d.length();
-            let wsum = w[a] + w[b];
-            if len >= min || len < 1e-9 || wsum == 0.0 {
+            if len >= min || len < 1e-9 {
                 continue;
             }
-            let push = d / len * ((min - len) / wsum);
-            x[a] -= push * w[a];
-            x[b] += push * w[b];
+            let (wa, wb) = (self.welded_w(x, w, a), self.welded_w(x, w, b));
+            if wa + wb == 0.0 {
+                continue;
+            }
+            let push = d / len * ((min - len) / (wa + wb));
+            self.shift(x, a, -push * wa);
+            self.shift(x, b, push * wb);
         }
     }
 
@@ -175,6 +224,38 @@ impl SelfCollision {
     pub fn is_excluded(&self, a: u32, b: u32) -> bool {
         self.excluded[a as usize].binary_search(&b).is_ok()
     }
+}
+
+/// For each of `n` particles, the others joined to it by seams, directly
+/// or through other seams (union–find).
+fn seam_groups(n: usize, seams: &[[u32; 2]]) -> Vec<Vec<u32>> {
+    let mut parent: Vec<u32> = (0..n as u32).collect();
+    fn root(parent: &mut [u32], mut i: u32) -> u32 {
+        while parent[i as usize] != i {
+            let up = parent[parent[i as usize] as usize];
+            parent[i as usize] = up;
+            i = up;
+        }
+        i
+    }
+    for [a, b] in seams {
+        let (ra, rb) = (root(&mut parent, *a), root(&mut parent, *b));
+        if ra != rb {
+            parent[ra.max(rb) as usize] = ra.min(rb);
+        }
+    }
+    let mut members: HashMap<u32, Vec<u32>> = HashMap::new();
+    for i in 0..n as u32 {
+        let r = root(&mut parent, i);
+        members.entry(r).or_default().push(i);
+    }
+    let mut sewn = vec![Vec::new(); n];
+    for group in members.values().filter(|g| g.len() > 1) {
+        for &i in group {
+            sewn[i as usize] = group.iter().copied().filter(|j| *j != i).collect();
+        }
+    }
+    sewn
 }
 
 #[cfg(test)]
@@ -212,5 +293,36 @@ mod tests {
         // A seam joining both ends makes them neighbours.
         let s = SelfCollision::new(&rest, &tris, &[[0, 40]]);
         assert!(s.is_excluded(0, 40) && s.is_excluded(2, 40));
+    }
+
+    #[test]
+    fn a_closed_seam_is_pushed_as_one() {
+        // Two strips sewn end to end (0 ↔ 42), closed; particle 20 of the
+        // first strip, far along the cloth, lies on the seam.
+        let (mut rest, mut tris) = strip(20);
+        let (rest2, tris2) = strip(20);
+        rest.extend(rest2);
+        tris.extend(tris2.iter().map(|t| t.map(|v| v + 42)));
+        let mut s = SelfCollision::new(&rest, &tris, &[[0, 42]]);
+        let mut x: Vec<Vec3> = (0..84).map(|i| Vec3::new(i as f32, 1.0, 0.0)).collect();
+        x[0] = Vec3::ZERO;
+        x[42] = Vec3::new(0.0, 0.0, 0.0005);
+        x[20] = Vec3::new(0.001, 0.0, 0.0);
+        let w = vec![1.0; 84];
+        s.refresh(&x, &w);
+        s.solve(&mut x, &w);
+        // Pushed apart, and the seam stayed as it was: both sides moved
+        // together, as one particle of twice the mass.
+        assert!(x[20].distance(x[0]) > 1.9 * s.radius() - 1e-6);
+        assert!((x[42] - x[0]).distance(Vec3::new(0.0, 0.0, 0.0005)) < 1e-6);
+        assert!(x[20].x - 0.001 > 1.9 * (0.0 - x[0].x));
+    }
+
+    #[test]
+    fn seam_groups_follow_chains() {
+        let g = seam_groups(5, &[[0, 3], [3, 4]]);
+        assert_eq!(g[0], vec![3, 4]);
+        assert_eq!(g[4], vec![0, 3]);
+        assert!(g[1].is_empty() && g[2].is_empty());
     }
 }

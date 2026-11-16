@@ -189,6 +189,10 @@ buckled inward. With the garment's own width it hangs as an A-line.
   cloth folds, and repelling them would stiffen ordinary folds. Candidate
   pairs come from a spatial hash [8] once per frame (with a 1 cm margin
   for motion) and are resolved every substep, sorted for determinism.
+  Particles sewn together (seam groups, by union–find) that have closed to
+  within a radius move as one particle of their summed mass when pushed:
+  contacts are solved after the seams, and pushing one side alone held a
+  seam open by ≈ 2 mm where a fold of the cloth lay on it.
 - Consequences: layers stay apart by up to one particle diameter (less
   where particles nest in each other's gaps, ≈ 8 mm on a regular grid), so
   folds look slightly puffy; it costs ≈ 1 ms per frame on the skirt.
