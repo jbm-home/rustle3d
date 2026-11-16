@@ -123,7 +123,7 @@ class GuideBanner extends StatelessWidget {
                       const SizedBox(width: Space.m),
                       Expanded(
                         child: Text(
-                          step.goal(l),
+                          context.keys(step.goal(l)),
                           style: ts(fontSize: 13, color: p.text),
                           overflow: TextOverflow.ellipsis,
                         ),

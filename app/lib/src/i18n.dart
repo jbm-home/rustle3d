@@ -5,6 +5,7 @@
 
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -46,8 +47,31 @@ class LanguageMemory {
   }
 }
 
+/// Whether shortcuts use the macOS keys (⌘ for commands) or Ctrl.
+bool get isMac => defaultTargetPlatform == TargetPlatform.macOS;
+
 extension Messages on BuildContext {
   L get l => L.of(this);
+
+  /// [text] with the macOS key symbols it is written with (⌘ ⌥ ⇧ ⌫) as
+  /// this platform's keys: unchanged on macOS, "Ctrl+Shift+Z" for "⇧⌘Z",
+  /// "Alt-click" for "⌥-click" elsewhere (key names in the UI language).
+  String keys(String text) {
+    if (isMac) return text;
+    final l = this.l;
+    return text.replaceAll('⌫', l.keyDelete).replaceAllMapped(
+      RegExp('([⌘⌥⇧]+)([A-Z0-9]?)'),
+      (m) {
+        final mods = m[1] ?? '';
+        return [
+          if (mods.contains('⌘')) l.keyCtrl,
+          if (mods.contains('⌥')) l.keyAlt,
+          if (mods.contains('⇧')) l.keyShift,
+          if (m[2] case final key? when key.isNotEmpty) key,
+        ].join('+');
+      },
+    );
+  }
 
   /// [value] with [digits] decimals, in the UI language's notation.
   String number(num value, [int digits = 0]) =>

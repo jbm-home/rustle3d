@@ -161,7 +161,7 @@ class _TourState extends State<_Tour> {
                   const SizedBox(height: 6),
                   Text.rich(
                     marked(
-                      stop.text,
+                      context.keys(stop.text),
                       ts(fontSize: 13, color: p.textMuted, height: 1.4),
                       p.text,
                     ),

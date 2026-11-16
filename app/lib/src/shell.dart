@@ -324,7 +324,7 @@ class _ShellState extends State<Shell> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(context.l.deleteTitle(panel['name'] as String)),
-        content: Text(context.l.deleteUndo),
+        content: Text(context.keys(context.l.deleteUndo)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -358,15 +358,24 @@ class _ShellState extends State<Shell> {
     final l = context.l;
     return CallbackShortcuts(
       bindings: {
-        const SingleActivator(LogicalKeyboardKey.keyZ, meta: true): _undo,
-        const SingleActivator(LogicalKeyboardKey.keyZ, meta: true, shift: true):
-            _redo,
+        // ⌘ on macOS, Ctrl elsewhere (where Ctrl+Y redoes too).
+        SingleActivator(LogicalKeyboardKey.keyZ, meta: isMac, control: !isMac):
+            _undo,
+        SingleActivator(
+          LogicalKeyboardKey.keyZ,
+          meta: isMac,
+          control: !isMac,
+          shift: true,
+        ): _redo,
+        if (!isMac)
+          const SingleActivator(LogicalKeyboardKey.keyY, control: true): _redo,
         const SingleActivator(LogicalKeyboardKey.keyR): _addRectangle,
         const SingleActivator(LogicalKeyboardKey.keyV): () =>
             _setTool('select'),
         const SingleActivator(LogicalKeyboardKey.keyD): () => _setTool('draw'),
         const SingleActivator(LogicalKeyboardKey.keyS): () => _setTool('sew'),
         const SingleActivator(LogicalKeyboardKey.backspace): _deleteSelected,
+        const SingleActivator(LogicalKeyboardKey.delete): _deleteSelected,
         const SingleActivator(LogicalKeyboardKey.digit1): () =>
             _look(CameraSide.front),
         const SingleActivator(LogicalKeyboardKey.digit2): () =>
@@ -514,8 +523,8 @@ class _ShellState extends State<Shell> {
                   'sew' when _sewFrom == null => l.hintSewFirst,
                   'sew' => l.hintSewSecond,
                   'draw' => l.hintDraw,
-                  _ when _selection.isEmpty => l.hintIdle,
-                  _ => l.hintSelection,
+                  _ when _selection.isEmpty => context.keys(l.hintIdle),
+                  _ => context.keys(l.hintSelection),
                 },
                 stats:
                     _simStats() +
@@ -646,12 +655,12 @@ class _TopBar extends StatelessWidget {
             const SizedBox(width: Space.s),
             _IconAction(
               icon: Icons.undo_rounded,
-              tip: l.undoTip,
+              tip: context.keys(l.undoTip),
               onTap: onUndo,
             ),
             _IconAction(
               icon: Icons.redo_rounded,
-              tip: l.redoTip,
+              tip: context.keys(l.redoTip),
               onTap: onRedo,
             ),
             const SizedBox(width: Space.s),
@@ -1149,7 +1158,7 @@ class _PinList extends StatelessWidget {
         ),
         const SizedBox(height: Space.xs),
         Text(
-          pins.isEmpty ? context.l.pinsEmpty : context.l.pinsAdd,
+          context.keys(pins.isEmpty ? context.l.pinsEmpty : context.l.pinsAdd),
           style: ts(fontSize: 12.5, height: 1.45, color: p.textMuted),
         ),
         for (final pin in pins)
@@ -1937,12 +1946,14 @@ class _EdgeCard extends StatelessWidget {
           ),
           const SizedBox(height: Space.xs),
           Text(
-            other == null
-                ? l.edgeOpen
-                : l.edgeSewn(
-                    '${other['panel_name'] ?? other['panel']}',
-                    context.number(seam['mismatch_mm'] as num, 1),
-                  ),
+            context.keys(
+              other == null
+                  ? l.edgeOpen
+                  : l.edgeSewn(
+                      '${other['panel_name'] ?? other['panel']}',
+                      context.number(seam['mismatch_mm'] as num, 1),
+                    ),
+            ),
             style: ts(fontSize: 12.5, height: 1.45, color: p.textMuted),
           ),
           const SizedBox(height: Space.s),

@@ -179,7 +179,7 @@ class _CardView extends StatelessWidget {
           const SizedBox(height: 6),
           Text.rich(
             marked(
-              card.how,
+              context.keys(card.how),
               ts(fontSize: 12.5, color: p.textMuted, height: 1.4),
               p.text,
             ),

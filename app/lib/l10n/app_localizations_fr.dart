@@ -49,6 +49,18 @@ class LFr extends L {
   String get cm => 'cm';
 
   @override
+  String get keyCtrl => 'Ctrl';
+
+  @override
+  String get keyAlt => 'Alt';
+
+  @override
+  String get keyShift => 'Maj';
+
+  @override
+  String get keyDelete => 'Suppr';
+
+  @override
   String get startTitle => 'Que voulez-vous créer ?';
 
   @override
@@ -737,7 +749,7 @@ class LFr extends L {
 
   @override
   String get learnMoveHow =>
-      'Maintenez **⌘** (**Ctrl** sous Linux et Windows) et faites glisser une pièce sur le vêtement, ou réglez-la dans l’inspecteur.';
+      'Maintenez **⌘** et faites glisser une pièce sur le vêtement, ou réglez-la dans l’inspecteur.';
 
   @override
   String get learnPin => 'Tirer et épingler le tissu';
@@ -849,7 +861,7 @@ class LFr extends L {
 
   @override
   String get learnDragPieceText =>
-      'Maintenez **⌘** (**Ctrl** sous Linux et Windows) et faites glisser une pièce : de côté la fait tourner autour du corps, de haut en bas change sa hauteur.';
+      'Maintenez **⌘** et faites glisser une pièce : de côté la fait tourner autour du corps, de haut en bas change sa hauteur.';
 
   @override
   String get learnSetPlacement => 'Ou réglez-la ici';

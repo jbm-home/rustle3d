@@ -175,6 +175,30 @@ abstract class L {
   /// **'cm'**
   String get cm;
 
+  /// No description provided for @keyCtrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Ctrl'**
+  String get keyCtrl;
+
+  /// No description provided for @keyAlt.
+  ///
+  /// In en, this message translates to:
+  /// **'Alt'**
+  String get keyAlt;
+
+  /// No description provided for @keyShift.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift'**
+  String get keyShift;
+
+  /// No description provided for @keyDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get keyDelete;
+
   /// No description provided for @startTitle.
   ///
   /// In en, this message translates to:
@@ -1366,7 +1390,7 @@ abstract class L {
   /// No description provided for @learnMoveHow.
   ///
   /// In en, this message translates to:
-  /// **'Hold **⌘** (**Ctrl** on Linux and Windows) and drag a piece on the garment, or set it in the inspector.'**
+  /// **'Hold **⌘** and drag a piece on the garment, or set it in the inspector.'**
   String get learnMoveHow;
 
   /// No description provided for @learnPin.
@@ -1558,7 +1582,7 @@ abstract class L {
   /// No description provided for @learnDragPieceText.
   ///
   /// In en, this message translates to:
-  /// **'Hold **⌘** (**Ctrl** on Linux and Windows) and drag a piece: sideways turns it around the body, up and down changes its height.'**
+  /// **'Hold **⌘** and drag a piece: sideways turns it around the body, up and down changes its height.'**
   String get learnDragPieceText;
 
   /// No description provided for @learnSetPlacement.

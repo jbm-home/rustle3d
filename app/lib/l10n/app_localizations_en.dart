@@ -49,6 +49,18 @@ class LEn extends L {
   String get cm => 'cm';
 
   @override
+  String get keyCtrl => 'Ctrl';
+
+  @override
+  String get keyAlt => 'Alt';
+
+  @override
+  String get keyShift => 'Shift';
+
+  @override
+  String get keyDelete => 'Delete';
+
+  @override
   String get startTitle => 'What will you make?';
 
   @override
@@ -728,7 +740,7 @@ class LEn extends L {
 
   @override
   String get learnMoveHow =>
-      'Hold **⌘** (**Ctrl** on Linux and Windows) and drag a piece on the garment, or set it in the inspector.';
+      'Hold **⌘** and drag a piece on the garment, or set it in the inspector.';
 
   @override
   String get learnPin => 'Pull and pin the cloth';
@@ -839,7 +851,7 @@ class LEn extends L {
 
   @override
   String get learnDragPieceText =>
-      'Hold **⌘** (**Ctrl** on Linux and Windows) and drag a piece: sideways turns it around the body, up and down changes its height.';
+      'Hold **⌘** and drag a piece: sideways turns it around the body, up and down changes its height.';
 
   @override
   String get learnSetPlacement => 'Or set it here';

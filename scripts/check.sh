@@ -19,5 +19,6 @@ if command -v flutter_rust_bridge_codegen >/dev/null; then
 fi
 if command -v flutter >/dev/null; then
   echo "== flutter analyze"; (cd app && flutter analyze --no-pub)
+  echo "== flutter test";    (cd app && flutter test --no-pub)
 fi
 echo "All checks passed."

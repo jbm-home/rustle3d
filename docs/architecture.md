@@ -390,6 +390,10 @@ code stays **i18n-ready** for more:
   `app_fr.arb` translates it; `flutter gen-l10n` generates the `L` class).
   Core errors are translated in `app/lib/src/i18n.dart` from `code` +
   `args`; a code without a translation shows the English `text`.
+- **Shortcuts** are written in messages with the macOS symbols (⌘ ⌥ ⇧ ⌫)
+  and shown as the platform's keys elsewhere ("Ctrl+Shift+Z", "Alt-click",
+  key names in the UI language); the bindings follow (⌘ on macOS, Ctrl
+  elsewhere, plus Ctrl+Y and Delete).
 - **Not translated**: command names, query names, JSON schemas and file
   formats. They are part of the agent/scripting API and stay in English.
 - **Locale-aware formatting** for numbers and units in the UI (decimal
