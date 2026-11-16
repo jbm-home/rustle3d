@@ -460,7 +460,13 @@ class LEn extends L {
   String get toolPolygon => 'Polygon';
 
   @override
+  String get toolPolygonHint => 'Click the corners of a new piece';
+
+  @override
   String get toolCurve => 'Curve';
+
+  @override
+  String get toolCurveHint => 'Click an edge, then drag its handles to bend it';
 
   @override
   String get toolDraw => 'Draw on garment';
@@ -473,19 +479,51 @@ class LEn extends L {
   String get toolNotch => 'Notch';
 
   @override
+  String get toolNotchHint => 'Click an edge where the notch goes';
+
+  @override
   String get toolSew => 'Sew';
 
   @override
   String get toolSewHint => 'Click two edges on the pattern';
 
   @override
-  String get comingSoon => 'Coming soon';
-
-  @override
   String get viewPattern => 'Pattern';
 
   @override
   String get view3d => '3D';
+
+  @override
+  String get hintPolygon =>
+      'Polygon: click the corners; click the first one or press Enter to close · Esc cancels · V to stop';
+
+  @override
+  String get hintCurve =>
+      'Curve: click an edge, then drag its handles · V to stop';
+
+  @override
+  String get hintNotch =>
+      'Notch: click an edge where the notch goes · V to stop';
+
+  @override
+  String get toastPieceAdded => 'Piece added.';
+
+  @override
+  String get toastNotchAdded => 'Notch added.';
+
+  @override
+  String get distance => 'Distance';
+
+  @override
+  String get pointPicked =>
+      'Corner picked. ⇧-click another corner to measure the distance between them.';
+
+  @override
+  String get pointsPicked =>
+      'Between the two corners. The second one moves along the line.';
+
+  @override
+  String get straighten => 'Straighten';
 
   @override
   String get hintSewFirst =>

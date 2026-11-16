@@ -18,6 +18,27 @@ import '../rust/api/engine.dart';
 
 const _channel = MethodChannel('dev.rustle3d/texture');
 
+/// What a board tool (Polygon, Notch, Curve) does with the pointer, in
+/// pattern coordinates (mm) with the board's millimetres per pixel.
+class PatternPointer {
+  const PatternPointer({this.onTap, this.onPress, this.onDrag, this.onRelease});
+
+  /// A click (no drag).
+  final void Function(Offset mm, double mmPerPx)? onTap;
+
+  /// A press: true holds it (the next moves go to [onDrag], not to
+  /// panning).
+  final bool Function(Offset mm, double mmPerPx)? onPress;
+  final ValueChanged<Offset>? onDrag;
+  final VoidCallback? onRelease;
+}
+
+/// Paints over a board; `toScreen` places a pattern point (mm).
+typedef BoardOverlay = void Function(
+  Canvas canvas,
+  Offset Function(Offset mm) toScreen,
+);
+
 class RustView extends StatefulWidget {
   const RustView({
     super.key,
@@ -29,6 +50,8 @@ class RustView extends StatefulWidget {
     this.drawing = false,
     this.onDrawn,
     this.holding = true,
+    this.pattern,
+    this.overlay,
   });
 
   final Engine engine;
@@ -52,6 +75,13 @@ class RustView extends StatefulWidget {
   /// A press may hold what is under the pointer to drag it (on the board:
   /// a corner or an edge). Off, drags only pan or turn the view.
   final bool holding;
+
+  /// A board tool's own pointer handling, instead of selecting and
+  /// holding.
+  final PatternPointer? pattern;
+
+  /// Drawn over the board every frame.
+  final BoardOverlay? overlay;
 
   @override
   State<RustView> createState() => _RustViewState();
@@ -92,6 +122,37 @@ class _RustViewState extends State<RustView>
   /// The trackpad pinch's scale at the last update.
   double _pinch = 1;
 
+  /// A board tool holds the pointer.
+  bool _patternHeld = false;
+
+  /// Ticks every frame, to repaint the overlay.
+  final _frames = ValueNotifier<int>(0);
+
+  /// The pattern point (mm) under a local position of a board.
+  Offset? _toPattern(Offset local) {
+    final view = _viewId;
+    if (view == null) return null;
+    final p = widget.engine.toPattern(
+      view: view,
+      x: local.dx * _ratio,
+      y: local.dy * _ratio,
+    );
+    return p == null ? null : Offset(p[0], p[1]);
+  }
+
+  /// Millimetres per logical pixel at `local`.
+  double _mmPerPx(Offset local) {
+    final (a, b) = (_toPattern(local), _toPattern(local + const Offset(1, 0)));
+    return a == null || b == null ? 1 : (b - a).distance;
+  }
+
+  Offset _toScreen(Offset mm) {
+    final view = _viewId;
+    if (view == null) return Offset.zero;
+    final p = widget.engine.toView(view: view, xMm: mm.dx, yMm: mm.dy);
+    return p == null ? Offset.zero : Offset(p[0], p[1]) / _ratio;
+  }
+
   /// Zoom by `amount` (positive = in) about the point under the pointer.
   void _zoom(Offset at, double amount) {
     final view = _viewId;
@@ -113,6 +174,7 @@ class _RustViewState extends State<RustView>
   @override
   void dispose() {
     _ticker.dispose();
+    _frames.dispose();
     _release();
     _image?.dispose();
     super.dispose();
@@ -167,6 +229,7 @@ class _RustViewState extends State<RustView>
   void _renderFrame() {
     final view = _viewId;
     if (view == null) return;
+    if (widget.overlay != null) _frames.value++;
     if (!_shared) {
       if (!_reading) _readBack(view);
       return;
@@ -225,6 +288,12 @@ class _RustViewState extends State<RustView>
           onPointerDown: (e) {
             _downAt = e.localPosition;
             _dragged = false;
+            final press = widget.pattern?.onPress;
+            if (press != null) {
+              final mm = _toPattern(e.localPosition);
+              _patternHeld = mm != null && press(mm, _mmPerPx(e.localPosition));
+              if (_patternHeld) return;
+            }
             final view = _viewId;
             // ⌥-click pins the cloth under the cursor.
             if (view != null && widget.drawing) {
@@ -251,6 +320,7 @@ class _RustViewState extends State<RustView>
             _holding =
                 view != null &&
                 widget.holding &&
+                widget.pattern == null &&
                 widget.engine.press(
                   view: view,
                   x: e.localPosition.dx * _ratio,
@@ -269,6 +339,12 @@ class _RustViewState extends State<RustView>
             final view = _viewId;
             if (view == null) return;
             if ((e.localPosition - _downAt).distance > 3) _dragged = true;
+            if (_patternHeld) {
+              if (_toPattern(e.localPosition) case final mm?) {
+                widget.pattern?.onDrag?.call(mm);
+              }
+              return;
+            }
             if (_stroke case final stroke?) {
               widget.engine.strokeTo(
                 view: view,
@@ -300,6 +376,17 @@ class _RustViewState extends State<RustView>
             );
           },
           onPointerUp: (e) {
+            if (_patternHeld) {
+              _patternHeld = false;
+              widget.pattern?.onRelease?.call();
+              return;
+            }
+            final tap = widget.pattern?.onTap;
+            if (tap != null) {
+              final mm = _dragged ? null : _toPattern(e.localPosition);
+              if (mm != null) tap(mm, _mmPerPx(e.localPosition));
+              return;
+            }
             if (_stroke != null) {
               setState(() => _stroke = null);
               try {
@@ -331,6 +418,8 @@ class _RustViewState extends State<RustView>
               view: view,
               x: e.localPosition.dx * _ratio,
               y: e.localPosition.dy * _ratio,
+              // ⇧-click a second corner to measure between them.
+              extend: HardwareKeyboard.instance.isShiftPressed,
             );
             widget.onSelection?.call(selection);
           },
@@ -372,6 +461,14 @@ class _RustViewState extends State<RustView>
                         stroke,
                         Tokens.of(context).accent,
                       ),
+                    ),
+                  ),
+                ),
+              if (widget.overlay case final overlay?)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: CustomPaint(
+                      painter: _OverlayPainter(overlay, _toScreen, _frames),
                     ),
                   ),
                 ),
@@ -457,4 +554,19 @@ class _StrokePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_StrokePainter old) => true;
+}
+
+/// A board overlay, repainted every frame (the board may pan or zoom).
+class _OverlayPainter extends CustomPainter {
+  _OverlayPainter(this.overlay, this.toScreen, Listenable frames)
+    : super(repaint: frames);
+
+  final BoardOverlay overlay;
+  final Offset Function(Offset mm) toScreen;
+
+  @override
+  void paint(Canvas canvas, Size size) => overlay(canvas, toScreen);
+
+  @override
+  bool shouldRepaint(_OverlayPainter old) => true;
 }

@@ -131,6 +131,7 @@ command_registry! {
     "panel.place" => PanelPlace,
     "panel.delete" => PanelDelete,
     "point.move" => PointMove,
+    "point.set_distance" => PointSetDistance,
     "point.remove" => PointRemove,
     "edge.set_curve" => EdgeSetCurve,
     "edge.split" => EdgeSplit,

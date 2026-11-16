@@ -153,3 +153,26 @@ fn a_seam_gets_both_sides_the_same_length() {
     .unwrap_err();
     assert_eq!(err.message().code, "invalid.not_seam_side");
 }
+
+#[test]
+fn a_point_is_set_at_a_distance_from_another() {
+    let mut s = Session::new(Project::new("t"));
+    let front = common::a_line_skirt(&mut s);
+    let (a, b) = (front.points[2].clone(), front.points[3].clone());
+    run(
+        &mut s,
+        json!({"type": "point.set_distance", "from": a, "point": b, "distance_mm": 300}),
+    )
+    .unwrap();
+    let d = run(&mut s, json!({"type": "measure.distance", "a": a, "b": b})).unwrap();
+    assert!(
+        (d["distance_mm"].as_f64().unwrap() - 300.0).abs() < 1e-6,
+        "{d}"
+    );
+    let err = run(
+        &mut s,
+        json!({"type": "point.set_distance", "from": a, "point": a, "distance_mm": 10}),
+    )
+    .unwrap_err();
+    assert_eq!(err.message().code, "invalid.same_point");
+}

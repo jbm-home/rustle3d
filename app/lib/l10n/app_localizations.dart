@@ -901,11 +901,23 @@ abstract class L {
   /// **'Polygon'**
   String get toolPolygon;
 
+  /// No description provided for @toolPolygonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Click the corners of a new piece'**
+  String get toolPolygonHint;
+
   /// No description provided for @toolCurve.
   ///
   /// In en, this message translates to:
   /// **'Curve'**
   String get toolCurve;
+
+  /// No description provided for @toolCurveHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Click an edge, then drag its handles to bend it'**
+  String get toolCurveHint;
 
   /// No description provided for @toolDraw.
   ///
@@ -925,6 +937,12 @@ abstract class L {
   /// **'Notch'**
   String get toolNotch;
 
+  /// No description provided for @toolNotchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Click an edge where the notch goes'**
+  String get toolNotchHint;
+
   /// No description provided for @toolSew.
   ///
   /// In en, this message translates to:
@@ -937,12 +955,6 @@ abstract class L {
   /// **'Click two edges on the pattern'**
   String get toolSewHint;
 
-  /// No description provided for @comingSoon.
-  ///
-  /// In en, this message translates to:
-  /// **'Coming soon'**
-  String get comingSoon;
-
   /// No description provided for @viewPattern.
   ///
   /// In en, this message translates to:
@@ -954,6 +966,60 @@ abstract class L {
   /// In en, this message translates to:
   /// **'3D'**
   String get view3d;
+
+  /// No description provided for @hintPolygon.
+  ///
+  /// In en, this message translates to:
+  /// **'Polygon: click the corners; click the first one or press Enter to close · Esc cancels · V to stop'**
+  String get hintPolygon;
+
+  /// No description provided for @hintCurve.
+  ///
+  /// In en, this message translates to:
+  /// **'Curve: click an edge, then drag its handles · V to stop'**
+  String get hintCurve;
+
+  /// No description provided for @hintNotch.
+  ///
+  /// In en, this message translates to:
+  /// **'Notch: click an edge where the notch goes · V to stop'**
+  String get hintNotch;
+
+  /// No description provided for @toastPieceAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Piece added.'**
+  String get toastPieceAdded;
+
+  /// No description provided for @toastNotchAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Notch added.'**
+  String get toastNotchAdded;
+
+  /// No description provided for @distance.
+  ///
+  /// In en, this message translates to:
+  /// **'Distance'**
+  String get distance;
+
+  /// No description provided for @pointPicked.
+  ///
+  /// In en, this message translates to:
+  /// **'Corner picked. ⇧-click another corner to measure the distance between them.'**
+  String get pointPicked;
+
+  /// No description provided for @pointsPicked.
+  ///
+  /// In en, this message translates to:
+  /// **'Between the two corners. The second one moves along the line.'**
+  String get pointsPicked;
+
+  /// No description provided for @straighten.
+  ///
+  /// In en, this message translates to:
+  /// **'Straighten'**
+  String get straighten;
 
   /// No description provided for @hintSewFirst.
   ///

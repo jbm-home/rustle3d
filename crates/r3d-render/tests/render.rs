@@ -138,3 +138,14 @@ fn view3d_renders_the_avatar_and_the_cloth() {
         keep(name, &png);
     }
 }
+
+#[test]
+fn board_pixels_and_points_round_trip() {
+    let view = r3d_render::board::BoardView {
+        center: r3d_geom::DVec2::new(120.0, -40.0),
+        mm_per_px: 0.75,
+    };
+    let p = r3d_geom::DVec2::new(333.0, 81.5);
+    let px = view.to_pixels(p, 800, 600);
+    assert!(view.to_board(px.x, px.y, 800, 600).distance(p) < 1e-9);
+}

@@ -7,12 +7,22 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `adjust_by`, `cloth_hit`, `edited`, `err`, `extend_stroke`, `forget_missing`, `form`, `graphics`, `new`, `new`, `pick_cloth`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `resync_if_due`, `rgba`, `selected`, `sim`, `to_theme`, `workspace`
+// These functions are ignored because they are not marked as `pub`: `adjust_by`, `cloth_hit`, `corner_at`, `edited`, `err`, `extend_stroke`, `forget_missing`, `form`, `frozen_board`, `graphics`, `new`, `new`, `offset_along`, `pick_cloth`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `resync_if_due`, `rgba`, `selected`, `sim`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Engine>>
 abstract class Engine implements RustOpaqueInterface {
+  /// Add a notch on the edge within `max_mm` of pattern point (`x_mm`,
+  /// `y_mm`), where that point is along it (`notch.add`). Returns the
+  /// notch, or `None` off the edges (and on linked mirror copies, which
+  /// follow their source).
+  String? addNotchNear({
+    required double xMm,
+    required double yMm,
+    required double maxMm,
+  });
+
   /// How many changes agents have made: the UI refreshes when it moves.
   /// Cheap while nothing changed (asked every frame; the project is only
   /// locked after a change, as an agent may hold it for a while).
@@ -37,7 +47,12 @@ abstract class Engine implements RustOpaqueInterface {
 
   /// A click at pixel (`x`, `y`) of a view. Updates the shared selection
   /// and returns it (panel ids).
-  List<String> click({required int view, required double x, required double y});
+  List<String> click({
+    required int view,
+    required double x,
+    required double y,
+    required bool extend,
+  });
 
   /// Stop rendering into a view (its UI texture is about to go away).
   void detachView({required int view});
@@ -71,6 +86,14 @@ abstract class Engine implements RustOpaqueInterface {
   /// Open the project folder at `path`, creating it if it does not exist.
   static Engine open({required String path}) =>
       RustLib.instance.api.crateApiEngineEngineOpen(path: path);
+
+  /// Pick the edge within `max_mm` of pattern point (`x_mm`, `y_mm`), as
+  /// a click on it would (its piece selected). Returns the edge.
+  String? pickEdgeNear({
+    required double xMm,
+    required double yMm,
+    required double maxMm,
+  });
 
   /// ⌥-click at (`x`, `y`) in the 3D view: pin the cloth there, where it
   /// is now (a `pin.add` command, so it is saved and undoable; the running
@@ -142,6 +165,9 @@ abstract class Engine implements RustOpaqueInterface {
   /// either view), if any.
   String? selectedEdge();
 
+  /// The corners picked on the board: one, or two to measure between.
+  List<PickedPoint> selectedPoints();
+
   /// The shared selection (panel ids).
   List<String> selection();
 
@@ -165,6 +191,20 @@ abstract class Engine implements RustOpaqueInterface {
   /// Continue the line to (`x`, `y`): points on other pieces, or off the
   /// cloth, are skipped.
   void strokeTo({required int view, required double x, required double y});
+
+  /// The pattern point (mm) under pixel (`x`, `y`) of a board.
+  Float64List? toPattern({
+    required int view,
+    required double x,
+    required double y,
+  });
+
+  /// The pixel of a board showing pattern point (`x_mm`, `y_mm`).
+  Float64List? toView({
+    required int view,
+    required double xMm,
+    required double yMm,
+  });
 
   /// Remove a pin (`pin.remove`); the cloth there moves again.
   void unpin({required String pin});
@@ -356,6 +396,27 @@ class PatternChange {
           runtimeType == other.runtimeType &&
           kind == other.kind &&
           mm == other.mm;
+}
+
+/// A corner picked on the board, and where it is (mm).
+class PickedPoint {
+  final String id;
+  final double xMm;
+  final double yMm;
+
+  const PickedPoint({required this.id, required this.xMm, required this.yMm});
+
+  @override
+  int get hashCode => id.hashCode ^ xMm.hashCode ^ yMm.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PickedPoint &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          xMm == other.xMm &&
+          yMm == other.yMm;
 }
 
 /// State of the cloth simulation, for the UI.

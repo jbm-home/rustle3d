@@ -13,6 +13,46 @@ fn get_point(tx: &Transaction<'_>, id: PointId) -> Result<Point, CommandError> {
         .ok_or_else(|| CommandError::not_found(id))
 }
 
+/// Put a point at a distance from another.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PointSetDistance {
+    /// The point that stays.
+    pub from: PointId,
+    /// The point that moves, along the line from `from` through it.
+    pub point: PointId,
+    /// The new straight-line distance between them (mm).
+    pub distance_mm: f64,
+}
+
+impl Described for PointSetDistance {
+    const SUMMARY: &'static str = "Set the straight-line distance between two contour points (e.g. across the shoulders, or between two pieces' corners): `point` moves along the line from `from` through it, as `point.move` does (its curve handles follow); `from` stays. `measure.distance` gives the current distance.";
+}
+
+impl CommandSpec for PointSetDistance {
+    fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        crate::error::positive("distance_mm", self.distance_mm)?;
+        if self.from == self.point {
+            return Err(CommandError::invalid("point", Invalid::SamePoint));
+        }
+        let (from, point) = (get_point(tx, self.from)?, get_point(tx, self.point)?);
+        let along = point.pos - from.pos;
+        if along.length() < 1e-9 {
+            return Err(CommandError::invalid("point", Invalid::SamePoint));
+        }
+        let to = from.pos + along.normalize() * self.distance_mm;
+        PointMove {
+            point: self.point,
+            to: [to.x, to.y],
+        }
+        .apply(tx)
+    }
+
+    fn merge_key(&self) -> Option<String> {
+        Some(format!("point.set_distance:{}", self.point))
+    }
+}
+
 /// Move a contour point.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

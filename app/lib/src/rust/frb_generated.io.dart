@@ -97,6 +97,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<FabricSwatch> dco_decode_list_fabric_swatch(dynamic raw);
 
   @protected
+  List<PickedPoint> dco_decode_list_picked_point(dynamic raw);
+
+  @protected
+  Float64List dco_decode_list_prim_f_64_strict(dynamic raw);
+
+  @protected
   Uint32List dco_decode_list_prim_u_32_strict(dynamic raw);
 
   @protected
@@ -115,7 +121,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BigInt? dco_decode_opt_box_autoadd_u_64(dynamic raw);
 
   @protected
+  Float64List? dco_decode_opt_list_prim_f_64_strict(dynamic raw);
+
+  @protected
   PatternChange dco_decode_pattern_change(dynamic raw);
+
+  @protected
+  PickedPoint dco_decode_picked_point(dynamic raw);
 
   @protected
   (String, String) dco_decode_record_string_string(dynamic raw);
@@ -219,6 +231,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<PickedPoint> sse_decode_list_picked_point(SseDeserializer deserializer);
+
+  @protected
+  Float64List sse_decode_list_prim_f_64_strict(SseDeserializer deserializer);
+
+  @protected
   Uint32List sse_decode_list_prim_u_32_strict(SseDeserializer deserializer);
 
   @protected
@@ -241,7 +259,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BigInt? sse_decode_opt_box_autoadd_u_64(SseDeserializer deserializer);
 
   @protected
+  Float64List? sse_decode_opt_list_prim_f_64_strict(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   PatternChange sse_decode_pattern_change(SseDeserializer deserializer);
+
+  @protected
+  PickedPoint sse_decode_picked_point(SseDeserializer deserializer);
 
   @protected
   (String, String) sse_decode_record_string_string(
@@ -354,6 +380,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_picked_point(
+    List<PickedPoint> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_prim_f_64_strict(
+    Float64List self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_prim_u_32_strict(
     Uint32List self,
     SseSerializer serializer,
@@ -384,7 +422,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_opt_box_autoadd_u_64(BigInt? self, SseSerializer serializer);
 
   @protected
+  void sse_encode_opt_list_prim_f_64_strict(
+    Float64List? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_pattern_change(PatternChange self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_picked_point(PickedPoint self, SseSerializer serializer);
 
   @protected
   void sse_encode_record_string_string(

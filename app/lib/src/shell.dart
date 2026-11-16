@@ -211,6 +211,7 @@ class _ShellState extends State<Shell> {
       _pins = (_run({'type': 'pin.list'}) as List<dynamic>?) ?? const [];
       _seams = (_run({'type': 'seam.list'}) as List<dynamic>?) ?? const [];
       _edge = _guard<String?>(widget.engine.selectedEdge);
+      _points = _guard(widget.engine.selectedPoints) ?? const [];
     });
   }
 
@@ -273,10 +274,185 @@ class _ShellState extends State<Shell> {
   /// The first edge picked with the Sew tool.
   String? _sewFrom;
 
+  /// The Polygon tool's corners so far (mm).
+  final List<Offset> _polygon = [];
+
+  /// Corners picked on the board (one, or two to measure between).
+  List<PickedPoint> _points = const [];
+
+  /// The Curve tool's handle being dragged: 1 or 2.
+  int? _handle;
+
   void _setTool(String tool) => setState(() {
     _tool = tool;
     _sewFrom = null;
+    _polygon.clear();
   });
+
+  /// Board pick tolerance (logical pixels).
+  static const _pickPx = 12.0;
+
+  void _polygonTap(Offset mm, double mmPerPx) {
+    if (_polygon.length >= 3 &&
+        (mm - _polygon.first).distance < _pickPx * mmPerPx) {
+      _finishPolygon();
+      return;
+    }
+    setState(() => _polygon.add(mm));
+  }
+
+  void _finishPolygon() {
+    if (_polygon.length < 3) return;
+    final panels = (_summary['panels'] as List<dynamic>? ?? const []);
+    final out = _run({
+      'type': 'panel.create_polygon',
+      'name': context.l.pieceNew(panels.length + 1),
+      'points': [
+        for (final p in _polygon) [p.dx, p.dy],
+      ],
+    });
+    setState(_polygon.clear);
+    _refresh();
+    if (out != null) _toast(context.l.toastPieceAdded);
+  }
+
+  void _notchTap(Offset mm, double mmPerPx) {
+    final notch = _guard(
+      () => widget.engine.addNotchNear(
+        xMm: mm.dx,
+        yMm: mm.dy,
+        maxMm: _pickPx * mmPerPx,
+      ),
+    );
+    if (notch != null) {
+      _refresh();
+      _toast(context.l.toastNotchAdded);
+    }
+  }
+
+  /// The picked edge, as `panel.get` gives it.
+  Map<String, dynamic>? get _pickedEdge => (_panel?['edges'] as List?)
+      ?.cast<Map<String, dynamic>>()
+      .where((e) => e['id'] == _edge)
+      .firstOrNull;
+
+  static Offset _at(Object? pos) =>
+      Offset(((pos as List)[0] as num).toDouble(), (pos[1] as num).toDouble());
+
+  /// Curve tool: pick an edge; a straight one gets handles on its line.
+  void _curveTap(Offset mm, double mmPerPx) {
+    _guard(
+      () => widget.engine.pickEdgeNear(
+        xMm: mm.dx,
+        yMm: mm.dy,
+        maxMm: _pickPx * mmPerPx,
+      ),
+    );
+    _refresh();
+    final e = _pickedEdge;
+    if (e == null || e['curve']['kind'] != 'line') return;
+    final (a, b) = (_at(e['start']['pos']), _at(e['end']['pos']));
+    final (c1, c2) = (a + (b - a) / 3, a + (b - a) * 2 / 3);
+    _run({
+      'type': 'edge.set_curve',
+      'edge': e['id'],
+      'curve': {
+        'kind': 'cubic',
+        'c1': [c1.dx, c1.dy],
+        'c2': [c2.dx, c2.dy],
+      },
+    });
+    _refresh();
+  }
+
+  bool _curvePress(Offset mm, double mmPerPx) {
+    final e = _pickedEdge;
+    if (e == null || e['curve']['kind'] != 'cubic') return false;
+    for (final (k, key) in [(1, 'c1'), (2, 'c2')]) {
+      if ((_at(e['curve'][key]) - mm).distance < _pickPx * mmPerPx) {
+        _handle = k;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void _curveDrag(Offset mm) {
+    final (e, h) = (_pickedEdge, _handle);
+    if (e == null || h == null) return;
+    final c1 = h == 1 ? mm : _at(e['curve']['c1']);
+    final c2 = h == 2 ? mm : _at(e['curve']['c2']);
+    _run({
+      'type': 'edge.set_curve',
+      'edge': e['id'],
+      'curve': {
+        'kind': 'cubic',
+        'c1': [c1.dx, c1.dy],
+        'c2': [c2.dx, c2.dy],
+      },
+    });
+    _refresh();
+  }
+
+  /// What the board tools draw over the pattern.
+  void _boardOverlay(
+    Canvas canvas,
+    Offset Function(Offset mm) toScreen,
+    Palette p,
+  ) {
+    final line = Paint()
+      ..color = p.accent
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+    final dot = Paint()..color = p.accent;
+    final ring = Paint()
+      ..color = p.surface
+      ..style = PaintingStyle.fill;
+    void point(Offset at, double r) {
+      canvas.drawCircle(at, r + 1.5, ring);
+      canvas.drawCircle(at, r, dot);
+    }
+
+    if (_polygon.isNotEmpty) {
+      final pts = [for (final q in _polygon) toScreen(q)];
+      for (var i = 1; i < pts.length; i++) {
+        canvas.drawLine(pts[i - 1], pts[i], line);
+      }
+      for (final (i, q) in pts.indexed) {
+        point(q, i == 0 ? 6 : 4);
+      }
+    }
+    final e = _tool == 'curve' ? _pickedEdge : null;
+    if (e != null) {
+      if (e['curve']['kind'] == 'cubic') {
+        for (final (end, handle) in [
+          (e['start']['pos'], e['curve']['c1']),
+          (e['end']['pos'], e['curve']['c2']),
+        ]) {
+          final h = toScreen(_at(handle));
+          canvas.drawLine(toScreen(_at(end)), h, line);
+          point(h, 5);
+        }
+      }
+    }
+    if (_tool == 'select' && _points.isNotEmpty) {
+      final pts = [for (final q in _points) toScreen(Offset(q.xMm, q.yMm))];
+      if (pts.length == 2) {
+        final (a, b) = (pts[0], pts[1]);
+        final n = ((b - a).distance / 8).floor();
+        for (var i = 0; i < n; i += 2) {
+          canvas.drawLine(
+            Offset.lerp(a, b, i / n)!,
+            Offset.lerp(a, b, (i + 1) / n)!,
+            line,
+          );
+        }
+      }
+      for (final q in pts) {
+        point(q, 5);
+      }
+    }
+  }
 
   /// Sew tool: the first click picks an edge, the second sews them.
   void _sewClick() {
@@ -429,6 +605,13 @@ class _ShellState extends State<Shell> {
             _setTool('select'),
         const SingleActivator(LogicalKeyboardKey.keyD): () => _setTool('draw'),
         const SingleActivator(LogicalKeyboardKey.keyS): () => _setTool('sew'),
+        const SingleActivator(LogicalKeyboardKey.keyP): () =>
+            _setTool('polygon'),
+        const SingleActivator(LogicalKeyboardKey.keyC): () => _setTool('curve'),
+        const SingleActivator(LogicalKeyboardKey.keyN): () => _setTool('notch'),
+        const SingleActivator(LogicalKeyboardKey.enter): _finishPolygon,
+        const SingleActivator(LogicalKeyboardKey.escape): () =>
+            setState(_polygon.clear),
         const SingleActivator(LogicalKeyboardKey.backspace): _deleteSelected,
         const SingleActivator(LogicalKeyboardKey.delete): _deleteSelected,
         const SingleActivator(LogicalKeyboardKey.digit1): () =>
@@ -507,6 +690,22 @@ class _ShellState extends State<Shell> {
                             kind: ViewKind.board,
                             // Corners and edges are dragged with Select.
                             holding: _tool == 'select',
+                            pattern: switch (_tool) {
+                              'polygon' => PatternPointer(onTap: _polygonTap),
+                              'notch' => PatternPointer(onTap: _notchTap),
+                              'curve' => PatternPointer(
+                                onTap: _curveTap,
+                                onPress: _curvePress,
+                                onDrag: _curveDrag,
+                                onRelease: () => _handle = null,
+                              ),
+                              _ => null,
+                            },
+                            overlay: (canvas, toScreen) => _boardOverlay(
+                              canvas,
+                              toScreen,
+                              Tokens.of(context),
+                            ),
                             onSelection: (_) =>
                                 _tool == 'sew' ? _sewClick() : _refresh(),
                             onFrameTime: (ms) => _onFrame(true, ms),
@@ -555,6 +754,7 @@ class _ShellState extends State<Shell> {
                         child: _Inspector(
                           key: _spotInspector,
                           selection: _selection,
+                          points: _points,
                           panel: _panel,
                           summary: _summary,
                           edge: _edge,
@@ -584,6 +784,9 @@ class _ShellState extends State<Shell> {
                   'sew' when _sewFrom == null => l.hintSewFirst,
                   'sew' => l.hintSewSecond,
                   'draw' => l.hintDraw,
+                  'polygon' => l.hintPolygon,
+                  'curve' => l.hintCurve,
+                  'notch' => l.hintNotch,
                   _ when _selection.isEmpty => context.keys(l.hintIdle),
                   _ => context.keys(l.hintSelection),
                 },
@@ -931,15 +1134,15 @@ class _ToolRail extends StatelessWidget {
       'R',
       l.toolRectangleHint,
     ),
-    ('polygon', Icons.pentagon_outlined, l.toolPolygon, 'P', l.comingSoon),
-    ('curve', Icons.gesture_rounded, l.toolCurve, 'C', l.comingSoon),
+    ('polygon', Icons.pentagon_outlined, l.toolPolygon, 'P', l.toolPolygonHint),
+    ('curve', Icons.gesture_rounded, l.toolCurve, 'C', l.toolCurveHint),
     ('draw', Icons.brush_rounded, l.toolDraw, 'D', l.toolDrawHint),
     (
       'notch',
       Icons.vertical_align_center_rounded,
       l.toolNotch,
       'N',
-      l.comingSoon,
+      l.toolNotchHint,
     ),
     ('sew', Icons.link_rounded, l.toolSew, 'S', l.toolSewHint),
   ];
@@ -1123,6 +1326,7 @@ class _Inspector extends StatelessWidget {
   const _Inspector({
     super.key,
     required this.selection,
+    required this.points,
     required this.panel,
     required this.summary,
     required this.edge,
@@ -1135,6 +1339,7 @@ class _Inspector extends StatelessWidget {
   });
 
   final List<String> selection;
+  final List<PickedPoint> points;
   final Map<String, dynamic>? panel;
   final Map<String, dynamic> summary;
   final String? edge;
@@ -1169,6 +1374,7 @@ class _Inspector extends StatelessWidget {
             ),
             1 when panel != null => _PanelInspector(
               panel: panel!,
+              points: points,
               edge: edge,
               seams: seams,
               run: run,
@@ -1343,6 +1549,7 @@ class _MultiInspector extends StatelessWidget {
 class _PanelInspector extends StatelessWidget {
   const _PanelInspector({
     required this.panel,
+    required this.points,
     required this.edge,
     required this.seams,
     required this.run,
@@ -1350,6 +1557,7 @@ class _PanelInspector extends StatelessWidget {
   });
 
   final Map<String, dynamic> panel;
+  final List<PickedPoint> points;
   final String? edge;
   final List<dynamic> seams;
   final ValueChanged<Map<String, Object?>> run;
@@ -1389,6 +1597,10 @@ class _PanelInspector extends StatelessWidget {
             case final Map<String, dynamic> e) ...[
           const SizedBox(height: Space.m),
           _EdgeCard(edge: e, seams: seams, run: run),
+        ],
+        if (points.isNotEmpty) ...[
+          const SizedBox(height: Space.m),
+          _PointsCard(points: points, run: run),
         ],
         const SizedBox(height: Space.l),
         Row(
@@ -2101,8 +2313,10 @@ class _EdgeCard extends StatelessWidget {
             style: ts(fontSize: 12.5, height: 1.45, color: p.textMuted),
           ),
           const SizedBox(height: Space.m),
-          _EdgeLength(
+          _LengthControl(
             key: ValueKey(id),
+            label: l.edgeLengthLabel,
+            fieldKey: const Key('edge-length'),
             cm: length,
             onCm: (cm) => run({
               'type': 'edge.set_length',
@@ -2110,28 +2324,49 @@ class _EdgeCard extends StatelessWidget {
               'length_mm': cm * 10,
             }),
           ),
-          if (seam != null)
-            SwitchListTile(
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              title: Text(
-                l.gathered,
-                style: ts(fontSize: 13, fontWeight: FontWeight.w500),
+          if (edge['curve']?['kind'] == 'cubic')
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => run({
+                  'type': 'edge.set_curve',
+                  'edge': id,
+                  'curve': {'kind': 'line'},
+                }),
+                icon: const Icon(Icons.horizontal_rule_rounded, size: 16),
+                label: Text(l.straighten),
               ),
-              subtitle: seam['gathered'] == true
-                  ? Text(
-                      l.gatheredHint(
-                        context.number(seam['gathering_ratio'] as num, 1),
+            ),
+          if (seam != null)
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l.gathered,
+                        style: ts(fontSize: 13, fontWeight: FontWeight.w500),
                       ),
-                      style: ts(fontSize: 12, color: p.textMuted),
-                    )
-                  : null,
-              value: seam['gathered'] == true,
-              onChanged: (on) => run({
-                'type': 'seam.set_gathered',
-                'seam': seam['id'],
-                'gathered': on,
-              }),
+                      if (seam['gathered'] == true)
+                        Text(
+                          l.gatheredHint(
+                            context.number(seam['gathering_ratio'] as num, 1),
+                          ),
+                          style: ts(fontSize: 12, color: p.textMuted),
+                        ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: seam['gathered'] == true,
+                  onChanged: (on) => run({
+                    'type': 'seam.set_gathered',
+                    'seam': seam['id'],
+                    'gathered': on,
+                  }),
+                ),
+              ],
             ),
           if (seam != null &&
               seam['gathered'] != true &&
@@ -2169,25 +2404,33 @@ class _EdgeCard extends StatelessWidget {
   }
 }
 
-/// An edge's length, typed or set with a slider (half to one and a half
-/// times what it was when picked).
-class _EdgeLength extends StatefulWidget {
-  const _EdgeLength({super.key, required this.cm, required this.onCm});
+/// A length, typed or set with a slider (half to one and a half times
+/// what it was when picked).
+class _LengthControl extends StatefulWidget {
+  const _LengthControl({
+    super.key,
+    required this.label,
+    required this.cm,
+    required this.onCm,
+    this.fieldKey,
+  });
 
+  final String label;
   final double cm;
   final ValueChanged<double> onCm;
+  final Key? fieldKey;
 
   @override
-  State<_EdgeLength> createState() => _EdgeLengthState();
+  State<_LengthControl> createState() => _LengthControlState();
 }
 
-class _EdgeLengthState extends State<_EdgeLength> {
+class _LengthControlState extends State<_LengthControl> {
   /// The slider's range stays put while it is dragged.
   late final double _picked = widget.cm;
 
   @override
   Widget build(BuildContext context) => _SliderRow(
-    label: context.l.edgeLengthLabel,
+    label: widget.label,
     value: widget.cm,
     min: (_picked * 0.5).floorToDouble(),
     max: (_picked * 1.5).ceilToDouble(),
@@ -2196,7 +2439,7 @@ class _EdgeLengthState extends State<_EdgeLength> {
     unit: context.l.cm,
     digits: 1,
     enabled: true,
-    fieldKey: const Key('edge-length'),
+    fieldKey: widget.fieldKey,
     onChanged: (cm) => widget.onCm((cm * 10).roundToDouble() / 10),
   );
 }
@@ -2270,6 +2513,53 @@ class _AgentButton extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The corners picked on the board: with two, their distance, typed or
+/// with a slider (the second one moves along the line).
+class _PointsCard extends StatelessWidget {
+  const _PointsCard({required this.points, required this.run});
+
+  final List<PickedPoint> points;
+  final ValueChanged<Map<String, Object?>> run;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final l = context.l;
+    final pair = points.length == 2 ? (points[0], points[1]) : null;
+    return Container(
+      padding: const EdgeInsets.all(Space.m),
+      decoration: BoxDecoration(
+        color: p.accentSoft,
+        borderRadius: BorderRadius.circular(Tokens.radius(context)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            context.keys(pair == null ? l.pointPicked : l.pointsPicked),
+            style: ts(fontSize: 12.5, height: 1.45, color: p.textMuted),
+          ),
+          if (pair case (final a, final b)) ...[
+            const SizedBox(height: Space.m),
+            _LengthControl(
+              key: ValueKey('${a.id}-${b.id}'),
+              label: l.distance,
+              fieldKey: const Key('distance'),
+              cm: (Offset(b.xMm, b.yMm) - Offset(a.xMm, a.yMm)).distance / 10,
+              onCm: (cm) => run({
+                'type': 'point.set_distance',
+                'from': a.id,
+                'point': b.id,
+                'distance_mm': cm * 10,
+              }),
+            ),
+          ],
+        ],
       ),
     );
   }

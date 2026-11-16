@@ -713,6 +713,51 @@ Move a contour point to a new position in mm. Curve handles attached to the poin
 
 </details>
 
+### `point.set_distance`
+
+Set the straight-line distance between two contour points (e.g. across the shoulders, or between two pieces' corners): `point` moves along the line from `from` through it, as `point.move` does (its curve handles follow); `from` stays. `measure.distance` gives the current distance.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "PointId": {
+      "description": "Identifier of a point, e.g. `point:1`.",
+      "pattern": "^point:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Put a point at a distance from another.",
+  "properties": {
+    "distance_mm": {
+      "description": "The new straight-line distance between them (mm).",
+      "format": "double",
+      "type": "number"
+    },
+    "from": {
+      "$ref": "#/$defs/PointId",
+      "description": "The point that stays."
+    },
+    "point": {
+      "$ref": "#/$defs/PointId",
+      "description": "The point that moves, along the line from `from` through it."
+    }
+  },
+  "required": [
+    "from",
+    "point",
+    "distance_mm"
+  ],
+  "title": "PointSetDistance",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `point.remove`
 
 Remove a contour point and join its two edges into one (a curve if either was curved, keeping the outer handles). The panel must keep at least 3 points.

@@ -217,6 +217,13 @@ impl BoardView {
     pub fn to_board(&self, x: f64, y: f64, width: u32, height: u32) -> DVec2 {
         self.center + DVec2::new(x - width as f64 / 2.0, height as f64 / 2.0 - y) * self.mm_per_px
     }
+
+    /// The pixel showing board point `p` (mm): the inverse of
+    /// [`Self::to_board`].
+    pub fn to_pixels(&self, p: DVec2, width: u32, height: u32) -> DVec2 {
+        let d = (p - self.center) / self.mm_per_px;
+        DVec2::new(width as f64 / 2.0 + d.x, height as f64 / 2.0 - d.y)
+    }
 }
 
 #[repr(C)]

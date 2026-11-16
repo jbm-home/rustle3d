@@ -63,6 +63,7 @@ fn every_command_round_trips() {
     assert_eq!(rect.created.len(), 1 + 4 + 4);
     let panel = rect.created[0].to_string();
     let point = rect.created[2].to_string();
+    let other_point = rect.created[1].to_string();
     let edge = rect.created[6].to_string();
 
     let poly = h.round_trip(json!({
@@ -76,6 +77,7 @@ fn every_command_round_trips() {
     h.round_trip(json!({"type": "edge.set_curve", "edge": edge,
         "curve": {"kind": "cubic", "c1": [300, 650], "c2": [120, 650]}}));
     h.round_trip(json!({"type": "point.move", "point": point, "to": [420, 0]}));
+    h.round_trip(json!({"type": "point.set_distance", "from": other_point, "point": point, "distance_mm": 250}));
     h.round_trip(json!({"type": "panel.translate", "panel": panel, "delta": [100, -50]}));
     h.round_trip(json!({"type": "panel.set_grain", "panel": panel, "angle_deg": 45}));
     h.round_trip(json!({"type": "panel.set_seam_allowance", "panel": panel, "mm": 15}));

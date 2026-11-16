@@ -465,7 +465,14 @@ class LFr extends L {
   String get toolPolygon => 'Polygone';
 
   @override
+  String get toolPolygonHint => 'Cliquez les coins d’une nouvelle pièce';
+
+  @override
   String get toolCurve => 'Courbe';
+
+  @override
+  String get toolCurveHint =>
+      'Cliquez un bord, puis faites glisser ses poignées pour le courber';
 
   @override
   String get toolDraw => 'Dessiner sur le vêtement';
@@ -478,19 +485,51 @@ class LFr extends L {
   String get toolNotch => 'Cran';
 
   @override
+  String get toolNotchHint => 'Cliquez un bord à l’endroit du cran';
+
+  @override
   String get toolSew => 'Coudre';
 
   @override
   String get toolSewHint => 'Cliquez deux bords sur le patron';
 
   @override
-  String get comingSoon => 'Bientôt';
-
-  @override
   String get viewPattern => 'Patron';
 
   @override
   String get view3d => '3D';
+
+  @override
+  String get hintPolygon =>
+      'Polygone : cliquez les coins ; cliquez le premier ou Entrée pour fermer · Échap annule · V pour arrêter';
+
+  @override
+  String get hintCurve =>
+      'Courbe : cliquez un bord, puis faites glisser ses poignées · V pour arrêter';
+
+  @override
+  String get hintNotch =>
+      'Cran : cliquez un bord à l’endroit du cran · V pour arrêter';
+
+  @override
+  String get toastPieceAdded => 'Pièce ajoutée.';
+
+  @override
+  String get toastNotchAdded => 'Cran ajouté.';
+
+  @override
+  String get distance => 'Distance';
+
+  @override
+  String get pointPicked =>
+      'Coin choisi. ⇧-cliquez un autre coin pour mesurer la distance entre eux.';
+
+  @override
+  String get pointsPicked =>
+      'Entre les deux coins. Le second se déplace le long de la ligne.';
+
+  @override
+  String get straighten => 'Redresser';
 
   @override
   String get hintSewFirst =>

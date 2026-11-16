@@ -19,7 +19,7 @@ use crate::cloth::{
     SEAM_END, STROKE_STEP_MM, Sync, Tool, ray_triangle,
 };
 use crate::sim::SimThread;
-use r3d_core::{Body, EdgeId, Fabric, Localizable, Message, PanelId};
+use r3d_core::{Body, EdgeId, Fabric, Localizable, Message, PanelId, PointId};
 use r3d_render::board::BoardView;
 use r3d_render::theme::PIECE_COLORS;
 use r3d_render::{
@@ -60,6 +60,48 @@ impl ApiError {
 
 pub(crate) fn err(e: impl Localizable) -> ApiError {
     e.message().into()
+}
+
+/// The corner nearest to `at` within `max_mm`: its panel, id and place.
+fn corner_at(
+    project: &r3d_core::Project,
+    at: r3d_geom::DVec2,
+    max_mm: f64,
+) -> Option<(PanelId, PointId, r3d_geom::DVec2)> {
+    project
+        .panels()
+        .iter()
+        .flat_map(|(id, p)| {
+            p.contour
+                .iter()
+                .filter_map(move |e| Some((*id, project.edge(*e)?.start)))
+        })
+        .filter_map(|(panel, point)| Some((panel, point, project.point(point)?.pos)))
+        .filter(|(.., pos)| pos.distance(at) <= max_mm)
+        .min_by(|a, b| a.2.distance(at).total_cmp(&b.2.distance(at)))
+}
+
+/// How far along `polyline` (mm, from its start) the point nearest to
+/// `at` is.
+fn offset_along(polyline: &[r3d_geom::DVec2], at: r3d_geom::DVec2) -> f64 {
+    let mut walked = 0.0;
+    let mut best = (f64::MAX, 0.0);
+    for w in polyline.windows(2) {
+        let (a, b) = (w[0], w[1]);
+        let ab = b - a;
+        let len = ab.length();
+        let t = if len > 0.0 {
+            ((at - a).dot(ab) / (len * len)).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        let d = at.distance(a + ab * t);
+        if d < best.0 {
+            best = (d, walked + len * t);
+        }
+        walked += len;
+    }
+    best.1
 }
 
 /// Canvas colours as `0xAARRGGBB` (Flutter's `Color.toARGB32()`).
@@ -115,6 +157,14 @@ pub enum Gesture {
     Adjust,
     /// Move the piece around the body (its placement).
     Move,
+}
+
+/// A corner picked on the board, and where it is (mm).
+#[derive(Debug, Clone)]
+pub struct PickedPoint {
+    pub id: String,
+    pub x_mm: f64,
+    pub y_mm: f64,
 }
 
 /// What to export, and how.
@@ -246,6 +296,8 @@ pub struct Engine {
     selection: Mutex<Vec<PanelId>>,
     /// The edge picked within the selection, if any.
     selected_edge: Mutex<Option<EdgeId>>,
+    /// Corners picked on the board (one, or two to measure between).
+    selected_points: Mutex<Vec<PointId>>,
     /// The simulation thread, started on first use.
     sim: Mutex<Option<SimThread>>,
     /// The loaded simulation's scene (pieces, pattern positions).
@@ -295,6 +347,7 @@ impl Engine {
             graphics: Mutex::new(None),
             selection: Mutex::new(Vec::new()),
             selected_edge: Mutex::new(None),
+            selected_points: Mutex::new(Vec::new()),
             sim: Mutex::new(None),
             cloth: Mutex::new(None),
             form: Mutex::new(None),
@@ -863,7 +916,8 @@ impl Engine {
     /// A click at pixel (`x`, `y`) of a view. Updates the shared selection
     /// and returns it (panel ids).
     #[frb(sync)]
-    pub fn click(&self, view: u32, x: f64, y: f64) -> Result<Vec<String>, ApiError> {
+    pub fn click(&self, view: u32, x: f64, y: f64, extend: bool) -> Result<Vec<String>, ApiError> {
+        let frozen = self.frozen_board(view)?;
         let ws = self.workspace()?;
         let project = ws.session().project();
         let slot = self.graphics()?;
@@ -871,20 +925,25 @@ impl Engine {
             .as_ref()
             .and_then(|g| g.views.get(&view))
             .ok_or_else(|| ApiError::new("no_view", format!("unknown view {view}")))?;
-        // The piece under the cursor, and its edge when close to one.
-        let (panel, edge) = match v.kind {
-            ViewKind::Board => {
+        // The piece under the cursor, and its edge when close to one (or
+        // the corner, on the board).
+        let mut corner = None;
+        let (panel, edge) = match (v.kind, frozen) {
+            (ViewKind::Board, Some((board_view, w, h))) => {
                 let scene = BoardScene::from_project(project, &[]);
-                let board_view = v
-                    .board_view
-                    .unwrap_or_else(|| BoardView::fit(scene.bounds(), v.width, v.height));
-                let p = board_view.to_board(x, y, v.width, v.height);
-                match scene.edge_at(p, EDGE_PICK_PX * board_view.mm_per_px) {
-                    Some(e) => (Some(e.panel), Some(e.id)),
-                    None => (scene.panel_at(p), None),
+                let p = board_view.to_board(x, y, w, h);
+                corner = corner_at(project, p, CORNER_PICK_PX * board_view.mm_per_px);
+                match (
+                    corner,
+                    scene.edge_at(p, EDGE_PICK_PX * board_view.mm_per_px),
+                ) {
+                    (Some((panel, _, _)), _) => (Some(panel), None),
+                    (None, Some(e)) => (Some(e.panel), Some(e.id)),
+                    (None, None) => (scene.panel_at(p), None),
                 }
             }
-            ViewKind::Garment => match self.cloth_hit(v, &slot, x, y)? {
+            (ViewKind::Board, None) => (None, None),
+            (ViewKind::Garment, _) => match self.cloth_hit(v, &slot, x, y)? {
                 Some(hit) => (
                     Some(hit.panel),
                     project.edge_near(hit.panel, hit.at, EDGE_PICK_MM),
@@ -892,10 +951,140 @@ impl Engine {
                 None => (None, None),
             },
         };
+        let mut points = self.selected_points.lock().map_err(|_| poisoned())?;
+        match corner {
+            // ⇧-click adds a second corner, to measure between them.
+            Some((_, point, _)) if extend && points.len() == 1 && points[..] != [point] => {
+                points.push(point)
+            }
+            Some((_, point, _)) => *points = vec![point],
+            None => points.clear(),
+        }
         let mut selected = self.selected()?;
         *selected = panel.into_iter().collect();
         *self.selected_edge.lock().map_err(|_| poisoned())? = edge;
         Ok(selected.iter().map(ToString::to_string).collect())
+    }
+
+    /// The corners picked on the board: one, or two to measure between.
+    #[frb(sync)]
+    pub fn selected_points(&self) -> Result<Vec<PickedPoint>, ApiError> {
+        let ws = self.workspace()?;
+        let project = ws.session().project();
+        let mut points = self.selected_points.lock().map_err(|_| poisoned())?;
+        points.retain(|p| project.point(*p).is_some());
+        Ok(points
+            .iter()
+            .filter_map(|id| {
+                let p = project.point(*id)?;
+                Some(PickedPoint {
+                    id: id.to_string(),
+                    x_mm: p.pos.x,
+                    y_mm: p.pos.y,
+                })
+            })
+            .collect())
+    }
+
+    /// Pick the edge within `max_mm` of pattern point (`x_mm`, `y_mm`), as
+    /// a click on it would (its piece selected). Returns the edge.
+    #[frb(sync)]
+    pub fn pick_edge_near(
+        &self,
+        x_mm: f64,
+        y_mm: f64,
+        max_mm: f64,
+    ) -> Result<Option<String>, ApiError> {
+        let at = r3d_geom::DVec2::new(x_mm, y_mm);
+        let found = {
+            let ws = self.workspace()?;
+            let scene = BoardScene::from_project(ws.session().project(), &[]);
+            scene.edge_at(at, max_mm).map(|e| (e.panel, e.id))
+        };
+        *self.selected()? = found.map(|(panel, _)| panel).into_iter().collect();
+        *self.selected_edge.lock().map_err(|_| poisoned())? = found.map(|(_, e)| e);
+        self.selected_points.lock().map_err(|_| poisoned())?.clear();
+        Ok(found.map(|(_, e)| e.to_string()))
+    }
+
+    /// The board's pan and zoom, fixed from now on if it was fitting the
+    /// pattern (so points keep their place while the pattern changes);
+    /// `None` for a 3D view.
+    fn frozen_board(&self, view: u32) -> Result<Option<(BoardView, u32, u32)>, ApiError> {
+        let shown = self
+            .graphics()?
+            .as_ref()
+            .and_then(|g| g.views.get(&view))
+            .filter(|v| v.kind == ViewKind::Board)
+            .map(|v| (v.board_view, v.width, v.height));
+        let Some((board_view, w, h)) = shown else {
+            return Ok(None);
+        };
+        if let Some(bv) = board_view {
+            return Ok(Some((bv, w, h)));
+        }
+        let bounds = BoardScene::from_project(self.workspace()?.session().project(), &[]).bounds();
+        let bv = BoardView::fit(bounds, w, h);
+        if let Some(v) = self
+            .graphics()?
+            .as_mut()
+            .and_then(|g| g.views.get_mut(&view))
+        {
+            v.board_view = Some(bv);
+        }
+        Ok(Some((bv, w, h)))
+    }
+
+    /// The pattern point (mm) under pixel (`x`, `y`) of a board.
+    #[frb(sync)]
+    pub fn to_pattern(&self, view: u32, x: f64, y: f64) -> Result<Option<Vec<f64>>, ApiError> {
+        Ok(self
+            .frozen_board(view)?
+            .map(|(bv, w, h)| bv.to_board(x, y, w, h).to_array().to_vec()))
+    }
+
+    /// The pixel of a board showing pattern point (`x_mm`, `y_mm`).
+    #[frb(sync)]
+    pub fn to_view(&self, view: u32, x_mm: f64, y_mm: f64) -> Result<Option<Vec<f64>>, ApiError> {
+        Ok(self.frozen_board(view)?.map(|(bv, w, h)| {
+            bv.to_pixels(r3d_geom::DVec2::new(x_mm, y_mm), w, h)
+                .to_array()
+                .to_vec()
+        }))
+    }
+
+    /// Add a notch on the edge within `max_mm` of pattern point (`x_mm`,
+    /// `y_mm`), where that point is along it (`notch.add`). Returns the
+    /// notch, or `None` off the edges (and on linked mirror copies, which
+    /// follow their source).
+    #[frb(sync)]
+    pub fn add_notch_near(
+        &self,
+        x_mm: f64,
+        y_mm: f64,
+        max_mm: f64,
+    ) -> Result<Option<String>, ApiError> {
+        let at = r3d_geom::DVec2::new(x_mm, y_mm);
+        let found = {
+            let ws = self.workspace()?;
+            let project = ws.session().project();
+            let scene = BoardScene::from_project(project, &[]);
+            scene
+                .edge_at(at, max_mm)
+                .filter(|e| {
+                    project
+                        .panel(e.panel)
+                        .is_some_and(|p| p.mirror_of.is_none())
+                })
+                .map(|e| (e.id, offset_along(&e.points, at)))
+        };
+        let Some((edge, offset)) = found else {
+            return Ok(None);
+        };
+        let step = serde_json::json!({ "type": "notch.add", "edge": edge, "offset_mm": offset });
+        let out: serde_json::Value = serde_json::from_str(&self.run(step.to_string())?)
+            .map_err(|e| ApiError::new("internal", e.to_string()))?;
+        Ok(out["created"][0].as_str().map(str::to_owned))
     }
 
     /// Start drawing on the garment at (`x`, `y`) of a 3D view. Returns
@@ -1320,18 +1509,8 @@ impl Engine {
         let bv = board_view.unwrap_or_else(|| BoardView::fit(scene.bounds(), width, height));
         let at = bv.to_board(x, y, width, height);
         let editable = |panel: PanelId| project.panel(panel).is_some_and(|p| p.mirror_of.is_none());
-        let corner = project
-            .panels()
-            .iter()
-            .filter(|(id, _)| editable(**id))
-            .flat_map(|(id, p)| {
-                p.contour
-                    .iter()
-                    .filter_map(move |e| Some((*id, project.edge(*e)?.start)))
-            })
-            .filter_map(|(panel, point)| Some((panel, point, project.point(point)?.pos)))
-            .filter(|(.., pos)| pos.distance(at) <= CORNER_PICK_PX * bv.mm_per_px)
-            .min_by(|a, b| a.2.distance(at).total_cmp(&b.2.distance(at)));
+        let corner = corner_at(project, at, CORNER_PICK_PX * bv.mm_per_px)
+            .filter(|(panel, ..)| editable(*panel));
         let (panel, edge, tool) = match corner {
             Some((panel, point, from)) => (
                 panel,
@@ -1655,7 +1834,10 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let engine = Engine::open(tmp.path().join("P.r3d").to_string_lossy().into()).unwrap();
         assert_eq!(engine.render_view(1).err().unwrap().code, "no_view");
-        assert_eq!(engine.click(1, 0.0, 0.0).err().unwrap().code, "no_view");
+        assert_eq!(
+            engine.click(1, 0.0, 0.0, false).err().unwrap().code,
+            "no_view"
+        );
         assert!(engine.selection().unwrap().is_empty());
     }
 }

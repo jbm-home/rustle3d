@@ -48,6 +48,11 @@ impl CommandSpec for EdgeSetCurve {
         tx.put_edge(self.edge, Edge { curve, ..edge });
         Ok(CommandOutput::default())
     }
+
+    /// Dragging a handle reshapes the curve many times: one undo step.
+    fn merge_key(&self) -> Option<String> {
+        Some(format!("edge.set_curve:{}", self.edge))
+    }
 }
 
 /// Insert a point on an edge.
