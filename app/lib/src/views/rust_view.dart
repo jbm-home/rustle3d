@@ -1,6 +1,11 @@
 // A view rendered by the Rust core into a GPU texture shared with Flutter
-// (no copy). The widget owns the texture, re-renders it every frame and
-// forwards pointer input to the engine.
+// (no copy, macOS), or elsewhere into a texture of its own whose pixels are
+// read back and shown as an image (Linux, Windows: shared textures come
+// later). The widget re-renders it every frame and forwards pointer input
+// to the engine.
+
+import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/scheduler.dart';
@@ -51,6 +56,15 @@ class _RustViewState extends State<RustView>
   late final Ticker _ticker = createTicker((_) => _renderFrame());
   int? _textureId;
   int? _viewId;
+
+  /// Shared textures (macOS); otherwise the pixels are copied.
+  /// `--dart-define=R3D_COPY_PIXELS=true` tries the copied path on macOS.
+  static final bool _shared =
+      Platform.isMacOS && !const bool.fromEnvironment('R3D_COPY_PIXELS');
+
+  /// The last frame read back (copied mode), and a read in flight.
+  ui.Image? _image;
+  bool _reading = false;
   Size _physical = Size.zero;
   double _ratio = 1;
   bool _creating = false;
@@ -79,6 +93,7 @@ class _RustViewState extends State<RustView>
   void dispose() {
     _ticker.dispose();
     _release();
+    _image?.dispose();
     super.dispose();
   }
 
@@ -100,6 +115,16 @@ class _RustViewState extends State<RustView>
     _creating = true;
     _physical = physical;
     _release();
+    if (!_shared) {
+      _viewId = widget.engine.attachView(
+        kind: widget.kind,
+        surface: null,
+        width: physical.width.round(),
+        height: physical.height.round(),
+      );
+      _creating = false;
+      return;
+    }
     final created = await _channel.invokeMapMethod<String, Object>('create', {
       'width': physical.width.round(),
       'height': physical.height.round(),
@@ -120,16 +145,49 @@ class _RustViewState extends State<RustView>
 
   void _renderFrame() {
     final view = _viewId;
+    if (view == null) return;
+    if (!_shared) {
+      if (!_reading) _readBack(view);
+      return;
+    }
     final texture = _textureId;
-    if (view == null || texture == null) return;
+    if (texture == null) return;
     final ms = widget.engine.renderView(view: view);
     _channel.invokeMethod('frame', {'textureId': texture});
     widget.onFrameTime?.call(ms);
   }
 
+  /// Copied mode: render, read the pixels back and show them; one frame
+  /// at a time.
+  Future<void> _readBack(int view) async {
+    _reading = true;
+    final ms = widget.engine.renderView(view: view);
+    widget.onFrameTime?.call(ms);
+    final size = _physical;
+    final pixels = await widget.engine.readView(view: view);
+    ui.decodeImageFromPixels(
+      pixels,
+      size.width.round(),
+      size.height.round(),
+      ui.PixelFormat.bgra8888,
+      (image) {
+        _reading = false;
+        if (!mounted || view != _viewId) {
+          image.dispose();
+          return;
+        }
+        setState(() {
+          _image?.dispose();
+          _image = image;
+        });
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    _ratio = MediaQuery.devicePixelRatioOf(context);
+    // Copied pixels cost bandwidth: render those at one pixel per point.
+    _ratio = _shared ? MediaQuery.devicePixelRatioOf(context) : 1;
     return LayoutBuilder(
       builder: (context, constraints) {
         final physical = Size(
@@ -253,11 +311,16 @@ class _RustViewState extends State<RustView>
             children: [
               Positioned.fill(
                 child: AnimatedOpacity(
-                  opacity: texture == null ? 0 : 1,
+                  opacity: texture == null && _image == null ? 0 : 1,
                   duration: const Duration(milliseconds: 220),
-                  child: texture == null
-                      ? const SizedBox.expand()
-                      : Texture(textureId: texture),
+                  child: switch ((texture, _image)) {
+                    (final int id, _) => Texture(textureId: id),
+                    (_, final ui.Image image) => RawImage(
+                      image: image,
+                      fit: BoxFit.fill,
+                    ),
+                    _ => const SizedBox.expand(),
+                  },
                 ),
               ),
               if (_stroke case final stroke?)

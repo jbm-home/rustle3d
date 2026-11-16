@@ -127,7 +127,7 @@ pub enum ViewKind {
 
 struct View {
     kind: ViewKind,
-    _texture: wgpu::Texture,
+    texture: wgpu::Texture,
     target: wgpu::TextureView,
     width: u32,
     height: u32,
@@ -465,13 +465,14 @@ impl Engine {
     }
 
     /// Attach a view rendering into a UI texture (`surface`: platform handle
-    /// from the UI side, an `IOSurfaceRef` pointer on macOS). Returns the
-    /// view id.
+    /// from the UI side, an `IOSurfaceRef` pointer on macOS), or without
+    /// one into a texture of its own, read back with `read_view`. Returns
+    /// the view id.
     #[frb(sync)]
     pub fn attach_view(
         &self,
         kind: ViewKind,
-        surface: u64,
+        surface: Option<u64>,
         width: u32,
         height: u32,
     ) -> Result<u32, ApiError> {
@@ -480,8 +481,24 @@ impl Engine {
             *slot = Some(Graphics::new()?);
         }
         let g = slot.as_mut().ok_or_else(poisoned)?;
-        let texture = crate::surface::wrap_ui_surface(&g.gpu.device, surface, width, height)
-            .map_err(|e| ApiError::new("ui_surface", e))?;
+        let texture = match surface {
+            Some(surface) => crate::surface::wrap_ui_surface(&g.gpu.device, surface, width, height)
+                .map_err(|e| ApiError::new("ui_surface", e))?,
+            None => g.gpu.device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("view pixels"),
+                size: wgpu::Extent3d {
+                    width: width.max(1),
+                    height: height.max(1),
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Bgra8Unorm,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+                view_formats: &[],
+            }),
+        };
         let target = texture.create_view(&wgpu::TextureViewDescriptor::default());
         let id = g.next_view;
         g.next_view += 1;
@@ -489,7 +506,7 @@ impl Engine {
             id,
             View {
                 kind,
-                _texture: texture,
+                texture,
                 target,
                 width,
                 height,
@@ -497,6 +514,21 @@ impl Engine {
             },
         );
         Ok(id)
+    }
+
+    /// The last frame of a view attached without a UI surface, as BGRA
+    /// pixels, row after row (platforms without shared textures).
+    pub fn read_view(&self, view: u32) -> Result<Vec<u8>, ApiError> {
+        let slot = self.graphics()?;
+        let g = slot
+            .as_ref()
+            .ok_or_else(|| ApiError::new("no_view", "no view attached"))?;
+        let v = g
+            .views
+            .get(&view)
+            .ok_or_else(|| ApiError::new("no_view", format!("unknown view {view}")))?;
+        r3d_render::offscreen::read_pixels(&g.gpu, &v.texture)
+            .map_err(|e| ApiError::new("gpu", e.to_string()))
     }
 
     /// Stop rendering into a view (its UI texture is about to go away).

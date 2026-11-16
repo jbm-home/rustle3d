@@ -28,7 +28,28 @@ pub fn render_png(
         view_formats: &[],
     });
     draw(&texture.create_view(&wgpu::TextureViewDescriptor::default()));
+    let pixels = read_pixels(gpu, &texture)?;
 
+    let mut png_bytes = Vec::new();
+    let mut encoder = png::Encoder::new(&mut png_bytes, width, height);
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Eight);
+    let mut writer = encoder
+        .write_header()
+        .map_err(|e| RenderError::Png(e.to_string()))?;
+    writer
+        .write_image_data(&pixels)
+        .map_err(|e| RenderError::Png(e.to_string()))?;
+    writer
+        .finish()
+        .map_err(|e| RenderError::Png(e.to_string()))?;
+    Ok(png_bytes)
+}
+
+/// The pixels of a 4-bytes-per-pixel `texture` (made with `COPY_SRC`),
+/// row after row with no padding. Waits for the GPU.
+pub fn read_pixels(gpu: &Gpu, texture: &wgpu::Texture) -> Result<Vec<u8>, RenderError> {
+    let (width, height) = (texture.width(), texture.height());
     let row = width * 4;
     let padded =
         row.div_ceil(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT) * wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
@@ -45,7 +66,7 @@ pub fn render_png(
         });
     encoder.copy_texture_to_buffer(
         wgpu::TexelCopyTextureInfo {
-            texture: &texture,
+            texture,
             mip_level: 0,
             origin: wgpu::Origin3d::ZERO,
             aspect: wgpu::TextureAspect::All,
@@ -82,25 +103,11 @@ pub fn render_png(
         .get_mapped_range()
         .map_err(|e| RenderError::Readback(e.to_string()))?;
     let mut pixels = Vec::with_capacity((row * height) as usize);
-    for r in 0..height {
-        let start = (r * padded) as usize;
-        pixels.extend_from_slice(&mapped[start..start + row as usize]);
+    for r in 0..height as usize {
+        let start = r * padded as usize;
+        pixels.extend_from_slice(mapped.get(start..start + row as usize).unwrap_or_default());
     }
     drop(mapped);
     buffer.unmap();
-
-    let mut png_bytes = Vec::new();
-    let mut encoder = png::Encoder::new(&mut png_bytes, width, height);
-    encoder.set_color(png::ColorType::Rgba);
-    encoder.set_depth(png::BitDepth::Eight);
-    let mut writer = encoder
-        .write_header()
-        .map_err(|e| RenderError::Png(e.to_string()))?;
-    writer
-        .write_image_data(&pixels)
-        .map_err(|e| RenderError::Png(e.to_string()))?;
-    writer
-        .finish()
-        .map_err(|e| RenderError::Png(e.to_string()))?;
-    Ok(png_bytes)
+    Ok(pixels)
 }

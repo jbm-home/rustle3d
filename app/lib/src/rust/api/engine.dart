@@ -14,11 +14,12 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Engine>>
 abstract class Engine implements RustOpaqueInterface {
   /// Attach a view rendering into a UI texture (`surface`: platform handle
-  /// from the UI side, an `IOSurfaceRef` pointer on macOS). Returns the
-  /// view id.
+  /// from the UI side, an `IOSurfaceRef` pointer on macOS), or without
+  /// one into a texture of its own, read back with `read_view`. Returns
+  /// the view id.
   int attachView({
     required ViewKind kind,
-    required BigInt surface,
+    BigInt? surface,
     required int width,
     required int height,
   });
@@ -80,6 +81,10 @@ abstract class Engine implements RustOpaqueInterface {
     required double x,
     required double y,
   });
+
+  /// The last frame of a view attached without a UI surface, as BGRA
+  /// pixels, row after row (platforms without shared textures).
+  Future<Uint8List> readView({required int view});
 
   /// Pointer up: let go of the cloth.
   void release();

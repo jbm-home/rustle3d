@@ -64,6 +64,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PatternChange dco_decode_box_autoadd_pattern_change(dynamic raw);
 
   @protected
+  BigInt dco_decode_box_autoadd_u_64(dynamic raw);
+
+  @protected
   CameraSide dco_decode_camera_side(dynamic raw);
 
   @protected
@@ -98,6 +101,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PatternChange? dco_decode_opt_box_autoadd_pattern_change(dynamic raw);
+
+  @protected
+  BigInt? dco_decode_opt_box_autoadd_u_64(dynamic raw);
 
   @protected
   PatternChange dco_decode_pattern_change(dynamic raw);
@@ -169,6 +175,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  BigInt sse_decode_box_autoadd_u_64(SseDeserializer deserializer);
+
+  @protected
   CameraSide sse_decode_camera_side(SseDeserializer deserializer);
 
   @protected
@@ -209,6 +218,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PatternChange? sse_decode_opt_box_autoadd_pattern_change(
     SseDeserializer deserializer,
   );
+
+  @protected
+  BigInt? sse_decode_opt_box_autoadd_u_64(SseDeserializer deserializer);
 
   @protected
   PatternChange sse_decode_pattern_change(SseDeserializer deserializer);
@@ -288,6 +300,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_u_64(BigInt self, SseSerializer serializer);
+
+  @protected
   void sse_encode_camera_side(CameraSide self, SseSerializer serializer);
 
   @protected
@@ -337,6 +352,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     PatternChange? self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_opt_box_autoadd_u_64(BigInt? self, SseSerializer serializer);
 
   @protected
   void sse_encode_pattern_change(PatternChange self, SseSerializer serializer);
