@@ -773,7 +773,7 @@ class LEn extends L {
 
   @override
   String get learnLookHow =>
-      'Drag to turn around the body, scroll to zoom. Keys **1**–**4**: front, side, back, three quarters.';
+      'Drag to turn around the body; scroll or pinch to zoom. Keys **1**–**4**: front, side, back, three quarters.';
 
   @override
   String get learnBody => 'Dress another body';
@@ -891,7 +891,7 @@ class LEn extends L {
 
   @override
   String get learnTurnZoomText =>
-      'Drag around the body to turn, scroll to zoom.';
+      'Drag around the body to turn; scroll, or pinch on a trackpad, to zoom.';
 
   @override
   String get learnBodyStop => 'Body';

@@ -1438,7 +1438,7 @@ abstract class L {
   /// No description provided for @learnLookHow.
   ///
   /// In en, this message translates to:
-  /// **'Drag to turn around the body, scroll to zoom. Keys **1**–**4**: front, side, back, three quarters.'**
+  /// **'Drag to turn around the body; scroll or pinch to zoom. Keys **1**–**4**: front, side, back, three quarters.'**
   String get learnLookHow;
 
   /// No description provided for @learnBody.
@@ -1642,7 +1642,7 @@ abstract class L {
   /// No description provided for @learnTurnZoomText.
   ///
   /// In en, this message translates to:
-  /// **'Drag around the body to turn, scroll to zoom.'**
+  /// **'Drag around the body to turn; scroll, or pinch on a trackpad, to zoom.'**
   String get learnTurnZoomText;
 
   /// No description provided for @learnBodyStop.

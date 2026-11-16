@@ -781,7 +781,7 @@ class LFr extends L {
 
   @override
   String get learnLookHow =>
-      'Faites glisser pour tourner autour du corps, molette pour zoomer. Touches **1**–**4** : face, profil, dos, trois quarts.';
+      'Faites glisser pour tourner autour du corps ; molette ou pincement pour zoomer. Touches **1**–**4** : face, profil, dos, trois quarts.';
 
   @override
   String get learnBody => 'Habiller un autre corps';
@@ -900,7 +900,7 @@ class LFr extends L {
 
   @override
   String get learnTurnZoomText =>
-      'Faites glisser autour du corps pour tourner, molette pour zoomer.';
+      'Faites glisser autour du corps pour tourner ; molette, ou pincement sur le trackpad, pour zoomer.';
 
   @override
   String get learnBodyStop => 'Corps';

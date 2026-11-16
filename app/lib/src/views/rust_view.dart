@@ -89,6 +89,21 @@ class _RustViewState extends State<RustView>
   List<Offset>? _stroke;
   Offset _labelAt = Offset.zero;
 
+  /// The trackpad pinch's scale at the last update.
+  double _pinch = 1;
+
+  /// Zoom by `amount` (positive = in) about the point under the pointer.
+  void _zoom(Offset at, double amount) {
+    final view = _viewId;
+    if (view == null || amount == 0 || !amount.isFinite) return;
+    widget.engine.zoom(
+      view: view,
+      x: at.dx * _ratio,
+      y: at.dy * _ratio,
+      amount: amount,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -320,14 +335,18 @@ class _RustViewState extends State<RustView>
             widget.onSelection?.call(selection);
           },
           onPointerSignal: (e) {
-            final view = _viewId;
-            if (view == null || e is! PointerScrollEvent) return;
-            widget.engine.zoom(
-              view: view,
-              x: e.localPosition.dx * _ratio,
-              y: e.localPosition.dy * _ratio,
-              amount: -e.scrollDelta.dy / 120,
-            );
+            if (e is PointerScrollEvent) {
+              _zoom(e.localPosition, -e.scrollDelta.dy / 120);
+            }
+          },
+          // Trackpads send gestures, not scrolls: a pinch zooms by its
+          // scale, two fingers moving up or down zoom like a wheel.
+          onPointerPanZoomStart: (_) => _pinch = 1,
+          onPointerPanZoomUpdate: (e) {
+            final ratio = e.scale / _pinch;
+            _pinch = e.scale;
+            // The engine scales by (1 − amount / 10).
+            _zoom(e.localPosition, 10 * (1 - 1 / ratio) + e.panDelta.dy / 120);
           },
           child: Stack(
             children: [
