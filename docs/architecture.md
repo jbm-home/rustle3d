@@ -460,3 +460,7 @@ must be **i18n-ready from day one**:
 | 2026-11-15 | Avatar SDF signed with angle-weighted pseudo-normals, built in 0.16 s and not cached on disk | The MakeHuman body is a closed manifold; winding numbers and a disk cache stay for imported avatars |
 | 2026-11-15 | Templates are scripts in `templates/`, embedded by `r3d-commands` | One source for the app, tests and demos |
 | 2026-11-15 | Rendering for agents lives in `r3d_mcp::render`, shared with `r3d render` | `r3d-commands` stays free of GPU code; one place composes the scene |
+| 2026-11-16 | Templates are parametric recipes in Rust (`template.apply`), not JSON scripts | Drafts compute from sizes (curves, a sleeve cap solved to the armhole length); scripts could not |
+| 2026-11-16 | Schema v6: `Placement.around` (body, left or right arm) | Sleeves start wrapped around the arm they dress |
+| 2026-11-16 | Gravity ramps in during the sewing phase | Pieces fell before closing; skirts slid off the waist |
+| 2026-11-16 | The user's library (body presets) is outside the project engine in the FFI | The start screen needs it before a project is open |

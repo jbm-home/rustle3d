@@ -1,0 +1,4 @@
+[
+  {"type": "avatar.set", "preset": "Men L",
+   "body": {"masculinity": 1, "height_cm": 182, "bust_cm": 106, "waist_cm": 94, "hips_cm": 104}}
+]

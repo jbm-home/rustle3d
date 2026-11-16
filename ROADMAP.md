@@ -107,7 +107,7 @@ Done:
   ⌥-click pins it; pins listed and removable.
 - CLI / MCP: `simulate` action, `r3d simulate`, `r3d render --view
   board|3d`, MCP `render_board` / `render_3d` (PNG).
-- One template source (`templates/a-line-skirt.json`).
+- One template source (now the parametric recipes of M10).
 
 Measured and dropped: per-colour parallel constraint solving (slower at
 garment sizes, `docs/physics.md` §6). The planned triple buffer is a
@@ -152,12 +152,36 @@ seam direction arrows on the board (M10).
 - **Demo**: the agent changes the skirt length while the user watches it
   re-drape live.
 
-## M10 — Templates, guided flow, polish → v0.1
+## M10 — Templates, guided flow, polish → v0.1 (in progress)
 - Parametric templates (skirts, T-shirt, dress, tote bag), guided flow step
   bar, Learn panel, first-launch tour.
 - Usability pass and the 10-minute test with first-time users.
 - Autosave/recovery, release builds for macOS, Windows and Linux.
 - **Demo**: a first-time user makes a T-shirt in under 10 minutes.
+
+Done so far (2026-11-16), demo `./demos/m10/demo.sh`:
+- `template.apply` / `template.list`: T-shirt, straight skirt and A-line
+  skirt drafted from sizes (the avatar's by default), sewn, placed and
+  given a fabric through ordinary commands; each drapes in a test.
+- Sleeves: schema v6 placements wrap a panel around the body or an arm
+  (the dress form finds its upper arms). Gravity ramps in while seams
+  close. The dress form's bust is smoothed; skirts hang from the measured
+  waist height.
+- App: start screen (template cards with rendered thumbnails, sizes sheet
+  per body, blank project, recent projects in Documents/Rustle3D, saved as
+  you work), back to projects, live step bar Measurements → Pattern → Sew →
+  Fabric → Drape with a goal, an action and a highlighted tool per step.
+- From the M8 leftovers: style lines and the selected edge drawn on the 3D
+  garment (also in agents' renders); seam direction chevrons and red
+  mismatched seams on the board; camera views (front, side, back, ¾; keys
+  1–4).
+
+Still to do: dress and tote bag templates, Learn panel and first-launch
+tour, the 10-minute test with first-time users, release builds; picking
+points and notches in 3D, per-panel placement and dragging panels in 3D.
+Known: XPBD creep lets a skirt slide a few cm below the waist before it
+settles (physics.md §7 convergence); a speck of the body can show at the
+bust through a tight top.
 
 ---
 

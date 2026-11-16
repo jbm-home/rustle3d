@@ -1,0 +1,4 @@
+[
+  {"type": "template.apply", "template": "t_shirt", "sizes": {"sleeve_cm": 25}},
+  {"type": "seam.list"}
+]

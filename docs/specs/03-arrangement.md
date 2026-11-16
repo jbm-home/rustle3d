@@ -13,8 +13,11 @@ the body's vertical axis, top height, offset; `panel.place`) and
 `garment.arrange` ("Arrange around the body" in the inspector) places
 every panel evenly in the order the seams join them, at the avatar's
 waist. Panels start wrapped at the larger of the body's and the garment's
-own radius. Not yet: arrangement points on arms and legs, per-panel
-placement in the UI, dragging panels in 3D.
+own radius. Since 2026-11-16 a placement can wrap a panel around the left
+or right upper arm instead (sleeves; `panel.place` `around`), its top on
+the arm's axis at the given height; `garment.arrange` keeps such
+placements. Not yet: legs, per-panel placement in the UI, dragging panels
+in 3D.
 
 ## Behavior
 - The avatar has **arrangement points**: front torso, back torso, left/right
