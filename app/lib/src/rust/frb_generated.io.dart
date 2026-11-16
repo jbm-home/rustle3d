@@ -73,6 +73,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CanvasColors dco_decode_canvas_colors(dynamic raw);
 
   @protected
+  ExportFormat dco_decode_export_format(dynamic raw);
+
+  @protected
   double dco_decode_f_64(dynamic raw);
 
   @protected
@@ -185,6 +188,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   CanvasColors sse_decode_canvas_colors(SseDeserializer deserializer);
+
+  @protected
+  ExportFormat sse_decode_export_format(SseDeserializer deserializer);
 
   @protected
   double sse_decode_f_64(SseDeserializer deserializer);
@@ -313,6 +319,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_canvas_colors(CanvasColors self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_export_format(ExportFormat self, SseSerializer serializer);
 
   @protected
   void sse_encode_f_64(double self, SseSerializer serializer);

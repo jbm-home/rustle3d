@@ -1847,6 +1847,7 @@ dependencies = [
  "r3d-commands",
  "r3d-core",
  "r3d-geom",
+ "r3d-io",
  "r3d-render",
  "r3d-sim",
  "serde_json",

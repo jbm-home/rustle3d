@@ -9,7 +9,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `adjust_by`, `cloth_hit`, `edited`, `err`, `extend_stroke`, `form`, `graphics`, `new`, `new`, `pick_cloth`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `resync_if_due`, `rgba`, `selected`, `sim`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Engine>>
 abstract class Engine implements RustOpaqueInterface {
@@ -33,6 +33,15 @@ abstract class Engine implements RustOpaqueInterface {
 
   /// A drag of (`dx`, `dy`) pixels: orbit the 3D camera, pan the board.
   void drag({required int view, required double dx, required double dy});
+
+  /// Write an export to `path`, a file the user chose (anywhere): the
+  /// pattern, or the garment as the 3D view shows it now (the running
+  /// drape, or its starting positions), with the avatar if `avatar`.
+  void exportFile({
+    required ExportFormat format,
+    required String path,
+    required bool avatar,
+  });
 
   /// The fabrics the UI offers, with the colour each one renders with by
   /// default (ARGB), so swatches match the 3D view.
@@ -248,6 +257,24 @@ class CanvasColors {
           ground == other.ground &&
           avatar == other.avatar &&
           pieces == other.pieces;
+}
+
+/// What to export, and how.
+enum ExportFormat {
+  /// The pattern at 1:1 scale.
+  svg,
+
+  /// The pattern at 1:1 scale, tiled on A4 pages.
+  pdfA4,
+
+  /// The pattern at 1:1 scale, on one large page.
+  pdfSingle,
+
+  /// The garment as the 3D view shows it, glTF 2.0 binary.
+  glb,
+
+  /// The garment as the 3D view shows it, Wavefront OBJ.
+  obj,
 }
 
 /// A fabric choice for the UI.

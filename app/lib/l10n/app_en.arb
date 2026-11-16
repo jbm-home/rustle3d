@@ -200,6 +200,21 @@
     }
   },
   "allProjects": "All projects",
+  "export": "Export",
+  "exportSvg": "Pattern, SVG at 1:1",
+  "exportPdfA4": "Pattern, PDF on A4 pages",
+  "exportPdfSingle": "Pattern, PDF on one page",
+  "exportGlb": "Garment in 3D, glTF (.glb)",
+  "exportGlbAvatar": "Garment and body in 3D, glTF (.glb)",
+  "exportObj": "Garment in 3D, OBJ",
+  "exported": "Exported {file}.",
+  "@exported": {
+    "placeholders": {
+      "file": {
+        "type": "String"
+      }
+    }
+  },
   "learn": "Learn",
   "undoTip": "Undo  ⌘Z",
   "redoTip": "Redo  ⇧⌘Z",

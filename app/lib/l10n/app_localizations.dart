@@ -619,6 +619,54 @@ abstract class L {
   /// **'All projects'**
   String get allProjects;
 
+  /// No description provided for @export.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get export;
+
+  /// No description provided for @exportSvg.
+  ///
+  /// In en, this message translates to:
+  /// **'Pattern, SVG at 1:1'**
+  String get exportSvg;
+
+  /// No description provided for @exportPdfA4.
+  ///
+  /// In en, this message translates to:
+  /// **'Pattern, PDF on A4 pages'**
+  String get exportPdfA4;
+
+  /// No description provided for @exportPdfSingle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pattern, PDF on one page'**
+  String get exportPdfSingle;
+
+  /// No description provided for @exportGlb.
+  ///
+  /// In en, this message translates to:
+  /// **'Garment in 3D, glTF (.glb)'**
+  String get exportGlb;
+
+  /// No description provided for @exportGlbAvatar.
+  ///
+  /// In en, this message translates to:
+  /// **'Garment and body in 3D, glTF (.glb)'**
+  String get exportGlbAvatar;
+
+  /// No description provided for @exportObj.
+  ///
+  /// In en, this message translates to:
+  /// **'Garment in 3D, OBJ'**
+  String get exportObj;
+
+  /// No description provided for @exported.
+  ///
+  /// In en, this message translates to:
+  /// **'Exported {file}.'**
+  String exported(String file);
+
   /// No description provided for @learn.
   ///
   /// In en, this message translates to:

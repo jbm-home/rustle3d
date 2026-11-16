@@ -116,6 +116,21 @@ pub enum Gesture {
     Move,
 }
 
+/// What to export, and how.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExportFormat {
+    /// The pattern at 1:1 scale.
+    Svg,
+    /// The pattern at 1:1 scale, tiled on A4 pages.
+    PdfA4,
+    /// The pattern at 1:1 scale, on one large page.
+    PdfSingle,
+    /// The garment as the 3D view shows it, glTF 2.0 binary.
+    Glb,
+    /// The garment as the 3D view shows it, Wavefront OBJ.
+    Obj,
+}
+
 /// Where the 3D view looks at the body from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CameraSide {
@@ -447,6 +462,67 @@ impl Engine {
             ws.save().map_err(err)?;
         }
         Ok(serde_json::Value::Array(results).to_string())
+    }
+
+    /// Write an export to `path`, a file the user chose (anywhere): the
+    /// pattern, or the garment as the 3D view shows it now (the running
+    /// drape, or its starting positions), with the avatar if `avatar`.
+    #[frb(sync)]
+    pub fn export_file(
+        &self,
+        format: ExportFormat,
+        path: String,
+        avatar: bool,
+    ) -> Result<(), ApiError> {
+        use r3d_io::pdf::{Paper, to_pdf};
+        let bytes = {
+            let ws = self.workspace()?;
+            let project = ws.session().project();
+            match format {
+                ExportFormat::Svg => {
+                    r3d_io::svg::to_svg(&r3d_io::pattern_drawing(project)).into_bytes()
+                }
+                ExportFormat::PdfA4 => to_pdf(&r3d_io::pattern_drawing(project), Paper::A4),
+                ExportFormat::PdfSingle => to_pdf(&r3d_io::pattern_drawing(project), Paper::Single),
+                ExportFormat::Glb | ExportFormat::Obj => {
+                    // Locks in the engine's usual order: the simulation
+                    // before the cloth.
+                    let live = self.sim()?.as_ref().map(|t| t.latest());
+                    let form = self.form(project)?;
+                    let fresh;
+                    let cloth = self.cloth.lock().map_err(|_| poisoned())?;
+                    let drape = match cloth.as_ref() {
+                        Some(d) => d,
+                        None => {
+                            fresh = drape::prepare(project, form.as_ref().map(|(_, f)| f))
+                                .map_err(err)?;
+                            &fresh
+                        }
+                    };
+                    let start: Vec<glam::Vec3> =
+                        drape.scene.particles.iter().map(|p| p.position).collect();
+                    let positions = match live {
+                        Some(now) if now.loaded && now.positions.len() == start.len() => {
+                            now.positions
+                        }
+                        _ => start,
+                    };
+                    let body = form.as_ref().map(|(_, f)| f).filter(|_| avatar);
+                    let scene = drape::scene3d(project, drape, &positions, body);
+                    if format == ExportFormat::Glb {
+                        r3d_io::gltf::to_glb(&scene)
+                    } else {
+                        r3d_io::obj::to_obj(&scene).into_bytes()
+                    }
+                }
+            }
+        };
+        std::fs::write(&path, bytes).map_err(|e| {
+            ApiError::from(
+                Message::new("write_failed", format!("cannot write {path}: {e}"))
+                    .arg("path", &path),
+            )
+        })
     }
 
     /// The fabrics the UI offers, with the colour each one renders with by

@@ -3,6 +3,7 @@
 
 import 'dart:convert';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -307,6 +308,36 @@ class _ShellState extends State<Shell> {
     _refresh();
   }
 
+  /// Ask where to save, then export there: the pattern, or the garment as
+  /// the 3D view shows it.
+  Future<void> _export(ExportFormat format, bool avatar) async {
+    final ext = switch (format) {
+      ExportFormat.svg => 'svg',
+      ExportFormat.pdfA4 || ExportFormat.pdfSingle => 'pdf',
+      ExportFormat.glb => 'glb',
+      ExportFormat.obj => 'obj',
+    };
+    final name = (_summary['name'] as String?) ?? 'Rustle3D';
+    final l = context.l;
+    final location = await getSaveLocation(
+      suggestedName: '$name.$ext',
+      acceptedTypeGroups: [
+        XTypeGroup(label: ext.toUpperCase(), extensions: [ext]),
+      ],
+    );
+    if (location == null || !mounted) return;
+    try {
+      widget.engine.exportFile(
+        format: format,
+        path: location.path,
+        avatar: avatar,
+      );
+      _toast(l.exported(location.path.split(RegExp(r'[/\\]')).last));
+    } on ApiError catch (e) {
+      _toast(context.error(e));
+    }
+  }
+
   void _undo() {
     _run({'type': 'history.undo'});
     _refresh();
@@ -404,6 +435,7 @@ class _ShellState extends State<Shell> {
                 onUndo: _undo,
                 onRedo: _redo,
                 onBody: _showBody,
+                onExport: _export,
                 bodyKey: _spotBody,
                 onLearn: () => _scaffold.currentState?.openEndDrawer(),
                 onHome: widget.onHome,
@@ -555,6 +587,7 @@ class _TopBar extends StatelessWidget {
     required this.onUndo,
     required this.onRedo,
     required this.onBody,
+    required this.onExport,
     required this.bodyKey,
     required this.onLearn,
     required this.onHome,
@@ -571,6 +604,9 @@ class _TopBar extends StatelessWidget {
   final VoidCallback onUndo;
   final VoidCallback onRedo;
   final VoidCallback onBody;
+
+  /// Export in a format (with the avatar, for 3D formats).
+  final void Function(ExportFormat format, bool avatar) onExport;
 
   /// The Body button, for Learn to point at.
   final GlobalKey bodyKey;
@@ -653,6 +689,42 @@ class _TopBar extends StatelessWidget {
               onPressed: onBody,
               icon: const Icon(Icons.accessibility_new_rounded, size: 18),
               label: Text(l.body),
+            ),
+            PopupMenuButton<(ExportFormat, bool)>(
+              tooltip: l.export,
+              onSelected: (choice) => onExport(choice.$1, choice.$2),
+              itemBuilder: (_) => [
+                for (final (format, avatar, label) in [
+                  (ExportFormat.svg, false, l.exportSvg),
+                  (ExportFormat.pdfA4, false, l.exportPdfA4),
+                  (ExportFormat.pdfSingle, false, l.exportPdfSingle),
+                  (ExportFormat.glb, false, l.exportGlb),
+                  (ExportFormat.glb, true, l.exportGlbAvatar),
+                  (ExportFormat.obj, false, l.exportObj),
+                ])
+                  PopupMenuItem(value: (format, avatar), child: Text(label)),
+              ],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: Space.s,
+                  vertical: 6,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.ios_share_rounded, size: 18, color: p.accent),
+                    const SizedBox(width: 6),
+                    Text(
+                      l.export,
+                      style: ts(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: p.accent,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(width: Space.s),
             _IconAction(

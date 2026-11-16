@@ -305,6 +305,32 @@ class LEn extends L {
   String get allProjects => 'All projects';
 
   @override
+  String get export => 'Export';
+
+  @override
+  String get exportSvg => 'Pattern, SVG at 1:1';
+
+  @override
+  String get exportPdfA4 => 'Pattern, PDF on A4 pages';
+
+  @override
+  String get exportPdfSingle => 'Pattern, PDF on one page';
+
+  @override
+  String get exportGlb => 'Garment in 3D, glTF (.glb)';
+
+  @override
+  String get exportGlbAvatar => 'Garment and body in 3D, glTF (.glb)';
+
+  @override
+  String get exportObj => 'Garment in 3D, OBJ';
+
+  @override
+  String exported(String file) {
+    return 'Exported $file.';
+  }
+
+  @override
   String get learn => 'Learn';
 
   @override

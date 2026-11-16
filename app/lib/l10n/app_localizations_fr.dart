@@ -308,6 +308,32 @@ class LFr extends L {
   String get allProjects => 'Tous les projets';
 
   @override
+  String get export => 'Exporter';
+
+  @override
+  String get exportSvg => 'Patron, SVG à l’échelle 1';
+
+  @override
+  String get exportPdfA4 => 'Patron, PDF en pages A4';
+
+  @override
+  String get exportPdfSingle => 'Patron, PDF sur une seule page';
+
+  @override
+  String get exportGlb => 'Vêtement en 3D, glTF (.glb)';
+
+  @override
+  String get exportGlbAvatar => 'Vêtement et corps en 3D, glTF (.glb)';
+
+  @override
+  String get exportObj => 'Vêtement en 3D, OBJ';
+
+  @override
+  String exported(String file) {
+    return 'Exporté : $file.';
+  }
+
+  @override
   String get learn => 'Apprendre';
 
   @override
