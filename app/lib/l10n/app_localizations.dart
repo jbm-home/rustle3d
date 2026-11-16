@@ -1369,6 +1369,18 @@ abstract class L {
   /// **'Make the other side this length'**
   String get matchOtherSide;
 
+  /// No description provided for @gathered.
+  ///
+  /// In en, this message translates to:
+  /// **'Gathered'**
+  String get gathered;
+
+  /// No description provided for @gatheredHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The longer side is gathered evenly onto the shorter one ({ratio} : 1).'**
+  String gatheredHint(String ratio);
+
   /// No description provided for @flipSeam.
   ///
   /// In en, this message translates to:

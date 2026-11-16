@@ -101,6 +101,7 @@ fn sample() -> Project {
                 edge: contour[3],
                 reversed: true,
             },
+            gathered: true,
         },
     );
     let notch = tx.new_notch_id();

@@ -143,6 +143,7 @@ command_registry! {
     "seam.add" => SeamAdd,
     "seam.remove" => SeamRemove,
     "seam.flip" => SeamFlip,
+    "seam.set_gathered" => SeamSetGathered,
     "edge.lengthen" => EdgeLengthen,
     "edge.set_length" => EdgeSetLength,
     "seam.take_in" => SeamTakeIn,

@@ -117,8 +117,10 @@ impl BoardScene {
                         Some(BoardSeam {
                             index: seams.iter().position(|x| *x == s)?,
                             reversed: side.reversed,
-                            mismatch: (length(seam.a.edge) - length(seam.b.edge)).abs()
-                                > SEAM_TOLERANCE_MM,
+                            // A gathered seam's sides differ on purpose.
+                            mismatch: !seam.gathered
+                                && (length(seam.a.edge) - length(seam.b.edge)).abs()
+                                    > SEAM_TOLERANCE_MM,
                         })
                     }),
                 })

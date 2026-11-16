@@ -181,6 +181,10 @@ pub struct Pin {
 pub struct Seam {
     pub a: SeamSide,
     pub b: SeamSide,
+    /// The longer side is gathered onto the shorter one on purpose (a
+    /// gathered skirt into a waistband, a sleeve cap): their difference
+    /// is not a mismatch.
+    pub gathered: bool,
 }
 
 impl Seam {

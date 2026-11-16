@@ -722,6 +722,14 @@ class LEn extends L {
   String get matchOtherSide => 'Make the other side this length';
 
   @override
+  String get gathered => 'Gathered';
+
+  @override
+  String gatheredHint(String ratio) {
+    return 'The longer side is gathered evenly onto the shorter one ($ratio : 1).';
+  }
+
+  @override
   String get flipSeam => 'Flip seam';
 
   @override

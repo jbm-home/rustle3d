@@ -88,6 +88,7 @@ fn every_command_round_trips() {
         "a": {"edge": poly_edge}, "b": {"edge": other_edge, "reversed": true}}));
     let seam = seam.created[0].to_string();
     h.round_trip(json!({"type": "seam.flip", "seam": seam}));
+    h.round_trip(json!({"type": "seam.set_gathered", "seam": seam, "gathered": true}));
     h.round_trip(json!({"type": "seam.take_in", "seam": seam, "mm": 6}));
     h.round_trip(json!({"type": "seam.match_length", "seam": seam, "keep": poly_edge}));
     h.round_trip(json!({"type": "garment.arrange"}));

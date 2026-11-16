@@ -1309,6 +1309,43 @@ Reverse how a seam matches its two edges (fixes a twisted seam).
 
 </details>
 
+### `seam.set_gathered`
+
+Mark a seam as gathered (or not): its longer side is gathered evenly onto the shorter one when it drapes (a gathered skirt into a waistband, a sleeve cap), so the difference in length is intended and not reported as a mismatch. `seam.list` gives each seam's gathering ratio.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "SeamId": {
+      "description": "Identifier of a seam, e.g. `seam:1`.",
+      "pattern": "^seam:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Gather a seam's longer side onto the shorter one, or stop.",
+  "properties": {
+    "gathered": {
+      "type": "boolean"
+    },
+    "seam": {
+      "$ref": "#/$defs/SeamId"
+    }
+  },
+  "required": [
+    "seam",
+    "gathered"
+  ],
+  "title": "SeamSetGathered",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `edge.lengthen`
 
 Lengthen (mm > 0) or shorten (mm < 0) the garment at an open edge such as a hem: the edge moves along its panel's grain, and so do the edges it continues into across seams (the whole hemline), so sewn sides stay matched. Linked mirror copies follow their source.
@@ -2017,7 +2054,7 @@ Built-in body presets: standard women's and men's sizes, as {name, body} pairs u
 
 ### `seam.list`
 
-Every seam: its two edges (with their panels and lengths in mm, and direction) and the length mismatch in mm.
+Every seam: its two edges (with their panels and lengths in mm, and direction), the length mismatch in mm, whether it is gathered and its gathering ratio (longer side / shorter side).
 
 <details><summary>Parameters (JSON schema)</summary>
 

@@ -20,7 +20,7 @@ use crate::model::Project;
 /// Identifies a Rustle3D project file.
 pub const FORMAT: &str = "rustle3d.project";
 /// Version written by this build.
-pub const SCHEMA_VERSION: u32 = 6;
+pub const SCHEMA_VERSION: u32 = 7;
 
 type Migration = fn(Value) -> Result<Value, FileError>;
 
@@ -31,6 +31,7 @@ const MIGRATIONS: &[Migration] = &[
     migrate_v3_to_v4,
     migrate_v4_to_v5,
     migrate_v5_to_v6,
+    migrate_v6_to_v7,
 ];
 
 fn object<'a>(
@@ -40,6 +41,16 @@ fn object<'a>(
     value.as_object_mut().ok_or_else(|| FileError::Json {
         detail: format!("{what} is not an object"),
     })
+}
+
+/// v7 lets a seam be gathered (until then, none was).
+fn migrate_v6_to_v7(mut project: Value) -> Result<Value, FileError> {
+    if let Some(seams) = object(&mut project, "project")?.get_mut("seams") {
+        for seam in object(seams, "seams")?.values_mut() {
+            object(seam, "seam")?.insert("gathered".into(), Value::from(false));
+        }
+    }
+    Ok(project)
 }
 
 /// v6 says what each placed panel is wrapped around (until then, the

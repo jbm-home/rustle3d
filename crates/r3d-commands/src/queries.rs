@@ -437,7 +437,7 @@ impl QuerySpec for AvatarPresets {
 pub struct SeamList {}
 
 impl Described for SeamList {
-    const SUMMARY: &'static str = "Every seam: its two edges (with their panels and lengths in mm, and direction) and the length mismatch in mm.";
+    const SUMMARY: &'static str = "Every seam: its two edges (with their panels and lengths in mm, and direction), the length mismatch in mm, whether it is gathered and its gathering ratio (longer side / shorter side).";
 }
 
 impl QuerySpec for SeamList {
@@ -457,10 +457,21 @@ impl QuerySpec for SeamList {
             .iter()
             .map(|(id, s)| {
                 let (a, b) = (side(&s.a)?, side(&s.b)?);
-                let mismatch = (a["length_mm"].as_f64().unwrap_or_default()
-                    - b["length_mm"].as_f64().unwrap_or_default())
-                .abs();
-                Ok(serde_json::json!({ "id": id, "a": a, "b": b, "mismatch_mm": r3(mismatch) }))
+                let (la, lb) = (
+                    a["length_mm"].as_f64().unwrap_or_default(),
+                    b["length_mm"].as_f64().unwrap_or_default(),
+                );
+                let ratio = if la.min(lb) > 0.0 {
+                    la.max(lb) / la.min(lb)
+                } else {
+                    1.0
+                };
+                Ok(serde_json::json!({
+                    "id": id, "a": a, "b": b,
+                    "mismatch_mm": r3((la - lb).abs()),
+                    "gathered": s.gathered,
+                    "gathering_ratio": r3(ratio),
+                }))
             })
             .collect::<Result<Vec<_>, CommandError>>()?;
         Ok(Value::Array(seams))

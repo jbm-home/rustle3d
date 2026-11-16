@@ -68,6 +68,7 @@ impl CommandSpec for SeamAdd {
                     edge: self.b.edge,
                     reversed: b_reversed,
                 },
+                gathered: false,
             },
         );
         Ok(CommandOutput {
@@ -113,6 +114,32 @@ pub struct SeamFlip {
 impl Described for SeamFlip {
     const SUMMARY: &'static str =
         "Reverse how a seam matches its two edges (fixes a twisted seam).";
+}
+
+/// Gather a seam's longer side onto the shorter one, or stop.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SeamSetGathered {
+    pub seam: SeamId,
+    pub gathered: bool,
+}
+
+impl Described for SeamSetGathered {
+    const SUMMARY: &'static str = "Mark a seam as gathered (or not): its longer side is gathered evenly onto the shorter one when it drapes (a gathered skirt into a waistband, a sleeve cap), so the difference in length is intended and not reported as a mismatch. `seam.list` gives each seam's gathering ratio.";
+}
+
+impl CommandSpec for SeamSetGathered {
+    fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        let seam = get_seam(tx, self.seam)?;
+        tx.put_seam(
+            self.seam,
+            Seam {
+                gathered: self.gathered,
+                ..seam
+            },
+        );
+        Ok(CommandOutput::default())
+    }
 }
 
 impl CommandSpec for SeamFlip {

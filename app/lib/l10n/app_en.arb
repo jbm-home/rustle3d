@@ -406,6 +406,15 @@
     }
   },
   "matchOtherSide": "Make the other side this length",
+  "gathered": "Gathered",
+  "gatheredHint": "The longer side is gathered evenly onto the shorter one ({ratio} : 1).",
+  "@gatheredHint": {
+    "placeholders": {
+      "ratio": {
+        "type": "String"
+      }
+    }
+  },
   "flipSeam": "Flip seam",
   "unpick": "Unpick",
   "changeTakenIn": "Taken in {amount} mm",

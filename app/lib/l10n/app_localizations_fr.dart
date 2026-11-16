@@ -731,6 +731,14 @@ class LFr extends L {
   String get matchOtherSide => 'Mettre l’autre côté à cette longueur';
 
   @override
+  String get gathered => 'Froncée';
+
+  @override
+  String gatheredHint(String ratio) {
+    return 'Le côté le plus long est froncé régulièrement sur le plus court ($ratio : 1).';
+  }
+
+  @override
   String get flipSeam => 'Inverser la couture';
 
   @override

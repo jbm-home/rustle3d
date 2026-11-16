@@ -212,6 +212,8 @@
   "edgeLengthLabel": "Longueur",
   "edgeSewn": "Cousu à {piece} · {mismatch} mm d’écart. Sa longueur change des deux côtés. En 3D, ⇧-glissez-le pour le reprendre.",
   "matchOtherSide": "Mettre l’autre côté à cette longueur",
+  "gathered": "Froncée",
+  "gatheredHint": "Le côté le plus long est froncé régulièrement sur le plus court ({ratio} : 1).",
   "flipSeam": "Inverser la couture",
   "unpick": "Découdre",
   "changeTakenIn": "Repris de {amount} mm",

@@ -1,6 +1,6 @@
 # 02 — Sewing
 
-Provenance: maintainer's functional brief (2026-11-14); general garment-making knowledge (seams join edges of equal length, edge direction matters).
+Provenance: maintainer's functional brief (2026-11-14, gathers 2026-11-16); general garment-making knowledge (seams join edges of equal length, edge direction matters; gathering a longer edge onto a shorter one).
 
 ## User story
 As a designer, I tell the software which edges are sewn together, and I see
@@ -28,6 +28,14 @@ mismatch badges and direction arrows on the board, welding.
 - A free edge can take part in several seams on different sub-ranges; an
   overlap of the same range in two seams is a validation error.
 - In the simulation, seams pull paired vertices together (see 04).
+- **Gathers** (M11, implemented, schema v7): a seam marked `gathered`
+  joins a longer side to a shorter one on purpose (a gathered skirt into a
+  waistband, a sleeve cap). Both sides get the same number of cloth
+  points, so the longer side's fullness is spread evenly along the
+  shorter one when it drapes. `seam.set_gathered` turns it on or off;
+  `seam.list` gives `gathered` and `gathering_ratio` (longer / shorter);
+  the board does not flag a gathered seam as mismatched, and the edge
+  card has a Gathered switch with the ratio.
 
 ## UX
 - **Seam tool**: click side A (hover previews the range; click and drag
@@ -46,3 +54,5 @@ mismatch badges and direction arrows on the board, welding.
 - Validation rejects a seam whose side overlaps an existing seam on the same
   range.
 - In simulation (M6), a simple two-panel tube closes with a gap < 1 mm.
+- A 1520 mm skirt gathered 2:1 into a 760 mm waistband drapes with its
+  seams closed (< 5 mm) and no cloth inside the body.

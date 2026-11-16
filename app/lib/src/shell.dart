@@ -2110,7 +2110,32 @@ class _EdgeCard extends StatelessWidget {
               'length_mm': cm * 10,
             }),
           ),
-          if (seam != null && (seam['mismatch_mm'] as num) >= 0.5)
+          if (seam != null)
+            SwitchListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                l.gathered,
+                style: ts(fontSize: 13, fontWeight: FontWeight.w500),
+              ),
+              subtitle: seam['gathered'] == true
+                  ? Text(
+                      l.gatheredHint(
+                        context.number(seam['gathering_ratio'] as num, 1),
+                      ),
+                      style: ts(fontSize: 12, color: p.textMuted),
+                    )
+                  : null,
+              value: seam['gathered'] == true,
+              onChanged: (on) => run({
+                'type': 'seam.set_gathered',
+                'seam': seam['id'],
+                'gathered': on,
+              }),
+            ),
+          if (seam != null &&
+              seam['gathered'] != true &&
+              (seam['mismatch_mm'] as num) >= 0.5)
             Padding(
               padding: const EdgeInsets.only(top: Space.xs),
               child: OutlinedButton.icon(
