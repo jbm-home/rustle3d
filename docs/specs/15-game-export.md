@@ -22,7 +22,7 @@ by a CI job). Not yet checked by hand: imports in Blender and Godot.
   positions are the cached `simulate` result if up to date, otherwise the
   starting ones; the app exports what it shows. OBJ: one object per
   panel, UVs and normals, geometry only.
-- **M14, game-ready preset**: decimated LODs, wrinkles baked from the full
+- **M15, game-ready preset**: decimated LODs, wrinkles baked from the full
   simulation into normal maps, back faces or thickness, and skinning
   weights transferred from the avatar skeleton when avatars are animated.
 - Engine presets set scale, axes and texture sizes for each target engine.
