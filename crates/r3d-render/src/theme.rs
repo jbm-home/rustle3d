@@ -8,6 +8,10 @@ pub type Rgba = [f32; 4];
 pub const PIECE_COLORS: usize = 8;
 
 /// Seam colours on the board, cycled: both sides of a seam share one.
+/// Something to fix on the pattern (e.g. a seam whose sides differ in
+/// length).
+pub const WARNING: Rgba = hex(0xD93025);
+
 pub const SEAM_COLORS: [Rgba; 6] = [
     hex(0xE0567A),
     hex(0x2F9E8F),

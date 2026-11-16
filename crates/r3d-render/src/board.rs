@@ -9,7 +9,7 @@ use wgpu::util::DeviceExt;
 
 use crate::gpu::Gpu;
 use crate::targets::Attachments;
-use crate::theme::{PIECE_COLORS, Rgba, SEAM_COLORS, Theme};
+use crate::theme::{PIECE_COLORS, Rgba, SEAM_COLORS, Theme, WARNING};
 use crate::{MSAA_SAMPLES, Target};
 
 const NOTCH_MM: f64 = 6.0;
@@ -47,9 +47,23 @@ pub struct BoardEdge {
     pub panel: PanelId,
     /// From its start to its end (mm).
     pub points: Vec<DVec2>,
-    /// Index of its seam (both sides share one colour), if sewn.
-    pub seam: Option<usize>,
+    /// Its seam, if sewn.
+    pub seam: Option<BoardSeam>,
 }
+
+/// How an edge is sewn.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BoardSeam {
+    /// Index of the seam (both sides share one colour).
+    pub index: usize,
+    /// The seam walks this edge from its end to its start.
+    pub reversed: bool,
+    /// The two sides differ in length by more than [`SEAM_TOLERANCE_MM`].
+    pub mismatch: bool,
+}
+
+/// Seam sides whose lengths differ by more than this are flagged (mm).
+pub const SEAM_TOLERANCE_MM: f64 = 2.0;
 
 impl BoardScene {
     pub fn from_project(project: &Project, selected: &[PanelId]) -> Self {
@@ -96,9 +110,17 @@ impl BoardScene {
                     id: e,
                     panel,
                     points: project.edge_polyline(e)?,
-                    seam: project
-                        .seam_of(e)
-                        .and_then(|s| seams.iter().position(|x| *x == s)),
+                    seam: project.seam_of(e).and_then(|s| {
+                        let seam = project.seams().get(&s)?;
+                        let side = if seam.a.edge == e { seam.a } else { seam.b };
+                        let length = |x: EdgeId| project.edge_length(x).unwrap_or_default();
+                        Some(BoardSeam {
+                            index: seams.iter().position(|x| *x == s)?,
+                            reversed: side.reversed,
+                            mismatch: (length(seam.a.edge) - length(seam.b.edge)).abs()
+                                > SEAM_TOLERANCE_MM,
+                        })
+                    }),
                 })
             })
             .collect();
@@ -219,6 +241,18 @@ impl Batch {
     }
 
     /// A straight stroke of `width` mm with square caps.
+    /// A filled disc.
+    fn dot(&mut self, at: DVec2, radius: f64, color: Rgba) {
+        const SIDES: usize = 16;
+        let corner = |k: usize| {
+            let a = std::f64::consts::TAU * k as f64 / SIDES as f64;
+            at + DVec2::new(a.cos(), a.sin()) * radius
+        };
+        for k in 0..SIDES {
+            self.tri(at, corner(k), corner(k + 1), color);
+        }
+    }
+
     fn segment(&mut self, a: DVec2, b: DVec2, width: f64, color: Rgba) {
         let Some(d) = (b - a).try_normalize() else {
             return;
@@ -247,6 +281,21 @@ fn mix(a: Rgba, b: Rgba, t: f32) -> Rgba {
         a[2] + (b[2] - a[2]) * t,
         a[3] + (b[3] - a[3]) * t,
     ]
+}
+
+/// The point halfway along a polyline and the unit direction there.
+fn midpoint(points: &[DVec2]) -> Option<(DVec2, DVec2)> {
+    let total: f64 = points.windows(2).map(|w| w[0].distance(w[1])).sum();
+    let mut left = total / 2.0;
+    for w in points.windows(2) {
+        let len = w[0].distance(w[1]);
+        if len > 0.0 && left <= len {
+            let dir = (w[1] - w[0]) / len;
+            return Some((w[0] + dir * left, dir));
+        }
+        left -= len;
+    }
+    None
 }
 
 /// Renders the board into a texture of the format given at creation.
@@ -412,15 +461,29 @@ impl BoardRenderer {
                 batch.segment(*pos, *pos - *outward * NOTCH_MM, width, line_color);
             }
         }
-        // Seams: both sides in the same colour, over the outlines.
+        // Seams: both sides in the same colour, over the outlines, with a
+        // chevron at the middle pointing the way the seam walks the edge
+        // (matching sides point alike when the pieces lie side by side).
+        // Sides of different lengths are red, with a dot.
         for edge in &scene.edges {
-            if let Some(k) = edge.seam {
-                batch.polyline(
-                    &edge.points,
-                    false,
-                    2.5 * px,
-                    SEAM_COLORS[k % SEAM_COLORS.len()],
-                );
+            let Some(seam) = edge.seam else { continue };
+            let color = if seam.mismatch {
+                WARNING
+            } else {
+                SEAM_COLORS[seam.index % SEAM_COLORS.len()]
+            };
+            batch.polyline(&edge.points, false, 2.5 * px, color);
+            if let Some((mid, dir)) = midpoint(&edge.points) {
+                let dir = if seam.reversed { -dir } else { dir };
+                let side = DVec2::new(-dir.y, dir.x);
+                let size = 7.0 * px;
+                let tip = mid + dir * size * 0.5;
+                for wing in [side, -side] {
+                    batch.segment(tip, tip - dir * size + wing * size * 0.7, 2.0 * px, color);
+                }
+                if seam.mismatch {
+                    batch.dot(mid + side * 9.0 * px, 4.5 * px, WARNING);
+                }
             }
         }
         if let Some(edge) = scene
