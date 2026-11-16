@@ -57,7 +57,16 @@ struct Signed<'a> {
 pub struct BodyModel {
     pack: BodyPack,
     landmarks: Landmarks,
+    /// Vertices smoothed like a dress form's (around the bust apexes):
+    /// each with its smoothing weight (0..1) and its neighbours.
+    smoothed: Vec<(u32, f32, Vec<u32>)>,
 }
+
+/// Radius of the smoothed area around each bust apex (m). The nipples are
+/// narrower than the cloth's vertex spacing, so they would poke through
+/// any garment; dress forms are smooth there too.
+const SMOOTH_RADIUS_M: f32 = 0.05;
+const SMOOTH_PASSES: usize = 30;
 
 impl BodyModel {
     /// The built-in MakeHuman-based body.
@@ -84,8 +93,42 @@ impl BodyModel {
         let mut model = Self {
             pack,
             landmarks: Landmarks { bust: [0, 0] },
+            smoothed: Vec::new(),
         };
-        model.landmarks = Landmarks::find(&model.positions(&BodyShape::default()));
+        let base = model.positions(&BodyShape::default());
+        model.landmarks = Landmarks::find(&base);
+        let apexes: Vec<Vec3> = model
+            .landmarks
+            .bust
+            .iter()
+            .filter_map(|i| base.get(*i as usize).copied())
+            .collect();
+        let mut neighbours = vec![Vec::new(); base.len()];
+        for t in &model.pack.triangles {
+            for k in 0..3 {
+                let (a, b) = (t[k], t[(k + 1) % 3]);
+                for (from, to) in [(a, b), (b, a)] {
+                    if let Some(list) = neighbours.get_mut(from as usize)
+                        && !list.contains(&to)
+                    {
+                        list.push(to);
+                    }
+                }
+            }
+        }
+        model.smoothed = base
+            .iter()
+            .zip(neighbours)
+            .enumerate()
+            .filter_map(|(i, (p, near))| {
+                let d = apexes
+                    .iter()
+                    .map(|a| a.distance(*p))
+                    .fold(f32::MAX, f32::min);
+                let w = 1.0 - d / SMOOTH_RADIUS_M;
+                (w > 0.0).then_some((i as u32, w, near))
+            })
+            .collect();
         Ok(model)
     }
 
@@ -142,6 +185,23 @@ impl BodyModel {
             for (v, o) in t.vertices.iter().zip(&t.offsets) {
                 if let Some(p) = out.get_mut(*v as usize) {
                     *p += *o * w;
+                }
+            }
+        }
+        for _ in 0..SMOOTH_PASSES {
+            let moves: Vec<(usize, Vec3)> = self
+                .smoothed
+                .iter()
+                .filter_map(|(i, w, near)| {
+                    let p = *out.get(*i as usize)?;
+                    let sum: Vec3 = near.iter().filter_map(|n| out.get(*n as usize)).sum();
+                    let mean = sum / near.len().max(1) as f32;
+                    Some((*i as usize, p + (mean - p) * 0.5 * w))
+                })
+                .collect();
+            for (i, p) in moves {
+                if let Some(slot) = out.get_mut(i) {
+                    *slot = p;
                 }
             }
         }

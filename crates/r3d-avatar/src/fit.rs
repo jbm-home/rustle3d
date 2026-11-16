@@ -53,6 +53,7 @@ fn scaled(model: &BodyModel, shape: &BodyShape, height_cm: f32) -> (Measurements
             bust_cm: m.bust_cm * k,
             waist_cm: m.waist_cm * k,
             hips_cm: m.hips_cm * k,
+            waist_height_cm: m.waist_height_cm * k,
         },
         k,
     )

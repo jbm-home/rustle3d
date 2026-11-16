@@ -15,6 +15,8 @@ pub struct Measurements {
     pub bust_cm: f32,
     pub waist_cm: f32,
     pub hips_cm: f32,
+    /// Height of the waist (the narrowest girth) above the floor.
+    pub waist_height_cm: f32,
 }
 
 /// Bands of the torso, as fractions of the stature, where the waist
@@ -94,15 +96,16 @@ fn extreme_girth(
     height: f32,
     band: (f32, f32),
     largest: bool,
-) -> f32 {
+) -> (f32, f32) {
+    // (girth, height) of the extreme section.
     let girths = (0..SAMPLES).filter_map(|i| {
-        let f = band.0 + (band.1 - band.0) * i as f32 / (SAMPLES - 1) as f32;
-        girth_at(positions, triangles, f * height, 0.0)
+        let y = (band.0 + (band.1 - band.0) * i as f32 / (SAMPLES - 1) as f32) * height;
+        girth_at(positions, triangles, y, 0.0).map(|g| (g, y))
     });
     if largest {
-        girths.fold(0.0, f32::max)
+        girths.fold((0.0, 0.0), |a, b| if b.0 > a.0 { b } else { a })
     } else {
-        girths.fold(f32::MAX, f32::min)
+        girths.fold((f32::MAX, 0.0), |a, b| if b.0 < a.0 { b } else { a })
     }
 }
 
@@ -148,10 +151,12 @@ pub fn measure(positions: &[Vec3], triangles: &[[u32; 3]], landmarks: &Landmarks
         .map(|p| p.y)
         .sum::<f32>()
         / 2.0;
+    let waist = extreme_girth(positions, triangles, height, WAIST_BAND, false);
     Measurements {
         height_cm: height * 100.0,
         bust_cm: girth_at(positions, triangles, bust_y, 0.0).unwrap_or_default(),
-        waist_cm: extreme_girth(positions, triangles, height, WAIST_BAND, false),
-        hips_cm: extreme_girth(positions, triangles, height, HIPS_BAND, true),
+        waist_cm: waist.0,
+        hips_cm: extreme_girth(positions, triangles, height, HIPS_BAND, true).0,
+        waist_height_cm: waist.1 * 100.0,
     }
 }
