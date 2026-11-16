@@ -8,20 +8,30 @@ import 'package:material_ui/material_ui.dart';
 
 import 'body_panel.dart';
 import 'design/tokens.dart';
+import 'guide.dart';
 import 'rust/api/engine.dart';
+import 'start_screen.dart' show Logo;
 import 'views/rust_view.dart';
 
 class Shell extends StatefulWidget {
   const Shell({
     super.key,
     required this.engine,
+    required this.libraryDir,
     required this.dark,
     required this.onToggleTheme,
+    required this.onHome,
   });
 
   final Engine engine;
+
+  /// The user's libraries (body presets).
+  final String libraryDir;
   final bool dark;
   final VoidCallback onToggleTheme;
+
+  /// Back to the start screen.
+  final VoidCallback onHome;
 
   @override
   State<Shell> createState() => _ShellState();
@@ -44,10 +54,56 @@ class _ShellState extends State<Shell> {
   SimStatus? _sim;
   final _clock = Stopwatch()..start();
 
+  /// The guided flow's current step, and whether the guide is shown.
+  late GuideStep _step;
+  bool _guide = true;
+
   @override
   void initState() {
     super.initState();
     _refresh();
+    _step = GuideStep.firstFor(
+      panels: (_summary['counts']?['panels'] as int?) ?? 0,
+      seams: _seams.length,
+    );
+  }
+
+  /// Go to a step of the guided flow: its tool becomes the active one.
+  void _goTo(GuideStep step) {
+    setState(() {
+      _step = step;
+      _guide = true;
+    });
+    switch (step) {
+      case GuideStep.sew:
+        _setTool('sew');
+      case GuideStep.fabric:
+        // The fabric is in the inspector when nothing is selected.
+        _guard(() => widget.engine.select(panels: const []));
+        _setTool('select');
+        _refresh();
+      case _:
+        _setTool('select');
+    }
+  }
+
+  void _showBody() =>
+      showBodyPanel(context, widget.engine, widget.libraryDir, _refresh);
+
+  /// The step's main action, from the guide banner.
+  void _stepAction() {
+    switch (_step) {
+      case GuideStep.measurements:
+        _showBody();
+      case GuideStep.pattern:
+        _addRectangle();
+      case GuideStep.sew:
+        _setTool('sew');
+      case GuideStep.fabric:
+        break;
+      case GuideStep.drape:
+        _setRunning(!(_sim?.running ?? false));
+    }
   }
 
   dynamic _run(Map<String, Object?> step) {
@@ -251,7 +307,19 @@ class _ShellState extends State<Shell> {
                 onToggleTheme: widget.onToggleTheme,
                 onUndo: _undo,
                 onRedo: _redo,
-                onBody: () => showBodyPanel(context, widget.engine, _refresh),
+                onBody: _showBody,
+                onHome: widget.onHome,
+                step: _step,
+                guide: _guide,
+                onStep: _goTo,
+              ),
+              GuideBanner(
+                step: _step,
+                visible: _guide,
+                running: _sim?.running ?? false,
+                onAction: _stepAction,
+                onNext: _step.next == null ? null : () => _goTo(_step.next!),
+                onClose: () => setState(() => _guide = false),
               ),
               Expanded(
                 child: Padding(
@@ -261,6 +329,7 @@ class _ShellState extends State<Shell> {
                     children: [
                       _ToolRail(
                         active: _tool,
+                        highlight: _guide ? _step.tool : null,
                         onSelect: (tool) {
                           if (tool == 'rectangle') {
                             _addRectangle();
@@ -364,6 +433,10 @@ class _TopBar extends StatelessWidget {
     required this.onUndo,
     required this.onRedo,
     required this.onBody,
+    required this.onHome,
+    required this.step,
+    required this.guide,
+    required this.onStep,
   });
 
   final String projectName;
@@ -372,11 +445,17 @@ class _TopBar extends StatelessWidget {
   final VoidCallback onUndo;
   final VoidCallback onRedo;
   final VoidCallback onBody;
+  final VoidCallback onHome;
+  final GuideStep step;
+
+  /// The guide is open: the current step is shown as active.
+  final bool guide;
+  final ValueChanged<GuideStep> onStep;
 
   @override
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
-    const steps = ['Pattern', 'Sew', 'Fabric', 'Drape'];
+    const steps = GuideStep.values;
     return SizedBox(
       height: 56,
       child: Padding(
@@ -384,27 +463,23 @@ class _TopBar extends StatelessWidget {
         padding: const EdgeInsets.only(left: 84, right: Space.m),
         child: Row(
           children: [
-            Container(
-              width: 26,
-              height: 26,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(7),
-                gradient: LinearGradient(
-                  colors: [
-                    p.accent,
-                    Color.lerp(p.accent, const Color(0xFFE879A6), 0.6)!,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                'R',
-                style: ts(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
+            Tooltip(
+              message: 'All projects',
+              child: InkWell(
+                onTap: onHome,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.chevron_left_rounded,
+                        size: 18,
+                        color: p.textMuted,
+                      ),
+                      const Logo(),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -419,7 +494,13 @@ class _TopBar extends StatelessWidget {
             ),
             const SizedBox(width: Space.xl),
             for (var i = 0; i < steps.length; i++) ...[
-              _StepChip(index: i + 1, label: steps[i], active: i == 0),
+              _StepChip(
+                index: i + 1,
+                label: steps[i].label,
+                active: guide && steps[i] == step,
+                done: steps[i].index < step.index,
+                onTap: () => onStep(steps[i]),
+              ),
               if (i < steps.length - 1)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: Space.xs),
@@ -465,53 +546,67 @@ class _StepChip extends StatelessWidget {
     required this.index,
     required this.label,
     required this.active,
+    required this.done,
+    required this.onTap,
   });
 
   final int index;
   final String label;
   final bool active;
 
+  /// Before the current step: shown with a check mark.
+  final bool done;
+  final VoidCallback onTap;
+
   @override
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
-    return AnimatedContainer(
-      duration: Motion.normal,
-      curve: Motion.curve,
-      padding: const EdgeInsets.symmetric(horizontal: Space.m, vertical: 6),
-      decoration: BoxDecoration(
-        color: active ? p.accentSoft : Colors.transparent,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 18,
-            height: 18,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: active ? p.accent : p.border,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: AnimatedContainer(
+        duration: Motion.normal,
+        curve: Motion.curve,
+        padding: const EdgeInsets.symmetric(horizontal: Space.m, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? p.accentSoft : Colors.transparent,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 18,
+              height: 18,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: active
+                    ? p.accent
+                    : (done ? p.accent.withValues(alpha: 0.18) : p.border),
+              ),
+              child: done && !active
+                  ? Icon(Icons.check_rounded, size: 12, color: p.accent)
+                  : Text(
+                      '$index',
+                      style: ts(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: active ? Colors.white : p.textMuted,
+                      ),
+                    ),
             ),
-            child: Text(
-              '$index',
+            const SizedBox(width: 6),
+            Text(
+              label,
               style: ts(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: active ? Colors.white : p.textMuted,
+                fontSize: 13,
+                fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                color: active ? p.accent : p.textMuted,
               ),
             ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: ts(
-              fontSize: 13,
-              fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-              color: active ? p.accent : p.textMuted,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -547,9 +642,16 @@ class _IconAction extends StatelessWidget {
 }
 
 class _ToolRail extends StatelessWidget {
-  const _ToolRail({required this.active, required this.onSelect});
+  const _ToolRail({
+    required this.active,
+    required this.highlight,
+    required this.onSelect,
+  });
 
   final String active;
+
+  /// The tool the guided flow's current step uses, ringed.
+  final String? highlight;
   final ValueChanged<String> onSelect;
 
   static const _tools = [
@@ -615,6 +717,7 @@ class _ToolRail extends StatelessWidget {
                 child: _RailButton(
                   icon: icon,
                   active: id == active,
+                  highlight: id == highlight,
                   onTap: () => onSelect(id),
                 ),
               ),
@@ -629,11 +732,13 @@ class _RailButton extends StatefulWidget {
   const _RailButton({
     required this.icon,
     required this.active,
+    required this.highlight,
     required this.onTap,
   });
 
   final IconData icon;
   final bool active;
+  final bool highlight;
   final VoidCallback onTap;
 
   @override
@@ -663,6 +768,12 @@ class _RailButtonState extends State<_RailButton> {
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(Tokens.radius(context, 0.75)),
+            border: Border.all(
+              color: widget.highlight
+                  ? p.accent.withValues(alpha: 0.7)
+                  : Colors.transparent,
+              width: 1.5,
+            ),
           ),
           child: Icon(
             widget.icon,

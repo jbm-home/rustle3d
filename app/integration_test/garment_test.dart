@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:rustle3d/main.dart';
+import 'package:rustle3d/src/projects.dart';
 import 'package:rustle3d/src/rust/api/engine.dart';
 import 'package:rustle3d/src/rust/frb_generated.dart';
 import 'package:rustle3d/src/views/rust_view.dart';
@@ -40,7 +41,12 @@ void main() {
     );
     expect(engine.resetSimulation().loaded, isTrue);
 
-    await tester.pumpWidget(Rustle3dApp(engine: engine));
+    await tester.pumpWidget(
+      Rustle3dApp(
+        store: ProjectStore(projectsDir: dir, libraryDir: dir),
+        engine: engine,
+      ),
+    );
     // Let the views attach their textures and draw.
     for (var i = 0; i < 20; i++) {
       await tester.pump(const Duration(milliseconds: 50));
@@ -126,15 +132,15 @@ void main() {
 
     // ⇧-drag on a seam takes it in or lets it out (towards or away from
     // the body; the direction itself is tested on the command): the
-    // pattern's width changes, the seams stay matched, one undo restores.
+    // pattern's area changes, the seams stay matched, one undo restores.
     double width() {
       final summary = jsonDecode(
         engine.run(stepJson: '{"type":"project.summary"}'),
       );
-      return (summary['panels'] as List).fold<double>(0, (sum, p) {
-        final bbox = p['bbox'];
-        return sum + (bbox['max'][0] as num) - (bbox['min'][0] as num);
-      });
+      return (summary['panels'] as List).fold<double>(
+        0,
+        (sum, p) => sum + (p['area_mm2'] as num),
+      );
     }
 
     final wide = width();
@@ -152,7 +158,7 @@ void main() {
       await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
       await tester.pump();
     }
-    expect((width() - wide).abs(), greaterThan(1));
+    expect((width() - wide).abs(), greaterThan(100));
     final seams =
         jsonDecode(engine.run(stepJson: '{"type":"seam.list"}')) as List;
     for (final seam in seams) {

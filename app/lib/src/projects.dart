@@ -1,0 +1,122 @@
+// Where projects and the user's libraries live, the recent projects, and
+// making a new project (from a template or blank).
+
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:path_provider/path_provider.dart';
+
+import 'rust/api/engine.dart';
+import 'rust/api/library.dart';
+
+/// A project folder found in the projects folder.
+class RecentProject {
+  const RecentProject({
+    required this.path,
+    required this.name,
+    required this.modified,
+  });
+
+  final String path;
+  final String name;
+  final DateTime modified;
+}
+
+/// The user's folders: projects (Documents/Rustle3D) and libraries (body
+/// presets, in the app's support folder).
+class ProjectStore {
+  const ProjectStore({required this.projectsDir, required this.libraryDir});
+
+  final String projectsDir;
+  final String libraryDir;
+
+  static Future<ProjectStore> open() async {
+    final docs = await getApplicationDocumentsDirectory();
+    final support = await getApplicationSupportDirectory();
+    final projects = Directory('${docs.path}/Rustle3D');
+    await projects.create(recursive: true);
+    return ProjectStore(projectsDir: projects.path, libraryDir: support.path);
+  }
+
+  /// Project folders, most recently changed first.
+  List<RecentProject> recent() {
+    final dir = Directory(projectsDir);
+    if (!dir.existsSync()) return const [];
+    final found = <RecentProject>[];
+    for (final entry in dir.listSync()) {
+      if (entry is! Directory || !entry.path.endsWith('.r3d')) continue;
+      final file = File('${entry.path}/project.json');
+      if (!file.existsSync()) continue;
+      try {
+        final json = jsonDecode(file.readAsStringSync());
+        found.add(
+          RecentProject(
+            path: entry.path,
+            name: json['project']['name'] as String,
+            modified: file.lastModifiedSync(),
+          ),
+        );
+      } on Object {
+        // Not readable as a project: not listed (opening it would say why).
+      }
+    }
+    found.sort((a, b) => b.modified.compareTo(a.modified));
+    return found;
+  }
+
+  /// A folder path for a new project called [name] that does not exist yet.
+  String freePath(String name) {
+    final safe = name.replaceAll(RegExp(r'[/\\:*?"<>|]'), ' ').trim();
+    final stem = safe.isEmpty ? 'Untitled' : safe;
+    var path = '$projectsDir/$stem.r3d';
+    for (var n = 2; Directory(path).existsSync(); n++) {
+      path = '$projectsDir/$stem $n.r3d';
+    }
+    return path;
+  }
+
+  /// The standard body new projects start with.
+  Map<String, dynamic> standardBody() {
+    final presets = jsonDecode(bodyPresets(libraryDir: libraryDir)) as List;
+    return presets.firstWhere((p) => p['name'] == 'Women M')
+        as Map<String, dynamic>;
+  }
+
+  /// Make a project called [name] for [body] (a preset entry: `{name,
+  /// body}`), drafted from [template] with [sizes] if given, and return its
+  /// folder. The project is then opened fresh, so its history starts
+  /// empty.
+  String create({
+    required String name,
+    required Map<String, dynamic> body,
+    String? template,
+    Map<String, double> sizes = const {},
+  }) {
+    final path = freePath(name);
+    final engine = Engine.open(path: path);
+    try {
+      engine.run(
+        stepJson: jsonEncode({
+          'type': 'avatar.set',
+          'body': body['body'],
+          'preset': body['name'],
+        }),
+      );
+      if (template != null) {
+        engine.run(
+          stepJson: jsonEncode({
+            'type': 'template.apply',
+            'template': template,
+            'sizes': sizes,
+          }),
+        );
+      }
+      engine.run(
+        stepJson: jsonEncode({'type': 'project.rename', 'name': name}),
+      );
+    } finally {
+      engine.dispose();
+    }
+    return path;
+  }
+}

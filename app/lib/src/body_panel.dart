@@ -8,6 +8,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'design/tokens.dart';
 import 'rust/api/engine.dart';
+import 'rust/api/library.dart';
 
 /// Ranges accepted by the `avatar.set` command (cm).
 const _ranges = {
@@ -27,6 +28,7 @@ const _labels = {
 Future<void> showBodyPanel(
   BuildContext context,
   Engine engine,
+  String libraryDir,
   VoidCallback onChanged,
 ) {
   return showDialog<void>(
@@ -37,16 +39,25 @@ Future<void> showBodyPanel(
       ),
       child: SizedBox(
         width: 520,
-        child: _BodyPanel(engine: engine, onChanged: onChanged),
+        child: _BodyPanel(
+          engine: engine,
+          libraryDir: libraryDir,
+          onChanged: onChanged,
+        ),
       ),
     ),
   );
 }
 
 class _BodyPanel extends StatefulWidget {
-  const _BodyPanel({required this.engine, required this.onChanged});
+  const _BodyPanel({
+    required this.engine,
+    required this.libraryDir,
+    required this.onChanged,
+  });
 
   final Engine engine;
+  final String libraryDir;
   final VoidCallback onChanged;
 
   @override
@@ -87,7 +98,7 @@ class _BodyPanelState extends State<_BodyPanel> {
   }
 
   void _loadPresets() {
-    _presets = (jsonDecode(widget.engine.bodyPresets()) as List)
+    _presets = (jsonDecode(bodyPresets(libraryDir: widget.libraryDir)) as List)
         .cast<Map<String, dynamic>>();
   }
 
@@ -154,7 +165,11 @@ class _BodyPanelState extends State<_BodyPanel> {
     final name = _name.text.trim();
     if (body == null || name.isEmpty) return;
     try {
-      widget.engine.saveBodyPreset(name: name, bodyJson: jsonEncode(body));
+      saveBodyPreset(
+        libraryDir: widget.libraryDir,
+        name: name,
+        bodyJson: jsonEncode(body),
+      );
       setState(() {
         _naming = false;
         _preset = name;
@@ -169,7 +184,7 @@ class _BodyPanelState extends State<_BodyPanel> {
   void _deletePreset() {
     final name = _preset;
     if (name == null) return;
-    widget.engine.deleteBodyPreset(name: name);
+    deleteBodyPreset(libraryDir: widget.libraryDir, name: name);
     setState(() {
       _preset = null;
       _loadPresets();
