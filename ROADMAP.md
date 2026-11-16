@@ -194,8 +194,7 @@ Before v0.1: the remaining detail fixes, then version 0.1.0. After v0.1: picking
 in 3D (needs point selection, in 2D too), zero-copy textures on Linux and
 Windows, signed packages.
 Known: XPBD creep lets a skirt slide a few cm below the waist before it
-settles (physics.md §7 convergence); a tight top can show a speck of the
-body at the bust.
+settles (physics.md §7 convergence).
 
 ---
 

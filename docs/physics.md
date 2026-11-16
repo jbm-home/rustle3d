@@ -152,6 +152,22 @@ measurement-based calibration on the roadmap.
   body: cloth triangles (~25 mm) and the avatar's are flat chords of curved
   surfaces, and without the margin the body shows through between cloth
   vertices.
+- The margin alone did not hold across the bust: particles rested 3.4 mm
+  out, but the middles of edges and triangles between them sank up to
+  2 mm into the body, which showed through a tight dress or T-shirt. Mesh
+  edges whose two particles touch the body are now sampled at their middle
+  too, and both ends are pushed out (by inverse mass) so the middle keeps
+  the same distance. Only touching edges are sampled, serially after the
+  parallel particle pass (≈ 6 % more per step on the dress); the template
+  tests check triangle middles as well as particles.
+- **Friction** against the body is Coulomb friction in positions [7]: the
+  sliding of a contact in a substep is cancelled up to μ_b × the depth the
+  particle was pushed out (its normal force), so cloth holds where it
+  presses and slides where it only rests. It used to cancel a fixed
+  fraction μ_b of the sliding every substep: over 30 substeps that is
+  0.7³⁰ ≈ 2·10⁻⁵ of it left per frame, so cloth touching the body was
+  glued there and folds made while the garment closed never slid out (the
+  back of the dress stayed crumpled; seen from the back only).
 - Without self-collision (below) a wide hem can fold through itself; this
   is visible on the A-line skirt and is the next physics item (M7).
 

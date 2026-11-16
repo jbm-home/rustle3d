@@ -19,6 +19,7 @@ fn drape(s: &Session, frames: u32) -> (f32, f32) {
     let form = Form::of_project(s.project()).unwrap().unwrap();
     let drape = build(s.project(), Some(&form), DEFAULT_SPACING_MM).unwrap();
     let collider = drape.scene.collider.clone().unwrap();
+    let triangles: Vec<[u32; 3]> = drape.scene.triangles.iter().map(|t| t.vertices).collect();
     let mut solver = Solver::new(drape.scene);
     for _ in 0..frames {
         solver.step(1.0 / 60.0);
@@ -31,6 +32,23 @@ fn drape(s: &Session, frames: u32) -> (f32, f32) {
         .filter(|q| collider.sample(**q).is_some_and(|c| c.distance < 0.0))
         .count();
     assert_eq!(inside, 0, "particles inside the body");
+    // Nor between particles: triangles are flat, and across a convex part
+    // of the body (the bust) their middle could sink in.
+    let sunk = triangles
+        .iter()
+        .map(|t| t.map(|i| p[i as usize]))
+        .flat_map(|[a, b, c]| {
+            [
+                (a + b + c) / 3.0,
+                (a + b) / 2.0,
+                (b + c) / 2.0,
+                (c + a) / 2.0,
+            ]
+        })
+        .filter_map(|q| collider.sample(q).map(|c| -c.distance))
+        .fold(0.0f32, f32::max);
+    // Within 1 mm: unseen, where 2 mm showed the body through a dress.
+    assert!(sunk < 0.001, "triangles cut {sunk} m into the body");
     let stats = solver.stats();
     assert!(stats.max_seam_gap < 0.005, "seams open: {stats:?}");
     let low = p.iter().map(|v| v.y).fold(f32::MAX, f32::min);

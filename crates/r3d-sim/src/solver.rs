@@ -10,7 +10,9 @@
 //!   discrete shells (Grinspun et al. 2003);
 //! - seams: zero-length distances whose compliance ramps down while the
 //!   garment closes;
-//! - contacts with the body and the ground, with friction;
+//! - contacts with the body and the ground, with friction; mesh edges
+//!   between two particles touching the body are kept out of it at their
+//!   middle too (a straight edge cuts into a convex body such as the bust);
 //! - self-collision between distant parts of the cloth (`selfcollide`);
 //! - grab: the user pulls a patch of cloth towards a moving target with a
 //!   soft zero-length constraint per particle (offsets kept).
@@ -85,6 +87,10 @@ pub struct Solver {
     membranes: Vec<Membrane>,
     hinges: Vec<Hinge>,
     seams: Vec<[u32; 2]>,
+    /// Mesh edges (each once, sorted).
+    edges: Vec<[u32; 2]>,
+    /// Particles touching the body after the last contact pass.
+    touching: Vec<bool>,
     collider: Option<StaticMesh>,
     self_collision: SelfCollision,
     grab: Option<Grab>,
@@ -208,6 +214,16 @@ impl Solver {
             .map(|(p, m)| if p.pinned || *m <= 0.0 { 0.0 } else { 1.0 / m })
             .collect();
         let x: Vec<Vec3> = scene.particles.iter().map(|p| p.position).collect();
+        let mut mesh_edges: Vec<[u32; 2]> = triangles
+            .iter()
+            .flat_map(|t| {
+                let v = t.vertices;
+                [[v[0], v[1]], [v[1], v[2]], [v[2], v[0]]]
+            })
+            .map(|[a, b]| [a.min(b), a.max(b)])
+            .collect();
+        mesh_edges.sort_unstable();
+        mesh_edges.dedup();
         Self {
             prev: x.clone(),
             v: vec![Vec3::ZERO; n],
@@ -224,6 +240,8 @@ impl Solver {
                 &seams,
             ),
             seams,
+            edges: mesh_edges,
+            touching: vec![false; n],
             grab: None,
             collider: scene.collider,
             ground: scene.ground,
@@ -367,9 +385,11 @@ impl Solver {
         self.x
             .par_iter_mut()
             .zip(&self.prev)
+            .zip(self.touching.par_iter_mut())
             .enumerate()
             .with_min_len(64)
-            .for_each(|(i, (x, prev))| {
+            .for_each(|(i, ((x, prev), touching))| {
+                *touching = false;
                 let (Some(w), Some(thickness), Some(friction)) =
                     (w.get(i), thickness.get(i), friction.get(i))
                 else {
@@ -378,7 +398,9 @@ impl Solver {
                 if *w == 0.0 {
                     return;
                 }
-                let mut contact_normal = None;
+                // The contact's normal and how far the particle was pushed
+                // out along it (the normal force, in position terms).
+                let mut contact: Option<(Vec3, f32)> = None;
                 // The body's distance field sees penetrations up to its band
                 // (2 cm) deep, far more than a particle moves in a substep.
                 let distance = thickness + SKIN;
@@ -386,20 +408,62 @@ impl Solver {
                     && let Some(c) = body.sample(*x)
                     && c.distance < distance
                 {
-                    *x += c.normal * (distance - c.distance);
-                    contact_normal = Some(c.normal);
+                    let depth = distance - c.distance;
+                    *x += c.normal * depth;
+                    contact = Some((c.normal, depth));
+                    *touching = true;
                 }
                 if ground && x.y < *thickness {
+                    let depth = *thickness - x.y;
                     x.y = *thickness;
-                    contact_normal = Some(Vec3::Y);
+                    contact = Some((Vec3::Y, depth));
                 }
-                if let Some(n) = contact_normal {
-                    // Coulomb-like friction: remove part of the sliding motion.
+                if let Some((n, depth)) = contact {
+                    // Coulomb friction in positions (Macklin et al. 2014,
+                    // §6.1): the sliding this substep is cancelled up to
+                    // `friction` × the push out of the body, so the cloth
+                    // holds where it presses and slides where it only rests.
                     let moved = *x - *prev;
                     let tangential = moved - n * moved.dot(n);
-                    *x -= tangential * *friction;
+                    let sliding = tangential.length();
+                    if sliding > 0.0 {
+                        *x -= tangential * (friction * depth / sliding).min(1.0);
+                    }
                 }
             });
+        self.collide_edges();
+    }
+
+    /// Edges whose two particles touch the body: keep their middle out of
+    /// it too, pushing both ends outward (by their inverse masses). Cloth
+    /// edges (~25 mm) are chords: across a convex part of the body their
+    /// middle sinks in while their ends rest on the skin. Only touching
+    /// edges are sampled, so the cost follows the contact area.
+    fn collide_edges(&mut self) {
+        let Some(body) = self.collider.as_ref() else {
+            return;
+        };
+        for [a, b] in &self.edges {
+            let (a, b) = (*a as usize, *b as usize);
+            if !(self.touching[a] && self.touching[b]) {
+                continue;
+            }
+            let (wa, wb) = (self.w[a], self.w[b]);
+            if wa + wb == 0.0 {
+                continue;
+            }
+            let middle = (self.x[a] + self.x[b]) / 2.0;
+            let distance = (self.thickness[a] + self.thickness[b]) / 2.0 + SKIN;
+            if let Some(c) = body.sample(middle)
+                && c.distance < distance
+            {
+                // Moving a by 2δ·wa/(wa+wb) and b by 2δ·wb/(wa+wb) moves
+                // the middle by δ.
+                let push = c.normal * (2.0 * (distance - c.distance) / (wa + wb));
+                self.x[a] += push * wa;
+                self.x[b] += push * wb;
+            }
+        }
     }
 }
 
