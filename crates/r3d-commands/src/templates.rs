@@ -639,6 +639,9 @@ fn t_shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
 
 /// A sleeveless dress: front and back whole, the T-shirt's neckline,
 /// shoulders and armholes, taken in at the waist, flared below the hips.
+/// How far a dress's side seam sits towards the back (mm per quarter).
+const SIDE_TO_BACK_MM: f64 = 10.0;
+
 fn dress(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
     let chest = mm("chest_cm", s.chest_cm)?;
     let waist = mm("waist_cm", s.waist_cm)?;
@@ -659,9 +662,14 @@ fn dress(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
     let y_w = (len - (NECK_HEIGHT * h - waist_height_cm(d.tx.project())?) * 10.0).max(0.4 * len);
     let depth = (HIP_DEPTH * h * 10.0).min(0.5 * y_w);
     let flare = 0.12;
-    let c = b + flare * (y_w - depth);
-    let hip = p(b, y_w - depth);
-    let piece = |d: &mut Draft, name: &str, neck_depth: f64| {
+    // The side seam sits 1 cm towards the back, as on a basic block: the
+    // front, over the bust, is 4 cm wider around than the back, which
+    // would otherwise hang in folds. The whole side moves, so both sides
+    // of each seam keep the same length.
+    let piece = |d: &mut Draft, name: &str, neck_depth: f64, shift: f64| {
+        let (w, a, b) = (w + shift, a + shift, b + shift);
+        let c = b + flare * (y_w - depth);
+        let hip = p(b, y_w - depth);
         let k = 4.0 / 3.0 * neck_depth;
         let hole = |sign: f64| {
             [
@@ -693,8 +701,8 @@ fn dress(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
             ],
         )
     };
-    let front = piece(d, "Front", neck + 10.0)?;
-    let back = piece(d, "Back", 20.0)?;
+    let front = piece(d, "Front", neck + 10.0, SIDE_TO_BACK_MM)?;
+    let back = piece(d, "Back", 20.0, -SIDE_TO_BACK_MM)?;
     // Edges: 0 hem, 1–2 right side (hips, waist to underarm), 3 right
     // armhole, 4 right shoulder, 5 neckline, 6 left shoulder, 7 left
     // armhole, 8–9 left side. The front's right is the body's left, the
