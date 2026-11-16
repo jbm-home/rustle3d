@@ -7,6 +7,8 @@
 // ignore_for_file: argument_type_not_assignable
 
 import 'api/engine.dart';
+import 'api/library.dart';
+import 'api/templates.dart';
 
 import 'dart:async';
 import 'dart:convert';

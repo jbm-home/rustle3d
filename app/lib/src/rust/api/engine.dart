@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `adjust_by`, `cloth_hit`, `edited`, `err`, `extend_stroke`, `form`, `graphics`, `library`, `new`, `new`, `pick_cloth`, `poisoned`, `presets_file`, `rebuild`, `resync_if_due`, `rgba`, `selected`, `sim`, `to_theme`, `workspace`
+// These functions are ignored because they are not marked as `pub`: `adjust_by`, `cloth_hit`, `edited`, `err`, `extend_stroke`, `form`, `graphics`, `new`, `new`, `pick_cloth`, `poisoned`, `rebuild`, `resync_if_due`, `rgba`, `selected`, `sim`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
@@ -23,16 +23,9 @@ abstract class Engine implements RustOpaqueInterface {
     required int height,
   });
 
-  /// Body presets as JSON: `[{name, body, builtin}]`, standard sizes first,
-  /// then the user's own.
-  String bodyPresets();
-
   /// A click at pixel (`x`, `y`) of a view. Updates the shared selection
   /// and returns it (panel ids).
   List<String> click({required int view, required double x, required double y});
-
-  /// Delete one of the user's body presets.
-  void deleteBodyPreset({required String name});
 
   /// Stop rendering into a view (its UI texture is about to go away).
   void detachView({required int view});
@@ -109,10 +102,6 @@ abstract class Engine implements RustOpaqueInterface {
   /// garment first.
   SimStatus runSimulation({required bool running});
 
-  /// Save (or replace) one of the user's body presets. `body_json` is a
-  /// `Body` object as in the `avatar.set` command.
-  void saveBodyPreset({required String name, required String bodyJson});
-
   /// Replace the shared selection with these panel ids; unknown ids are
   /// ignored. Returns the resulting selection.
   List<String> select({required List<String> panels});
@@ -127,9 +116,6 @@ abstract class Engine implements RustOpaqueInterface {
   /// Set the canvas colours from the UI design system, so the board and
   /// the 3D view match the app theme.
   void setCanvas({required CanvasColors colors});
-
-  /// Where the user's libraries (body presets…) are stored.
-  void setLibraryDir({required String path});
 
   /// The latest simulation state.
   SimStatus simulationStatus();

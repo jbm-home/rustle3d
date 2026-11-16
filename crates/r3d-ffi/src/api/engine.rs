@@ -8,9 +8,7 @@ use std::sync::{Mutex, MutexGuard};
 use std::time::Instant;
 
 use flutter_rust_bridge::frb;
-use std::path::PathBuf;
 
-use r3d_avatar::presets::{BodyPreset, PresetLibrary};
 use r3d_commands::drape::{self, Drape, Form};
 use r3d_commands::{Script, Step, Workspace};
 use r3d_sim::Solver;
@@ -50,7 +48,7 @@ impl From<Message> for ApiError {
 }
 
 impl ApiError {
-    fn new(code: &str, text: impl Into<String>) -> Self {
+    pub(crate) fn new(code: &str, text: impl Into<String>) -> Self {
         Self {
             code: code.to_owned(),
             args: HashMap::new(),
@@ -59,7 +57,7 @@ impl ApiError {
     }
 }
 
-fn err(e: impl Localizable) -> ApiError {
+pub(crate) fn err(e: impl Localizable) -> ApiError {
     e.message().into()
 }
 
@@ -85,7 +83,7 @@ fn rgba(argb: u32) -> [f32; 4] {
 }
 
 impl CanvasColors {
-    fn to_theme(&self) -> Result<Theme, ApiError> {
+    pub(crate) fn to_theme(&self) -> Result<Theme, ApiError> {
         let pieces: [u32; PIECE_COLORS] = self.pieces.clone().try_into().map_err(|_| {
             ApiError::new(
                 "invalid.piece_colors",
@@ -198,8 +196,6 @@ pub struct Engine {
     selection: Mutex<Vec<PanelId>>,
     /// The edge picked within the selection, if any.
     selected_edge: Mutex<Option<EdgeId>>,
-    /// Folder of the user's libraries (body presets…), set by the UI.
-    library_dir: Mutex<Option<PathBuf>>,
     /// The simulation thread, started on first use.
     sim: Mutex<Option<SimThread>>,
     /// The loaded simulation's scene (pieces, pattern positions).
@@ -237,7 +233,6 @@ impl Engine {
             graphics: Mutex::new(None),
             selection: Mutex::new(Vec::new()),
             selected_edge: Mutex::new(None),
-            library_dir: Mutex::new(None),
             sim: Mutex::new(None),
             cloth: Mutex::new(None),
             form: Mutex::new(None),
@@ -1145,67 +1140,6 @@ impl Engine {
         Ok(selected.iter().map(ToString::to_string).collect())
     }
 
-    /// Where the user's libraries (body presets…) are stored.
-    #[frb(sync)]
-    pub fn set_library_dir(&self, path: String) -> Result<(), ApiError> {
-        *self.library_dir.lock().map_err(|_| poisoned())? = Some(PathBuf::from(path));
-        Ok(())
-    }
-
-    fn presets_file(&self) -> Result<PathBuf, ApiError> {
-        self.library_dir
-            .lock()
-            .map_err(|_| poisoned())?
-            .as_ref()
-            .map(|d| d.join("body-presets.json"))
-            .ok_or_else(|| ApiError::new("no_library", "the library folder is not set"))
-    }
-
-    fn library(&self) -> Result<PresetLibrary, ApiError> {
-        PresetLibrary::load(&self.presets_file()?)
-            .map_err(|e| ApiError::new("library", e.to_string()))
-    }
-
-    /// Body presets as JSON: `[{name, body, builtin}]`, standard sizes first,
-    /// then the user's own.
-    #[frb(sync)]
-    pub fn body_presets(&self) -> Result<String, ApiError> {
-        let tag = |p: BodyPreset, builtin: bool| serde_json::json!({ "name": p.name, "body": p.body, "builtin": builtin });
-        let mut all: Vec<serde_json::Value> = r3d_avatar::presets::builtin()
-            .into_iter()
-            .map(|p| tag(p, true))
-            .collect();
-        all.extend(self.library()?.presets.into_iter().map(|p| tag(p, false)));
-        Ok(serde_json::Value::Array(all).to_string())
-    }
-
-    /// Save (or replace) one of the user's body presets. `body_json` is a
-    /// `Body` object as in the `avatar.set` command.
-    #[frb(sync)]
-    pub fn save_body_preset(&self, name: String, body_json: String) -> Result<(), ApiError> {
-        let name = name.trim().to_owned();
-        if name.is_empty() {
-            return Err(ApiError::new("invalid.empty", "the preset needs a name"));
-        }
-        let body: Body = serde_json::from_str(&body_json)
-            .map_err(|e| ApiError::new("malformed", e.to_string()))?;
-        let mut lib = self.library()?;
-        lib.upsert(BodyPreset { name, body });
-        lib.save(&self.presets_file()?)
-            .map_err(|e| ApiError::new("library", e.to_string()))
-    }
-
-    /// Delete one of the user's body presets.
-    #[frb(sync)]
-    pub fn delete_body_preset(&self, name: String) -> Result<(), ApiError> {
-        let mut lib = self.library()?;
-        if lib.remove(&name) {
-            lib.save(&self.presets_file()?)
-                .map_err(|e| ApiError::new("library", e.to_string()))?;
-        }
-        Ok(())
-    }
-
     /// The shared selection (panel ids).
     #[frb(sync)]
     pub fn selection(&self) -> Result<Vec<String>, ApiError> {
@@ -1240,36 +1174,6 @@ mod tests {
                 .unwrap()
                 .contains("panel:2")
         );
-    }
-
-    #[test]
-    fn body_presets_are_listed_saved_and_deleted() {
-        let tmp = tempfile::tempdir().unwrap();
-        let engine = Engine::open(tmp.path().join("P.r3d").to_string_lossy().into()).unwrap();
-        assert_eq!(engine.body_presets().err().unwrap().code, "no_library");
-        engine
-            .set_library_dir(tmp.path().join("lib").to_string_lossy().into())
-            .unwrap();
-        let list = |e: &Engine| -> Vec<serde_json::Value> {
-            serde_json::from_str(&e.body_presets().unwrap()).unwrap()
-        };
-        let builtin = list(&engine).len();
-        assert!(builtin >= 9);
-        let body = r#"{"masculinity":0,"height_cm":165,"bust_cm":88,"waist_cm":70,"hips_cm":96}"#;
-        engine.save_body_preset("Me".into(), body.into()).unwrap();
-        let all = list(&engine);
-        assert_eq!(all.len(), builtin + 1);
-        assert_eq!(all.last().unwrap()["builtin"], false);
-        assert_eq!(
-            engine
-                .save_body_preset(" ".into(), body.into())
-                .err()
-                .unwrap()
-                .code,
-            "invalid.empty"
-        );
-        engine.delete_body_preset("Me".into()).unwrap();
-        assert_eq!(list(&engine).len(), builtin);
     }
 
     #[test]
