@@ -550,13 +550,33 @@ Make a linked mirror copy independent: it keeps its current shape and can then b
 
 ### `panel.place`
 
-Place a panel around the body for the 3D simulation: angle (0 front, 90 left side, 180 back, 270 right side), height of its top in cm, distance from the body in mm. Unplaced panels are not simulated.
+Place a panel around the body (or around an arm, for sleeves) for the 3D simulation: angle (0 front, 90 left side, 180 back, 270 right side; around an arm 0 is its outside), height of its top in cm, distance from the body in mm. Unplaced panels are not simulated.
 
 <details><summary>Parameters (JSON schema)</summary>
 
 ```json
 {
   "$defs": {
+    "Around": {
+      "description": "What a panel is wrapped around when the simulation starts.",
+      "oneOf": [
+        {
+          "const": "body",
+          "description": "The torso and legs: a vertical cylinder around the body's axis.",
+          "type": "string"
+        },
+        {
+          "const": "left_arm",
+          "description": "The left upper arm (the body's left, +x): a cylinder around the arm.",
+          "type": "string"
+        },
+        {
+          "const": "right_arm",
+          "description": "The right upper arm (−x).",
+          "type": "string"
+        }
+      ]
+    },
     "PanelId": {
       "description": "Identifier of a panel, e.g. `panel:1`.",
       "pattern": "^panel:[1-9][0-9]*$",
@@ -568,9 +588,14 @@ Place a panel around the body for the 3D simulation: angle (0 front, 90 left sid
   "description": "Place a panel around the body for the simulation.",
   "properties": {
     "angle_deg": {
-      "description": "Angle around the body (degrees): 0 front, 90 the body's left side,\n180 back, 270 right side.",
+      "description": "Angle around the body (degrees): 0 front, 90 the body's left side,\n180 back, 270 right side. Around an arm: 0 the outside of the arm,\n180 the side facing the body.",
       "format": "double",
       "type": "number"
+    },
+    "around": {
+      "$ref": "#/$defs/Around",
+      "default": "body",
+      "description": "What the panel is wrapped around: `body` (default), `left_arm` or\n`right_arm` (sleeves)."
     },
     "offset_mm": {
       "default": 30.0,
@@ -582,7 +607,7 @@ Place a panel around the body for the 3D simulation: angle (0 front, 90 left sid
       "$ref": "#/$defs/PanelId"
     },
     "top_cm": {
-      "description": "Height of the panel's top above the floor (cm).",
+      "description": "Height of the panel's top above the floor (cm). Around an arm, the\ntop goes to the arm at that height and the panel runs down the arm.",
       "format": "double",
       "type": "number"
     }
@@ -1476,7 +1501,7 @@ Choose what the garment is made of: cotton, denim, jersey, silk or wool. Sets ho
 
 ### `garment.arrange`
 
-Place every panel around the body for the simulation, evenly spaced in the order the seams join them (a panel's right side continues into the next panel), tops at the avatar's waist unless top_cm is given. Re-run it after adding panels or seams.
+Place every panel around the body for the simulation, evenly spaced in the order the seams join them (a panel's right side continues into the next panel), tops at the avatar's waist (its narrowest girth) unless top_cm is given. Panels placed on an arm (sleeves) keep their placement. Re-run it after adding panels or seams.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -1541,6 +1566,115 @@ Set the garment's colour as #RRGGBB, or clear it to use the fabric's usual colou
     }
   },
   "title": "GarmentSetColor",
+  "type": "object"
+}
+```
+
+</details>
+
+### `template.apply`
+
+Draft a starter garment (t_shirt, straight_skirt, a_line_skirt) from sizes in cm, the avatar's measurements filling in any left out: its pieces are drawn, sewn, placed around the body and given a fabric, ready to simulate and edit. A project without panels takes the template's name. Returns the panels, seams and notches.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "Sizes": {
+      "additionalProperties": false,
+      "description": "Sizes for a template (cm). Any left out come from the avatar's\nmeasurements, or from a standard size without an avatar.",
+      "properties": {
+        "chest_cm": {
+          "description": "Body chest or bust (tops).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "ease_cm": {
+          "description": "Room added to the body measurements (hips for skirts, chest for\ntops).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "hips_cm": {
+          "description": "Body hips (skirts).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "length_cm": {
+          "description": "Garment length: waist to hem for skirts, neck to hem for tops.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "sleeve_cm": {
+          "description": "Sleeve length, from the top of the shoulder.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "waist_cm": {
+          "description": "Body waist (skirts).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "Template": {
+      "description": "The starter garments.",
+      "oneOf": [
+        {
+          "const": "straight_skirt",
+          "description": "A straight skirt: a front and two back halves, close at the hips.",
+          "type": "string"
+        },
+        {
+          "const": "a_line_skirt",
+          "description": "An A-line skirt: the straight skirt flared towards the hem.",
+          "type": "string"
+        },
+        {
+          "const": "t_shirt",
+          "description": "A T-shirt: front, back and two short sleeves.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Draft a starter garment from body measurements.",
+  "properties": {
+    "sizes": {
+      "$ref": "#/$defs/Sizes",
+      "default": {},
+      "description": "Sizes in cm; any left out come from the avatar (see template.list)."
+    },
+    "template": {
+      "$ref": "#/$defs/Template",
+      "description": "`t_shirt`, `straight_skirt` or `a_line_skirt`."
+    }
+  },
+  "required": [
+    "template"
+  ],
+  "title": "TemplateApply",
   "type": "object"
 }
 ```
@@ -1762,6 +1896,24 @@ Every pin: its panel, the pinned point on the pattern (mm) and where it is held 
   "additionalProperties": false,
   "description": "Every pin.",
   "title": "PinList",
+  "type": "object"
+}
+```
+
+</details>
+
+### `template.list`
+
+The starter garments template.apply can draft, each with the sizes it reads (cm), filled in from the avatar's measurements (or a standard size without one).
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The starter garments and their default sizes.",
+  "title": "TemplateList",
   "type": "object"
 }
 ```

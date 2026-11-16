@@ -12,7 +12,7 @@ use std::path::PathBuf;
 
 use r3d_avatar::presets::{BodyPreset, PresetLibrary};
 use r3d_commands::drape::{self, Drape, Form};
-use r3d_commands::{Script, Step, Workspace, templates};
+use r3d_commands::{Script, Step, Workspace};
 use r3d_sim::Solver;
 
 use crate::cloth::{
@@ -450,18 +450,6 @@ impl Engine {
             }
         })
         .collect()
-    }
-
-    /// Run a built-in template (a starting project, see
-    /// `r3d_commands::templates`) and return its results like `run_script`.
-    #[frb(sync)]
-    pub fn run_template(&self, name: String) -> Result<String, ApiError> {
-        let script = templates::get(&name).ok_or_else(|| ApiError {
-            code: "not_found".into(),
-            args: HashMap::from([("id".into(), name.clone())]),
-            text: format!("no template called {name}"),
-        })?;
-        self.run_script(script.to_owned())
     }
 
     /// Attach a view rendering into a UI texture (`surface`: platform handle

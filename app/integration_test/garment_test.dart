@@ -32,7 +32,12 @@ void main() {
         },
       }),
     );
-    engine.runTemplate(name: 'a-line-skirt');
+    engine.run(
+      stepJson: jsonEncode({
+        'type': 'template.apply',
+        'template': 'a_line_skirt',
+      }),
+    );
     expect(engine.resetSimulation().loaded, isTrue);
 
     await tester.pumpWidget(Rustle3dApp(engine: engine));

@@ -107,7 +107,8 @@ fn agents_simulate_and_look_at_the_garment() {
     let mut ws = Workspace::create(&tmp.path().join("P.r3d"), "P").unwrap();
     let body = r#"[{"type": "avatar.set", "body": {"masculinity": 0, "height_cm": 168,
         "bust_cm": 90, "waist_cm": 73, "hips_cm": 98}}]"#;
-    for script in [body, r3d_commands::templates::get("a-line-skirt").unwrap()] {
+    let skirt = r#"[{"type": "template.apply", "template": "a_line_skirt"}]"#;
+    for script in [body, skirt] {
         let script = r3d_commands::Script::parse(script).unwrap();
         script.run(|step| ws.run_step(step)).unwrap();
     }

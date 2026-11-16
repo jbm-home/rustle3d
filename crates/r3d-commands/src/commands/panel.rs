@@ -1,4 +1,6 @@
-use r3d_core::{AnyId, Edge, EdgeCurve, MirrorLink, Panel, PanelId, Placement, Point, Transaction};
+use r3d_core::{
+    AnyId, Around, Edge, EdgeCurve, MirrorLink, Panel, PanelId, Placement, Point, Transaction,
+};
 use r3d_geom::{DVec2, polygon};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -407,10 +409,16 @@ impl CommandSpec for PanelDelete {
 #[serde(deny_unknown_fields)]
 pub struct PanelPlace {
     pub panel: PanelId,
+    /// What the panel is wrapped around: `body` (default), `left_arm` or
+    /// `right_arm` (sleeves).
+    #[serde(default)]
+    pub around: Around,
     /// Angle around the body (degrees): 0 front, 90 the body's left side,
-    /// 180 back, 270 right side.
+    /// 180 back, 270 right side. Around an arm: 0 the outside of the arm,
+    /// 180 the side facing the body.
     pub angle_deg: f64,
-    /// Height of the panel's top above the floor (cm).
+    /// Height of the panel's top above the floor (cm). Around an arm, the
+    /// top goes to the arm at that height and the panel runs down the arm.
     pub top_cm: f64,
     /// Distance from the body at the start of the simulation (mm,
     /// default 30).
@@ -423,7 +431,7 @@ fn default_offset() -> f64 {
 }
 
 impl Described for PanelPlace {
-    const SUMMARY: &'static str = "Place a panel around the body for the 3D simulation: angle (0 front, 90 left side, 180 back, 270 right side), height of its top in cm, distance from the body in mm. Unplaced panels are not simulated.";
+    const SUMMARY: &'static str = "Place a panel around the body (or around an arm, for sleeves) for the 3D simulation: angle (0 front, 90 left side, 180 back, 270 right side; around an arm 0 is its outside), height of its top in cm, distance from the body in mm. Unplaced panels are not simulated.";
 }
 
 impl CommandSpec for PanelPlace {
@@ -433,6 +441,7 @@ impl CommandSpec for PanelPlace {
         non_negative("offset_mm", self.offset_mm)?;
         let mut p = get_panel(tx.project(), self.panel)?;
         p.placement = Some(Placement {
+            around: self.around,
             angle_deg: self.angle_deg.rem_euclid(360.0),
             top_cm: self.top_cm,
             offset_mm: self.offset_mm,

@@ -1,0 +1,4 @@
+[
+  {"type": "template.apply", "template": "a_line_skirt", "sizes": {"length_cm": 60}},
+  {"type": "seam.list"}
+]

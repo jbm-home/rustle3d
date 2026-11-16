@@ -109,10 +109,6 @@ abstract class Engine implements RustOpaqueInterface {
   /// garment first.
   SimStatus runSimulation({required bool running});
 
-  /// Run a built-in template (a starting project, see
-  /// `r3d_commands::templates`) and return its results like `run_script`.
-  String runTemplate({required String name});
-
   /// Save (or replace) one of the user's body presets. `body_json` is a
   /// `Body` object as in the `avatar.set` command.
   void saveBodyPreset({required String name, required String bodyJson});

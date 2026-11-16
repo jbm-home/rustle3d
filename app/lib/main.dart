@@ -21,7 +21,9 @@ Future<void> main() async {
     engine.run(stepJson: '{"type":"project.summary"}'),
   );
   if ((summary['counts']['panels'] as int) == 0) {
-    engine.runTemplate(name: 'a-line-skirt');
+    engine.run(
+      stepJson: '{"type":"template.apply","template":"a_line_skirt"}',
+    );
   }
   engine.setLibraryDir(path: (await getApplicationSupportDirectory()).path);
   // Every project starts with a body to dress: a standard size.

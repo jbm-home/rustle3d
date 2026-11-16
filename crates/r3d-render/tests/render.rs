@@ -5,7 +5,7 @@
 use r3d_avatar::fit::{fit, fitted_positions};
 use r3d_avatar::model::BodyModel;
 use r3d_commands::drape;
-use r3d_commands::{Script, Session, templates};
+use r3d_commands::{Script, Session};
 use r3d_core::{Fabric, Project};
 use r3d_render::board::BoardView;
 use r3d_render::offscreen::{PNG_FORMAT, render_png};
@@ -94,8 +94,10 @@ fn view3d_renders_the_avatar_and_the_cloth() {
     avatar.recompute_normals();
     // The skirt template where the simulation starts it, around the body.
     let mut session = Session::new(Project::new("t"));
-    let script = Script::parse(templates::get("a-line-skirt").unwrap()).unwrap();
-    script.run(|step| session.run_step(step)).unwrap();
+    let step = serde_json::json!({"type": "template.apply", "template": "a_line_skirt"});
+    session
+        .run_step(&r3d_commands::Step::from_value(step).unwrap())
+        .unwrap();
     let form = drape::Form::new(avatar.positions.clone(), model.triangles().to_vec());
     let scene = drape::build(session.project(), Some(&form), 25.0)
         .unwrap()

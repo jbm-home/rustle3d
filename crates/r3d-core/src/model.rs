@@ -90,15 +90,33 @@ pub enum Fabric {
     Wool,
 }
 
+/// What a panel is wrapped around when the simulation starts.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Around {
+    /// The torso and legs: a vertical cylinder around the body's axis.
+    #[default]
+    Body,
+    /// The left upper arm (the body's left, +x): a cylinder around the arm.
+    LeftArm,
+    /// The right upper arm (−x).
+    RightArm,
+}
+
 /// Where a panel sits around the body for the simulation: wrapped on a
-/// vertical cylinder around the body's axis.
+/// cylinder around the body's axis or around an arm.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Placement {
+    pub around: Around,
     /// Angle around the body (degrees): 0 = front, 90 = the body's left
-    /// side, 180 = back, 270 = right side. The panel's centre goes there.
+    /// side, 180 = back, 270 = right side. Around an arm: 0 = the outside
+    /// of the arm, 180 = the side facing the body. The panel's centre goes
+    /// there.
     pub angle_deg: f64,
-    /// Height of the panel's top above the floor (cm).
+    /// Height of the panel's top above the floor (cm). Around an arm, the
+    /// top goes to the arm's axis at that height and the panel runs down
+    /// the arm.
     pub top_cm: f64,
     /// Distance between the body and the panel when it starts (mm).
     pub offset_mm: f64,

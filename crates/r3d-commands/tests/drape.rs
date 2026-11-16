@@ -2,19 +2,21 @@
 //! End to end: a sewn skirt on the avatar drapes and stays on the hips.
 
 use r3d_commands::drape::{DEFAULT_SPACING_MM, Form, build};
-use r3d_commands::{Script, Session, Step, templates};
+mod common;
+
+use r3d_commands::{Session, Step};
 use r3d_core::Project;
 use r3d_sim::Solver;
 
 #[test]
 fn skirt_template_closes_and_stays_on_the_body() {
     let mut s = Session::new(Project::new("t"));
-    let body = serde_json::json!({"type": "avatar.set", "preset": "Women M",
-        "body": {"masculinity": 0, "height_cm": 168, "bust_cm": 90, "waist_cm": 73, "hips_cm": 98}});
-    s.run_step(&Step::from_value(body).unwrap()).unwrap();
-    let script = Script::parse(templates::get("a-line-skirt").unwrap()).unwrap();
-    let results = script.run(|step| s.run_step(step)).unwrap();
-    let seams = results.last().unwrap().as_array().unwrap();
+    common::women_m(&mut s);
+    common::a_line_skirt(&mut s);
+    let seams = s
+        .run_step(&Step::from_value(serde_json::json!({"type": "seam.list"})).unwrap())
+        .unwrap();
+    let seams = seams.as_array().unwrap();
     assert_eq!(seams.len(), 3);
     assert!(seams.iter().all(|s| s["mismatch_mm"] == 0.0), "{seams:?}");
 
@@ -61,16 +63,14 @@ fn skirt_template_closes_and_stays_on_the_body() {
 #[test]
 fn a_pin_holds_the_cloth_where_it_says() {
     let mut s = Session::new(Project::new("t"));
-    let body = serde_json::json!({"type": "avatar.set", "preset": "Women M",
-        "body": {"masculinity": 0, "height_cm": 168, "bust_cm": 90, "waist_cm": 73, "hips_cm": 98}});
-    s.run_step(&Step::from_value(body).unwrap()).unwrap();
-    let script = Script::parse(templates::get("a-line-skirt").unwrap()).unwrap();
-    let results = script.run(|step| s.run_step(step)).unwrap();
-    let front = results[2]["created"][0].clone();
+    common::women_m(&mut s);
+    let front = common::a_line_skirt(&mut s);
     // Hold the middle of the front hem out in front of the knees.
     let hand = [0.05, 0.6, 0.35];
-    let pin =
-        serde_json::json!({"type": "pin.add", "panel": front, "at": [390, 0], "position": hand});
+    let id: r3d_core::PanelId = front.panel.as_str().unwrap().parse().unwrap();
+    let b = s.project().panel_bounding_box(id).unwrap();
+    let pin = serde_json::json!({"type": "pin.add", "panel": front.panel,
+        "at": [(b.min.x + b.max.x) / 2.0, 0], "position": hand});
     s.run_step(&Step::from_value(pin).unwrap()).unwrap();
 
     let form = Form::of_project(s.project()).unwrap().unwrap();
@@ -92,12 +92,8 @@ fn a_pin_holds_the_cloth_where_it_says() {
 #[test]
 fn edits_carry_the_drape_over_without_a_jump() {
     let mut s = Session::new(Project::new("t"));
-    let body = serde_json::json!({"type": "avatar.set",
-        "body": {"masculinity": 0, "height_cm": 168, "bust_cm": 90, "waist_cm": 73, "hips_cm": 98}});
-    s.run_step(&Step::from_value(body).unwrap()).unwrap();
-    let script = Script::parse(templates::get("a-line-skirt").unwrap()).unwrap();
-    let results = script.run(|step| s.run_step(step)).unwrap();
-    let front = &results[2]["created"];
+    common::women_m(&mut s);
+    let front = common::a_line_skirt(&mut s);
     let form = Form::of_project(s.project()).unwrap().unwrap();
     let old = build(s.project(), Some(&form), DEFAULT_SPACING_MM).unwrap();
     let mut solver = Solver::new(old.scene.clone());
@@ -107,8 +103,10 @@ fn edits_carry_the_drape_over_without_a_jump() {
     let draped = solver.positions().to_vec();
 
     // Lengthen the front by 50 mm: move its two hem corners down.
-    for (k, x) in [(1, 0.0), (2, 780.0)] {
-        let step = serde_json::json!({"type": "point.move", "point": front[k], "to": [x, -50.0]});
+    for point in &front.points[..2] {
+        let id: r3d_core::PointId = point.as_str().unwrap().parse().unwrap();
+        let x = s.project().point(id).unwrap().pos.x;
+        let step = serde_json::json!({"type": "point.move", "point": point, "to": [x, -50.0]});
         s.run_step(&Step::from_value(step).unwrap()).unwrap();
     }
     let mut new = build(s.project(), Some(&form), DEFAULT_SPACING_MM).unwrap();

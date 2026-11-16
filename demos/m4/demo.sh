@@ -15,7 +15,7 @@ echo "== 1. A standard body (fitted MakeHuman avatar), measurements achieved"
 "$R3D" run "$OUT" demos/m4/body.json | grep -E '"(height_cm|bust_cm|waist_cm|hips_cm)"' | head -n 4
 
 echo "== 2. The skirt template: three pieces, placed and sewn; seam lengths"
-"$R3D" run "$OUT" templates/a-line-skirt.json | grep -E '"(length_mm|mismatch_mm)"' | head -n 9
+"$R3D" run "$OUT" demos/m4/skirt.json | grep -E '"(length_mm|mismatch_mm)"' | head -n 9
 
 echo "== 3. Drape it headless (5 s of simulated time), in cotton then denim"
 "$R3D" simulate "$OUT" --frames 300 | grep -E '"(top_m|bottom_m|max_seam_gap_mm|ms_per_frame)"'

@@ -15,7 +15,7 @@ OUT="$(mktemp -d)/Skirt.r3d"
 
 "$R3D" new "$OUT" >/dev/null
 "$R3D" run "$OUT" demos/m4/body.json >/dev/null
-"$R3D" run "$OUT" templates/a-line-skirt.json >/dev/null
+"$R3D" run "$OUT" demos/m4/skirt.json >/dev/null
 
 echo "== 1. The skirt as drafted: drape and pattern"
 "$R3D" simulate "$OUT" --frames 240 | grep -E '"(top_m|bottom_m)"'

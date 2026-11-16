@@ -1,6 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // test code
 
-use r3d_commands::{CommandError, Script, Session, Step, templates};
+mod common;
+
+use r3d_commands::{CommandError, Session, Step};
 use r3d_core::{Localizable, Project};
 use serde_json::{Value, json};
 
@@ -8,11 +10,10 @@ fn run(s: &mut Session, v: Value) -> Result<Value, CommandError> {
     Step::from_value(v).and_then(|step| s.run_step(&step))
 }
 
-fn skirt() -> (Session, Vec<Value>) {
+fn skirt() -> (Session, common::Piece) {
     let mut s = Session::new(Project::new("t"));
-    let script = Script::parse(templates::get("a-line-skirt").unwrap()).unwrap();
-    let results = script.run(|step| s.run_step(step)).unwrap();
-    (s, results)
+    let front = common::a_line_skirt(&mut s);
+    (s, front)
 }
 
 fn max_mismatch(s: &mut Session) -> f64 {
@@ -37,10 +38,11 @@ fn pos(s: &Session, id: &Value) -> (f64, f64) {
 
 #[test]
 fn taking_in_a_side_seam_keeps_it_matched() {
-    let (mut s, results) = skirt();
-    let side_seam = results[14]["created"][0].clone(); // front right side + back left
-    let front = &results[2]["created"];
-    let (hem, waist) = (front[2].clone(), front[3].clone()); // (780,0), (575,600)
+    let (mut s, front) = skirt();
+    // The front's right side, sewn to the back left.
+    let edge: r3d_core::EdgeId = front.edges[1].as_str().unwrap().parse().unwrap();
+    let side_seam = json!(s.project().seam_of(edge).unwrap().to_string());
+    let (hem, waist) = (front.points[1].clone(), front.points[2].clone());
     let (hem0, waist0) = (pos(&s, &hem), pos(&s, &waist));
 
     run(
@@ -58,7 +60,7 @@ fn taking_in_a_side_seam_keeps_it_matched() {
     // Only at the waist: the hem stays. The back is a linked mirror, so the
     // left side seam is taken in too (its waist point moves right), and
     // every seam stays matched even though the change is tapered.
-    let left_waist = front[4].clone(); // (205, 600)
+    let left_waist = front.points[3].clone();
     let left0 = pos(&s, &left_waist);
     run(
         &mut s,
@@ -72,7 +74,7 @@ fn taking_in_a_side_seam_keeps_it_matched() {
 
     let err = run(
         &mut s,
-        json!({"type": "seam.take_in", "seam": side_seam, "mm": 5, "at": front[1]}),
+        json!({"type": "seam.take_in", "seam": side_seam, "mm": 5, "at": front.points[0]}),
     )
     .unwrap_err();
     assert_eq!(err.message().code, "invalid.not_seam_end");

@@ -1,6 +1,6 @@
 //! Place every panel around the body ("Arrange all").
 
-use r3d_core::{PanelId, Placement, Project, Transaction};
+use r3d_core::{Around, PanelId, Placement, Project, Transaction};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -8,11 +8,18 @@ use super::centre;
 use crate::error::{CommandError, positive};
 use crate::spec::{CommandOutput, CommandSpec, Described};
 
-/// Waist height as a fraction of stature (general anthropometry: about
-/// 0.62–0.66 for adults).
-const WAIST_PER_HEIGHT: f64 = 0.655;
 /// Panel tops when there is no avatar (cm).
 const DEFAULT_TOP_CM: f64 = 110.0;
+
+/// Height of the avatar's waist (its narrowest girth) above the floor
+/// (cm); [`DEFAULT_TOP_CM`] without an avatar. Skirts hang from there.
+pub(crate) fn waist_height_cm(p: &Project) -> Result<f64, CommandError> {
+    let Some(avatar) = p.avatar() else {
+        return Ok(DEFAULT_TOP_CM);
+    };
+    let fit = r3d_avatar::fit::fit(crate::queries::body_model()?, &avatar.body);
+    Ok(f64::from(fit.achieved.waist_height_cm))
+}
 
 /// Place every panel around the body.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -24,13 +31,24 @@ pub struct GarmentArrange {
 }
 
 impl Described for GarmentArrange {
-    const SUMMARY: &'static str = "Place every panel around the body for the simulation, evenly spaced in the order the seams join them (a panel's right side continues into the next panel), tops at the avatar's waist unless top_cm is given. Re-run it after adding panels or seams.";
+    const SUMMARY: &'static str = "Place every panel around the body for the simulation, evenly spaced in the order the seams join them (a panel's right side continues into the next panel), tops at the avatar's waist (its narrowest girth) unless top_cm is given. Panels placed on an arm (sleeves) keep their placement. Re-run it after adding panels or seams.";
 }
 
-/// The panels in the order the seams join them: from a panel, the next one
-/// is sewn to its right side (larger x on the pattern).
+fn on_arm(p: &Project, panel: PanelId) -> bool {
+    p.panel(panel)
+        .and_then(|pn| pn.placement)
+        .is_some_and(|pl| pl.around != Around::Body)
+}
+
+/// The body panels in the order the seams join them: from a panel, the
+/// next one is sewn to its right side (larger x on the pattern).
 fn ring(p: &Project) -> Vec<PanelId> {
-    let mut left: Vec<PanelId> = p.panels().keys().copied().collect();
+    let mut left: Vec<PanelId> = p
+        .panels()
+        .keys()
+        .copied()
+        .filter(|id| !on_arm(p, *id))
+        .collect();
     let mut order = Vec::with_capacity(left.len());
     let mut current = left.first().copied();
     while let Some(panel) = current {
@@ -64,9 +82,7 @@ impl CommandSpec for GarmentArrange {
                 positive("top_cm", t)?;
                 t
             }
-            None => p
-                .avatar()
-                .map_or(DEFAULT_TOP_CM, |a| a.body.height_cm * WAIST_PER_HEIGHT),
+            None => waist_height_cm(p)?,
         };
         let order = ring(p);
         let n = order.len().max(1) as f64;
@@ -77,6 +93,7 @@ impl CommandSpec for GarmentArrange {
             .collect();
         for (id, mut panel, i) in panels {
             panel.placement = Some(Placement {
+                around: Around::Body,
                 angle_deg: 360.0 * i as f64 / n,
                 top_cm,
                 offset_mm: panel.placement.map_or(30.0, |pl| pl.offset_mm),

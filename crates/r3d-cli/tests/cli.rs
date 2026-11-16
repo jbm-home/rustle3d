@@ -274,7 +274,7 @@ fn run_resolves_references_to_earlier_results() {
 fn skirt_project(dir: &std::path::Path) {
     r3d().arg("new").arg(dir).assert().success();
     let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
-    for script in ["demos/m4/body.json", "templates/a-line-skirt.json"] {
+    for script in ["demos/m4/body.json", "demos/m4/skirt.json"] {
         r3d()
             .arg("run")
             .arg(dir)

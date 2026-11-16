@@ -491,3 +491,18 @@ impl QuerySpec for PinList {
         ))
     }
 }
+
+/// The starter garments and their default sizes.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct TemplateList {}
+
+impl Described for TemplateList {
+    const SUMMARY: &'static str = "The starter garments template.apply can draft, each with the sizes it reads (cm), filled in from the avatar's measurements (or a standard size without one).";
+}
+
+impl QuerySpec for TemplateList {
+    fn run(&self, p: &Project) -> Result<Value, CommandError> {
+        to_value(&crate::templates::list(p.avatar().map(|a| &a.body)))
+    }
+}

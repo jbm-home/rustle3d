@@ -12,8 +12,8 @@ use std::path::PathBuf;
 use glam::DVec2;
 use r3d_core::file::{self, SCHEMA_VERSION};
 use r3d_core::{
-    Avatar, Body, Edge, EdgeCurve, InternalLine, Notch, Panel, PathSegment, Pin, Placement, Point,
-    Project, Seam, SeamSide, Transaction,
+    Around, Avatar, Body, Edge, EdgeCurve, InternalLine, Notch, Panel, PathSegment, Pin, Placement,
+    Point, Project, Seam, SeamSide, Transaction,
 };
 
 fn golden_dir(version: u32) -> PathBuf {
@@ -73,6 +73,7 @@ fn sample() -> Project {
             seam_allowance_mm: 10.0,
             mirror_of: None,
             placement: Some(Placement {
+                around: Around::Body,
                 angle_deg: 0.0,
                 top_cm: 104.0,
                 offset_mm: 30.0,

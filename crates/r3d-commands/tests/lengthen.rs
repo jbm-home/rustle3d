@@ -1,6 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // test code
 
-use r3d_commands::{CommandError, Script, Session, Step, templates};
+mod common;
+
+use r3d_commands::{CommandError, Session, Step};
 use r3d_core::{Localizable, Project};
 use serde_json::{Value, json};
 
@@ -26,9 +28,8 @@ fn heights(s: &Session) -> Vec<(f64, f64)> {
 #[test]
 fn shortening_the_hem_moves_the_whole_hemline() {
     let mut s = Session::new(Project::new("t"));
-    let script = Script::parse(templates::get("a-line-skirt").unwrap()).unwrap();
-    let results = script.run(|step| s.run_step(step)).unwrap();
-    let front_hem = results[2]["created"][5].clone(); // bottom edge (0,0)→(780,0)
+    let front = common::a_line_skirt(&mut s);
+    let front_hem = front.edges[0].clone();
     let before = heights(&s);
 
     run(
@@ -53,7 +54,7 @@ fn shortening_the_hem_moves_the_whole_hemline() {
     assert_eq!(heights(&s), before);
 
     // Seams cannot be lengthened this way, and a hem cannot cross the waist.
-    let side = results[2]["created"][6].clone();
+    let side = front.edges[1].clone();
     let err = run(
         &mut s,
         json!({"type": "edge.lengthen", "edge": side, "mm": 10}),
@@ -65,5 +66,9 @@ fn shortening_the_hem_moves_the_whole_hemline() {
         json!({"type": "edge.lengthen", "edge": front_hem, "mm": -700}),
     )
     .unwrap_err();
-    assert_eq!(err.message().code, "invalid.inverted");
+    // The curved side seams cross before the panel turns inside out.
+    assert!(
+        ["invalid.inverted", "invalid.not_simple"].contains(&err.message().code),
+        "{err}"
+    );
 }

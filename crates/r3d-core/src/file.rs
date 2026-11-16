@@ -20,7 +20,7 @@ use crate::model::Project;
 /// Identifies a Rustle3D project file.
 pub const FORMAT: &str = "rustle3d.project";
 /// Version written by this build.
-pub const SCHEMA_VERSION: u32 = 5;
+pub const SCHEMA_VERSION: u32 = 6;
 
 type Migration = fn(Value) -> Result<Value, FileError>;
 
@@ -30,6 +30,7 @@ const MIGRATIONS: &[Migration] = &[
     migrate_v2_to_v3,
     migrate_v3_to_v4,
     migrate_v4_to_v5,
+    migrate_v5_to_v6,
 ];
 
 fn object<'a>(
@@ -39,6 +40,21 @@ fn object<'a>(
     value.as_object_mut().ok_or_else(|| FileError::Json {
         detail: format!("{what} is not an object"),
     })
+}
+
+/// v6 says what each placed panel is wrapped around (until then, the
+/// body).
+fn migrate_v5_to_v6(mut project: Value) -> Result<Value, FileError> {
+    if let Some(panels) = object(&mut project, "project")?.get_mut("panels") {
+        for panel in object(panels, "panels")?.values_mut() {
+            if let Some(place) = object(panel, "panel")?.get_mut("placement")
+                && let Some(place) = place.as_object_mut()
+            {
+                place.insert("around".into(), Value::from("body"));
+            }
+        }
+    }
+    Ok(project)
 }
 
 /// v5 adds pins.

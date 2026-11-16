@@ -17,7 +17,7 @@ use std::time::Instant;
 
 use glam::{Vec2, Vec3};
 use r3d_avatar::fit::{fit, fitted_positions};
-use r3d_core::{EdgeId, Fabric, PanelId, PinId, Project};
+use r3d_core::{Around, EdgeId, Fabric, PanelId, PinId, Project};
 use r3d_geom::DVec2;
 use r3d_geom::mesh::mesh_polygon;
 use r3d_sim::collide::StaticMesh;
@@ -31,6 +31,8 @@ use crate::queries::body_model;
 pub const DEFAULT_SPACING_MM: f64 = 25.0;
 /// Grid step of the avatar's distance field (m).
 const BODY_VOXEL: f32 = 0.005;
+/// Stature assumed when there is no avatar (m).
+const DEFAULT_HEIGHT_M: f32 = 1.68;
 /// Body radius assumed when there is no avatar (m).
 const DEFAULT_BODY_RADIUS_M: f32 = 0.16;
 
@@ -56,8 +58,9 @@ pub struct Piece {
 }
 
 /// The dress form garments are draped on: the fitted body (m), its
-/// profile and its distance field. Building one takes a fraction of a
-/// second, so callers keep it for as long as the measurements do not change.
+/// profile, its upper arms and its distance field. Building one takes a
+/// fraction of a second, so callers keep it for as long as the
+/// measurements do not change.
 #[derive(Debug, Clone)]
 pub struct Form {
     pub positions: Vec<Vec3>,
@@ -66,32 +69,148 @@ pub struct Form {
     /// `PROFILE_STEP` from the floor and every 360° / `ANGLE_BINS` around
     /// (angle 0 = front, as placements count), arms left out.
     radial: Vec<[f32; ANGLE_BINS]>,
+    /// The left (+x) and right upper arms.
+    arms: [Arm; 2],
     collider: StaticMesh,
+}
+
+/// An upper arm: a straight axis from the shoulder towards the elbow, and
+/// how far the arm reaches from it.
+#[derive(Debug, Clone)]
+struct Arm {
+    /// A point on the axis (m).
+    point: Vec3,
+    /// Unit direction down the arm.
+    down: Vec3,
+    /// Largest distance of the arm's surface from the axis (m), every
+    /// `PROFILE_STEP` along it from `point - REACH_FROM * down`.
+    reach: Vec<f32>,
 }
 
 /// Height step of the body profile (m).
 const PROFILE_STEP: f32 = 0.01;
 /// Angular bins of the body profile.
 const ANGLE_BINS: usize = 36;
-/// Body points farther from the axis than this are arms (in the A pose the
-/// hands hang at hip height, about 0.4 m out), not part of what a skirt or
-/// a top wraps.
+/// Body points farther from the axis than this are forearms and hands (in
+/// the A pose the hands hang at hip height, about 0.4 m out).
 const ARM_REACH_M: f32 = 0.3;
+/// The upper arm, as fractions of stature in the A pose of the base body:
+/// between these heights, points farther out than `ARM_SIDE` are the arm.
+const UPPER_ARM_HEIGHTS: (f32, f32) = (0.69, 0.79);
+const ARM_SIDE: f32 = 0.13;
+/// Points closer than this to an upper arm's axis, below the shoulder
+/// (`SHOULDER` of stature), belong to the arm (m; the arm itself measures
+/// 5–6 cm from its axis, the torso 13 cm or more).
+const ARM_RADIUS_M: f32 = 0.08;
+const SHOULDER: f32 = 0.78;
+/// The arm profile starts this far up the axis from its point (m).
+const REACH_FROM: f32 = 0.5;
+/// Arm reach assumed between measured rows and without an avatar (m).
+const DEFAULT_ARM_RADIUS_M: f32 = 0.05;
 
 fn angle_bin(theta: f32) -> usize {
     let t = theta.rem_euclid(std::f32::consts::TAU) / std::f32::consts::TAU;
     ((t * ANGLE_BINS as f32) as usize).min(ANGLE_BINS - 1)
 }
 
+/// Unit principal direction of `points` around their centroid (power
+/// iteration from `start`).
+fn principal_axis(points: &[Vec3], centre: Vec3, start: Vec3) -> Vec3 {
+    let mut cov = glam::Mat3::ZERO;
+    for p in points {
+        let d = *p - centre;
+        cov += glam::Mat3::from_cols(d * d.x, d * d.y, d * d.z);
+    }
+    let mut axis = start;
+    for _ in 0..64 {
+        axis = (cov * axis).normalize_or(start);
+    }
+    axis
+}
+
+impl Arm {
+    /// The arm on `side` (+1 left, −1 right) of a body of `height` (m),
+    /// without an avatar: a typical A pose.
+    fn default(side: f32, height: f32) -> Self {
+        Self {
+            point: Vec3::new(side * 0.17 * height, 0.72 * height, 0.0),
+            down: Vec3::new(side * 0.6, -0.8, 0.0),
+            reach: Vec::new(),
+        }
+    }
+
+    /// Find the upper arm on `side` of a body (A pose).
+    fn find(positions: &[Vec3], height: f32, side: f32) -> Self {
+        let (lo, hi) = UPPER_ARM_HEIGHTS;
+        let upper: Vec<Vec3> = positions
+            .iter()
+            .copied()
+            .filter(|p| side * p.x > ARM_SIDE * height && p.y > lo * height && p.y < hi * height)
+            .collect();
+        if upper.len() < 3 {
+            return Self::default(side, height);
+        }
+        let point = upper.iter().copied().sum::<Vec3>() / upper.len() as f32;
+        let mut down = principal_axis(&upper, point, Vec3::new(side, -1.0, 0.0).normalize());
+        if down.y > 0.0 {
+            down = -down;
+        }
+        let mut arm = Self {
+            point,
+            down,
+            reach: Vec::new(),
+        };
+        for p in positions {
+            if let Some((t, r)) = arm.holds(*p, height) {
+                let k = ((t + REACH_FROM) / PROFILE_STEP).round().max(0.0) as usize;
+                if arm.reach.len() <= k {
+                    arm.reach.resize(k + 1, 0.0);
+                }
+                if let Some(slot) = arm.reach.get_mut(k) {
+                    *slot = slot.max(r);
+                }
+            }
+        }
+        arm
+    }
+
+    /// Where `p` is along the axis and how far from it, if it is part of
+    /// this upper arm.
+    fn holds(&self, p: Vec3, height: f32) -> Option<(f32, f32)> {
+        let q = p - self.point;
+        let t = q.dot(self.down);
+        let r = (q - self.down * t).length();
+        (r < ARM_RADIUS_M && p.y < SHOULDER * height).then_some((t, r))
+    }
+
+    /// How far the arm reaches from its axis between `t0` and `t1` along
+    /// it (m).
+    fn reach_between(&self, t0: f32, t1: f32) -> f32 {
+        let index = |t: f32| ((t + REACH_FROM) / PROFILE_STEP).round().max(0.0) as usize;
+        let measured = self
+            .reach
+            .get(index(t0.min(t1))..=index(t0.max(t1)).min(self.reach.len().saturating_sub(1)))
+            .map_or(0.0, |rows| rows.iter().copied().fold(0.0, f32::max));
+        if measured > 0.0 {
+            measured
+        } else {
+            DEFAULT_ARM_RADIUS_M
+        }
+    }
+}
+
 impl Form {
     pub fn new(positions: Vec<Vec3>, triangles: Vec<[u32; 3]>) -> Self {
         let height = positions.iter().map(|p| p.y).fold(0.0, f32::max);
+        let arms = [1.0, -1.0].map(|side| Arm::find(&positions, height, side));
         let steps = (height / PROFILE_STEP).ceil() as usize;
         let mut radial = vec![[0.0f32; ANGLE_BINS]; steps + 1];
         for p in &positions {
             let r = Vec2::new(p.x, p.z).length();
             let k = (p.y / PROFILE_STEP).round().max(0.0) as usize;
+            let on_arm = arms.iter().any(|a| a.holds(*p, height).is_some());
             if r < ARM_REACH_M
+                && !on_arm
                 && let Some(row) = radial.get_mut(k)
             {
                 let bin = &mut row[angle_bin(p.x.atan2(p.z))];
@@ -131,6 +250,7 @@ impl Form {
             positions,
             triangles,
             radial,
+            arms,
             collider,
         }
     }
@@ -189,11 +309,94 @@ struct Laid {
 }
 
 impl Laid {
-    /// Width of the panel at world height `y` (m).
-    fn width_at(&self, y: f32) -> f32 {
-        let below_mm = f64::from(self.place.top_cm as f32 / 100.0 - y) * 1000.0;
-        (span_at(&self.boundary, self.top - below_mm) / 1000.0) as f32
+    /// Width of the panel `below` its top (m).
+    fn width_below(&self, below: f32) -> f32 {
+        (span_at(&self.boundary, self.top - f64::from(below) * 1000.0) / 1000.0) as f32
     }
+
+    fn on_body(&self) -> bool {
+        self.place.around == Around::Body
+    }
+}
+
+/// Horizontal centre of a laid panel on the pattern (mm).
+fn centre_x(l: &Laid) -> f64 {
+    let lo = l.mesh.vertices.iter().fold(f64::MAX, |m, v| m.min(v.x));
+    let hi = l.mesh.vertices.iter().fold(f64::MIN, |m, v| m.max(v.x));
+    (lo + hi) / 2.0
+}
+
+/// Start positions of a panel wrapped around the body: its horizontal
+/// centre goes to the placement angle, its top to the placement height;
+/// distances along the pattern are kept as arc lengths. At each height the
+/// radius is the larger of the body's (plus the gap) and the garment's own
+/// (`around`: circumference at a height / 2π), so the panels start just
+/// touching.
+fn wrap_body(l: &Laid, form: Option<&Form>, around: &dyn Fn(f32) -> f32) -> Vec<Vec3> {
+    let centre = centre_x(l);
+    let gap = (l.place.offset_mm / 1000.0) as f32;
+    let top_y = l.place.top_cm as f32 / 100.0;
+    let angle0 = (l.place.angle_deg as f32).to_radians();
+    l.mesh
+        .vertices
+        .iter()
+        .map(|v| {
+            let below = ((l.top - v.y) / 1000.0) as f32;
+            let y = top_y - below;
+            // Arc lengths are kept (no stretch in the start pose), so the
+            // angle depends on the radius and the radius on the body's
+            // reach at that angle: a couple of fixed-point steps settle it.
+            let own = (around(y) / std::f32::consts::TAU).max(1e-3);
+            let arc = ((v.x - centre) / 1000.0) as f32;
+            let mut r = own;
+            for _ in 0..2 {
+                r = (body_radius(form, top_y, below, angle0 + arc / r) + gap).max(own);
+            }
+            let theta = angle0 + arc / r;
+            Vec3::new(r * theta.sin(), y, r * theta.cos())
+        })
+        .collect()
+}
+
+/// Start positions of a panel wrapped around the upper arm on `side` (+1
+/// left, −1 right), like a sleeve: its top on the arm's axis at the
+/// placement height, running down the arm, its horizontal centre at the
+/// placement angle (0 = the outside of the arm). The radius is the larger
+/// of the arm's (plus the gap) and the sleeve's own (its width / 2π).
+///
+/// The pattern is seen from outside, as on the body: on the left arm its
+/// right (+x) goes towards the back, on the right arm towards the front,
+/// so a sleeve and its mirror copy dress both arms alike.
+fn wrap_arm(l: &Laid, form: Option<&Form>, side: f32) -> Vec<Vec3> {
+    let arm = match form.and_then(|f| f.arms.get(usize::from(side < 0.0))) {
+        Some(a) => a.clone(),
+        None => Arm::default(side, DEFAULT_HEIGHT_M),
+    };
+    let d = arm.down;
+    let out = (Vec3::X * side - d * (d.x * side)).normalize_or(Vec3::X * side);
+    let front = (Vec3::Z - d * d.z - out * out.z).normalize_or(Vec3::Z);
+    let across = -side * front;
+    let top_y = l.place.top_cm as f32 / 100.0;
+    let t_top = if d.y.abs() > 1e-3 {
+        (top_y - arm.point.y) / d.y
+    } else {
+        0.0
+    };
+    let gap = (l.place.offset_mm / 1000.0) as f32;
+    let angle0 = (l.place.angle_deg as f32).to_radians();
+    let centre = centre_x(l);
+    l.mesh
+        .vertices
+        .iter()
+        .map(|v| {
+            let below = ((l.top - v.y) / 1000.0) as f32;
+            let t = t_top + below;
+            let own = (l.width_below(below) / std::f32::consts::TAU).max(1e-3);
+            let r = (arm.reach_between(t - 0.02, t + 0.02) + gap).max(own);
+            let theta = angle0 + ((v.x - centre) / 1000.0) as f32 / r;
+            arm.point + d * t + (out * theta.cos() + across * theta.sin()) * r
+        })
+        .collect()
 }
 
 pub fn fabric_preset(f: Fabric) -> FabricPreset {
@@ -286,8 +489,14 @@ pub fn build(
             top,
         });
     }
-    // The garment's circumference at a height: all its panels side by side.
-    let around = |y: f32| laid.iter().map(|l| l.width_at(y)).sum::<f32>();
+    // The garment's circumference at a height: all its body panels side by
+    // side.
+    let around = |y: f32| {
+        laid.iter()
+            .filter(|l| l.on_body())
+            .map(|l| l.width_below(l.place.top_cm as f32 / 100.0 - y))
+            .sum::<f32>()
+    };
 
     for l in &laid {
         let Some(panel) = project.panel(l.panel) else {
@@ -305,36 +514,21 @@ pub fn build(
             edge_vertices.insert(*e, verts);
         }
 
-        // Wrap around the body: the panel's horizontal centre goes to the
-        // placement angle, its top to the placement height; distances along
-        // the pattern are kept as arc lengths. At each height the radius is
-        // the larger of the body's (plus the gap) and the garment's own
-        // (circumference / 2π), so the panels start just touching.
-        let lo = mesh.vertices.iter().fold(f64::MAX, |m, v| m.min(v.x));
-        let hi = mesh.vertices.iter().fold(f64::MIN, |m, v| m.max(v.x));
-        let centre = (lo + hi) / 2.0;
-        let gap = (l.place.offset_mm / 1000.0) as f32;
-        let top_y = l.place.top_cm as f32 / 100.0;
-        let angle0 = (l.place.angle_deg as f32).to_radians();
-        for v in &mesh.vertices {
-            let below = ((l.top - v.y) / 1000.0) as f32;
-            let y = top_y - below;
-            // Arc lengths are kept (no stretch in the start pose), so the
-            // angle depends on the radius and the radius on the body's
-            // reach at that angle: a couple of fixed-point steps settle it.
-            let own = (around(y) / std::f32::consts::TAU).max(1e-3);
-            let arc = ((v.x - centre) / 1000.0) as f32;
-            let mut r = own;
-            for _ in 0..2 {
-                r = (body_radius(form, top_y, below, angle0 + arc / r) + gap).max(own);
-            }
-            let theta = angle0 + arc / r;
-            scene.particles.push(Particle {
-                position: Vec3::new(r * theta.sin(), y, r * theta.cos()),
-                rest: Vec2::new((v.x / 1000.0) as f32, (v.y / 1000.0) as f32),
-                pinned: false,
-            });
-        }
+        let start = match l.place.around {
+            Around::Body => wrap_body(l, form, &around),
+            Around::LeftArm => wrap_arm(l, form, 1.0),
+            Around::RightArm => wrap_arm(l, form, -1.0),
+        };
+        scene.particles.extend(
+            mesh.vertices
+                .iter()
+                .zip(start)
+                .map(|(v, position)| Particle {
+                    position,
+                    rest: Vec2::new((v.x / 1000.0) as f32, (v.y / 1000.0) as f32),
+                    pinned: false,
+                }),
+        );
         pieces.push(Piece {
             panel: l.panel,
             particles: offset as usize..scene.particles.len(),

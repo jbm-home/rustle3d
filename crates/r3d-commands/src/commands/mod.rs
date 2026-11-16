@@ -14,6 +14,7 @@ mod point;
 mod project;
 mod seam;
 mod take_in;
+mod template;
 
 pub use arrange::*;
 pub use avatar::*;
@@ -29,6 +30,7 @@ pub use point::*;
 pub use project::*;
 pub use seam::*;
 pub use take_in::*;
+pub use template::*;
 
 use std::collections::{BTreeMap, BTreeSet};
 

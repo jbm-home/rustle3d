@@ -149,6 +149,7 @@ command_registry! {
     "garment.set_fabric" => GarmentSetFabric,
     "garment.arrange" => GarmentArrange,
     "garment.set_color" => GarmentSetColor,
+    "template.apply" => TemplateApply,
 }
 
 query_registry! {
@@ -161,6 +162,7 @@ query_registry! {
     "avatar.presets" => AvatarPresets,
     "seam.list" => SeamList,
     "pin.list" => PinList,
+    "template.list" => TemplateList,
 }
 
 action_registry! {
