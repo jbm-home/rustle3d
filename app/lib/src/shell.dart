@@ -9,6 +9,8 @@ import 'package:material_ui/material_ui.dart';
 import 'body_panel.dart';
 import 'design/tokens.dart';
 import 'guide.dart';
+import 'learn.dart';
+import 'tour.dart';
 import 'rust/api/engine.dart';
 import 'start_screen.dart' show Logo;
 import 'views/rust_view.dart';
@@ -66,6 +68,9 @@ class _ShellState extends State<Shell> {
       panels: (_summary['counts']?['panels'] as int?) ?? 0,
       seams: _seams.length,
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _maybeTour();
+    });
   }
 
   /// Go to a step of the guided flow: its tool becomes the active one.
@@ -89,6 +94,61 @@ class _ShellState extends State<Shell> {
 
   void _showBody() =>
       showBodyPanel(context, widget.engine, widget.libraryDir, _refresh);
+
+  final _scaffold = GlobalKey<ScaffoldState>();
+
+  // What the first-launch tour points at.
+  final _tourTop = GlobalKey();
+  final _tourGuide = GlobalKey();
+  final _tourPattern = GlobalKey();
+  final _tourGarment = GlobalKey();
+
+  void _maybeTour() {
+    final memory = TourMemory(widget.libraryDir);
+    if (memory.seen) return;
+    memory.markSeen();
+    showTour(context, [
+      TourStop(
+        _tourPattern,
+        'Your pattern',
+        'The flat pieces, full size. Drag their points to reshape them; R adds a piece.',
+      ),
+      TourStop(
+        _tourGarment,
+        'The garment on the body',
+        'Simulate drapes it. Drag to turn around; ⇧-drag a hem or a seam to change the pattern from here.',
+      ),
+      TourStop(
+        _tourGuide,
+        'One step at a time',
+        'The guide says what to do next. Click a step at the top to jump to it, or close the guide.',
+      ),
+      TourStop(
+        _tourTop,
+        'Help is always here',
+        'Learn has short how-tos that play on your project; Body changes the measurements. ⌘Z undoes anything.',
+      ),
+    ]);
+  }
+
+  LearnActions _learnActions() => LearnActions(
+    run: (step) {
+      final out = _run(step);
+      _refresh();
+      return out;
+    },
+    query: _run,
+    setTool: _setTool,
+    simulate: _setRunning,
+    showBody: _showBody,
+    look: (side) => _look(switch (side) {
+      'side' => CameraSide.left,
+      'back' => CameraSide.back,
+      'three_quarter' => CameraSide.threeQuarter,
+      _ => CameraSide.front,
+    }),
+    toast: _toast,
+  );
 
   void _look(CameraSide side) =>
       _guard(() => widget.engine.lookFrom(side: side));
@@ -310,21 +370,26 @@ class _ShellState extends State<Shell> {
       child: Focus(
         autofocus: true,
         child: Scaffold(
+          key: _scaffold,
+          endDrawer: LearnPanel(actions: _learnActions()),
           body: Column(
             children: [
               _TopBar(
+                key: _tourTop,
                 projectName: (_summary['name'] as String?) ?? '',
                 dark: widget.dark,
                 onToggleTheme: widget.onToggleTheme,
                 onUndo: _undo,
                 onRedo: _redo,
                 onBody: _showBody,
+                onLearn: () => _scaffold.currentState?.openEndDrawer(),
                 onHome: widget.onHome,
                 step: _step,
                 guide: _guide,
                 onStep: _goTo,
               ),
               GuideBanner(
+                key: _tourGuide,
                 step: _step,
                 visible: _guide,
                 running: _sim?.running ?? false,
@@ -351,6 +416,7 @@ class _ShellState extends State<Shell> {
                       ),
                       Expanded(
                         child: _ViewCard(
+                          key: _tourPattern,
                           title: 'Pattern',
                           icon: Icons.architecture_outlined,
                           child: RustView(
@@ -365,6 +431,7 @@ class _ShellState extends State<Shell> {
                       const SizedBox(width: Space.m),
                       Expanded(
                         child: _ViewCard(
+                          key: _tourGarment,
                           title: '3D',
                           icon: Icons.view_in_ar_outlined,
                           trailing: Row(
@@ -445,12 +512,14 @@ class _ShellState extends State<Shell> {
 
 class _TopBar extends StatelessWidget {
   const _TopBar({
+    super.key,
     required this.projectName,
     required this.dark,
     required this.onToggleTheme,
     required this.onUndo,
     required this.onRedo,
     required this.onBody,
+    required this.onLearn,
     required this.onHome,
     required this.step,
     required this.guide,
@@ -463,6 +532,7 @@ class _TopBar extends StatelessWidget {
   final VoidCallback onUndo;
   final VoidCallback onRedo;
   final VoidCallback onBody;
+  final VoidCallback onLearn;
   final VoidCallback onHome;
   final GuideStep step;
 
@@ -530,6 +600,11 @@ class _TopBar extends StatelessWidget {
                 ),
             ],
             const Spacer(),
+            TextButton.icon(
+              onPressed: onLearn,
+              icon: const Icon(Icons.school_outlined, size: 18),
+              label: const Text('Learn'),
+            ),
             TextButton.icon(
               onPressed: onBody,
               icon: const Icon(Icons.accessibility_new_rounded, size: 18),
@@ -806,6 +881,7 @@ class _RailButtonState extends State<_RailButton> {
 
 class _ViewCard extends StatelessWidget {
   const _ViewCard({
+    super.key,
     required this.title,
     required this.icon,
     required this.child,

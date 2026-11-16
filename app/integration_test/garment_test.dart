@@ -41,6 +41,8 @@ void main() {
     );
     expect(engine.resetSimulation().loaded, isTrue);
 
+    // The first-launch tour would cover the views: seen already.
+    File('$dir/tour-seen').createSync();
     await tester.pumpWidget(
       Rustle3dApp(
         store: ProjectStore(projectsDir: dir, libraryDir: dir),
