@@ -13,6 +13,7 @@ mod pin;
 mod point;
 mod project;
 mod seam;
+mod set_length;
 mod take_in;
 mod template;
 
@@ -29,6 +30,7 @@ pub use pin::*;
 pub use point::*;
 pub use project::*;
 pub use seam::*;
+pub use set_length::*;
 pub use take_in::*;
 pub use template::*;
 

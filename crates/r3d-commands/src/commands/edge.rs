@@ -3,7 +3,9 @@ use r3d_core::{Edge, EdgeCurve, EdgeId, Notch, Panel, Point, Transaction};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{Vec2, editable_edge_panel, not_sewn, v};
+use std::collections::BTreeMap;
+
+use super::{Vec2, editable_edge_panel, move_points, not_sewn, v};
 use crate::error::{CommandError, Invalid, finite};
 use crate::spec::{CommandOutput, CommandSpec, Described};
 
@@ -144,5 +146,32 @@ impl CommandSpec for EdgeSplit {
         Ok(CommandOutput {
             created: vec![point.into(), new_edge.into()],
         })
+    }
+}
+
+/// Move an edge: both its end points, by the same offset.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct EdgeMove {
+    pub edge: EdgeId,
+    /// Offset in mm.
+    pub by: Vec2,
+}
+
+impl Described for EdgeMove {
+    const SUMMARY: &'static str = "Move an edge by an offset in mm: both its end points move, with the curve handles attached to them, so the neighbouring edges stretch to follow. A sewn edge's partner does not move (the seam may then mismatch; `seam.list` reports it). The panel may end up self-intersecting; `panel.get` reports it.";
+}
+
+impl CommandSpec for EdgeMove {
+    fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        finite("by", &self.by)?;
+        let (edge, _) = editable_edge_panel(tx, self.edge)?;
+        let by = v(self.by);
+        move_points(tx, &BTreeMap::from([(edge.start, by), (edge.end, by)]));
+        Ok(CommandOutput::default())
+    }
+
+    fn merge_key(&self) -> Option<String> {
+        Some(format!("edge.move:{}", self.edge))
     }
 }

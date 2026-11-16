@@ -35,11 +35,15 @@ point to move.
     is highlighted on the board and described in the inspector (length,
     seam partner, flip / unpick). Clicking near an edge on the board does
     the same. Points and notches: later.
-  - **Same edits from the inspector** (implemented): for the picked edge,
-    from either view, a typed amount (cm) with Shorter / Longer on an open
-    edge (`edge.lengthen`) or Let out / Take in on a sewn one
-    (`seam.take_in`), for exact values and for users who do not know the
-    ⇧-drag.
+  - **Edge length in the inspector** (implemented): the picked edge (from
+    either view) shows its length, typed or set with a slider
+    (`edge.set_length`: scaled about its middle; a sewn edge's other side
+    and the mirrored seams follow, so seams stay matched). It replaced
+    typed Shorter / Longer and Take in / Let out buttons, which first-time
+    users found unclear (user test, 2026-11-16).
+  - **On the board** (implemented): with Select, dragging a corner moves
+    it (`point.move`), dragging an edge moves both its ends
+    (`edge.move`); one drag is one undo step; a drag elsewhere pans.
 - Every 3D edit is undoable, appears in the history with its own label
   ("Shorten hem 30 mm") and is available to agents as commands.
 

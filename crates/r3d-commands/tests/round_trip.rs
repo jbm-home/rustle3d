@@ -94,6 +94,8 @@ fn every_command_round_trips() {
         "sizes": {"chest_cm": 100}}));
     h.round_trip(json!({"type": "seam.remove", "seam": seam}));
     h.round_trip(json!({"type": "edge.lengthen", "edge": poly_edge, "mm": 12}));
+    h.round_trip(json!({"type": "edge.set_length", "edge": poly_edge, "length_mm": 150}));
+    h.round_trip(json!({"type": "edge.move", "edge": poly_edge, "by": [5, -8]}));
     let pin = h.round_trip(json!({"type": "pin.add", "panel": panel,
         "at": [10, 20], "position": [0.0, 1.0, 0.1]}));
     let pin = pin.created[0].to_string();

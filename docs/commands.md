@@ -875,6 +875,50 @@ Insert a point on an edge at a distance (mm) along it; the curve shape is kept. 
 
 </details>
 
+### `edge.move`
+
+Move an edge by an offset in mm: both its end points move, with the curve handles attached to them, so the neighbouring edges stretch to follow. A sewn edge's partner does not move (the seam may then mismatch; `seam.list` reports it). The panel may end up self-intersecting; `panel.get` reports it.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "EdgeId": {
+      "description": "Identifier of a edge, e.g. `edge:1`.",
+      "pattern": "^edge:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Move an edge: both its end points, by the same offset.",
+  "properties": {
+    "by": {
+      "description": "Offset in mm.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+    },
+    "edge": {
+      "$ref": "#/$defs/EdgeId"
+    }
+  },
+  "required": [
+    "edge",
+    "by"
+  ],
+  "title": "EdgeMove",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `notch.add`
 
 Add a notch (alignment mark) on an edge, at a distance in mm from the edge's start point. Returns the notch.
@@ -1299,6 +1343,45 @@ Lengthen (mm > 0) or shorten (mm < 0) the garment at an open edge such as a hem:
     "mm"
   ],
   "title": "EdgeLengthen",
+  "type": "object"
+}
+```
+
+</details>
+
+### `edge.set_length`
+
+Give an edge a new length (mm): it is scaled about its middle, curve included, so its end points move along it. A sewn edge's partner is scaled in the same ratio so the seam stays matched, and so are the symmetric seams of linked mirror copies (which follow their source).
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "EdgeId": {
+      "description": "Identifier of a edge, e.g. `edge:1`.",
+      "pattern": "^edge:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Scale an edge about its middle to a given length.",
+  "properties": {
+    "edge": {
+      "$ref": "#/$defs/EdgeId"
+    },
+    "length_mm": {
+      "description": "The new length along the edge (mm).",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "edge",
+    "length_mm"
+  ],
+  "title": "EdgeSetLength",
   "type": "object"
 }
 ```
