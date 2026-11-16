@@ -947,3 +947,68 @@ pub fn load_cache(dir: &Path, project: &Project, particles: usize) -> Option<Vec
             .collect(),
     )
 }
+
+/// The garment draped at `positions` (one per particle of `drape`), as
+/// meshes to export: one per piece, named after it, with its pattern
+/// position as texture coordinates; the dress form too when `form` is
+/// given.
+pub fn scene3d(
+    project: &Project,
+    drape: &Drape,
+    positions: &[Vec3],
+    form: Option<&Form>,
+) -> r3d_io::scene3d::Scene3d {
+    use r3d_io::scene3d::{Material3d, Mesh3d, Scene3d};
+    let garment = project
+        .default_garment()
+        .and_then(|id| project.garments().get(&id));
+    let fabric = garment.map(|g| g.fabric).unwrap_or_default();
+    let rgb = garment.map_or(fabric.appearance().0, |g| g.rgb());
+    let mut materials = vec![Material3d {
+        name: format!("{fabric:?}"),
+        rgb,
+        sheen: fabric.appearance().1,
+        roughness: 0.85,
+        double_sided: true,
+    }];
+    let pieces = drape
+        .pieces
+        .iter()
+        .filter_map(|piece| {
+            let at = positions.get(piece.particles.clone())?;
+            let rest = drape.scene.particles.get(piece.particles.clone())?;
+            Some(Mesh3d {
+                name: project
+                    .panel(piece.panel)
+                    .map_or_else(|| piece.panel.to_string(), |p| p.name.clone()),
+                positions: at.iter().map(|p| p.to_array()).collect(),
+                uvs: rest.iter().map(|p| [p.rest.x, -p.rest.y]).collect(),
+                indices: piece.indices.clone(),
+                material: 0,
+            })
+        })
+        .collect();
+    let avatar = form.map(|f| {
+        materials.push(Material3d {
+            name: "Avatar".into(),
+            rgb: 0xC9C6C1,
+            sheen: 0.0,
+            roughness: 0.7,
+            double_sided: false,
+        });
+        Mesh3d {
+            name: "Avatar".into(),
+            positions: f.positions.iter().map(|p| p.to_array()).collect(),
+            uvs: Vec::new(),
+            indices: f.triangles.iter().flatten().copied().collect(),
+            material: 1,
+        }
+    });
+    Scene3d {
+        generator: format!("Rustle3D {}", env!("CARGO_PKG_VERSION")),
+        name: project.name().to_owned(),
+        pieces,
+        avatar,
+        materials,
+    }
+}

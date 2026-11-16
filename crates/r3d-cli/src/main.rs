@@ -29,8 +29,14 @@ struct Cli {
 
 #[derive(Clone, Copy, ValueEnum)]
 enum Format {
+    /// The pattern at 1:1 scale.
     Svg,
+    /// The pattern at 1:1 scale, tiled or on one page.
     Pdf,
+    /// The draped garment, glTF 2.0 binary.
+    Glb,
+    /// The draped garment, Wavefront OBJ.
+    Obj,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -76,7 +82,9 @@ enum Cmd {
         /// e.g. '{"type": "project.summary"}'
         query: String,
     },
-    /// Export the pattern at 1:1 scale into the project folder.
+    /// Export the pattern at 1:1 scale (svg, pdf) or the draped garment
+    /// (glb, obj; the cached `simulate` result if up to date) into the
+    /// project folder.
     Export {
         project: PathBuf,
         #[arg(long, value_enum)]
@@ -84,6 +92,9 @@ enum Cmd {
         /// PDF page layout.
         #[arg(long, value_enum, default_value = "a4")]
         paper: PaperArg,
+        /// Include the avatar in a 3D export.
+        #[arg(long)]
+        avatar: bool,
         /// Output path relative to the project (default: exports/<name>.<ext>).
         #[arg(long)]
         out: Option<String>,
@@ -214,6 +225,7 @@ fn cmd_export(
     project: &Path,
     format: Format,
     paper: PaperArg,
+    avatar: bool,
     out: Option<String>,
 ) -> Result<(), Failure> {
     let mut step = match format {
@@ -226,6 +238,8 @@ fn cmd_export(
                 PaperArg::Single => "single",
             }
         }),
+        Format::Glb => json!({ "type": "export.gltf", "avatar": avatar }),
+        Format::Obj => json!({ "type": "export.obj", "avatar": avatar }),
     };
     if let Some(path) = out {
         step["path"] = Value::from(path);
@@ -329,8 +343,9 @@ fn main() -> ExitCode {
             project,
             format,
             paper,
+            avatar,
             out,
-        } => cmd_export(&project, format, paper, out),
+        } => cmd_export(&project, format, paper, avatar, out),
         Cmd::Simulate { project, frames } => cmd_simulate(&project, frames),
         Cmd::Render {
             project,

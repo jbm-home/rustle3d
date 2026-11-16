@@ -1787,6 +1787,7 @@ dependencies = [
  "pdf-writer",
  "r3d-core",
  "r3d-geom",
+ "serde_json",
 ]
 
 [[package]]

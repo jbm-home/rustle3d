@@ -90,6 +90,35 @@ pub enum Fabric {
     Wool,
 }
 
+impl Fabric {
+    /// The fabric's usual colour (sRGB, `0xRRGGBB`) and the strength of its
+    /// sheen, the fibres' colour at grazing angles (0 = matte): strong for
+    /// silk, a soft halo for wool, faint for denim. Shared by the renderer
+    /// and the 3D exports.
+    pub const fn appearance(self) -> (u32, f32) {
+        match self {
+            Fabric::Cotton => (0xE4DCCD, 0.6),
+            Fabric::Denim => (0x3E5677, 0.3),
+            Fabric::Jersey => (0x9A5A6A, 0.5),
+            Fabric::Silk => (0xC9A46C, 1.6),
+            Fabric::Wool => (0x5F5B58, 0.9),
+        }
+    }
+}
+
+impl Garment {
+    /// The garment's colour (sRGB, `0xRRGGBB`): its own if it has a valid
+    /// one, otherwise its fabric's.
+    pub fn rgb(&self) -> u32 {
+        self.color
+            .as_deref()
+            .and_then(|c| c.strip_prefix('#'))
+            .filter(|d| d.len() == 6)
+            .and_then(|d| u32::from_str_radix(d, 16).ok())
+            .unwrap_or(self.fabric.appearance().0)
+    }
+}
+
 /// What a panel is wrapped around when the simulation starts.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]

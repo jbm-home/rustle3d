@@ -2181,3 +2181,67 @@ Export all panels as a PDF at 1:1 scale, tiled on A4/Letter pages (labelled A1, 
 
 </details>
 
+### `export.gltf`
+
+Export the draped garment as glTF 2.0 binary (GLB): one named node and mesh per piece, metres, Y up, the pattern position as texture coordinates (1 unit = 1 m of fabric), the fabric as a PBR material with KHR_materials_sheen; the avatar too if asked. Uses the cached drape from `simulate` if it is up to date, otherwise the starting positions, and says which. Returns the written path.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Export the draped garment as glTF 2.0 (GLB).",
+  "properties": {
+    "avatar": {
+      "default": false,
+      "description": "Include the avatar as its own node (default false).",
+      "type": "boolean"
+    },
+    "path": {
+      "description": "Output path relative to the project folder. Defaults to\n`exports/<project name>.glb`.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "title": "ExportGltf",
+  "type": "object"
+}
+```
+
+</details>
+
+### `export.obj`
+
+Export the draped garment as Wavefront OBJ: one object per piece, metres, Y up, the pattern position as texture coordinates, smooth normals; geometry only. Uses the cached drape from `simulate` if it is up to date, otherwise the starting positions, and says which. Returns the written path.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Export the draped garment as Wavefront OBJ.",
+  "properties": {
+    "avatar": {
+      "default": false,
+      "description": "Include the avatar as its own object (default false).",
+      "type": "boolean"
+    },
+    "path": {
+      "description": "Output path relative to the project folder. Defaults to\n`exports/<project name>.obj`.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "title": "ExportObj",
+  "type": "object"
+}
+```
+
+</details>
+

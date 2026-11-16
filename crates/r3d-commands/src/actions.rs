@@ -2,6 +2,8 @@
 //! (not undoable). They run on a [`Workspace`], which confines every write
 //! to the project folder.
 
+use r3d_io::gltf::to_glb;
+use r3d_io::obj::to_obj;
 use r3d_io::pdf::{Paper, layout, to_pdf};
 use r3d_io::{pattern_drawing, svg::to_svg};
 use schemars::JsonSchema;
@@ -156,6 +158,79 @@ impl ActionSpec for Simulate {
             "max_speed_m_s": r3(out.stats.max_speed.into()),
             "settled": out.stats.max_speed < SETTLED_SPEED,
         }))
+    }
+}
+
+/// The draped garment to export: the cached drape if it is up to date,
+/// otherwise the starting positions; which one, for the result.
+fn draped(
+    ws: &Workspace,
+    avatar: bool,
+) -> Result<(r3d_io::scene3d::Scene3d, &'static str), WorkspaceError> {
+    let project = ws.session().project();
+    let form = drape::Form::of_project(project)?;
+    let built = drape::prepare(project, form.as_ref())?;
+    let start: Vec<glam::Vec3> = built.scene.particles.iter().map(|p| p.position).collect();
+    let cached = drape::load_cache(ws.dir(), project, start.len());
+    let state = if cached.is_some() {
+        "simulated"
+    } else {
+        "start"
+    };
+    let positions = cached.unwrap_or(start);
+    let form = if avatar { form.as_ref() } else { None };
+    Ok((drape::scene3d(project, &built, &positions, form), state))
+}
+
+/// Export the draped garment as glTF 2.0 (GLB).
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ExportGltf {
+    /// Output path relative to the project folder. Defaults to
+    /// `exports/<project name>.glb`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    /// Include the avatar as its own node (default false).
+    #[serde(default)]
+    pub avatar: bool,
+}
+
+impl Described for ExportGltf {
+    const SUMMARY: &'static str = "Export the draped garment as glTF 2.0 binary (GLB): one named node and mesh per piece, metres, Y up, the pattern position as texture coordinates (1 unit = 1 m of fabric), the fabric as a PBR material with KHR_materials_sheen; the avatar too if asked. Uses the cached drape from `simulate` if it is up to date, otherwise the starting positions, and says which. Returns the written path.";
+}
+
+impl ActionSpec for ExportGltf {
+    fn run(&self, ws: &Workspace) -> Result<Value, WorkspaceError> {
+        let (scene, state) = draped(ws, self.avatar)?;
+        let path = self.path.clone().unwrap_or_else(|| default_path(ws, "glb"));
+        let written = ws.write(&path, &to_glb(&scene))?;
+        Ok(json!({ "path": written, "drape": state, "pieces": scene.pieces.len() }))
+    }
+}
+
+/// Export the draped garment as Wavefront OBJ.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ExportObj {
+    /// Output path relative to the project folder. Defaults to
+    /// `exports/<project name>.obj`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    /// Include the avatar as its own object (default false).
+    #[serde(default)]
+    pub avatar: bool,
+}
+
+impl Described for ExportObj {
+    const SUMMARY: &'static str = "Export the draped garment as Wavefront OBJ: one object per piece, metres, Y up, the pattern position as texture coordinates, smooth normals; geometry only. Uses the cached drape from `simulate` if it is up to date, otherwise the starting positions, and says which. Returns the written path.";
+}
+
+impl ActionSpec for ExportObj {
+    fn run(&self, ws: &Workspace) -> Result<Value, WorkspaceError> {
+        let (scene, state) = draped(ws, self.avatar)?;
+        let path = self.path.clone().unwrap_or_else(|| default_path(ws, "obj"));
+        let written = ws.write(&path, to_obj(&scene).as_bytes())?;
+        Ok(json!({ "path": written, "drape": state, "pieces": scene.pieces.len() }))
     }
 }
 

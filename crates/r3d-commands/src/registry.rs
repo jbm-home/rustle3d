@@ -172,4 +172,6 @@ action_registry! {
     "export.svg" => ExportSvg,
     "simulate" => Simulate,
     "export.pdf" => ExportPdf,
+    "export.gltf" => ExportGltf,
+    "export.obj" => ExportObj,
 }

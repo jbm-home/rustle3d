@@ -17,6 +17,9 @@ if command -v flutter_rust_bridge_codegen >/dev/null; then
   [ "$before" = "$(bindings)" ] \
     || { echo "Flutter bindings were stale (now regenerated): review them and run again"; exit 1; }
 fi
+if command -v node >/dev/null; then
+  echo "== glTF validator"; ./scripts/validate-exports.sh
+fi
 if command -v flutter >/dev/null; then
   echo "== flutter analyze"; (cd app && flutter analyze --no-pub)
   echo "== flutter test";    (cd app && flutter test --no-pub)

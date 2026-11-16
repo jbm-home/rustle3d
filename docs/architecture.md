@@ -57,7 +57,7 @@ the change log at the end. Sections marked **Open** are explicitly undecided.
 | `r3d-geom` | `glam` (later `spade` for triangulation, M4) | anything r3d, GUI, GPU |
 | `r3d-core` | `r3d-geom`, `serde`, `serde_json`, `schemars` | sim, GUI, GPU |
 | `r3d-sim` | `r3d-geom`, `glam`, `rayon` | core, GUI, GPU (for the CPU backend) |
-| `r3d-io` | `r3d-core`, `r3d-geom`, `pdf-writer` (later `gltf`, `tobj`) | sim, GUI, GPU; no file I/O (returns bytes) |
+| `r3d-io` | `r3d-core`, `r3d-geom`, `pdf-writer`, `serde_json` | sim, GUI, GPU; no file I/O (returns bytes) |
 | `r3d-commands` | core, geom, io (sim from M4) | GUI, GPU |
 | `r3d-render` | core, geom, `wgpu`, `image` | commands, GUI toolkit |
 | `r3d-mcp` | commands (render from M3), `rmcp`, `tokio` | GUI toolkit |
@@ -475,3 +475,4 @@ code stays **i18n-ready** for more:
 | 2026-11-16 | Views without a shared texture render into their own and are read back (Linux, Windows) | The app must run on Linux/WSL2 now; zero-copy dma-buf/D3D12 sharing can replace it later |
 | 2026-11-16 | `r3d-app` skeleton removed; `r3d-ffi` is the app's bridge crate | The desktop app is the Flutter one (7.1); no dead code |
 | 2026-11-16 | UI catalog in ARB (Flutter gen-l10n, `intl`) instead of Fluent; French added, language chosen in the app | ARB is the Flutter stack's native format (7.7 said the format follows the GUI stack); keys and the `code` + `args` contract are unchanged |
+| 2026-11-16 | glTF (GLB) and OBJ written by `r3d-io` itself, not the `gltf`/`tobj` crates; fabric colours and sheen moved to `r3d-core` (`Fabric::appearance`) | Writing is simple (a JSON chunk and a binary chunk, a text file); the crates are mostly readers. The renderer and the exports must agree on a fabric's look, and `r3d-io` cannot depend on the GPU crate |

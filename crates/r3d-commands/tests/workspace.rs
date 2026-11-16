@@ -65,3 +65,48 @@ fn first_save_after_migration_keeps_a_backup() {
     // A second open is current: no new backup needed.
     assert!(Workspace::open(&dir).is_ok());
 }
+
+#[test]
+fn the_draped_garment_exports_as_glb_and_obj() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut ws = Workspace::create(&tmp.path().join("Skirt.r3d"), "Skirt").unwrap();
+    ws.run_step(&step(json!({"type": "avatar.set", "preset": "Women M",
+        "body": {"masculinity": 0, "height_cm": 168, "bust_cm": 90, "waist_cm": 73, "hips_cm": 98}})))
+        .unwrap();
+    ws.run_step(&step(
+        json!({"type": "template.apply", "template": "a_line_skirt"}),
+    ))
+    .unwrap();
+
+    // Before any simulation, the starting positions are exported.
+    let out = ws
+        .run_step(&step(json!({"type": "export.gltf", "avatar": true})))
+        .unwrap();
+    assert_eq!(out["drape"], "start");
+    assert_eq!(out["pieces"], 3);
+    let glb = std::fs::read(ws.dir().join(out["path"].as_str().unwrap())).unwrap();
+    assert_eq!(&glb[0..4], b"glTF");
+    let json_len = u32::from_le_bytes(glb[12..16].try_into().unwrap()) as usize;
+    let doc: Value = serde_json::from_slice(&glb[20..20 + json_len]).unwrap();
+    let names: Vec<&str> = doc["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|n| n["name"].as_str())
+        .collect();
+    assert!(
+        names.contains(&"Front") && names.contains(&"Avatar"),
+        "{names:?}"
+    );
+
+    // After a simulation, the drape.
+    ws.run_step(&step(json!({"type": "simulate", "frames": 10})))
+        .unwrap();
+    let out = ws
+        .run_step(&step(json!({"type": "export.obj", "path": "skirt.obj"})))
+        .unwrap();
+    assert_eq!(out["drape"], "simulated");
+    let obj = std::fs::read_to_string(ws.dir().join("skirt.obj")).unwrap();
+    assert_eq!(obj.lines().filter(|l| l.starts_with("o ")).count(), 3);
+    assert!(obj.lines().any(|l| l.starts_with("vt ")));
+}
