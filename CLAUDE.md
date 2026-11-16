@@ -100,7 +100,7 @@ cargo fmt --all                              # format
 cargo run -p r3d-cli -- --help               # headless CLI (binary: r3d)
 cargo xtask gen-docs                         # regenerate docs/commands.md (a test checks it)
 UPDATE_GOLDEN=1 cargo test -p r3d-core       # regenerate current-version golden files
-./demos/m12/demo.sh                          # latest milestone demo (one folder per milestone)
+./demos/m13/demo.sh                          # latest milestone demo (one folder per milestone)
 cargo bench -p r3d-sim                       # solver benchmarks (docs/physics.md §7)
 cargo run -p r3d-cli -- simulate X.r3d       # headless drape (cached), then: render X.r3d --view 3d --out a.png
 cargo run -p r3d-cli -- mcp --project X.r3d  # MCP server over stdio for agents
@@ -118,7 +118,7 @@ If `cargo` is not on `PATH`, run `source ~/.cargo/env` first.
 | `r3d-geom`     | 2D math: Bézier, polylines, offsets, polygon ops, panel triangulation |
 | `r3d-core`     | Document model, typed IDs, versioned JSON + migrations               |
 | `r3d-sim`      | XPBD cloth solver (CPU/rayon) behind a `Solver` trait, collisions    |
-| `r3d-io`       | OBJ, glTF, SVG, PDF import/export (DXF-AAMA later)                   |
+| `r3d-io`       | OBJ, glTF, SVG, PDF, DXF-AAMA export; DXF, SVG, PDF pattern import    |
 | `r3d-commands` | Typed commands, validation, JSON schemas, undo/redo, `Session`       |
 | `r3d-render`   | wgpu renderers for the 2D board and 3D view, on-screen and offscreen |
 | `r3d-mcp`      | MCP server over the command layer (stdio or local socket)            |

@@ -26,7 +26,7 @@ can be tested through MCP as soon as they exist.
 | M9 | glTF export, attached MCP ✅ | 2 wk | An agent edits the garment live in the open app; the result opens in a game engine |
 | M11 | Pattern drafting tools ✅ | 3–4 wk | Draw a bodice with the curve tool, set the distance between two points, gather a skirt into a waistband |
 | M12 | Drafting tools 2: curve family, cut ✅ | 2–3 wk | Draw a curved piece in one go, cut a bodice along a curved princess line into two pieces sewn together |
-| M13 | Pattern interchange: DXF, SVG and PDF | 2–3 wk | A pattern drawn elsewhere is imported from DXF-AAMA, SVG or PDF, edited, sewn and exported back |
+| M13 | Pattern interchange: DXF, SVG and PDF ✅ | 2–3 wk | A pattern drawn elsewhere is imported from DXF-AAMA, SVG or PDF, edited, sewn and exported back |
 | M14 | Photorealistic rendering | 4–6 wk | A path-traced studio image of the draped garment |
 | M15 | Game-ready export | 3–4 wk | LODs + baked wrinkle normal maps, imported in Godot/Unity/Unreal |
 
@@ -300,7 +300,7 @@ Built (2026-11-16), demo `./demos/m12/demo.sh`:
   cut or not (the waist grip is too weak; the women's bodies hold). To
   look at with the solver's convergence (physics.md §7).
 
-## M13 — Pattern interchange: DXF, SVG and PDF
+## M13 — Pattern interchange: DXF, SVG and PDF ✅
 - **DXF-AAMA / ASTM D6673** import and export (open standards): piece
   outlines, internal lines, notches, grain line, piece names and sizes;
   units checked on import.
@@ -310,6 +310,25 @@ Built (2026-11-16), demo `./demos/m12/demo.sh`:
 - Round-trip tests on reference files we draw ourselves.
 - **Demo**: a pattern drawn elsewhere is imported from DXF-AAMA, SVG or
   PDF, edited, sewn, draped and exported back.
+
+Built (2026-11-16), demo `./demos/m13/demo.sh`:
+- **Export DXF-AAMA** (`export.dxf`, `r3d export --format dxf`, Export →
+  "Pattern, DXF-AAMA"): one block per piece, cutting line, sewing line,
+  turn and curve points, notches, grainline, internal lines, piece name.
+- **Import** (`import.pattern` over the undoable `pattern.import`;
+  `r3d import`; Import in the top bar): DXF-AAMA and plain DXF, SVG, PDF.
+  Units from the file (or asked in the app when it says nothing),
+  sewing line and seam allowance, notches, grainline, darts and internal
+  lines, names; polylines fitted back to editable curves (Schneider
+  1990, `r3d_geom::fit`); tiled PDFs put back together by matching the
+  pages' shapes. The file is kept in the project's `imports/`.
+- Grainlines are drawn inside the piece in every export (a bag's handle
+  opening pushed them out).
+- Tests: every template through SVG, PDF (one page, A4 tiles) and DXF
+  and back; hand-drawn references (AAMA in inches, Inkscape-style SVG).
+- Not yet: sizes and grading (AAMA RUL files), seams in the exchange
+  (DXF-AAMA has none), PDFs whose pages hold different parts of the
+  pattern, binary DXF, pieces with holes, the tiling preview.
 
 ## M14 — Photorealistic rendering
 - Progressive GPU path tracer in `r3d-render` (wgpu compute, hardware ray

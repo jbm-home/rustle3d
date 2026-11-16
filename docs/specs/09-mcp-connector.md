@@ -40,7 +40,8 @@ and look at the result, either headless or live in the user's open app.
     project if missing and saves after every successful change.
   - Attached: `r3d mcp --attach` relays to the running desktop app over a
     local socket. Changes appear live in the UI and are undoable there.
-- **Safety**: file paths are confined to the project folder; destructive
+- **Safety**: file paths, read (`import.pattern`) or written (exports), are
+  confined to the project folder; destructive
   commands require `confirm: true`; the app shows an indicator while an agent
   is attached, and the user can disconnect it.
 
