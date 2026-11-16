@@ -399,6 +399,26 @@ fn wrap_arm(l: &Laid, form: Option<&Form>, side: f32) -> Vec<Vec3> {
         .collect()
 }
 
+/// Start positions of a flat panel: a vertical sheet facing outward at the
+/// placement angle, `offset_mm` from the body's axis, its top at the
+/// placement height; seen from outside like the body's panels.
+fn lay_flat(l: &Laid) -> Vec<Vec3> {
+    let theta = (l.place.angle_deg as f32).to_radians();
+    let out = Vec3::new(theta.sin(), 0.0, theta.cos());
+    let across = Vec3::new(theta.cos(), 0.0, -theta.sin());
+    let r = (l.place.offset_mm / 1000.0) as f32;
+    let top_y = l.place.top_cm as f32 / 100.0;
+    let centre = centre_x(l);
+    l.mesh
+        .vertices
+        .iter()
+        .map(|v| {
+            let below = ((l.top - v.y) / 1000.0) as f32;
+            out * r + across * ((v.x - centre) / 1000.0) as f32 + Vec3::Y * (top_y - below)
+        })
+        .collect()
+}
+
 pub fn fabric_preset(f: Fabric) -> FabricPreset {
     match f {
         Fabric::Cotton => FabricPreset::Cotton,
@@ -518,6 +538,7 @@ pub fn build(
             Around::Body => wrap_body(l, form, &around),
             Around::LeftArm => wrap_arm(l, form, 1.0),
             Around::RightArm => wrap_arm(l, form, -1.0),
+            Around::Flat => lay_flat(l),
         };
         scene.particles.extend(
             mesh.vertices

@@ -574,6 +574,11 @@ Place a panel around the body (or around an arm, for sleeves) for the 3D simulat
           "const": "right_arm",
           "description": "The right upper arm (−x).",
           "type": "string"
+        },
+        {
+          "const": "flat",
+          "description": "Not wrapped: a flat sheet facing outward at the placement angle,\n`offset_mm` from the body's vertical axis (a bag hanging in front\nof the body).",
+          "type": "string"
         }
       ]
     },
@@ -595,7 +600,7 @@ Place a panel around the body (or around an arm, for sleeves) for the 3D simulat
     "around": {
       "$ref": "#/$defs/Around",
       "default": "body",
-      "description": "What the panel is wrapped around: `body` (default), `left_arm` or\n`right_arm` (sleeves)."
+      "description": "What the panel is wrapped around: `body` (default), `left_arm` or\n`right_arm` (sleeves), or `flat` (not wrapped: a flat sheet facing\noutward, `offset_mm` from the body's axis)."
     },
     "offset_mm": {
       "default": 30.0,
@@ -1501,7 +1506,7 @@ Choose what the garment is made of: cotton, denim, jersey, silk or wool. Sets ho
 
 ### `garment.arrange`
 
-Place every panel around the body for the simulation, evenly spaced in the order the seams join them (a panel's right side continues into the next panel), tops at the avatar's waist (its narrowest girth) unless top_cm is given. Panels placed on an arm (sleeves) keep their placement. Re-run it after adding panels or seams.
+Place every panel around the body for the simulation, evenly spaced in the order the seams join them (a panel's right side continues into the next panel), tops at the avatar's waist (its narrowest girth) unless top_cm is given. Panels placed on an arm (sleeves) or flat keep their placement. Re-run it after adding panels or seams.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -1574,7 +1579,7 @@ Set the garment's colour as #RRGGBB, or clear it to use the fabric's usual colou
 
 ### `template.apply`
 
-Draft a starter garment (t_shirt, dress, straight_skirt, a_line_skirt) from sizes in cm, the avatar's measurements filling in any left out: its pieces are drawn, sewn, placed around the body and given a fabric, ready to simulate and edit. A project without panels takes the template's name. Returns the panels, seams and notches.
+Draft a starter garment (t_shirt, dress, straight_skirt, a_line_skirt, tote_bag) from sizes in cm, the avatar's measurements filling in any left out: its pieces are drawn, sewn, placed around the body and given a fabric, ready to simulate and edit. A project without panels takes the template's name. Returns the panels, seams and notches.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -1632,6 +1637,14 @@ Draft a starter garment (t_shirt, dress, straight_skirt, a_line_skirt) from size
             "number",
             "null"
           ]
+        },
+        "width_cm": {
+          "description": "Width of a flat item (bags).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         }
       },
       "type": "object"
@@ -1658,6 +1671,11 @@ Draft a starter garment (t_shirt, dress, straight_skirt, a_line_skirt) from size
           "const": "dress",
           "description": "A sleeveless dress: front and back from the neck to the knee,\nshaped at the waist, flared at the hem.",
           "type": "string"
+        },
+        {
+          "const": "tote_bag",
+          "description": "A tote bag: two rectangles with handles, hanging from two pins.",
+          "type": "string"
         }
       ]
     }
@@ -1673,7 +1691,7 @@ Draft a starter garment (t_shirt, dress, straight_skirt, a_line_skirt) from size
     },
     "template": {
       "$ref": "#/$defs/Template",
-      "description": "`t_shirt`, `dress`, `straight_skirt` or `a_line_skirt`."
+      "description": "`t_shirt`, `dress`, `straight_skirt`, `a_line_skirt` or `tote_bag`."
     }
   },
   "required": [

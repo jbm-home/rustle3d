@@ -31,10 +31,10 @@ pub struct GarmentArrange {
 }
 
 impl Described for GarmentArrange {
-    const SUMMARY: &'static str = "Place every panel around the body for the simulation, evenly spaced in the order the seams join them (a panel's right side continues into the next panel), tops at the avatar's waist (its narrowest girth) unless top_cm is given. Panels placed on an arm (sleeves) keep their placement. Re-run it after adding panels or seams.";
+    const SUMMARY: &'static str = "Place every panel around the body for the simulation, evenly spaced in the order the seams join them (a panel's right side continues into the next panel), tops at the avatar's waist (its narrowest girth) unless top_cm is given. Panels placed on an arm (sleeves) or flat keep their placement. Re-run it after adding panels or seams.";
 }
 
-fn on_arm(p: &Project, panel: PanelId) -> bool {
+fn off_body(p: &Project, panel: PanelId) -> bool {
     p.panel(panel)
         .and_then(|pn| pn.placement)
         .is_some_and(|pl| pl.around != Around::Body)
@@ -47,7 +47,7 @@ fn ring(p: &Project) -> Vec<PanelId> {
         .panels()
         .keys()
         .copied()
-        .filter(|id| !on_arm(p, *id))
+        .filter(|id| !off_body(p, *id))
         .collect();
     let mut order = Vec::with_capacity(left.len());
     let mut current = left.first().copied();

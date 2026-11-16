@@ -101,6 +101,10 @@ pub enum Around {
     LeftArm,
     /// The right upper arm (−x).
     RightArm,
+    /// Not wrapped: a flat sheet facing outward at the placement angle,
+    /// `offset_mm` from the body's vertical axis (a bag hanging in front
+    /// of the body).
+    Flat,
 }
 
 /// Where a panel sits around the body for the simulation: wrapped on a

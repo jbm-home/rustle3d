@@ -14,8 +14,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::commands::{
     CurveSpec, EdgeSetCurve, GarmentSetFabric, NotchAdd, PanelCreatePolygon, PanelMirror,
-    PanelPlace, PanelSetSeamAllowance, ProjectRename, SeamAdd, SeamSideSpec, mirrored_source,
-    waist_height_cm,
+    PanelPlace, PanelSetSeamAllowance, PinAdd, ProjectRename, SeamAdd, SeamSideSpec,
+    mirrored_source, waist_height_cm,
 };
 use crate::error::{CommandError, positive};
 use crate::spec::CommandSpec;
@@ -33,14 +33,17 @@ pub enum Template {
     /// A sleeveless dress: front and back from the neck to the knee,
     /// shaped at the waist, flared at the hem.
     Dress,
+    /// A tote bag: two rectangles with handles, hanging from two pins.
+    ToteBag,
 }
 
 impl Template {
-    pub const ALL: [Template; 4] = [
+    pub const ALL: [Template; 5] = [
         Template::TShirt,
         Template::Dress,
         Template::StraightSkirt,
         Template::ALineSkirt,
+        Template::ToteBag,
     ];
 
     /// Stable identifier, as in JSON.
@@ -48,6 +51,7 @@ impl Template {
         match self {
             Template::StraightSkirt => "straight_skirt",
             Template::ALineSkirt => "a_line_skirt",
+            Template::ToteBag => "tote_bag",
             Template::TShirt => "t_shirt",
             Template::Dress => "dress",
         }
@@ -58,6 +62,7 @@ impl Template {
         match self {
             Template::StraightSkirt => "Straight skirt",
             Template::ALineSkirt => "A-line skirt",
+            Template::ToteBag => "Tote bag",
             Template::TShirt => "T-shirt",
             Template::Dress => "Dress",
         }
@@ -71,6 +76,7 @@ impl Template {
             }
             Template::TShirt => &["chest_cm", "length_cm", "sleeve_cm", "ease_cm"],
             Template::Dress => &["chest_cm", "waist_cm", "hips_cm", "length_cm", "ease_cm"],
+            Template::ToteBag => &["width_cm", "length_cm"],
         }
     }
 }
@@ -92,6 +98,9 @@ pub struct Sizes {
     /// Garment length: waist to hem for skirts, neck to hem for tops.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub length_cm: Option<f64>,
+    /// Width of a flat item (bags).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width_cm: Option<f64>,
     /// Sleeve length, from the top of the shoulder.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sleeve_cm: Option<f64>,
@@ -133,12 +142,14 @@ impl Sizes {
             Template::ALineSkirt => (0.36 * h, 2.0),
             Template::TShirt => (0.39 * h, 10.0),
             Template::Dress => (0.55 * h, 8.0),
+            Template::ToteBag => (40.0, 0.0),
         };
         let all = Sizes {
             waist_cm: Some(self.waist_cm.unwrap_or(body.waist_cm)),
             hips_cm: Some(self.hips_cm.unwrap_or(body.hips_cm)),
             chest_cm: Some(self.chest_cm.unwrap_or(body.bust_cm)),
             length_cm: Some(self.length_cm.unwrap_or(round1(length))),
+            width_cm: Some(self.width_cm.unwrap_or(38.0)),
             sleeve_cm: Some(self.sleeve_cm.unwrap_or(round1(0.12 * h))),
             ease_cm: Some(self.ease_cm.unwrap_or(ease)),
         };
@@ -148,6 +159,7 @@ impl Sizes {
             hips_cm: keep("hips_cm", all.hips_cm),
             chest_cm: keep("chest_cm", all.chest_cm),
             length_cm: keep("length_cm", all.length_cm),
+            width_cm: keep("width_cm", all.width_cm),
             sleeve_cm: keep("sleeve_cm", all.sleeve_cm),
             ease_cm: keep("ease_cm", all.ease_cm),
         }
@@ -320,6 +332,11 @@ impl Draft<'_, '_> {
     /// Sew `a` to `b`, walked in opposite directions: two pieces seen from
     /// outside, side by side, meet edge to edge that way.
     fn sew(&mut self, a: EdgeId, b: EdgeId) -> Result<(), CommandError> {
+        self.sew_walking(a, b, true)
+    }
+
+    /// Sew `a` to `b`; `reversed`: walk `b` from its end.
+    fn sew_walking(&mut self, a: EdgeId, b: EdgeId, reversed: bool) -> Result<(), CommandError> {
         let out = SeamAdd {
             a: SeamSideSpec {
                 edge: a,
@@ -327,7 +344,7 @@ impl Draft<'_, '_> {
             },
             b: SeamSideSpec {
                 edge: b,
-                reversed: Some(true),
+                reversed: Some(reversed),
             },
         }
         .apply(self.tx)?;
@@ -342,12 +359,23 @@ impl Draft<'_, '_> {
         angle_deg: f64,
         top_cm: f64,
     ) -> Result<(), CommandError> {
+        self.place_at(piece, around, angle_deg, top_cm, 30.0)
+    }
+
+    fn place_at(
+        &mut self,
+        piece: &Piece,
+        around: Around,
+        angle_deg: f64,
+        top_cm: f64,
+        offset_mm: f64,
+    ) -> Result<(), CommandError> {
         PanelPlace {
             panel: piece.id,
             around,
             angle_deg,
             top_cm,
-            offset_mm: 30.0,
+            offset_mm,
         }
         .apply(self.tx)?;
         Ok(())
@@ -393,9 +421,11 @@ pub fn draft(
         Template::ALineSkirt => skirt(&mut d, &sizes, &body, 0.2)?,
         Template::TShirt => t_shirt(&mut d, &sizes, &body)?,
         Template::Dress => dress(&mut d, &sizes, &body)?,
+        Template::ToteBag => tote_bag(&mut d, &sizes)?,
     }
     let fabric = match template {
         Template::TShirt => Fabric::Jersey,
+        Template::ToteBag => Fabric::Denim,
         _ => Fabric::Cotton,
     };
     GarmentSetFabric {
@@ -674,5 +704,68 @@ fn dress(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
     }
     d.place(&front, Around::Body, 0.0, NECK_HEIGHT * h + TOP_LIFT_CM)?;
     d.place(&back, Around::Body, 180.0, NECK_HEIGHT * h + TOP_LIFT_CM)?;
+    Ok(())
+}
+
+/// Where the tote bag hangs: in front of the body (m from its axis), its
+/// handles' tops at this height (cm), its two layers this far apart (mm).
+const TOTE_OUT_MM: f64 = 420.0;
+const TOTE_TOP_CM: f64 = 125.0;
+const TOTE_LAYERS_MM: f64 = 30.0;
+
+/// A tote bag: front and back alike, each a rectangle with two handle
+/// tabs; sewn at the sides, the bottom and the tabs' tops, and hung by its
+/// handles from two pins in front of the body, as from hooks.
+fn tote_bag(d: &mut Draft, s: &Sizes) -> Result<(), CommandError> {
+    let w = mm("width_cm", s.width_cm)? / 2.0;
+    let h = mm("length_cm", s.length_cm)?;
+    // Handles: tabs `tab` wide, `handle` high, `inset` in from the sides.
+    let (tab, handle, inset) = (40.0, 280.0, (0.22 * 2.0 * w).max(40.0));
+    let (x0, x1) = (w - inset - tab, w - inset);
+    let top = h + handle;
+    let outline = [
+        (p(-w, 0.0), None),
+        (p(w, 0.0), None),
+        (p(w, h), None),
+        (p(x1, h), None),
+        (p(x1, top), None),
+        (p(x0, top), None),
+        (p(x0, h), None),
+        (p(-x0, h), None),
+        (p(-x0, top), None),
+        (p(-x1, top), None),
+        (p(-x1, h), None),
+        (p(-w, h), None),
+    ];
+    let front = d.panel("Front", &outline)?;
+    let back = d.panel("Back", &outline)?;
+    // Edges: 0 bottom, 1 right side, 4 right tab's top, 8 left tab's top,
+    // 11 left side. Both layers face the same way: sewn walking alike.
+    for k in [0, 1, 4, 8, 11] {
+        d.sew_walking(front.edge(k)?, back.edge(k)?, false)?;
+    }
+    d.place_at(&front, Around::Flat, 0.0, TOTE_TOP_CM, TOTE_OUT_MM)?;
+    d.place_at(
+        &back,
+        Around::Flat,
+        0.0,
+        TOTE_TOP_CM,
+        TOTE_OUT_MM - TOTE_LAYERS_MM,
+    )?;
+    // The pins hold the front's tab tops where the bag starts (the flat
+    // layout: x across, y up, z out), so it hangs as it was laid.
+    let left =
+        d.tx.project()
+            .panel_bounding_box(front.id)
+            .map_or(0.0, |b| b.min.x);
+    for x in [-(x0 + x1) / 2.0, (x0 + x1) / 2.0] {
+        let out = PinAdd {
+            panel: front.id,
+            at: [left + w + x, top - 10.0],
+            position: [x / 1000.0, TOTE_TOP_CM / 100.0 - 0.01, TOTE_OUT_MM / 1000.0],
+        }
+        .apply(d.tx)?;
+        d.created.extend(out.created);
+    }
     Ok(())
 }

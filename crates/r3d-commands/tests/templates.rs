@@ -105,6 +105,20 @@ fn a_dress_hangs_from_the_shoulders() {
 }
 
 #[test]
+fn a_tote_bag_hangs_from_its_handles() {
+    let s = draft("tote_bag");
+    let p = s.project();
+    assert_eq!(p.panels().len(), 2);
+    assert_eq!(p.seams().len(), 5);
+    assert_eq!(p.pins().len(), 2);
+    let (low, high) = drape(&s, 180);
+    eprintln!("tote: {low:.3}..{high:.3}");
+    // Held at 1.25 m by the pins; 28 cm handles above a 40 cm bag.
+    assert!((high - 1.25).abs() < 0.02, "top at {high}");
+    assert!(low > 0.5 && low < 0.65, "bottom at {low}");
+}
+
+#[test]
 fn skirts_hang_from_the_waist() {
     for template in ["straight_skirt", "a_line_skirt"] {
         let s = draft(template);

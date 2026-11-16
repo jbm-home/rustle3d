@@ -410,7 +410,8 @@ impl CommandSpec for PanelDelete {
 pub struct PanelPlace {
     pub panel: PanelId,
     /// What the panel is wrapped around: `body` (default), `left_arm` or
-    /// `right_arm` (sleeves).
+    /// `right_arm` (sleeves), or `flat` (not wrapped: a flat sheet facing
+    /// outward, `offset_mm` from the body's axis).
     #[serde(default)]
     pub around: Around,
     /// Angle around the body (degrees): 0 front, 90 the body's left side,

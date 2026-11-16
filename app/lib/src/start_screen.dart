@@ -40,6 +40,12 @@ const _templates = [
     'Flares gently from the hips to the hem.',
     Icons.change_history_rounded,
   ),
+  (
+    'tote_bag',
+    'Tote bag',
+    'Two pieces and four seams: the easiest start.',
+    Icons.shopping_bag_outlined,
+  ),
 ];
 
 /// The sizes a template reads, with their labels and hints.
@@ -47,8 +53,12 @@ const _sizeLabels = {
   'chest_cm': ('Chest', 'Around the fullest part of the chest'),
   'waist_cm': ('Waist', 'Around the narrowest part'),
   'hips_cm': ('Hips', 'Around the fullest part'),
-  'length_cm': ('Length', 'Neck to hem for tops, waist to hem for skirts'),
+  'length_cm': (
+    'Length',
+    'Neck to hem for tops, waist to hem for skirts, height of a bag',
+  ),
   'sleeve_cm': ('Sleeve', 'From the top of the shoulder'),
+  'width_cm': ('Width', 'Across the bag'),
   'ease_cm': ('Ease', 'Room added to the body'),
 };
 
