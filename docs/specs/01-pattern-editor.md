@@ -2,6 +2,21 @@
 
 Provenance: maintainer's functional brief (2026-11-14); general garment-making knowledge (panels, notches, grainline, seam allowance); open SVG path semantics for cubic Béziers.
 
+## Status (2026-11-16, M11)
+
+Implemented in the app's board: Rectangle (R); **Polygon** (P: click the
+corners, close on the first one or with Enter, Esc cancels); **Curve**
+(C: click an edge, a straight one gets handles on its line, drag the
+handles; Straighten in the edge card); **Notch** (N: click an edge where
+the notch goes); with Select, drag a corner (`point.move`) or an edge
+(`edge.move`), type an edge's length (`edge.set_length`), click a corner
+and ⇧-click another to see and set their distance (`point.set_distance`:
+the second corner moves along the line). Tools draw over the board in
+pattern coordinates (the polygon being drawn, the handles, the dashed
+line between two corners). Not yet: smooth Bézier contours drawn by
+dragging, picking points in 3D, notches and points on edges as distance
+targets, construction lines that stay fixed (dimensions).
+
 ## User story
 As a designer, I draw and edit flat pattern panels precisely and quickly, so
 that they can later be sewn and draped.

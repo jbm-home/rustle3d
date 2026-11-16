@@ -24,7 +24,7 @@ can be tested through MCP as soon as they exist.
 | M8 | 3D → 2D editing tools ✅ | 3 wk | Lengthen a hem and take in a seam directly in 3D; the pattern follows |
 | M10 | Templates, guided flow, polish → **v0.1** ✅ (released 2026-11-16) | 3–4 wk | A first-time user makes a T-shirt in < 10 minutes |
 | M9 | glTF export, attached MCP ✅ | 2 wk | An agent edits the garment live in the open app; the result opens in a game engine |
-| M11 | Pattern drafting tools | 3–4 wk | Draw a bodice with the curve tool, set the distance between two points, gather a skirt into a waistband |
+| M11 | Pattern drafting tools ✅ | 3–4 wk | Draw a bodice with the curve tool, set the distance between two points, gather a skirt into a waistband |
 | M12 | Pattern interchange: DXF, SVG and PDF | 2–3 wk | A pattern drawn elsewhere is imported from DXF-AAMA, SVG or PDF, edited, sewn and exported back |
 | M13 | Photorealistic rendering | 4–6 wk | A path-traced studio image of the draped garment |
 | M14 | Game-ready export | 3–4 wk | LODs + baked wrinkle normal maps, imported in Godot/Unity/Unreal |
@@ -224,7 +224,7 @@ settles (physics.md §7 convergence).
 
 ---
 
-## M11 — Pattern drafting tools
+## M11 — Pattern drafting tools ✅
 - The tool rail's waiting tools: **Polygon** (P, click the corners of a
   new piece), **Curve** (C, draw a curved edge or bend a straight one by
   its handles), **Notch** (N).
@@ -242,6 +242,19 @@ settles (physics.md §7 convergence).
   (spec to write).
 - **Demo**: draw a bodice with the curve tool, set the distance between
   two notches, gather a skirt into a waistband and drape it.
+
+Built (2026-11-16), demo `./demos/m11/demo.sh`:
+- Polygon (P), Curve (C, handles dragged as one undo step, Straighten)
+  and Notch (N) on the board; corners picked with Select, ⇧-click a
+  second to see and set their distance (`point.set_distance`).
+- Gathers (schema v7): `seam.set_gathered`, `seam.list` gives the
+  gathering ratio; the Gathered switch in the edge card; the board does
+  not flag a gathered seam. The drape already pairs both sides point
+  for point, so a 2:1 gathered skirt drapes with its seams closed.
+- Not yet: points on edges and notches as distance targets, picking
+  points in 3D, construction lines that keep a distance (dimensions), a
+  gathering curve; UI tests for dragging handles and for the distance
+  field (their commands are tested).
 
 ## M12 — Pattern interchange: DXF, SVG and PDF
 - **DXF-AAMA / ASTM D6673** import and export (open standards): piece
