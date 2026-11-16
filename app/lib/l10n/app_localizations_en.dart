@@ -466,7 +466,40 @@ class LEn extends L {
   String get toolCurve => 'Curve';
 
   @override
-  String get toolCurveHint => 'Click an edge, then drag its handles to bend it';
+  String get toolCurveHint =>
+      'Draw a piece: click for a corner, drag for a smooth point';
+
+  @override
+  String get toolEditCurve => 'Edit curves';
+
+  @override
+  String get toolEditCurveHint =>
+      'Bend an edge, straighten it, or add a point on it';
+
+  @override
+  String get toolBend => 'Bend';
+
+  @override
+  String get toolBendHint => 'Click an edge, then drag its handles to bend it';
+
+  @override
+  String get toolStraighten => 'Straighten';
+
+  @override
+  String get toolStraightenHint => 'Click a curved edge to make it straight';
+
+  @override
+  String get toolAddPoint => 'Add point';
+
+  @override
+  String get toolAddPointHint => 'Click an edge where the new point goes';
+
+  @override
+  String get toolCut => 'Cut';
+
+  @override
+  String get toolCutHint =>
+      'Draw a line across a piece: it becomes two pieces sewn together';
 
   @override
   String get toolDraw => 'Draw on garment';
@@ -499,7 +532,22 @@ class LEn extends L {
 
   @override
   String get hintCurve =>
-      'Curve: click an edge, then drag its handles · V to stop';
+      'Curve: click for a corner, drag for a smooth point; click the first point or press Enter to close · Esc cancels · V to stop';
+
+  @override
+  String get hintBend =>
+      'Bend: click an edge, then drag its handles · V to stop';
+
+  @override
+  String get hintStraighten => 'Straighten: click a curved edge · V to stop';
+
+  @override
+  String get hintAddPoint =>
+      'Add point: click an edge where the point goes · V to stop';
+
+  @override
+  String get hintCut =>
+      'Cut: click across a piece, drag for a curve, from outside to outside; Enter cuts · Esc cancels · V to stop';
 
   @override
   String get hintNotch =>
@@ -510,6 +558,12 @@ class LEn extends L {
 
   @override
   String get toastNotchAdded => 'Notch added.';
+
+  @override
+  String get toastCut => 'Cut in two pieces, sewn together.';
+
+  @override
+  String get toastPointAdded => 'Point added.';
 
   @override
   String get distance => 'Distance';
@@ -1035,6 +1089,14 @@ class LEn extends L {
 
   @override
   String get errNotSimple => 'The outline must not cross itself.';
+
+  @override
+  String get errNotAcross =>
+      'The cut must cross one piece from side to side: start and end outside it.';
+
+  @override
+  String get errMirrored =>
+      'This piece has a linked mirror copy: unlink the copy first.';
 
   @override
   String get errFileIo => 'Could not read or write the project files.';

@@ -1,6 +1,7 @@
-// The drafting tools on the board: Polygon draws a piece, Notch adds a
-// notch where an edge is clicked, Curve bends an edge (and Straighten
-// undoes the bend).
+// The drafting tools on the board: Polygon and Curve draw pieces, Notch
+// adds a notch where an edge is clicked, Cut cuts a piece in two sewn
+// pieces, and the Edit curves tools bend an edge, straighten it (from the
+// group's menu) and add a point on it.
 
 import 'dart:convert';
 import 'dart:io';
@@ -85,16 +86,52 @@ void main() {
     }
     expect(notches(), before + 1);
 
-    // Curve: the first edge clicked gets handles (it becomes a cubic).
+    // Curve: a corner, a smooth point (dragged), a corner, then Enter.
+    Offset at(double fx, double fy) =>
+        board.topLeft + Offset(board.width * fx, board.height * fy);
+    final before2 = panels().length;
     await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
     await tester.pump();
+    await tester.tapAt(at(0.7, 0.1));
+    await tester.pump();
+    await tester.dragFrom(at(0.85, 0.15), const Offset(20, 30));
+    await tester.pump();
+    await tester.tapAt(at(0.75, 0.3));
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await frames();
+    expect(panels().length, before2 + 1);
+    final drawn = query({'type': 'panel.get', 'panel': panels().last['id']});
+    expect(
+      (drawn['edges'] as List).where((e) => e['curve']['kind'] == 'cubic'),
+      isNotEmpty,
+    );
+
+    // Cut: a line across the polygon drawn first, then Enter.
+    final seams = (query({'type': 'seam.list'}) as List).length;
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
+    await tester.pump();
+    await tester.tapAt(at(0.17, 0.08));
+    await tester.pump();
+    await tester.tapAt(at(0.17, 0.3));
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await frames();
+    expect(panels().length, before2 + 2);
+    expect((query({'type': 'seam.list'}) as List).length, seams + 1);
+
+    // Bend: the first edge clicked gets handles (it becomes a cubic).
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyB);
+    await tester.pump();
     engine.select(panels: const []);
+    var spot = Offset.zero;
     for (
       var x = board.left + 10;
       x < board.right && engine.selectedEdge() == null;
       x += 3
     ) {
-      await tester.tapAt(Offset(x, board.center.dy - 40));
+      spot = Offset(x, board.center.dy - 40);
+      await tester.tapAt(spot);
       await tester.pump();
     }
     final edge = engine.selectedEdge()!;
@@ -109,8 +146,32 @@ void main() {
 
     expect(kind(), 'cubic');
     await frames();
-    await tester.tap(find.text('Straighten'));
+
+    // Edit curves menu → Straighten, then a click on the curved edge.
+    await tester.tap(find.bySemanticsLabel('Edit curves'));
+    await frames();
+    await tester.tap(find.text('Straighten').last);
+    await frames();
+    await tester.tapAt(spot);
     await frames();
     expect(kind(), 'line');
+
+    // Add point (A): a click on an edge of the curved piece splits it
+    // (the skirt's edges are sewn, and a sewn edge cannot be split).
+    int edges() => panels().fold(
+      0,
+      (n, p) =>
+          n +
+          (query({'type': 'panel.get', 'panel': p['id']})['edges'] as List)
+              .length,
+    );
+    final edgesBefore = edges();
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
+    await tester.pump();
+    for (var fx = 0.62; fx < 0.95 && edges() == edgesBefore; fx += 0.004) {
+      await tester.tapAt(at(fx, 0.2));
+      await tester.pump();
+    }
+    expect(edges(), edgesBefore + 1);
   });
 }

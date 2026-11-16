@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `adjust_by`, `cloth_hit`, `corner_at`, `edited`, `err`, `extend_stroke`, `forget_missing`, `form`, `frozen_board`, `graphics`, `new`, `new`, `offset_along`, `pick_cloth`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `resync_if_due`, `rgba`, `selected`, `sim`, `to_theme`, `workspace`
+// These functions are ignored because they are not marked as `pub`: `adjust_by`, `cloth_hit`, `corner_at`, `edge_spot`, `edited`, `err`, `extend_stroke`, `forget_missing`, `form`, `frozen_board`, `graphics`, `new`, `new`, `offset_along`, `pick_cloth`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `resync_if_due`, `rgba`, `run_created`, `selected`, `sim`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
@@ -18,6 +18,16 @@ abstract class Engine implements RustOpaqueInterface {
   /// notch, or `None` off the edges (and on linked mirror copies, which
   /// follow their source).
   String? addNotchNear({
+    required double xMm,
+    required double yMm,
+    required double maxMm,
+  });
+
+  /// Insert a point on the edge within `max_mm` of pattern point
+  /// (`x_mm`, `y_mm`), where that point is along it (`edge.split`; the
+  /// curve keeps its shape). Returns the new point, or `None` off the
+  /// edges or within `max_mm` of an edge's ends.
+  String? addPointNear({
     required double xMm,
     required double yMm,
     required double maxMm,

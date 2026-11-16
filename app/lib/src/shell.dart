@@ -280,13 +280,22 @@ class _ShellState extends State<Shell> {
   /// Corners picked on the board (one, or two to measure between).
   List<PickedPoint> _points = const [];
 
-  /// The Curve tool's handle being dragged: 1 or 2.
+  /// The Bend tool's handle being dragged: 1 or 2.
   int? _handle;
+
+  /// The points placed so far with Curve (a closed piece) or Cut (an open
+  /// line), in mm.
+  final List<_Anchor> _path = [];
+
+  /// The Edit curves tool last used, shown on its rail button.
+  String _curveEdit = 'bend';
 
   void _setTool(String tool) => setState(() {
     _tool = tool;
+    if (_ToolRail.curveEdits.contains(tool)) _curveEdit = tool;
     _sewFrom = null;
     _polygon.clear();
+    _path.clear();
   });
 
   /// Board pick tolerance (logical pixels).
@@ -339,8 +348,118 @@ class _ShellState extends State<Shell> {
   static Offset _at(Object? pos) =>
       Offset(((pos as List)[0] as num).toDouble(), (pos[1] as num).toDouble());
 
-  /// Curve tool: pick an edge; a straight one gets handles on its line.
-  void _curveTap(Offset mm, double mmPerPx) {
+  /// Curve and Cut: a press places a point; dragging pulls its handle out
+  /// (a smooth point, the curve leaving it towards the pointer). With
+  /// Curve, a press on the first point closes the piece.
+  bool _pathPress(Offset mm, double mmPerPx) {
+    if (_tool == 'curve' &&
+        _path.length >= 2 &&
+        (mm - _path.first.at).distance < _pickPx * mmPerPx) {
+      _finishPath();
+      return true;
+    }
+    setState(() => _path.add(_Anchor(mm)));
+    return true;
+  }
+
+  void _pathDrag(Offset mm) {
+    if (_path.isEmpty) return;
+    setState(() => _path.last = _Anchor(_path.last.at, handle: mm));
+  }
+
+  /// The path's segments (`panel.create_path`, `panel.cut`); `closed`
+  /// adds the edge back to the first point.
+  static List<Map<String, Object>> _segments(
+    List<_Anchor> pts, {
+    required bool closed,
+  }) {
+    List<double> xy(Offset o) => [o.dx, o.dy];
+    final n = pts.length;
+    return [
+      for (var i = 0; i < (closed ? n : n - 1); i++)
+        if ((pts[i].handle, pts[(i + 1) % n].handleIn) case (final c1, final c2)
+            when c1 != null || c2 != null)
+          {
+            'kind': 'cubic',
+            'c1': xy(c1 ?? pts[i].at),
+            'c2': xy(c2 ?? pts[(i + 1) % n].at),
+            'to': xy(pts[(i + 1) % n].at),
+          }
+        else
+          {'kind': 'line', 'to': xy(pts[(i + 1) % n].at)},
+    ];
+  }
+
+  /// Enter: close the polygon or the curved piece, or make the cut.
+  void _finish() {
+    if (_tool == 'polygon') return _finishPolygon();
+    if (_tool == 'curve' || _tool == 'cut') return _finishPath();
+  }
+
+  void _finishPath() {
+    if (_path.length < 2) return;
+    final l = context.l;
+    final start = [_path.first.at.dx, _path.first.at.dy];
+    final Map<String, Object> step;
+    if (_tool == 'curve') {
+      final panels = (_summary['panels'] as List<dynamic>? ?? const []);
+      step = {
+        'type': 'panel.create_path',
+        'name': l.pieceNew(panels.length + 1),
+        'start': start,
+        'segments': _segments(_path, closed: true),
+      };
+    } else {
+      step = {
+        'type': 'panel.cut',
+        'start': start,
+        'segments': _segments(_path, closed: false),
+      };
+    }
+    final out = _run(step);
+    setState(_path.clear);
+    _refresh();
+    if (out != null) {
+      _toast(_tool == 'curve' ? l.toastPieceAdded : l.toastCut);
+    }
+  }
+
+  /// Straighten: a curved edge clicked becomes a straight line.
+  void _straightenTap(Offset mm, double mmPerPx) {
+    _guard(
+      () => widget.engine.pickEdgeNear(
+        xMm: mm.dx,
+        yMm: mm.dy,
+        maxMm: _pickPx * mmPerPx,
+      ),
+    );
+    _refresh();
+    final e = _pickedEdge;
+    if (e == null || e['curve']['kind'] != 'cubic') return;
+    _run({
+      'type': 'edge.set_curve',
+      'edge': e['id'],
+      'curve': {'kind': 'line'},
+    });
+    _refresh();
+  }
+
+  void _addPointTap(Offset mm, double mmPerPx) {
+    final point = _guard(
+      () => widget.engine.addPointNear(
+        xMm: mm.dx,
+        yMm: mm.dy,
+        maxMm: _pickPx * mmPerPx,
+      ),
+    );
+    if (point != null) {
+      _refresh();
+      _toast(context.l.toastPointAdded);
+    }
+  }
+
+  /// Bend: pick an edge; a straight one gets handles on its line.
+  void _bendTap(Offset mm, double mmPerPx) {
     _guard(
       () => widget.engine.pickEdgeNear(
         xMm: mm.dx,
@@ -365,7 +484,7 @@ class _ShellState extends State<Shell> {
     _refresh();
   }
 
-  bool _curvePress(Offset mm, double mmPerPx) {
+  bool _bendPress(Offset mm, double mmPerPx) {
     final e = _pickedEdge;
     if (e == null || e['curve']['kind'] != 'cubic') return false;
     for (final (k, key) in [(1, 'c1'), (2, 'c2')]) {
@@ -377,7 +496,7 @@ class _ShellState extends State<Shell> {
     return false;
   }
 
-  void _curveDrag(Offset mm) {
+  void _bendDrag(Offset mm) {
     final (e, h) = (_pickedEdge, _handle);
     if (e == null || h == null) return;
     final c1 = h == 1 ? mm : _at(e['curve']['c1']);
@@ -422,7 +541,41 @@ class _ShellState extends State<Shell> {
         point(q, i == 0 ? 6 : 4);
       }
     }
-    final e = _tool == 'curve' ? _pickedEdge : null;
+    if (_path.isNotEmpty) {
+      final cut = _tool == 'cut';
+      final pen = Paint()
+        ..color = cut ? p.danger : p.accent
+        ..strokeWidth = 1.5
+        ..style = PaintingStyle.stroke;
+      final path = Path();
+      final first = toScreen(_path.first.at);
+      path.moveTo(first.dx, first.dy);
+      for (final s in _segments(_path, closed: false)) {
+        Offset at(String key) {
+          final v = s[key]! as List<double>;
+          return toScreen(Offset(v[0], v[1]));
+        }
+
+        final to = at('to');
+        if (s['kind'] == 'cubic') {
+          final (c1, c2) = (at('c1'), at('c2'));
+          path.cubicTo(c1.dx, c1.dy, c2.dx, c2.dy, to.dx, to.dy);
+        } else {
+          path.lineTo(to.dx, to.dy);
+        }
+      }
+      canvas.drawPath(path, pen);
+      for (final (i, a) in _path.indexed) {
+        if (a.handle case final h?) {
+          final (o, hi) = (toScreen(h), toScreen(a.handleIn!));
+          canvas.drawLine(hi, o, line);
+          point(o, 3);
+          point(hi, 3);
+        }
+        point(toScreen(a.at), i == 0 && !cut ? 6 : 4);
+      }
+    }
+    final e = _tool == 'bend' ? _pickedEdge : null;
     if (e != null) {
       if (e['curve']['kind'] == 'cubic') {
         for (final (end, handle) in [
@@ -609,9 +762,17 @@ class _ShellState extends State<Shell> {
             _setTool('polygon'),
         const SingleActivator(LogicalKeyboardKey.keyC): () => _setTool('curve'),
         const SingleActivator(LogicalKeyboardKey.keyN): () => _setTool('notch'),
-        const SingleActivator(LogicalKeyboardKey.enter): _finishPolygon,
-        const SingleActivator(LogicalKeyboardKey.escape): () =>
-            setState(_polygon.clear),
+        const SingleActivator(LogicalKeyboardKey.keyB): () => _setTool('bend'),
+        const SingleActivator(LogicalKeyboardKey.keyL): () =>
+            _setTool('straighten'),
+        const SingleActivator(LogicalKeyboardKey.keyA): () =>
+            _setTool('addPoint'),
+        const SingleActivator(LogicalKeyboardKey.keyK): () => _setTool('cut'),
+        const SingleActivator(LogicalKeyboardKey.enter): _finish,
+        const SingleActivator(LogicalKeyboardKey.escape): () => setState(() {
+          _polygon.clear();
+          _path.clear();
+        }),
         const SingleActivator(LogicalKeyboardKey.backspace): _deleteSelected,
         const SingleActivator(LogicalKeyboardKey.delete): _deleteSelected,
         const SingleActivator(LogicalKeyboardKey.digit1): () =>
@@ -670,6 +831,7 @@ class _ShellState extends State<Shell> {
                     children: [
                       _ToolRail(
                         active: _tool,
+                        curveEdit: _curveEdit,
                         highlight: _guide ? _step.tool : null,
                         keys: _spotTools,
                         onSelect: (tool) {
@@ -693,12 +855,20 @@ class _ShellState extends State<Shell> {
                             pattern: switch (_tool) {
                               'polygon' => PatternPointer(onTap: _polygonTap),
                               'notch' => PatternPointer(onTap: _notchTap),
-                              'curve' => PatternPointer(
-                                onTap: _curveTap,
-                                onPress: _curvePress,
-                                onDrag: _curveDrag,
+                              'curve' || 'cut' => PatternPointer(
+                                onPress: _pathPress,
+                                onDrag: _pathDrag,
+                              ),
+                              'bend' => PatternPointer(
+                                onTap: _bendTap,
+                                onPress: _bendPress,
+                                onDrag: _bendDrag,
                                 onRelease: () => _handle = null,
                               ),
+                              'straighten' => PatternPointer(
+                                onTap: _straightenTap,
+                              ),
+                              'addPoint' => PatternPointer(onTap: _addPointTap),
                               _ => null,
                             },
                             overlay: (canvas, toScreen) => _boardOverlay(
@@ -786,6 +956,10 @@ class _ShellState extends State<Shell> {
                   'draw' => l.hintDraw,
                   'polygon' => l.hintPolygon,
                   'curve' => l.hintCurve,
+                  'bend' => l.hintBend,
+                  'straighten' => l.hintStraighten,
+                  'addPoint' => l.hintAddPoint,
+                  'cut' => l.hintCut,
                   'notch' => l.hintNotch,
                   _ when _selection.isEmpty => context.keys(l.hintIdle),
                   _ => context.keys(l.hintSelection),
@@ -1107,15 +1281,33 @@ class _IconAction extends StatelessWidget {
   }
 }
 
+/// A point of a Curve or Cut path (mm): a corner, or a smooth point whose
+/// curve leaves towards [handle] (and arrives from its mirror image).
+class _Anchor {
+  _Anchor(this.at, {Offset? handle})
+    : handle = handle == null || (handle - at).distance < 1 ? null : handle;
+
+  final Offset at;
+  final Offset? handle;
+  Offset? get handleIn => handle == null ? null : at * 2 - handle!;
+}
+
+/// One rail tool: id, icon, name, key, hint.
+typedef _RailTool = (String, IconData, String, String, String);
+
 class _ToolRail extends StatelessWidget {
   const _ToolRail({
     required this.active,
+    required this.curveEdit,
     required this.highlight,
     required this.keys,
     required this.onSelect,
   });
 
   final String active;
+
+  /// The Edit curves tool shown on its button: the last one used.
+  final String curveEdit;
 
   /// Buttons Learn points at, by tool.
   final Map<String, GlobalKey> keys;
@@ -1124,8 +1316,29 @@ class _ToolRail extends StatelessWidget {
   final String? highlight;
   final ValueChanged<String> onSelect;
 
-  /// id, icon, name, key, hint.
-  static List<(String, IconData, String, String, String)> _tools(L l) => [
+  /// The tools grouped under Edit curves.
+  static const curveEdits = ['bend', 'straighten', 'addPoint'];
+
+  static List<_RailTool> _curveEdits(L l) => [
+    ('bend', Icons.gesture_rounded, l.toolBend, 'B', l.toolBendHint),
+    (
+      'straighten',
+      Icons.horizontal_rule_rounded,
+      l.toolStraighten,
+      'L',
+      l.toolStraightenHint,
+    ),
+    (
+      'addPoint',
+      Icons.add_circle_outline_rounded,
+      l.toolAddPoint,
+      'A',
+      l.toolAddPointHint,
+    ),
+  ];
+
+  /// The rail, top to bottom; a list is a group (one button, a menu).
+  static List<Object> _tools(L l) => [
     ('select', Icons.near_me_outlined, l.toolSelect, 'V', l.toolSelectHint),
     (
       'rectangle',
@@ -1135,7 +1348,9 @@ class _ToolRail extends StatelessWidget {
       l.toolRectangleHint,
     ),
     ('polygon', Icons.pentagon_outlined, l.toolPolygon, 'P', l.toolPolygonHint),
-    ('curve', Icons.gesture_rounded, l.toolCurve, 'C', l.toolCurveHint),
+    ('curve', Icons.draw_outlined, l.toolCurve, 'C', l.toolCurveHint),
+    _curveEdits(l),
+    ('cut', Icons.content_cut_rounded, l.toolCut, 'K', l.toolCutHint),
     ('draw', Icons.brush_rounded, l.toolDraw, 'D', l.toolDrawHint),
     (
       'notch',
@@ -1150,6 +1365,53 @@ class _ToolRail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
+    final l = context.l;
+    TextSpan line(_RailTool t, {bool first = false}) {
+      final (_, _, name, key, hint) = t;
+      return TextSpan(
+        children: [
+          TextSpan(
+            text: '${first ? '' : '\n\n'}$name  ',
+            style: ts(fontWeight: FontWeight.w600),
+          ),
+          TextSpan(
+            text: key,
+            style: ts(color: p.surface.withValues(alpha: 0.6)),
+          ),
+          TextSpan(text: '\n$hint'),
+        ],
+      );
+    }
+
+    Widget button(
+      _RailTool shown,
+      String tip,
+      InlineSpan message, {
+      required bool active,
+      required VoidCallback? onTap,
+      void Function(BuildContext)? onMenu,
+    }) {
+      final (id, icon, _, _, _) = shown;
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Tooltip(
+          richMessage: message,
+          preferBelow: false,
+          child: Builder(
+            builder: (context) => _RailButton(
+              key: keys[id],
+              icon: icon,
+              label: tip,
+              active: active,
+              highlight: id == highlight,
+              grouped: onMenu != null,
+              onTap: onMenu == null ? onTap! : () => onMenu(context),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Container(
       width: 52,
       margin: const EdgeInsets.only(right: Space.s),
@@ -1161,36 +1423,77 @@ class _ToolRail extends StatelessWidget {
       ),
       child: Column(
         children: [
-          for (final (id, icon, name, key, hint) in _tools(context.l))
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Tooltip(
-                richMessage: TextSpan(
+          for (final t in _tools(l))
+            if (t is _RailTool)
+              button(
+                t,
+                t.$3,
+                line(t, first: true),
+                active: t.$1 == active,
+                onTap: () => onSelect(t.$1),
+              )
+            else if (t is List<_RailTool>)
+              button(
+                t.firstWhere((x) => x.$1 == curveEdit, orElse: () => t.first),
+                l.toolEditCurve,
+                TextSpan(
                   children: [
                     TextSpan(
-                      text: '$name  ',
-                      style: ts(fontWeight: FontWeight.w600),
+                      text: '${l.toolEditCurve}\n',
+                      style: ts(fontWeight: FontWeight.w700),
                     ),
-                    TextSpan(
-                      text: key,
-                      style: ts(color: p.surface.withValues(alpha: 0.6)),
-                    ),
-                    TextSpan(text: '\n$hint'),
+                    for (final (i, x) in t.indexed) line(x, first: i == 0),
                   ],
                 ),
-                preferBelow: false,
-                child: _RailButton(
-                  key: keys[id],
-                  icon: icon,
-                  active: id == active,
-                  highlight: id == highlight,
-                  onTap: () => onSelect(id),
-                ),
+                active: t.any((x) => x.$1 == active),
+                onTap: null,
+                onMenu: (context) => _openGroup(context, t),
               ),
-            ),
         ],
       ),
     );
+  }
+
+  /// The group's tools in a menu beside its button.
+  Future<void> _openGroup(BuildContext context, List<_RailTool> group) async {
+    final box = context.findRenderObject() as RenderBox?;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (box == null || overlay == null) return;
+    final at = box.localToGlobal(
+      box.size.topRight(const Offset(6, 0)),
+      ancestor: overlay,
+    );
+    final p = Tokens.of(context);
+    final picked = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        at.dx,
+        at.dy,
+        overlay.size.width - at.dx,
+        overlay.size.height - at.dy,
+      ),
+      items: [
+        for (final (id, icon, name, key, _) in group)
+          PopupMenuItem(
+            value: id,
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  size: 18,
+                  color: id == active ? p.accent : p.textMuted,
+                ),
+                const SizedBox(width: Space.s),
+                Expanded(child: Text(name)),
+                const SizedBox(width: Space.m),
+                Text(key, style: ts(color: p.textMuted)),
+              ],
+            ),
+          ),
+      ],
+    );
+    if (picked != null) onSelect(picked);
   }
 }
 
@@ -1198,14 +1501,22 @@ class _RailButton extends StatefulWidget {
   const _RailButton({
     super.key,
     required this.icon,
+    required this.label,
     required this.active,
     required this.highlight,
+    required this.grouped,
     required this.onTap,
   });
 
   final IconData icon;
+
+  /// For screen readers and tests.
+  final String label;
   final bool active;
   final bool highlight;
+
+  /// Opens a menu of tools: marked with a small corner.
+  final bool grouped;
   final VoidCallback onTap;
 
   @override
@@ -1221,36 +1532,71 @@ class _RailButtonState extends State<_RailButton> {
     final bg = widget.active
         ? p.accentSoft
         : (_hover ? p.surfaceMuted : Colors.transparent);
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: Motion.fast,
-          curve: Motion.curve,
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(Tokens.radius(context, 0.75)),
-            border: Border.all(
-              color: widget.highlight
-                  ? p.accent.withValues(alpha: 0.7)
-                  : Colors.transparent,
-              width: 1.5,
+    final color = widget.active ? p.accent : p.textMuted;
+    return Semantics(
+      button: true,
+      label: widget.label,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: Motion.fast,
+            curve: Motion.curve,
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(Tokens.radius(context, 0.75)),
+              border: Border.all(
+                color: widget.highlight
+                    ? p.accent.withValues(alpha: 0.7)
+                    : Colors.transparent,
+                width: 1.5,
+              ),
             ),
-          ),
-          child: Icon(
-            widget.icon,
-            size: 20,
-            color: widget.active ? p.accent : p.textMuted,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Icon(widget.icon, size: 20, color: color),
+                if (widget.grouped)
+                  Positioned(
+                    right: 3,
+                    bottom: 3,
+                    child: CustomPaint(
+                      size: const Size(5, 5),
+                      painter: _CornerPainter(color),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+}
+
+/// The small corner marking a button that opens more tools.
+class _CornerPainter extends CustomPainter {
+  const _CornerPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..moveTo(size.width, 0)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(path, Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(_CornerPainter old) => old.color != color;
 }
 
 class _ViewCard extends StatelessWidget {
@@ -1743,6 +2089,8 @@ class _PlacementCard extends StatelessWidget {
         'offset_mm': (next == 'flat') == (around == 'flat')
             ? offset
             : (next == 'flat' ? 420 : 30),
+        // A cut piece keeps the whole's reference.
+        'centre_x_mm': current['centre_x_mm'],
       });
     }
 

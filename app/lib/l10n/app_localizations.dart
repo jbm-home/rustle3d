@@ -916,8 +916,68 @@ abstract class L {
   /// No description provided for @toolCurveHint.
   ///
   /// In en, this message translates to:
-  /// **'Click an edge, then drag its handles to bend it'**
+  /// **'Draw a piece: click for a corner, drag for a smooth point'**
   String get toolCurveHint;
+
+  /// No description provided for @toolEditCurve.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit curves'**
+  String get toolEditCurve;
+
+  /// No description provided for @toolEditCurveHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Bend an edge, straighten it, or add a point on it'**
+  String get toolEditCurveHint;
+
+  /// No description provided for @toolBend.
+  ///
+  /// In en, this message translates to:
+  /// **'Bend'**
+  String get toolBend;
+
+  /// No description provided for @toolBendHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Click an edge, then drag its handles to bend it'**
+  String get toolBendHint;
+
+  /// No description provided for @toolStraighten.
+  ///
+  /// In en, this message translates to:
+  /// **'Straighten'**
+  String get toolStraighten;
+
+  /// No description provided for @toolStraightenHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Click a curved edge to make it straight'**
+  String get toolStraightenHint;
+
+  /// No description provided for @toolAddPoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add point'**
+  String get toolAddPoint;
+
+  /// No description provided for @toolAddPointHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Click an edge where the new point goes'**
+  String get toolAddPointHint;
+
+  /// No description provided for @toolCut.
+  ///
+  /// In en, this message translates to:
+  /// **'Cut'**
+  String get toolCut;
+
+  /// No description provided for @toolCutHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Draw a line across a piece: it becomes two pieces sewn together'**
+  String get toolCutHint;
 
   /// No description provided for @toolDraw.
   ///
@@ -976,8 +1036,32 @@ abstract class L {
   /// No description provided for @hintCurve.
   ///
   /// In en, this message translates to:
-  /// **'Curve: click an edge, then drag its handles · V to stop'**
+  /// **'Curve: click for a corner, drag for a smooth point; click the first point or press Enter to close · Esc cancels · V to stop'**
   String get hintCurve;
+
+  /// No description provided for @hintBend.
+  ///
+  /// In en, this message translates to:
+  /// **'Bend: click an edge, then drag its handles · V to stop'**
+  String get hintBend;
+
+  /// No description provided for @hintStraighten.
+  ///
+  /// In en, this message translates to:
+  /// **'Straighten: click a curved edge · V to stop'**
+  String get hintStraighten;
+
+  /// No description provided for @hintAddPoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add point: click an edge where the point goes · V to stop'**
+  String get hintAddPoint;
+
+  /// No description provided for @hintCut.
+  ///
+  /// In en, this message translates to:
+  /// **'Cut: click across a piece, drag for a curve, from outside to outside; Enter cuts · Esc cancels · V to stop'**
+  String get hintCut;
 
   /// No description provided for @hintNotch.
   ///
@@ -996,6 +1080,18 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Notch added.'**
   String get toastNotchAdded;
+
+  /// No description provided for @toastCut.
+  ///
+  /// In en, this message translates to:
+  /// **'Cut in two pieces, sewn together.'**
+  String get toastCut;
+
+  /// No description provided for @toastPointAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Point added.'**
+  String get toastPointAdded;
 
   /// No description provided for @distance.
   ///
@@ -1896,6 +1992,18 @@ abstract class L {
   /// In en, this message translates to:
   /// **'The outline must not cross itself.'**
   String get errNotSimple;
+
+  /// No description provided for @errNotAcross.
+  ///
+  /// In en, this message translates to:
+  /// **'The cut must cross one piece from side to side: start and end outside it.'**
+  String get errNotAcross;
+
+  /// No description provided for @errMirrored.
+  ///
+  /// In en, this message translates to:
+  /// **'This piece has a linked mirror copy: unlink the copy first.'**
+  String get errMirrored;
 
   /// No description provided for @errFileIo.
   ///

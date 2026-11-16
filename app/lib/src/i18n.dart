@@ -104,6 +104,8 @@ extension Messages on BuildContext {
       'invalid.negative' => l.errNegative,
       'invalid.empty' => l.errEmpty,
       'invalid.not_simple' => l.errNotSimple,
+      'invalid.not_across' => l.errNotAcross,
+      'invalid.mirrored' => l.errMirrored,
       'file.io' || 'write_failed' => l.errFileIo,
       'file.not_a_project' => l.errNotAProject,
       'file.too_new' || 'file.unsupported_version' => l.errTooNew,

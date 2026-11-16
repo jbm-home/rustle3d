@@ -472,7 +472,41 @@ class LFr extends L {
 
   @override
   String get toolCurveHint =>
+      'Tracez une pièce : cliquez pour un coin, glissez pour un point arrondi';
+
+  @override
+  String get toolEditCurve => 'Modifier les courbes';
+
+  @override
+  String get toolEditCurveHint =>
+      'Courber un bord, le redresser ou y ajouter un point';
+
+  @override
+  String get toolBend => 'Courber';
+
+  @override
+  String get toolBendHint =>
       'Cliquez un bord, puis faites glisser ses poignées pour le courber';
+
+  @override
+  String get toolStraighten => 'Redresser';
+
+  @override
+  String get toolStraightenHint =>
+      'Cliquez un bord courbe pour le rendre droit';
+
+  @override
+  String get toolAddPoint => 'Ajouter un point';
+
+  @override
+  String get toolAddPointHint => 'Cliquez un bord là où va le nouveau point';
+
+  @override
+  String get toolCut => 'Couper';
+
+  @override
+  String get toolCutHint =>
+      'Tracez une ligne à travers une pièce : elle devient deux pièces cousues';
 
   @override
   String get toolDraw => 'Dessiner sur le vêtement';
@@ -505,7 +539,23 @@ class LFr extends L {
 
   @override
   String get hintCurve =>
-      'Courbe : cliquez un bord, puis faites glisser ses poignées · V pour arrêter';
+      'Courbe : cliquez pour un coin, glissez pour un point arrondi ; cliquez le premier point ou Entrée pour fermer · Échap annule · V pour arrêter';
+
+  @override
+  String get hintBend =>
+      'Courber : cliquez un bord, puis faites glisser ses poignées · V pour arrêter';
+
+  @override
+  String get hintStraighten =>
+      'Redresser : cliquez un bord courbe · V pour arrêter';
+
+  @override
+  String get hintAddPoint =>
+      'Ajouter un point : cliquez un bord là où va le point · V pour arrêter';
+
+  @override
+  String get hintCut =>
+      'Couper : cliquez à travers une pièce, glissez pour une courbe, de l’extérieur à l’extérieur ; Entrée coupe · Échap annule · V pour arrêter';
 
   @override
   String get hintNotch =>
@@ -516,6 +566,12 @@ class LFr extends L {
 
   @override
   String get toastNotchAdded => 'Cran ajouté.';
+
+  @override
+  String get toastCut => 'Coupée en deux pièces, cousues ensemble.';
+
+  @override
+  String get toastPointAdded => 'Point ajouté.';
 
   @override
   String get distance => 'Distance';
@@ -1046,6 +1102,14 @@ class LFr extends L {
 
   @override
   String get errNotSimple => 'Le contour ne doit pas se croiser.';
+
+  @override
+  String get errNotAcross =>
+      'La coupe doit traverser une pièce de part en part : commencez et finissez à l’extérieur.';
+
+  @override
+  String get errMirrored =>
+      'Cette pièce a une copie miroir liée : déliez d’abord la copie.';
 
   @override
   String get errFileIo =>
