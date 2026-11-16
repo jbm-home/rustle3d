@@ -72,3 +72,23 @@ fn shortening_the_hem_moves_the_whole_hemline() {
         "{err}"
     );
 }
+
+#[test]
+fn moving_any_open_edge_keeps_curved_seams_matched() {
+    for k in [0, 2] {
+        for mm in [-40.0, 40.0] {
+            let mut s = Session::new(Project::new("t"));
+            let front = common::a_line_skirt(&mut s);
+            run(
+                &mut s,
+                json!({"type": "edge.lengthen", "edge": front.edges[k], "mm": mm}),
+            )
+            .unwrap();
+            let seams = run(&mut s, json!({"type": "seam.list"})).unwrap();
+            for seam in seams.as_array().unwrap() {
+                let m = seam["mismatch_mm"].as_f64().unwrap();
+                assert!(m < 0.5, "edge {k} by {mm}: {seam}");
+            }
+        }
+    }
+}

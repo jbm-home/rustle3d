@@ -79,3 +79,36 @@ fn taking_in_a_side_seam_keeps_it_matched() {
     .unwrap_err();
     assert_eq!(err.message().code, "invalid.not_seam_end");
 }
+
+#[test]
+fn every_seam_and_end_stays_matched() {
+    for mm in [-30.0, 30.0] {
+        let (s0, _) = skirt();
+        let seams: Vec<_> = s0.project().seams().keys().copied().collect();
+        for seam in seams {
+            let ends = {
+                let p = s0.project();
+                let e = p.edge(p.seams()[&seam].a.edge).unwrap();
+                [None, Some(e.start), Some(e.end)]
+            };
+            for at in ends {
+                let (mut s, _) = skirt();
+                let mut step = json!({"type": "seam.take_in", "seam": seam.to_string()});
+                if let Some(at) = at {
+                    step["at"] = json!(at.to_string());
+                }
+                // In small steps, as a drag in 3D applies it.
+                let mut ok = true;
+                for _ in 0..10 {
+                    let mut part = step.clone();
+                    part["mm"] = json!(mm / 10.0);
+                    ok &= run(&mut s, part).is_ok();
+                }
+                if ok {
+                    let m = max_mismatch(&mut s);
+                    assert!(m < 0.5, "{seam} at {at:?} by {mm}: mismatch {m}");
+                }
+            }
+        }
+    }
+}
