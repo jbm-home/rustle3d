@@ -124,9 +124,10 @@ measurement-based calibration on the roadmap.
 - Per substep: predict positions (gravity, external forces) → solve
   constraints in fixed color order → update velocities → apply friction and
   damping.
-- Sewing phase: seam compliance ramps from soft to stiff over ~0.5 s of
-  simulated time, and gravity can optionally be reduced while seams close,
-  so that panels do not fall before they are sewn.
+- Sewing phase: seam compliance ramps from soft to stiff over 0.6 s of
+  simulated time, and in a scene with seams gravity ramps from zero to
+  full over the same time, so that panels do not fall before they are
+  sewn (a skirt that closed below the waist would slide down the hips).
 - Simulated time is decoupled from wall time. If a frame is late, we drop
   simulated time rather than take larger steps.
 

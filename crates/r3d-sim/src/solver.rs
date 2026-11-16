@@ -300,10 +300,19 @@ impl Solver {
     }
 
     fn substep(&mut self, h: f32) {
+        // Seams start soft and tighten while the garment closes; meanwhile
+        // gravity grows from zero, so pieces do not fall before they are
+        // sewn (a skirt would close below the waist and slide off).
+        let ramp = (self.time / SEWING_TIME).clamp(0.0, 1.0);
+        let gravity = if self.seams.is_empty() {
+            GRAVITY
+        } else {
+            GRAVITY * ramp
+        };
         for i in 0..self.x.len() {
             self.prev[i] = self.x[i];
             if self.w[i] > 0.0 {
-                self.v[i] += GRAVITY * h;
+                self.v[i] += gravity * h;
                 self.x[i] += self.v[i] * h;
             }
         }
@@ -314,8 +323,6 @@ impl Solver {
         for hinge in &self.hinges {
             bend(&mut self.x, &self.w, hinge, h2);
         }
-        // Seams start soft and tighten while the garment closes.
-        let ramp = (self.time / SEWING_TIME).clamp(0.0, 1.0);
         let seam_alpha = 10f32.powf(-3.0 - 6.0 * ramp);
         for [a, b] in &self.seams {
             let (a, b) = (*a as usize, *b as usize);
