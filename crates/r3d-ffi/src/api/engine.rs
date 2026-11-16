@@ -105,6 +105,17 @@ impl CanvasColors {
     }
 }
 
+/// What a press on the garment does when dragged.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Gesture {
+    /// Pull the cloth.
+    Pull,
+    /// On a hem: lengthen; on a seam: take in or let out.
+    Adjust,
+    /// Move the piece around the body (its placement).
+    Move,
+}
+
 /// Where the 3D view looks at the body from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CameraSide {
@@ -767,12 +778,32 @@ impl Engine {
     }
 
     /// Finish the line: it becomes an internal line on the pattern
-    /// (`internal_line.add`; a style line, a pocket placement…). Returns the
-    /// new line's id, or `None` when the stroke was too short.
+    /// (`internal_line.add`; a style line, a pocket placement…), on the
+    /// source piece when drawn on a linked mirror copy. Returns the new
+    /// line's id, or `None` when the stroke was too short.
     #[frb(sync)]
     pub fn stroke_end(&self) -> Result<Option<String>, ApiError> {
-        let Some((panel, points)) = self.stroke.lock().map_err(|_| poisoned())?.take() else {
+        let Some((panel, mut points)) = self.stroke.lock().map_err(|_| poisoned())?.take() else {
             return Ok(None);
+        };
+        // On a linked mirror copy, the line goes on its source (the copy
+        // follows): copy = reflect(source) + offset.
+        let link = self
+            .workspace()?
+            .session()
+            .project()
+            .panel(panel)
+            .and_then(|p| p.mirror_of.clone());
+        let panel = match link {
+            Some(link) => {
+                if let Some(m) = r3d_geom::Mirror::new(link.origin, link.dir) {
+                    for p in &mut points {
+                        *p = m.apply(*p - link.offset);
+                    }
+                }
+                link.source
+            }
+            None => panel,
         };
         let (Some(start), true) = (points.first(), points.len() >= 2) else {
             return Ok(None);
@@ -913,14 +944,16 @@ impl Engine {
     }
 
     /// Pointer down at (`x`, `y`): in the 3D view, on the cloth, get ready
-    /// to drag it. With `adjust` (⇧ held) the drag changes the pattern at
+    /// to drag it. With `Adjust` (⇧ held) the drag changes the pattern at
     /// the contour edge under the cursor: an open edge (a hem) is
     /// lengthened, a seam is taken in or let out (at the nearer end when
-    /// grabbed near one). Otherwise the drag pulls the cloth. Returns
+    /// grabbed near one). With `Move` (⌘ held) it moves the piece around
+    /// the body (its placement). Otherwise the drag pulls the cloth. Returns
     /// whether there is something to drag (then moves should call `pull`);
     /// otherwise drags orbit as usual.
     #[frb(sync)]
-    pub fn press(&self, view: u32, x: f64, y: f64, adjust: bool) -> Result<bool, ApiError> {
+    pub fn press(&self, view: u32, x: f64, y: f64, gesture: Gesture) -> Result<bool, ApiError> {
+        let adjust = gesture == Gesture::Adjust;
         // Particles on contour edges, and what dragging them adjusts.
         let mut open: HashMap<usize, Adjust> = HashMap::new();
         if adjust {
@@ -959,6 +992,28 @@ impl Engine {
             return Ok(false);
         };
         drop(slot);
+        if gesture == Gesture::Move {
+            let placement = hit.panel.and_then(|panel| {
+                let ws = self.workspace().ok()?;
+                let place = ws.session().project().panel(panel)?.placement?;
+                Some((panel, place))
+            });
+            let Some((panel, from)) = placement else {
+                return Ok(false);
+            };
+            *self.selected()? = vec![panel];
+            let running = self.simulation_status()?.running;
+            *self.held.lock().map_err(|_| poisoned())? = Some(Held {
+                particle: hit.particle,
+                anchor: hit.position,
+                tool: Tool::Move {
+                    panel,
+                    from,
+                    running,
+                },
+            });
+            return Ok(true);
+        }
         let tool = match open.get(&hit.particle) {
             Some(adjust) => {
                 // Show the panel being changed in both views.
@@ -1042,6 +1097,23 @@ impl Engine {
                     applied: self.adjust_by(step, applied, total),
                 }
             }
+            Tool::Move { panel, from, .. } => {
+                // Around the vertical axis by the angle swept, up or down
+                // by the height dragged; the pieces start again there.
+                let angle = |p: glam::Vec3| p.x.atan2(p.z).to_degrees();
+                let swept = f64::from(angle(target) - angle(anchor));
+                let step = serde_json::json!({
+                    "type": "panel.place",
+                    "panel": panel,
+                    "around": from.around,
+                    "angle_deg": (from.angle_deg + swept).round(),
+                    "top_cm": (from.top_cm + f64::from(target.y - anchor.y) * 100.0).round().max(1.0),
+                    "offset_mm": from.offset_mm,
+                });
+                self.run(step.to_string())?;
+                self.rebuild(false)?;
+                held.tool
+            }
         };
         if let Some(h) = self.held.lock().map_err(|_| poisoned())?.as_mut() {
             h.tool = tool;
@@ -1053,7 +1125,7 @@ impl Engine {
         Ok(match tool {
             Tool::Length { applied, .. } => Some(change("length", applied)),
             Tool::Fit { applied, .. } => Some(change("fit", applied)),
-            Tool::Pull { .. } => None,
+            Tool::Pull { .. } | Tool::Move { .. } => None,
         })
     }
 
@@ -1120,12 +1192,12 @@ impl Engine {
     /// Pointer up: let go of the cloth.
     #[frb(sync)]
     pub fn release(&self) -> Result<(), ApiError> {
-        let was_pulling = self
-            .held
-            .lock()
-            .map_err(|_| poisoned())?
-            .take()
-            .is_some_and(|h| matches!(h.tool, Tool::Pull { pulling: true }));
+        let held = self.held.lock().map_err(|_| poisoned())?.take();
+        let was_pulling = held.is_some_and(|h| matches!(h.tool, Tool::Pull { pulling: true }));
+        // A moved piece drapes again if the drape was running.
+        if held.is_some_and(|h| matches!(h.tool, Tool::Move { running: true, .. })) {
+            self.run_simulation(true)?;
+        }
         // (No let-chain: the bridge macro parses this function as Rust 2021.)
         if was_pulling {
             if let Some(thread) = self.sim()?.as_ref() {

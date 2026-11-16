@@ -81,6 +81,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   FabricSwatch dco_decode_fabric_swatch(dynamic raw);
 
   @protected
+  Gesture dco_decode_gesture(dynamic raw);
+
+  @protected
   int dco_decode_i_32(dynamic raw);
 
   @protected
@@ -190,6 +193,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   FabricSwatch sse_decode_fabric_swatch(SseDeserializer deserializer);
+
+  @protected
+  Gesture sse_decode_gesture(SseDeserializer deserializer);
 
   @protected
   int sse_decode_i_32(SseDeserializer deserializer);
@@ -315,6 +321,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_fabric_swatch(FabricSwatch self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_gesture(Gesture self, SseSerializer serializer);
 
   @protected
   void sse_encode_i_32(int self, SseSerializer serializer);

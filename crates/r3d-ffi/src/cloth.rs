@@ -51,6 +51,13 @@ pub(crate) enum Tool {
         at: Option<PointId>,
         applied: f64,
     },
+    /// Move a piece around the body (`panel.place`): its placement when
+    /// the drag started, and whether the drape was running.
+    Move {
+        panel: PanelId,
+        from: r3d_core::Placement,
+        running: bool,
+    },
 }
 
 /// What ⇧-dragging a particle on a contour edge adjusts.

@@ -482,7 +482,7 @@ fn wire__crate__api__engine__Engine_press_impl(
             let api_view = <u32>::sse_decode(&mut deserializer);
             let api_x = <f64>::sse_decode(&mut deserializer);
             let api_y = <f64>::sse_decode(&mut deserializer);
-            let api_adjust = <bool>::sse_decode(&mut deserializer);
+            let api_gesture = <crate::api::engine::Gesture>::sse_decode(&mut deserializer);
             deserializer.end();
             transform_result_sse::<_, crate::api::engine::ApiError>((move || {
                 let mut api_that_guard = None;
@@ -504,7 +504,7 @@ fn wire__crate__api__engine__Engine_press_impl(
                     api_view,
                     api_x,
                     api_y,
-                    api_adjust,
+                    api_gesture,
                 )?;
                 std::result::Result::Ok(output_ok)
             })())
@@ -1679,6 +1679,19 @@ impl SseDecode for crate::api::engine::FabricSwatch {
     }
 }
 
+impl SseDecode for crate::api::engine::Gesture {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::engine::Gesture::Pull,
+            1 => crate::api::engine::Gesture::Adjust,
+            2 => crate::api::engine::Gesture::Move,
+            _ => unreachable!("Invalid variant for Gesture: {}", inner),
+        };
+    }
+}
+
 impl SseDecode for i32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -2038,6 +2051,25 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::engine::FabricSwatch>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::engine::Gesture {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Pull => 0.into_dart(),
+            Self::Adjust => 1.into_dart(),
+            Self::Move => 2.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::engine::Gesture {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::engine::Gesture>
+    for crate::api::engine::Gesture
+{
+    fn into_into_dart(self) -> crate::api::engine::Gesture {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::engine::PatternChange {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -2192,6 +2224,23 @@ impl SseEncode for crate::api::engine::FabricSwatch {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.id, serializer);
         <u32>::sse_encode(self.argb, serializer);
+    }
+}
+
+impl SseEncode for crate::api::engine::Gesture {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::engine::Gesture::Pull => 0,
+                crate::api::engine::Gesture::Adjust => 1,
+                crate::api::engine::Gesture::Move => 2,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
     }
 }
 

@@ -9,7 +9,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `adjust_by`, `cloth_hit`, `edited`, `err`, `extend_stroke`, `form`, `graphics`, `new`, `new`, `pick_cloth`, `poisoned`, `rebuild`, `resync_if_due`, `rgba`, `selected`, `sim`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Engine>>
 abstract class Engine implements RustOpaqueInterface {
@@ -56,17 +56,18 @@ abstract class Engine implements RustOpaqueInterface {
   String? pinAt({required int view, required double x, required double y});
 
   /// Pointer down at (`x`, `y`): in the 3D view, on the cloth, get ready
-  /// to drag it. With `adjust` (⇧ held) the drag changes the pattern at
+  /// to drag it. With `Adjust` (⇧ held) the drag changes the pattern at
   /// the contour edge under the cursor: an open edge (a hem) is
   /// lengthened, a seam is taken in or let out (at the nearer end when
-  /// grabbed near one). Otherwise the drag pulls the cloth. Returns
+  /// grabbed near one). With `Move` (⌘ held) it moves the piece around
+  /// the body (its placement). Otherwise the drag pulls the cloth. Returns
   /// whether there is something to drag (then moves should call `pull`);
   /// otherwise drags orbit as usual.
   bool press({
     required int view,
     required double x,
     required double y,
-    required bool adjust,
+    required Gesture gesture,
   });
 
   /// Pointer moved to (`x`, `y`) after `press`: pull the cloth there (on
@@ -129,8 +130,9 @@ abstract class Engine implements RustOpaqueInterface {
   SimStatus simulationStatus();
 
   /// Finish the line: it becomes an internal line on the pattern
-  /// (`internal_line.add`; a style line, a pocket placement…). Returns the
-  /// new line's id, or `None` when the stroke was too short.
+  /// (`internal_line.add`; a style line, a pocket placement…), on the
+  /// source piece when drawn on a linked mirror copy. Returns the new
+  /// line's id, or `None` when the stroke was too short.
   String? strokeEnd();
 
   /// Start drawing on the garment at (`x`, `y`) of a 3D view. Returns
@@ -268,6 +270,18 @@ class FabricSwatch {
           runtimeType == other.runtimeType &&
           id == other.id &&
           argb == other.argb;
+}
+
+/// What a press on the garment does when dragged.
+enum Gesture {
+  /// Pull the cloth.
+  pull,
+
+  /// On a hem: lengthen; on a seam: take in or let out.
+  adjust,
+
+  /// Move the piece around the body (its placement).
+  move,
 }
 
 /// A pattern change made by dragging in 3D, for the label by the cursor.

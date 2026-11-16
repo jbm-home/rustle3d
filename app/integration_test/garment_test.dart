@@ -113,8 +113,12 @@ void main() {
       return (front['bbox']['min'][1] as num).toDouble();
     }
 
+    // From here, gestures aim at the cloth in its start pose (paused), so
+    // where it is does not depend on timing.
+    engine.resetSimulation();
+    await tester.pump();
     final before = frontBottom();
-    for (var dy = 60.0; dy < 260 && frontBottom() == before; dy += 8) {
+    for (var dy = 60.0; dy < 600 && frontBottom() == before; dy += 6) {
       await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
       final drag = await tester.startGesture(
         centre + Offset(0, dy),
@@ -145,6 +149,8 @@ void main() {
       );
     }
 
+    engine.resetSimulation();
+    await tester.pump();
     final wide = width();
     for (var dx = -160.0; dx <= 160 && width() == wide; dx += 6) {
       await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
@@ -164,7 +170,7 @@ void main() {
     final seams =
         jsonDecode(engine.run(stepJson: '{"type":"seam.list"}')) as List;
     for (final seam in seams) {
-      expect(seam['mismatch_mm'] as num, lessThan(0.5));
+      expect(seam['mismatch_mm'] as num, lessThan(0.5), reason: '$seam');
     }
     engine.run(stepJson: '{"type":"history.undo"}');
     expect(width(), closeTo(wide, 1e-6));
@@ -185,22 +191,65 @@ void main() {
       });
     }
 
+    // Draw on the draped skirt: let it settle, then hold it still.
+    engine.runSimulation(running: true);
+    for (var i = 0; i < 30; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    engine.runSimulation(running: false);
     final linesBefore = lines();
     await tester.sendKeyEvent(LogicalKeyboardKey.keyD);
     await tester.pump();
-    final stroke = await tester.startGesture(
-      centre + const Offset(-20, 0),
-      kind: PointerDeviceKind.mouse,
-    );
-    for (var i = 0; i < 10; i++) {
-      await stroke.moveBy(const Offset(0, 8));
-      await tester.pump(const Duration(milliseconds: 16));
+    for (var dx = -20.0; dx <= 120 && lines() == linesBefore; dx += 20) {
+      final stroke = await tester.startGesture(
+        centre + Offset(dx, 0),
+        kind: PointerDeviceKind.mouse,
+      );
+      for (var i = 0; i < 10; i++) {
+        await stroke.moveBy(const Offset(0, 8));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await stroke.up();
+      await tester.pump();
     }
-    await stroke.up();
-    await tester.pump();
     // One line, or two when drawn on a piece with a linked mirror copy.
     expect(lines(), greaterThan(linesBefore));
     engine.run(stepJson: '{"type":"history.undo"}');
     expect(lines(), linesBefore);
+
+    // ⌘-drag on a piece moves it around the body: its placement turns,
+    // as one undoable step.
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyV);
+    await tester.pump();
+    double angleOf(String panel) {
+      final p = jsonDecode(
+        engine.run(stepJson: jsonEncode({'type': 'panel.get', 'panel': panel})),
+      );
+      return (p['placement']['angle_deg'] as num).toDouble();
+    }
+
+    final summary = jsonDecode(
+      engine.run(stepJson: '{"type":"project.summary"}'),
+    );
+    final angles = {
+      for (final p in summary['panels'] as List)
+        p['id'] as String: angleOf(p['id'] as String),
+    };
+    bool moved() => angles.entries.any((e) => angleOf(e.key) != e.value);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    final move = await tester.startGesture(
+      centre,
+      kind: PointerDeviceKind.mouse,
+    );
+    for (var i = 0; i < 8; i++) {
+      await move.moveBy(const Offset(12, 0));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await move.up();
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await tester.pump();
+    expect(moved(), isTrue);
+    engine.run(stepJson: '{"type":"history.undo"}');
+    expect(moved(), isFalse);
   });
 }

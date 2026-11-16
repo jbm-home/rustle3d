@@ -131,7 +131,7 @@ abstract class RustLibApi extends BaseApi {
     required int view,
     required double x,
     required double y,
-    required bool adjust,
+    required Gesture gesture,
   });
 
   PatternChange? crateApiEngineEnginePull({
@@ -544,7 +544,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required int view,
     required double x,
     required double y,
-    required bool adjust,
+    required Gesture gesture,
   }) {
     return handler.executeSync(
       SyncTask(
@@ -557,7 +557,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_u_32(view, serializer);
           sse_encode_f_64(x, serializer);
           sse_encode_f_64(y, serializer);
-          sse_encode_bool(adjust, serializer);
+          sse_encode_gesture(gesture, serializer);
           return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
         },
         codec: SseCodec(
@@ -565,7 +565,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_api_error,
         ),
         constMeta: kCrateApiEngineEnginePressConstMeta,
-        argValues: [that, view, x, y, adjust],
+        argValues: [that, view, x, y, gesture],
         apiImpl: this,
       ),
     );
@@ -573,7 +573,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   TaskConstMeta get kCrateApiEngineEnginePressConstMeta => const TaskConstMeta(
     debugName: "Engine_press",
-    argNames: ["that", "view", "x", "y", "adjust"],
+    argNames: ["that", "view", "x", "y", "gesture"],
   );
 
   @override
@@ -1429,6 +1429,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  Gesture dco_decode_gesture(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return Gesture.values[raw as int];
+  }
+
+  @protected
   int dco_decode_i_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
@@ -1691,6 +1697,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_id = sse_decode_String(deserializer);
     var var_argb = sse_decode_u_32(deserializer);
     return FabricSwatch(id: var_id, argb: var_argb);
+  }
+
+  @protected
+  Gesture sse_decode_gesture(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return Gesture.values[inner];
   }
 
   @protected
@@ -1991,6 +2004,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_gesture(Gesture self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
   void sse_encode_i_32(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putInt32(self);
@@ -2229,23 +2248,24 @@ class EngineImpl extends RustOpaque implements Engine {
       );
 
   /// Pointer down at (`x`, `y`): in the 3D view, on the cloth, get ready
-  /// to drag it. With `adjust` (⇧ held) the drag changes the pattern at
+  /// to drag it. With `Adjust` (⇧ held) the drag changes the pattern at
   /// the contour edge under the cursor: an open edge (a hem) is
   /// lengthened, a seam is taken in or let out (at the nearer end when
-  /// grabbed near one). Otherwise the drag pulls the cloth. Returns
+  /// grabbed near one). With `Move` (⌘ held) it moves the piece around
+  /// the body (its placement). Otherwise the drag pulls the cloth. Returns
   /// whether there is something to drag (then moves should call `pull`);
   /// otherwise drags orbit as usual.
   bool press({
     required int view,
     required double x,
     required double y,
-    required bool adjust,
+    required Gesture gesture,
   }) => RustLib.instance.api.crateApiEngineEnginePress(
     that: this,
     view: view,
     x: x,
     y: y,
-    adjust: adjust,
+    gesture: gesture,
   );
 
   /// Pointer moved to (`x`, `y`) after `press`: pull the cloth there (on
@@ -2325,8 +2345,9 @@ class EngineImpl extends RustOpaque implements Engine {
       RustLib.instance.api.crateApiEngineEngineSimulationStatus(that: this);
 
   /// Finish the line: it becomes an internal line on the pattern
-  /// (`internal_line.add`; a style line, a pocket placement…). Returns the
-  /// new line's id, or `None` when the stroke was too short.
+  /// (`internal_line.add`; a style line, a pocket placement…), on the
+  /// source piece when drawn on a linked mirror copy. Returns the new
+  /// line's id, or `None` when the stroke was too short.
   String? strokeEnd() =>
       RustLib.instance.api.crateApiEngineEngineStrokeEnd(that: this);
 

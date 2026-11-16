@@ -233,8 +233,14 @@ class _RustViewState extends State<RustView>
                   view: view,
                   x: e.localPosition.dx * _ratio,
                   y: e.localPosition.dy * _ratio,
-                  // ⇧-drag on a hem lengthens the garment.
-                  adjust: HardwareKeyboard.instance.isShiftPressed,
+                  // ⇧-drag on a hem lengthens the garment; ⌘-drag (Ctrl
+                  // elsewhere) moves the piece around the body.
+                  gesture: switch (HardwareKeyboard.instance) {
+                    final k when k.isMetaPressed || k.isControlPressed =>
+                      Gesture.move,
+                    final k when k.isShiftPressed => Gesture.adjust,
+                    _ => Gesture.pull,
+                  },
                 );
           },
           onPointerMove: (e) {
@@ -274,8 +280,17 @@ class _RustViewState extends State<RustView>
           onPointerUp: (e) {
             if (_stroke != null) {
               setState(() => _stroke = null);
-              final line = widget.engine.strokeEnd();
-              if (line != null) widget.onDrawn?.call(line);
+              try {
+                final line = widget.engine.strokeEnd();
+                if (line != null) widget.onDrawn?.call(line);
+              } on ApiError catch (error) {
+                ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                  SnackBar(
+                    content: Text(error.text),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
               return;
             }
             if (widget.drawing) return;

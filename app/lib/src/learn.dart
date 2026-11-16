@@ -150,6 +150,11 @@ final _cards = <_Card>[
     tool: 'draw',
   ),
   const _Card(
+    Icons.open_with_rounded,
+    'Move a piece around the body',
+    'Hold ⌘ (Ctrl on Linux and Windows) and drag a piece on the garment: sideways turns it around the body, up and down changes its height. The inspector has the same settings.',
+  ),
+  const _Card(
     Icons.push_pin_outlined,
     'Pull and pin the cloth',
     'Drag the cloth in 3D to pull it. ⌥-click to pin it where it is; pins are listed on the right.',

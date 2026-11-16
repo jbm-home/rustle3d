@@ -498,7 +498,7 @@ class _ShellState extends State<Shell> {
                     'Sew: click the first edge on the pattern · V to stop',
                   'sew' => 'Sew: now click the edge to sew it to · V to stop',
                   'draw' => 'Draw: drag on the 3D garment; the line goes on the pattern · V to stop',
-                  _ when _selection.isEmpty => 'In 3D: drag to pull the cloth · ⇧-drag a hem to lengthen, a seam to take in · ⌥-click to pin',
+                  _ when _selection.isEmpty => 'In 3D: drag to pull the cloth · ⇧-drag a hem to lengthen, a seam to take in · ⌘-drag to move a piece · ⌥-click to pin',
                   _ => 'Adjust the selection in the inspector · ⌫ deletes · ⌘Z undoes',
                 },
                 stats:
