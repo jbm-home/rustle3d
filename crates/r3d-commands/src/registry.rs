@@ -99,7 +99,7 @@ macro_rules! action_registry {
             pub fn name(&self) -> &'static str {
                 match self { $( Action::$T(_) => $name, )* }
             }
-            pub fn run(&self, ws: &Workspace) -> Result<Value, WorkspaceError> {
+            pub fn run(&self, ws: &mut Workspace) -> Result<Value, WorkspaceError> {
                 match self { $( Action::$T(a) => a.run(ws), )* }
             }
             /// Every action, in registry order.
@@ -157,6 +157,7 @@ command_registry! {
     "garment.arrange" => GarmentArrange,
     "garment.set_color" => GarmentSetColor,
     "template.apply" => TemplateApply,
+    "pattern.import" => PatternImport,
 }
 
 query_registry! {
@@ -178,4 +179,6 @@ action_registry! {
     "export.pdf" => ExportPdf,
     "export.gltf" => ExportGltf,
     "export.obj" => ExportObj,
+    "export.dxf" => ExportDxf,
+    "import.pattern" => ImportPattern,
 }

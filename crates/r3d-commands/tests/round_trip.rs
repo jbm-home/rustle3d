@@ -138,6 +138,19 @@ fn every_command_round_trips() {
     let cut = h.round_trip(json!({"type": "panel.cut", "panel": path.created[0],
         "start": [2150, 650], "segments": [{"kind": "cubic", "c1": [2100, 400], "c2": [2200, 200], "to": [2150, -50]}]}));
     assert_eq!(cut.created.len(), 2);
+    let imported = h.round_trip(json!({"type": "pattern.import", "pieces": [{
+        "name": "Pocket", "start": [0, 0], "seam_allowance_mm": 10, "grain_angle_deg": 0,
+        "segments": [
+            {"kind": "line", "to": [150, 0]},
+            {"kind": "cubic", "c1": [160, 60], "c2": [150, 120], "to": [150, 180]},
+            {"kind": "line", "to": [0, 180]},
+            {"kind": "line", "to": [0, 0]}
+        ],
+        "notches": [[75, 1], [0, 90]],
+        "internal_lines": [{"start": [20, 160], "segments": [{"kind": "line", "to": [130, 160]}]}]
+    }]}));
+    // Panel, 4 points, 4 edges, 2 notches, 1 line.
+    assert_eq!(imported.created.len(), 1 + 4 + 4 + 2 + 1);
 
     let registered: BTreeSet<_> = Command::registry().iter().map(|i| i.name).collect();
     let missing: Vec<_> = registered.difference(&h.covered).collect();

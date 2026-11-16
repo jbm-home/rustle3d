@@ -10,8 +10,14 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+use r3d_core::{AnyId, PathSegment};
+
+use crate::commands::{
+    DEFAULT_GRAIN_ANGLE_DEG, LineSpec, PatternImport, PieceSpec, SegmentSpec, Vec2,
+};
 use crate::drape;
 use crate::error::{CommandError, Invalid};
+use crate::registry::Command;
 use crate::spec::Described;
 use crate::workspace::{Workspace, WorkspaceError};
 
@@ -19,7 +25,7 @@ use crate::workspace::{Workspace, WorkspaceError};
 pub trait ActionSpec:
     crate::spec::Named + Described + Serialize + serde::de::DeserializeOwned + JsonSchema + Clone
 {
-    fn run(&self, ws: &Workspace) -> Result<Value, WorkspaceError>;
+    fn run(&self, ws: &mut Workspace) -> Result<Value, WorkspaceError>;
 }
 
 /// Default export path: `exports/<project name>.<ext>`.
@@ -57,7 +63,7 @@ impl Described for ExportSvg {
 }
 
 impl ActionSpec for ExportSvg {
-    fn run(&self, ws: &Workspace) -> Result<Value, WorkspaceError> {
+    fn run(&self, ws: &mut Workspace) -> Result<Value, WorkspaceError> {
         let svg = to_svg(&pattern_drawing(ws.session().project()));
         let path = self.path.clone().unwrap_or_else(|| default_path(ws, "svg"));
         Ok(json!({ "path": ws.write(&path, svg.as_bytes())? }))
@@ -106,7 +112,7 @@ impl Described for ExportPdf {
 }
 
 impl ActionSpec for ExportPdf {
-    fn run(&self, ws: &Workspace) -> Result<Value, WorkspaceError> {
+    fn run(&self, ws: &mut Workspace) -> Result<Value, WorkspaceError> {
         let drawing = pattern_drawing(ws.session().project());
         let paper = Paper::from(self.paper);
         let pages = layout(&drawing, paper).2.len();
@@ -134,7 +140,7 @@ impl Described for Simulate {
 }
 
 impl ActionSpec for Simulate {
-    fn run(&self, ws: &Workspace) -> Result<Value, WorkspaceError> {
+    fn run(&self, ws: &mut Workspace) -> Result<Value, WorkspaceError> {
         if !(1..=3600).contains(&self.frames) {
             return Err(CommandError::invalid("frames", Invalid::Range(1.0, 3600.0)).into());
         }
@@ -200,7 +206,7 @@ impl Described for ExportGltf {
 }
 
 impl ActionSpec for ExportGltf {
-    fn run(&self, ws: &Workspace) -> Result<Value, WorkspaceError> {
+    fn run(&self, ws: &mut Workspace) -> Result<Value, WorkspaceError> {
         let (scene, state) = draped(ws, self.avatar)?;
         let path = self.path.clone().unwrap_or_else(|| default_path(ws, "glb"));
         let written = ws.write(&path, &to_glb(&scene))?;
@@ -226,12 +232,170 @@ impl Described for ExportObj {
 }
 
 impl ActionSpec for ExportObj {
-    fn run(&self, ws: &Workspace) -> Result<Value, WorkspaceError> {
+    fn run(&self, ws: &mut Workspace) -> Result<Value, WorkspaceError> {
         let (scene, state) = draped(ws, self.avatar)?;
         let path = self.path.clone().unwrap_or_else(|| default_path(ws, "obj"));
         let written = ws.write(&path, to_obj(&scene).as_bytes())?;
         Ok(json!({ "path": written, "drape": state, "pieces": scene.pieces.len() }))
     }
+}
+
+/// Export the pattern as DXF-AAMA.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ExportDxf {
+    /// Output path relative to the project folder. Defaults to
+    /// `exports/<project name>.dxf`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+}
+
+impl Described for ExportDxf {
+    const SUMMARY: &'static str = "Export all panels as DXF-AAMA (ASTM D6673, ASCII DXF in mm), for pattern and cutting software: one block per piece with its cutting line, sewing line, turn points, notches, grainline, internal lines and name. Returns the written path.";
+}
+
+impl ActionSpec for ExportDxf {
+    fn run(&self, ws: &mut Workspace) -> Result<Value, WorkspaceError> {
+        let dxf = r3d_io::dxf::to_dxf(ws.session().project());
+        let path = self.path.clone().unwrap_or_else(|| default_path(ws, "dxf"));
+        Ok(json!({ "path": ws.write(&path, dxf.as_bytes())? }))
+    }
+}
+
+/// What one unit of an imported drawing is.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum UnitSpec {
+    Mm,
+    Cm,
+    M,
+    /// Inch.
+    In,
+    /// Point, 1/72 inch.
+    Pt,
+    /// CSS pixel, 1/96 inch.
+    Px,
+}
+
+impl UnitSpec {
+    fn mm(self) -> f64 {
+        match self {
+            UnitSpec::Mm => 1.0,
+            UnitSpec::Cm => 10.0,
+            UnitSpec::M => 1000.0,
+            UnitSpec::In => 25.4,
+            UnitSpec::Pt => 25.4 / 72.0,
+            UnitSpec::Px => 25.4 / 96.0,
+        }
+    }
+}
+
+/// Import a pattern from a DXF-AAMA, SVG or PDF file.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ImportPattern {
+    /// The file, relative to the project folder (`r3d import` and the app
+    /// copy files into `imports/`). Its extension gives the format:
+    /// `.dxf`, `.svg` or `.pdf`.
+    pub path: String,
+    /// What one unit of the drawing is, when the file says nothing or says
+    /// it wrong: `mm`, `cm`, `m`, `in`, `pt` or `px`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub units: Option<UnitSpec>,
+    /// Size factor for a drawing at another scale (e.g. 2 for a pattern
+    /// drawn at half size). Default 1.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scale: Option<f64>,
+    /// PDF: import only this page (1 = first). By default every page,
+    /// with the tiles of a tiled pattern put back together.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page: Option<u32>,
+}
+
+impl Described for ImportPattern {
+    const SUMMARY: &'static str = "Import the pieces of a pattern drawn elsewhere, from a DXF-AAMA (or plain DXF), SVG or PDF file inside the project folder: outlines (curves fitted back to editable edges), seam allowances, notches, grainlines, internal lines and names. A tiled PDF's pages are put back together. One undo step (`pattern.import`). Returns the new panels, what was left out, and the scale: `file`, `given` or `assumed` (check the size when assumed).";
+}
+
+impl ActionSpec for ImportPattern {
+    fn run(&self, ws: &mut Workspace) -> Result<Value, WorkspaceError> {
+        use r3d_io::import::{ImportOptions, grain_angle_deg};
+        if let Some(s) = self.scale {
+            crate::error::positive("scale", s)?;
+            crate::error::finite("scale", &[s])?;
+        }
+        let ext = std::path::Path::new(&self.path)
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(str::to_lowercase)
+            .unwrap_or_default();
+        let bytes = ws.read(&self.path)?;
+        let options = ImportOptions {
+            mm_per_unit: self.units.map(UnitSpec::mm),
+            page: self.page.map(|p| p as usize),
+            scale: self.scale,
+        };
+        let pattern = match ext.as_str() {
+            "dxf" => r3d_io::dxf::read(&bytes, &options)?,
+            "svg" => r3d_io::import::svg::read(&bytes, &options)?,
+            "pdf" => r3d_io::import::pdf::read(&bytes, &options)?,
+            _ => return Err(CommandError::invalid("path", Invalid::Format).into()),
+        };
+        let pieces = pattern
+            .pieces
+            .iter()
+            .map(|p| PieceSpec {
+                name: p.name.clone(),
+                start: xy(p.outline.start),
+                segments: segments(&p.outline.segments),
+                seam_allowance_mm: p.seam_allowance_mm,
+                grain_angle_deg: p.grain.map_or(DEFAULT_GRAIN_ANGLE_DEG, grain_angle_deg),
+                notches: p.notches.iter().map(|n| xy(*n)).collect(),
+                internal_lines: p
+                    .internal_lines
+                    .iter()
+                    .filter(|l| !l.segments.is_empty())
+                    .map(|l| LineSpec {
+                        start: xy(l.start),
+                        segments: segments(&l.segments),
+                    })
+                    .collect(),
+            })
+            .collect();
+        let cmd = Command::PatternImport(PatternImport {
+            pieces,
+            keep_position: false,
+        });
+        let out = ws.session_mut().execute(&cmd)?;
+        let panels: Vec<String> = out
+            .created
+            .iter()
+            .filter(|id| matches!(id, AnyId::Panel(_)))
+            .map(ToString::to_string)
+            .collect();
+        Ok(json!({
+            "panels": panels,
+            "ignored": pattern.ignored,
+            "mm_per_unit": pattern.mm_per_unit,
+            "scale": pattern.scale.as_str(),
+        }))
+    }
+}
+
+fn xy(p: glam::DVec2) -> Vec2 {
+    [p.x, p.y]
+}
+
+fn segments(segs: &[PathSegment]) -> Vec<SegmentSpec> {
+    segs.iter()
+        .map(|s| match s {
+            PathSegment::Line { to } => SegmentSpec::Line { to: xy(*to) },
+            PathSegment::Cubic { c1, c2, to } => SegmentSpec::Cubic {
+                c1: xy(*c1),
+                c2: xy(*c2),
+                to: xy(*to),
+            },
+        })
+        .collect()
 }
 
 /// Below this particle speed (m/s) the cloth counts as settled.

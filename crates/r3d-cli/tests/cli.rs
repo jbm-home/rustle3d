@@ -356,3 +356,67 @@ fn simulate_without_placed_panels_is_a_user_error() {
         .clone();
     assert_eq!(json_of(&out)["error"]["code"], "nothing_to_simulate");
 }
+
+#[test]
+fn a_dxf_export_imports_into_another_project() {
+    let tmp = tempfile::tempdir().unwrap();
+    let a = tmp.path().join("A.r3d");
+    let b = tmp.path().join("B.r3d");
+    r3d().arg("new").arg(&a).assert().success();
+    r3d().arg("new").arg(&b).assert().success();
+    r3d()
+        .arg("run")
+        .arg(&a)
+        .arg("-")
+        .write_stdin(r#"[{"type": "template.apply", "template": "straight_skirt"}]"#)
+        .assert()
+        .success();
+    let out = r3d()
+        .args(["export", "--format", "dxf"])
+        .arg(&a)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let dxf = a.join(json_of(&out)["path"].as_str().unwrap());
+    let out = r3d()
+        .arg("import")
+        .arg(&b)
+        .arg(&dxf)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let v = json_of(&out);
+    assert_eq!(v["scale"], "file");
+    let pieces = v["panels"].as_array().unwrap().len();
+    assert!(pieces >= 2, "{v}");
+    // Copied into the project, and saved.
+    assert!(b.join("imports").join(dxf.file_name().unwrap()).is_file());
+    let out = r3d()
+        .arg("query")
+        .arg(&b)
+        .arg(json!({"type": "panel.list"}).to_string())
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    assert_eq!(json_of(&out).as_array().unwrap().len(), pieces);
+
+    // Inches given on the command line.
+    let out = r3d()
+        .arg("import")
+        .arg(&b)
+        .arg(&dxf)
+        .args(["--units", "in"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    assert_eq!(json_of(&out)["scale"], "given");
+    assert_eq!(json_of(&out)["mm_per_unit"], 25.4);
+}

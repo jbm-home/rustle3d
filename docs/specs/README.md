@@ -16,7 +16,7 @@ descriptions, public papers, open standards, general garment-making knowledge.
 | 04 | [3D simulation](04-simulation.md) | M4–M7 |
 | 05 | [Fabric materials](05-fabric-materials.md) | M7 |
 | 06 | [Project files](06-project-files.md) | M1 |
-| 07 | [Import / export](07-import-export.md) | M2, M5, M8 |
+| 07 | [Import / export](07-import-export.md) | M2, M5, M8, M9, M13 |
 | 08 | [Command layer and undo](08-command-layer.md) | M1 |
 | 09 | [MCP connector](09-mcp-connector.md) | M2, M8 |
 | 10 | [CLI](10-cli.md) | M1 |

@@ -23,6 +23,10 @@ pub enum WorkspaceError {
     OutsideProject { path: String },
     #[error("cannot write {path}: {detail}")]
     Write { path: String, detail: String },
+    #[error("cannot read {path}: {detail}")]
+    Read { path: String, detail: String },
+    #[error(transparent)]
+    Import(#[from] r3d_io::import::ImportError),
 }
 
 impl Localizable for WorkspaceError {
@@ -36,6 +40,10 @@ impl Localizable for WorkspaceError {
             Self::Write { path, detail } => Message::new("write_failed", self.to_string())
                 .arg("path", path)
                 .arg("detail", detail),
+            Self::Read { path, detail } => Message::new("read_failed", self.to_string())
+                .arg("path", path)
+                .arg("detail", detail),
+            Self::Import(e) => e.message(),
         }
     }
 }
@@ -79,6 +87,10 @@ impl Workspace {
 
     pub fn session(&self) -> &Session {
         &self.session
+    }
+
+    pub(crate) fn session_mut(&mut self) -> &mut Session {
+        &mut self.session
     }
 
     /// Save the project. The first save after a migration keeps the
@@ -150,6 +162,65 @@ impl Workspace {
         Ok(path)
     }
 
+    /// Read a file inside the project folder.
+    pub(crate) fn read(&self, relative: &str) -> Result<Vec<u8>, WorkspaceError> {
+        let failed = |e: std::io::Error| WorkspaceError::Read {
+            path: relative.to_owned(),
+            detail: e.to_string(),
+        };
+        let rel = Path::new(relative);
+        if relative.is_empty() || !rel.components().all(|c| matches!(c, Component::Normal(_))) {
+            return Err(WorkspaceError::OutsideProject {
+                path: relative.to_owned(),
+            });
+        }
+        let root = self.dir.canonicalize().map_err(failed)?;
+        let path = self.dir.join(rel).canonicalize().map_err(failed)?;
+        if !path.starts_with(&root) {
+            return Err(WorkspaceError::OutsideProject {
+                path: relative.to_owned(),
+            });
+        }
+        fs::read(&path).map_err(failed)
+    }
+
+    /// Copy a file from anywhere (one the user picked) into the project's
+    /// `imports/` folder, so the project keeps what it was made from.
+    /// Returns its path relative to the project; a different file of the
+    /// same name gets a numbered name, the same file is not copied twice.
+    pub fn adopt(&self, source: &Path) -> Result<String, WorkspaceError> {
+        let failed = |e: std::io::Error| WorkspaceError::Read {
+            path: source.display().to_string(),
+            detail: e.to_string(),
+        };
+        let bytes = fs::read(source).map_err(failed)?;
+        let name = source
+            .file_name()
+            .and_then(|n| n.to_str())
+            .filter(|n| !n.starts_with('.'))
+            .unwrap_or("pattern");
+        let (stem, ext) = match name.rsplit_once('.') {
+            Some((s, e)) if !s.is_empty() => (s, format!(".{e}")),
+            _ => (name, String::new()),
+        };
+        for k in 1.. {
+            let candidate = if k == 1 {
+                format!("imports/{stem}{ext}")
+            } else {
+                format!("imports/{stem} ({k}){ext}")
+            };
+            match fs::read(self.dir.join(&candidate)) {
+                Ok(existing) if existing == bytes => return Ok(candidate),
+                Ok(_) => continue,
+                Err(_) => return self.write(&candidate, &bytes),
+            }
+        }
+        Err(WorkspaceError::Write {
+            path: source.display().to_string(),
+            detail: "no free name in imports/".into(),
+        })
+    }
+
     /// Write a file inside the project folder; returns its relative path.
     pub(crate) fn write(&self, relative: &str, bytes: &[u8]) -> Result<String, WorkspaceError> {
         let path = self.confined(relative)?;
@@ -185,6 +256,26 @@ mod tests {
         }
     }
 
+    #[test]
+    fn imports_are_adopted_and_read_back() {
+        let tmp = tempfile::tempdir().unwrap();
+        let ws = Workspace::create(&tmp.path().join("P.r3d"), "P").unwrap();
+        let src = tmp.path().join("skirt.svg");
+        std::fs::write(&src, "a").unwrap();
+        assert_eq!(ws.adopt(&src).unwrap(), "imports/skirt.svg");
+        assert_eq!(ws.adopt(&src).unwrap(), "imports/skirt.svg");
+        std::fs::write(&src, "b").unwrap();
+        assert_eq!(ws.adopt(&src).unwrap(), "imports/skirt (2).svg");
+        assert_eq!(ws.read("imports/skirt (2).svg").unwrap(), b"b");
+        std::fs::write(tmp.path().join("secret"), "x").unwrap();
+        for bad in ["../secret", "/etc/passwd", ""] {
+            assert!(matches!(
+                ws.read(bad),
+                Err(WorkspaceError::OutsideProject { .. })
+            ));
+        }
+    }
+
     #[cfg(unix)]
     #[test]
     fn symlinks_cannot_escape() {
@@ -213,5 +304,11 @@ mod tests {
             Err(WorkspaceError::OutsideProject { .. })
         ));
         assert_eq!(std::fs::read_to_string(&victim).unwrap(), "keep");
+
+        // Nor read through one.
+        assert!(matches!(
+            ws.read("exports/link.svg"),
+            Err(WorkspaceError::OutsideProject { .. })
+        ));
     }
 }

@@ -1,6 +1,6 @@
 # Rustle3D architecture
 
-Status: living document, last updated 2026-11-14.
+Status: living document, last updated 2026-11-16.
 
 Every choice here is the **current best guess**, not a rule. Each one says
 why it was made and what was considered, so it can be challenged and changed
@@ -57,7 +57,7 @@ the change log at the end. Sections marked **Open** are explicitly undecided.
 | `r3d-geom` | `glam` (later `spade` for triangulation, M4) | anything r3d, GUI, GPU |
 | `r3d-core` | `r3d-geom`, `serde`, `serde_json`, `schemars` | sim, GUI, GPU |
 | `r3d-sim` | `r3d-geom`, `glam`, `rayon` | core, GUI, GPU (for the CPU backend) |
-| `r3d-io` | `r3d-core`, `r3d-geom`, `pdf-writer`, `serde_json` | sim, GUI, GPU; no file I/O (returns bytes) |
+| `r3d-io` | `r3d-core`, `r3d-geom`, `pdf-writer`, `lopdf`, `roxmltree`, `svgtypes`, `serde_json`, `thiserror` | sim, GUI, GPU; no file I/O (takes and returns bytes) |
 | `r3d-commands` | core, geom, io (sim from M4) | GUI, GPU |
 | `r3d-render` | core, geom, `wgpu`, `image` | commands, GUI toolkit |
 | `r3d-mcp` | commands (render from M3), `rmcp`, `tokio` | GUI toolkit |
@@ -194,8 +194,11 @@ Validation lives at the start of `apply` rather than in a separate
   The `xtask` generates `docs/commands.md`, and `r3d-mcp` builds its tool list
   from the same registry at startup, so there is a single source of truth.
 - **Actions** (`export.svg`, `export.pdf`, …) are a third registry next to
-  commands and queries: operations that write files and are not undoable.
-  They run on a `Workspace`, never on a bare `Session`.
+  commands and queries: operations that read or write files. They run on
+  a `Workspace`, never on a bare `Session`. They are not undoable
+  themselves; `import.pattern` reads a file inside the project folder and
+  runs the undoable `pattern.import` command with what it found, so an
+  import is one undo step and an agent can also send pieces directly.
 - **Workspace** = `Session` + project folder. It owns saving (atomic, with a
   `project.vN.json.bak` backup on the first save after a migration) and every
   file write, confined to the project folder: relative paths only, no `..`,
@@ -436,6 +439,11 @@ code stays **i18n-ready** for more:
   from the full simulation into normal maps, thickness or back faces, and,
   with animated avatars, skinning weights transferred from the avatar
   skeleton.
+- **Patterns**: SVG, PDF and DXF-AAMA out; DXF-AAMA (or plain DXF), SVG
+  and PDF in (spec 07). All readers produce one `ImportedPattern`; SVG,
+  PDF and AAMA-less DXF share the rules that read pieces out of a plain
+  drawing (`r3d_io::import::vector`), and polylines are fitted back to
+  editable curves (`r3d_geom::fit`, Schneider 1990).
 - **OBJ** for simple tools. **OpenUSD** later (open, used by film and
   visualisation pipelines). FBX is excluded: proprietary SDK.
 
@@ -479,3 +487,6 @@ code stays **i18n-ready** for more:
 | 2026-11-16 | Attached MCP over loopback TCP with a token in `agent.json` (support folder), opt-in from the app; `r3d mcp --attach` is a byte relay | Works the same on macOS, Linux and Windows (no Unix sockets or named pipes); the token keeps other local programs out; nothing listens unless the user allows it; the relay needs no MCP knowledge, so the app's server is the only one |
 | 2026-11-16 | Schema v8: `Placement.centre_x_mm`, the pattern abscissa that goes to the placement angle (default the panel's centre) | The pieces of a cut panel start exactly where the whole did; estimating an angle per piece left gaps of several cm at the waist |
 | 2026-11-16 | M12: `panel.cut` moves the outline edges and points of the smaller half to the new panel (same IDs) and keeps the larger half on the original panel | Seams, notches and pins on edges the cut does not touch survive without remapping; only the edges it crosses are split |
+| 2026-11-16 | M13: pattern import as an action (`import.pattern`, reads inside the project folder) over an undoable command (`pattern.import`); actions take `&mut Workspace`; `Workspace::adopt` copies a user's file into `imports/` | One code path for the app, CLI and MCP, with the same path confinement as exports; the project keeps the files it was made from; agents can import structured pieces without a file |
+| 2026-11-16 | Import parsers: `lopdf` (MIT; brings decompression and the decryption crates, not optional), `roxmltree` and `svgtypes` (MIT/Apache); our own DXF reader and writer | PDF objects, streams and filters are too much to reimplement; `usvg` would also resolve SVG but pulls in text shaping; DXF ASCII is simple and the AAMA subset is small |
+| 2026-11-16 | Tiled PDFs are put back together by matching shapes across pages (the shift each page applies), not by a grid the user types | Works with no input for Rustle3D's own tiles and for the common "whole drawing on every page, clipped" layout; files that really split pieces across pages are refused with a clear error and `page` |

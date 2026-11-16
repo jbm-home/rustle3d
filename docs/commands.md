@@ -2184,6 +2184,205 @@ Draft a starter garment (t_shirt, dress, straight_skirt, a_line_skirt, tote_bag)
 
 </details>
 
+### `pattern.import`
+
+Add pattern pieces in one step: for each, its sewing line (as in panel.create_path), seam allowance, grainline angle, notches (points near the outline) and internal lines. Placed to the right of the existing pieces unless keep_position. `import.pattern` reads them from a DXF, SVG or PDF file. Returns, for each piece, its panel, points and edges, then its notches and lines.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "LineSpec": {
+      "additionalProperties": false,
+      "description": "An open path (mm).",
+      "properties": {
+        "segments": {
+          "description": "At least one segment.",
+          "items": {
+            "$ref": "#/$defs/SegmentSpec"
+          },
+          "type": "array"
+        },
+        "start": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        }
+      },
+      "required": [
+        "start",
+        "segments"
+      ],
+      "type": "object"
+    },
+    "PieceSpec": {
+      "additionalProperties": false,
+      "description": "One piece of an imported pattern.",
+      "properties": {
+        "grain_angle_deg": {
+          "default": 90.0,
+          "description": "Grainline angle in degrees from +X (default 90, vertical).",
+          "format": "double",
+          "type": "number"
+        },
+        "internal_lines": {
+          "items": {
+            "$ref": "#/$defs/LineSpec"
+          },
+          "type": "array"
+        },
+        "name": {
+          "description": "Piece name. Defaults to \"Panel N\".",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "notches": {
+          "description": "Notches: points on or near the outline (within 5 mm), each put on\nthe nearest edge.",
+          "items": {
+            "items": {
+              "format": "double",
+              "type": "number"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "seam_allowance_mm": {
+          "description": "Seam allowance in mm (default 0).",
+          "format": "double",
+          "type": "number"
+        },
+        "segments": {
+          "description": "…and the edges in order; the last should end at `start`.",
+          "items": {
+            "$ref": "#/$defs/SegmentSpec"
+          },
+          "type": "array"
+        },
+        "start": {
+          "description": "The sewing line, as in `panel.create_path`: first point (mm)…",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        }
+      },
+      "required": [
+        "start",
+        "segments"
+      ],
+      "type": "object"
+    },
+    "SegmentSpec": {
+      "description": "One segment of an internal line, starting where the previous one ended.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "line",
+              "type": "string"
+            },
+            "to": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "to"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "c1": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "c2": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "kind": {
+              "const": "cubic",
+              "type": "string"
+            },
+            "to": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "c1",
+            "c2",
+            "to"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Add the pieces of a pattern made elsewhere.",
+  "properties": {
+    "keep_position": {
+      "description": "Keep the given coordinates. By default the pieces are moved, all\ntogether, to the right of the pieces already on the board.",
+      "type": "boolean"
+    },
+    "pieces": {
+      "description": "At least one piece.",
+      "items": {
+        "$ref": "#/$defs/PieceSpec"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "pieces"
+  ],
+  "title": "PatternImport",
+  "type": "object"
+}
+```
+
+</details>
+
 ## Queries
 
 Read-only. Lengths in mm, areas in mm², rounded to 0.001.
@@ -2593,6 +2792,118 @@ Export the draped garment as Wavefront OBJ: one object per piece, metres, Y up, 
     }
   },
   "title": "ExportObj",
+  "type": "object"
+}
+```
+
+</details>
+
+### `export.dxf`
+
+Export all panels as DXF-AAMA (ASTM D6673, ASCII DXF in mm), for pattern and cutting software: one block per piece with its cutting line, sewing line, turn points, notches, grainline, internal lines and name. Returns the written path.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Export the pattern as DXF-AAMA.",
+  "properties": {
+    "path": {
+      "description": "Output path relative to the project folder. Defaults to\n`exports/<project name>.dxf`.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "title": "ExportDxf",
+  "type": "object"
+}
+```
+
+</details>
+
+### `import.pattern`
+
+Import the pieces of a pattern drawn elsewhere, from a DXF-AAMA (or plain DXF), SVG or PDF file inside the project folder: outlines (curves fitted back to editable edges), seam allowances, notches, grainlines, internal lines and names. A tiled PDF's pages are put back together. One undo step (`pattern.import`). Returns the new panels, what was left out, and the scale: `file`, `given` or `assumed` (check the size when assumed).
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "UnitSpec": {
+      "description": "What one unit of an imported drawing is.",
+      "oneOf": [
+        {
+          "enum": [
+            "mm",
+            "cm",
+            "m"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "in",
+          "description": "Inch.",
+          "type": "string"
+        },
+        {
+          "const": "pt",
+          "description": "Point, 1/72 inch.",
+          "type": "string"
+        },
+        {
+          "const": "px",
+          "description": "CSS pixel, 1/96 inch.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Import a pattern from a DXF-AAMA, SVG or PDF file.",
+  "properties": {
+    "page": {
+      "description": "PDF: import only this page (1 = first). By default every page,\nwith the tiles of a tiled pattern put back together.",
+      "format": "uint32",
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "path": {
+      "description": "The file, relative to the project folder (`r3d import` and the app\ncopy files into `imports/`). Its extension gives the format:\n`.dxf`, `.svg` or `.pdf`.",
+      "type": "string"
+    },
+    "scale": {
+      "description": "Size factor for a drawing at another scale (e.g. 2 for a pattern\ndrawn at half size). Default 1.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "units": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/UnitSpec"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "What one unit of the drawing is, when the file says nothing or says\nit wrong: `mm`, `cm`, `m`, `in`, `pt` or `px`."
+    }
+  },
+  "required": [
+    "path"
+  ],
+  "title": "ImportPattern",
   "type": "object"
 }
 ```

@@ -55,6 +55,7 @@ const MARGIN_MM: f64 = 10.0;
 const NOTCH_MM: f64 = 6.0;
 const ARROW_MM: f64 = 8.0;
 const LABEL_MM: f64 = 8.0;
+const GRAIN_SHRINK_STEPS: usize = 12;
 
 /// Build the drawing of every panel plus a 100 mm test square placed above
 /// the top-left corner, so it is on the first page of a tiled print.
@@ -119,15 +120,10 @@ pub fn pattern_drawing(project: &Project) -> Drawing {
                 });
             }
         }
-        if let Some(bb) = polygon::bounding_box(&outline) {
-            let center = (bb.min + bb.max) * 0.5;
-            let dir = DVec2::from_angle(panel.grain_angle_deg.to_radians());
-            let (lo, hi) = outline
-                .iter()
-                .map(|p| (*p - center).dot(dir))
-                .fold((f64::MAX, f64::MIN), |(lo, hi), t| (lo.min(t), hi.max(t)));
-            let half = 0.3 * (hi - lo);
-            push_arrow(&mut d, center - dir * half, center + dir * half);
+        if let Some((a, b)) = grainline(&outline, panel.grain_angle_deg) {
+            let center = (a + b) * 0.5;
+            let dir = (b - a).normalize_or_zero();
+            push_arrow(&mut d, a, b);
             // Beside the grainline, never across it.
             let clearance = 0.5 * approx_text_width(&panel.name, LABEL_MM) + LABEL_MM;
             d.labels.push(Label {
@@ -172,6 +168,39 @@ pub fn pattern_drawing(project: &Project) -> Drawing {
         };
     }
     d
+}
+
+/// Where to draw a panel's grainline: through the middle of its bounding
+/// box, 60 % of the panel's extent along the grain, shortened until it
+/// lies inside the outline (a bag's handle opening, a deep neckline).
+pub(crate) fn grainline(outline: &[DVec2], angle_deg: f64) -> Option<(DVec2, DVec2)> {
+    let bb = polygon::bounding_box(outline)?;
+    let center = (bb.min + bb.max) * 0.5;
+    let dir = DVec2::from_angle(angle_deg.to_radians());
+    let (lo, hi) = outline
+        .iter()
+        .map(|p| (*p - center).dot(dir))
+        .fold((f64::MAX, f64::MIN), |(lo, hi), t| (lo.min(t), hi.max(t)));
+    let mut half = 0.3 * (hi - lo);
+    let n = outline.len();
+    let inside = |a: DVec2, b: DVec2| {
+        polygon::contains(outline, a)
+            && polygon::contains(outline, b)
+            && (0..n).all(|i| !polygon::segments_intersect(a, b, outline[i], outline[(i + 1) % n]))
+    };
+    for _ in 0..GRAIN_SHRINK_STEPS {
+        let (a, b) = (center - dir * half, center + dir * half);
+        if inside(a, b) {
+            return Some((a, b));
+        }
+        half *= 0.8;
+    }
+    // The middle is outside the piece (a ring, a crescent): keep the full
+    // line rather than none.
+    Some((
+        center - dir * 0.3 * (hi - lo),
+        center + dir * 0.3 * (hi - lo),
+    ))
 }
 
 fn push_arrow(d: &mut Drawing, a: DVec2, b: DVec2) {

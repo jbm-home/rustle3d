@@ -37,6 +37,19 @@ enum Format {
     Glb,
     /// The draped garment, Wavefront OBJ.
     Obj,
+    /// The pattern as DXF-AAMA (ASTM D6673), for pattern and cutting
+    /// software.
+    Dxf,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum UnitArg {
+    Mm,
+    Cm,
+    M,
+    In,
+    Pt,
+    Px,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -82,7 +95,26 @@ enum Cmd {
         /// e.g. '{"type": "project.summary"}'
         query: String,
     },
-    /// Export the pattern at 1:1 scale (svg, pdf) or the draped garment
+    /// Import the pieces of a pattern drawn elsewhere (DXF-AAMA or plain
+    /// DXF, SVG, PDF), then save. The file is copied into the project's
+    /// `imports/` folder first. One undo step.
+    Import {
+        project: PathBuf,
+        /// The .dxf, .svg or .pdf file.
+        file: PathBuf,
+        /// What one unit of the drawing is, when the file does not say or
+        /// says it wrong.
+        #[arg(long, value_enum)]
+        units: Option<UnitArg>,
+        /// Size factor for a drawing at another scale (2 = drawn at half
+        /// size).
+        #[arg(long)]
+        scale: Option<f64>,
+        /// PDF: import only this page (1 = first).
+        #[arg(long)]
+        page: Option<u32>,
+    },
+    /// Export the pattern at 1:1 scale (svg, pdf, dxf) or the draped garment
     /// (glb, obj; the cached `simulate` result if up to date) into the
     /// project folder.
     Export {
@@ -248,12 +280,44 @@ fn cmd_export(
         }),
         Format::Glb => json!({ "type": "export.gltf", "avatar": avatar }),
         Format::Obj => json!({ "type": "export.obj", "avatar": avatar }),
+        Format::Dxf => json!({ "type": "export.dxf" }),
     };
     if let Some(path) = out {
         step["path"] = Value::from(path);
     }
     let mut ws = Workspace::open(project)?;
     let result = ws.run_step(&Step::from_value(step)?)?;
+    print_json(&result)
+}
+
+fn cmd_import(
+    project: &Path,
+    file: &Path,
+    units: Option<UnitArg>,
+    scale: Option<f64>,
+    page: Option<u32>,
+) -> Result<(), Failure> {
+    let mut ws = Workspace::open(project)?;
+    let path = ws.adopt(file)?;
+    let mut step = json!({ "type": "import.pattern", "path": path });
+    if let Some(u) = units {
+        step["units"] = Value::from(match u {
+            UnitArg::Mm => "mm",
+            UnitArg::Cm => "cm",
+            UnitArg::M => "m",
+            UnitArg::In => "in",
+            UnitArg::Pt => "pt",
+            UnitArg::Px => "px",
+        });
+    }
+    if let Some(s) = scale {
+        step["scale"] = Value::from(s);
+    }
+    if let Some(p) = page {
+        step["page"] = Value::from(p);
+    }
+    let result = ws.run_step(&Step::from_value(step)?)?;
+    ws.save()?;
     print_json(&result)
 }
 
@@ -354,6 +418,13 @@ fn main() -> ExitCode {
             avatar,
             out,
         } => cmd_export(&project, format, paper, avatar, out),
+        Cmd::Import {
+            project,
+            file,
+            units,
+            scale,
+            page,
+        } => cmd_import(&project, &file, units, scale, page),
         Cmd::Simulate { project, frames } => cmd_simulate(&project, frames),
         Cmd::Render {
             project,
