@@ -10,7 +10,7 @@ Unity, Unreal or Blender and looks like it did in Rustle3D.
 - **M9**: glTF 2.0 / GLB with pattern UVs (1 UV unit = 1 m of fabric), PBR
   materials with sheen, one primitive per panel, optional avatar, metres,
   Y-up.
-- **M12, game-ready preset**: decimated LODs, wrinkles baked from the full
+- **M14, game-ready preset**: decimated LODs, wrinkles baked from the full
   simulation into normal maps, back faces or thickness, and skinning
   weights transferred from the avatar skeleton when avatars are animated.
 - Engine presets set scale, axes and texture sizes for each target engine.

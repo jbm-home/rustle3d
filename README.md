@@ -7,20 +7,27 @@ with real-time cloth physics. Rustle3D aims to cover the core workflow of
 professional 3D fashion tools with a simpler, more approachable UI, and to be
 fully drivable by AI agents through an MCP server.
 
-> **Status:** pre-alpha. The workspace skeleton and planning documents are in
-> place; see [`ROADMAP.md`](ROADMAP.md) for what comes next.
+> **Status:** v0.1, the first release: a first-time user makes a skirt or
+> a T-shirt in minutes. See [`ROADMAP.md`](ROADMAP.md) for what comes next
+> (glTF export and live agents, drafting tools, DXF/SVG/PDF import).
 
-## Planned features (v0.1)
+## In v0.1
 
-- 2D pattern editor: panels, Bézier contours, symmetry, notches, internal
-  lines, snapping, undo/redo.
-- Sewing between edges, with direction and length mismatch shown clearly.
-- Arrangement points around the avatar and automatic pre-positioning.
-- Real-time drape (XPBD) with avatar collision and self-collision.
+- Garments from templates drafted to the body's measurements (T-shirt,
+  dress, straight and A-line skirts, tote bag), or from blank pieces.
+- 2D pattern editor: drag corners and edges, type an edge's length, mirror
+  copies, seam allowance and grain line, undo/redo.
+- Sewing between edges, with direction and length mismatch shown, and both
+  sides of a seam made the same length in one click.
+- Real-time drape (XPBD) on a parametric avatar, with collisions,
+  self-collision, pins and pulling the cloth; lengthen a hem or take in a
+  seam directly in 3D.
 - Fabric presets: cotton, denim, jersey, silk, wool.
-- Open formats only: project folders with JSON, OBJ/glTF, SVG/PDF patterns
-  at 1:1 scale.
-- A headless CLI and an MCP server for AI agents, including offscreen renders.
+- A guided flow, short how-tos and a first-launch tour; English and French.
+- Open formats only: project folders with JSON, SVG/PDF patterns at 1:1
+  scale.
+- A headless CLI and an MCP server for AI agents, including offscreen
+  renders.
 
 ## Building
 

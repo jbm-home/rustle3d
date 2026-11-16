@@ -23,5 +23,5 @@ descriptions, public papers, open standards, general garment-making knowledge.
 | 11 | [Templates and guided flow](11-templates-guided-flow.md) | M10 |
 | 12 | [Synchronized 2D/3D views](12-synced-views.md) | M6 |
 | 13 | [3D → 2D editing](13-3d-to-2d-editing.md) | M8 |
-| 14 | [Photorealistic rendering](14-photoreal-rendering.md) | M11 |
-| 15 | [Game-engine export](15-game-export.md) | M9, M12 |
+| 14 | [Photorealistic rendering](14-photoreal-rendering.md) | M13 |
+| 15 | [Game-engine export](15-game-export.md) | M9, M14 |
