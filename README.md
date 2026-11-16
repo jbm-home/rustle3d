@@ -37,13 +37,59 @@ Prerequisites: Rust stable (`rustup`), Flutter stable, and
 `cargo install flutter_rust_bridge_codegen --version 2.13.0` (to regenerate
 the Dart bindings). macOS needs Xcode.
 
+### Installing Flutter
+
+The app needs Flutter ≥ 3.47 (Dart ≥ 3.14, see `app/pubspec.lock`). On
+macOS and Linux, a clone of the stable channel is the simplest install:
+
+```sh
+sudo apt install git curl unzip xz-utils zip   # Linux only
+git clone --depth 1 -b stable https://github.com/flutter/flutter.git ~/development/flutter
+echo 'export PATH="$HOME/development/flutter/bin:$PATH"' >> ~/.zshrc   # or ~/.bashrc
+export PATH="$HOME/development/flutter/bin:$PATH"
+flutter --disable-analytics
+flutter doctor          # only the line for your desktop OS has to be ✓
+```
+
+`flutter doctor` also lists Android, Chrome and Android Studio; they are
+not needed. Update later with `flutter upgrade`.
+
 ### Linux (and WSL2 on Windows)
+
+Install Flutter as above, then the desktop toolchain:
 
 ```sh
 sudo apt install build-essential clang cmake ninja-build pkg-config \
   libgtk-3-dev mesa-vulkan-drivers libvulkan1
 (cd app && flutter run -d linux)
 ```
+
+Under WSL2, clone the repository inside the Linux file system (e.g.
+`~/Git`), not under `/mnt/c`: builds there are much slower.
+
+### Windows (native)
+
+Run everything from Windows itself: Flutter inside WSL only builds the
+Linux app. Prerequisites:
+
+- Visual Studio 2022 (Community is enough) with the "Desktop development
+  with C++" workload.
+- Rust through `rustup-init.exe`, default MSVC toolchain
+  (`stable-x86_64-pc-windows-msvc`).
+- Flutter: `git clone --depth 1 -b stable https://github.com/flutter/flutter.git C:\dev\flutter`,
+  add `C:\dev\flutter\bin` to `PATH`; `flutter doctor` must show ✓ for
+  Visual Studio.
+- Git for Windows (Git Bash runs `scripts/release.sh`).
+
+Clone the repository on the Windows side (e.g. `C:\dev\rustle3d`), not
+under `\\wsl$\`, then:
+
+```powershell
+cd C:\dev\rustle3d\app
+flutter run -d windows
+```
+
+The GPU is used natively, so the 3D view is much faster than under WSL2.
 
 On Linux and Windows the views are rendered by the GPU and copied to the
 UI (shared textures are macOS-only for now). Under WSL2 the app runs
