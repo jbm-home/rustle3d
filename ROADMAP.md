@@ -25,7 +25,7 @@ can be tested through MCP as soon as they exist.
 | M10 | Templates, guided flow, polish → **v0.1** ✅ (released 2026-11-16) | 3–4 wk | A first-time user makes a T-shirt in < 10 minutes |
 | M9 | glTF export, attached MCP ✅ | 2 wk | An agent edits the garment live in the open app; the result opens in a game engine |
 | M11 | Pattern drafting tools ✅ | 3–4 wk | Draw a bodice with the curve tool, set the distance between two points, gather a skirt into a waistband |
-| M12 | Drafting tools 2: curve family, cut | 2–3 wk | Draw a curved piece in one go, cut a bodice along a curved princess line into two pieces sewn together |
+| M12 | Drafting tools 2: curve family, cut ✅ | 2–3 wk | Draw a curved piece in one go, cut a bodice along a curved princess line into two pieces sewn together |
 | M13 | Pattern interchange: DXF, SVG and PDF | 2–3 wk | A pattern drawn elsewhere is imported from DXF-AAMA, SVG or PDF, edited, sewn and exported back |
 | M14 | Photorealistic rendering | 4–6 wk | A path-traced studio image of the draped garment |
 | M15 | Game-ready export | 3–4 wk | LODs + baked wrinkle normal maps, imported in Godot/Unity/Unreal |
@@ -258,7 +258,7 @@ Built (2026-11-16), demo `./demos/m11/demo.sh`:
   gathering curve; UI tests for dragging handles and for the distance
   field (their commands are tested).
 
-## M12 — Drafting tools 2: curve family, cut
+## M12 — Drafting tools 2: curve family, cut ✅
 From the M11 test (2026-11-16): what Curve does today is right but
 belongs in a family of edit tools; the Curve tool itself should draw.
 - **Tool groups** on the rail: a tool can hold sub-tools (a small
@@ -278,6 +278,27 @@ belongs in a family of edit tools; the Curve tool itself should draw.
   original piece.
 - **Demo**: draw a curved piece with Curve, cut a bodice along a curved
   princess line, drape both halves sewn together.
+
+Built (2026-11-16), demo `./demos/m12/demo.sh`:
+- Tool groups on the rail (a small corner marks them; a click opens the
+  menu, the button shows the last tool used). **Edit curves**: Bend (B,
+  M11's curve editing), Straighten (L), Add point (A, `edge.split`).
+- **Curve** (C) draws a piece: click for a corner, drag for a smooth
+  point; `panel.create_path` (straight and cubic edges, any direction).
+- **Cut** (K): a straight or curved line across a piece, Enter cuts;
+  `panel.cut` (spec 16) keeps the larger piece's ID, moves the other's
+  edges and points to a new panel, sews them along the cut, splits a
+  sewn edge with its partner, carries notches, lines and pins, and moves
+  the new piece 20 mm away. Schema v8: `Placement.centre_x_mm`, so the
+  pieces of a placed panel start exactly where the whole did (an A-line
+  skirt cut along a princess line drapes like the whole one).
+- `panel.translate` now moves the panel's pins too.
+- Not yet: editing handles of a drawn point afterwards, smooth/corner
+  toggle, removing a point from the board, cutting a piece and its linked
+  mirror copy together (refused for now: unlink first).
+- Found: on the Men L body an A-line skirt in denim slides off the hips,
+  cut or not (the waist grip is too weak; the women's bodies hold). To
+  look at with the solver's convergence (physics.md §7).
 
 ## M13 — Pattern interchange: DXF, SVG and PDF
 - **DXF-AAMA / ASTM D6673** import and export (open standards): piece

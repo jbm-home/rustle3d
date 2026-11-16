@@ -10,7 +10,7 @@ descriptions, public papers, open standards, general garment-making knowledge.
 
 | # | Spec | Milestone |
 |---|---|---|
-| 01 | [Pattern editor](01-pattern-editor.md) | M3 |
+| 01 | [Pattern editor](01-pattern-editor.md) | M3, M11, M12 |
 | 02 | [Sewing](02-sewing.md) | M6 |
 | 03 | [Arrangement](03-arrangement.md) | M5–M6 |
 | 04 | [3D simulation](04-simulation.md) | M4–M7 |
@@ -25,3 +25,4 @@ descriptions, public papers, open standards, general garment-making knowledge.
 | 13 | [3D → 2D editing](13-3d-to-2d-editing.md) | M8 |
 | 14 | [Photorealistic rendering](14-photoreal-rendering.md) | M14 |
 | 15 | [Game-engine export](15-game-export.md) | M9, M15 |
+| 16 | [Cutting a piece](16-cut.md) | M12 |
