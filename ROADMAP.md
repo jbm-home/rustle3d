@@ -27,7 +27,7 @@ can be tested through MCP as soon as they exist.
 | M11 | Pattern drafting tools ✅ | 3–4 wk | Draw a bodice with the curve tool, set the distance between two points, gather a skirt into a waistband |
 | M12 | Drafting tools 2: curve family, cut ✅ | 2–3 wk | Draw a curved piece in one go, cut a bodice along a curved princess line into two pieces sewn together |
 | M13 | Pattern interchange: DXF, SVG and PDF ✅ | 2–3 wk | A pattern drawn elsewhere is imported from DXF-AAMA, SVG or PDF, edited, sewn and exported back |
-| M14 | Photorealistic rendering | 4–6 wk | A path-traced studio image of the draped garment |
+| M14 | Photorealistic rendering ✅ | 4–6 wk | A path-traced studio image of the draped garment |
 | M15 | Game-ready export | 3–4 wk | LODs + baked wrinkle normal maps, imported in Godot/Unity/Unreal |
 
 M10 came before M9: the first-time user test, not the export, decided
@@ -330,11 +330,39 @@ Built (2026-11-16), demo `./demos/m13/demo.sh`:
   (DXF-AAMA has none), PDFs whose pages hold different parts of the
   pattern, binary DXF, pieces with holes, the tiling preview.
 
-## M14 — Photorealistic rendering
+## M14 — Photorealistic rendering ✅
 - Progressive GPU path tracer in `r3d-render` (wgpu compute, hardware ray
   queries when available), physically based fabric materials (sheen, fuzz,
   thickness), HDRI studio lighting, denoising; renders in the background and
   refines in the 3D view; `render_photo` for CLI/MCP.
+
+Built (2026-11-17), demo `./demos/m14/demo.sh`; algorithms and papers in
+`docs/rendering.md`:
+- `r3d_render::photo`: path tracing with next event estimation on soft
+  boxes and MIS, over a SAH bounding volume hierarchy built on the CPU and
+  walked in a compute shader; Phong-tessellated cloth and body (round
+  folds and silhouettes), shadow rays off the shading surface; a layered
+  fabric BSDF (Charlie sheen, GGX specular, diffuse reflection and
+  transmission) from `Fabric::look()`, now shared with the 3D view and the
+  glTF export (which gains each fabric's sheen roughness); deterministic
+  sampling.
+- Three procedural studios (Studio, Soft, Dramatic): soft boxes that turn
+  with the camera and a seamless backdrop, instead of HDRI files.
+- Denoising with an à-trous wavelet filter guided by normals, depth and
+  variance; Khronos PBR Neutral tone mapping, so a fabric's colour comes
+  out as chosen.
+- Headless: MCP `render_photo` (quality, lighting, camera angle, framing,
+  samples, bounces, denoise) and `r3d render --view photo`.
+- App: Photo button over the 3D view (quality Quick/Good/Best, lighting,
+  size up to 4K, advanced settings folded); the photo refines in the 3D
+  view on a thread of its own, with progress, Stop, Save image… (PNG) and
+  Close.
+- Measured without a GPU (software Vulkan, 16 threads): a 480 × 360 Good
+  photo of the T-shirt in 15 s; the 1920 × 1080 Good target (< 1 min) is
+  to measure on the reference Mac.
+- Not yet: hardware ray queries (an unsafe, experimental wgpu feature),
+  the user's own HDRI, textures and weave normal maps, cloth thickness at
+  the edges.
 
 ## M15 — Game-ready export
 - Decimated LODs, wrinkle detail baked into normal maps, back faces or

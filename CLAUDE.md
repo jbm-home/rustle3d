@@ -6,7 +6,8 @@ real-time cloth physics. It must stay simple to use and fully drivable by AI
 agents through its command layer (CLI and MCP).
 
 Read `docs/architecture.md` before touching code, `docs/physics.md` before
-touching `r3d-sim`, and the relevant `docs/specs/*.md` before implementing a
+touching `r3d-sim`, `docs/rendering.md` before touching `r3d-render`'s photo
+renderer, and the relevant `docs/specs/*.md` before implementing a
 feature. `ROADMAP.md` says which milestone we are on.
 
 **Firm vs. flexible.** Only the clean-room rules (section 1) are fixed. They
@@ -40,8 +41,9 @@ This is an independent, clean-room implementation.
 - Other permissively licensed projects may inspire design ideas. If code is
   copied or closely adapted, keep the original copyright notice and add an
   entry to `THIRD_PARTY_NOTICES.md`. Prefer reimplementing from papers.
-- Physics algorithms come from published papers; cite them in the doc comment
-  of the implementing code and in `docs/physics.md`.
+- Physics and rendering algorithms come from published papers; cite them in
+  the doc comment of the implementing code and in `docs/physics.md` or
+  `docs/rendering.md`.
 
 If a request would break one of these rules, stop and say so.
 
@@ -100,9 +102,9 @@ cargo fmt --all                              # format
 cargo run -p r3d-cli -- --help               # headless CLI (binary: r3d)
 cargo xtask gen-docs                         # regenerate docs/commands.md (a test checks it)
 UPDATE_GOLDEN=1 cargo test -p r3d-core       # regenerate current-version golden files
-./demos/m13/demo.sh                          # latest milestone demo (one folder per milestone)
+./demos/m14/demo.sh                          # latest milestone demo (one folder per milestone)
 cargo bench -p r3d-sim                       # solver benchmarks (docs/physics.md §7)
-cargo run -p r3d-cli -- simulate X.r3d       # headless drape (cached), then: render X.r3d --view 3d --out a.png
+cargo run -p r3d-cli -- simulate X.r3d       # headless drape (cached), then: render X.r3d --view 3d|photo --out a.png
 cargo run -p r3d-cli -- mcp --project X.r3d  # MCP server over stdio for agents
 (cd app && flutter run -d macos)             # desktop app (Flutter UI + Rust core)
 (cd app && flutter_rust_bridge_codegen generate)  # after changing crates/r3d-ffi/src/api
@@ -120,7 +122,7 @@ If `cargo` is not on `PATH`, run `source ~/.cargo/env` first.
 | `r3d-sim`      | XPBD cloth solver (CPU/rayon) behind a `Solver` trait, collisions    |
 | `r3d-io`       | OBJ, glTF, SVG, PDF, DXF-AAMA export; DXF, SVG, PDF pattern import    |
 | `r3d-commands` | Typed commands, validation, JSON schemas, undo/redo, `Session`       |
-| `r3d-render`   | wgpu renderers for the 2D board and 3D view, on-screen and offscreen |
+| `r3d-render`   | wgpu renderers: 2D board, 3D view, path-traced photos; on-screen and offscreen |
 | `r3d-mcp`      | MCP server over the command layer (stdio or local socket)            |
 | `r3d-cli`      | `r3d` binary: scripts, simulate, export, render, `mcp`               |
 | `r3d-ffi`      | Bridge for the Flutter desktop app (`app/`): engine, views, libraries |

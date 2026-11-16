@@ -12,8 +12,8 @@ token to `agent.json` in its support folder. `r3d mcp --attach
 a wrong token is refused. One agent at a time; its changes are saved,
 go into the app's undo history and show at once (pattern, inspector,
 live drape). The app shows "Agent connected" and can disconnect it.
-`render_3d` in attached mode still draws the cached or starting drape,
-not the app's live one; a long action (e.g. `simulate`) holds the project
+`render_3d` and `render_photo` in attached mode still draw the cached or
+starting drape, not the app's live one; a long action (e.g. `simulate`) holds the project
 while it runs.
 
 ## User story
@@ -30,8 +30,12 @@ and look at the result, either headless or live in the user's open app.
 - **Visual feedback**: `render_board` and `render_3d` return PNG images
   (`width`, `height`; implemented in M4). `render_3d` shows the last
   `simulate` result if the document has not changed since, otherwise the
-  starting positions, and says which. Camera presets and highlighting of
-  ids come later.
+  starting positions, and says which. `render_photo` (M14, spec 14)
+  path-traces the same garment in a photo studio: `quality`
+  (quick/good/best), `lighting` (studio/soft/dramatic), `camera`
+  (front/three_quarter/side/back), `frame` (garment/body), and advanced
+  `samples`, `bounces`, `denoise`; the text result gives the time taken.
+  Highlighting of ids comes later.
 - **Naming**: tool names are the operation names with underscores
   (`panel_create_rect`). Errors are tool results with `isError` and the
   structured error (`code`, `args`, `text`).

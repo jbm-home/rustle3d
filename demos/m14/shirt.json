@@ -1,0 +1,7 @@
+[
+  {"type": "avatar.set", "preset": "Women M",
+   "body": {"masculinity": 0, "height_cm": 168, "bust_cm": 90, "waist_cm": 73, "hips_cm": 98}},
+  {"type": "template.apply", "template": "t_shirt"},
+  {"type": "garment.set_fabric", "fabric": "jersey"},
+  {"type": "garment.set_color", "color": "#2F6E8E"}
+]

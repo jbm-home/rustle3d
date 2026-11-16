@@ -1,6 +1,6 @@
 # Rustle3D architecture
 
-Status: living document, last updated 2026-11-16.
+Status: living document, last updated 2026-11-17.
 
 Every choice here is the **current best guess**, not a rule. Each one says
 why it was made and what was considered, so it can be challenged and changed
@@ -317,7 +317,7 @@ Whatever wins, the UI stays a thin client of `r3d-commands`.
 |---|---|---|
 | **Interactive** | Board and 3D view while editing, agent PNGs | Raster PBR with a cloth BRDF (sheen), soft studio lighting, shadow, MSAA. Fit maps and seam overlays. |
 | **Preview** | "Looks good" screenshots | Interactive tier plus screen-space AO and higher-resolution shadows, rendered offscreen at any size. |
-| **Photorealistic** | Marketing-quality images | Progressive GPU path tracer (wgpu compute; hardware ray queries where available, a BVH in compute otherwise), physically based fabric materials, HDRI lighting, denoising. Renders in the background and refines in the view. |
+| **Photorealistic** (M14) | Marketing-quality images | Progressive GPU path tracer in wgpu compute over a BVH built on the CPU (hardware ray queries later), layered fabric BSDF (sheen, GGX specular, translucency), procedural studio lighting (soft boxes and a seamless backdrop), à-trous denoising, Khronos PBR Neutral tone mapping. Renders on its own thread and refines in the 3D view. Details and references: [`rendering.md`](rendering.md). |
 
 The board renderer draws instanced lines and curves, points, fills, and text
 with `glyphon`. Every tier renders offscreen too, for the CLI and MCP.
@@ -355,9 +355,9 @@ the callers.
   tool per operation, with the dots turned into underscores
   (`panel.create_rect` → `panel_create_rect`, as MCP clients require
   `[a-zA-Z0-9_-]`) and the same JSON schema. `history_undo`,
-  `history_redo` and `batch` complete the set. `render_board` and
-  `render_3d` return PNG image content (module `r3d_mcp::render`, shared
-  with `r3d render`).
+  `history_redo` and `batch` complete the set. `render_board`,
+  `render_3d` and `render_photo` return PNG image content (module
+  `r3d_mcp::render`, shared with `r3d render`).
 - Tool failures are returned as tool results with `isError` and the
   structured error (`code`, `args`, `text`), never as protocol errors, so
   the agent can read them and correct itself. Results are compact JSON.
@@ -490,3 +490,8 @@ code stays **i18n-ready** for more:
 | 2026-11-16 | M13: pattern import as an action (`import.pattern`, reads inside the project folder) over an undoable command (`pattern.import`); actions take `&mut Workspace`; `Workspace::adopt` copies a user's file into `imports/` | One code path for the app, CLI and MCP, with the same path confinement as exports; the project keeps the files it was made from; agents can import structured pieces without a file |
 | 2026-11-16 | Import parsers: `lopdf` (MIT; brings decompression and the decryption crates, not optional), `roxmltree` and `svgtypes` (MIT/Apache); our own DXF reader and writer | PDF objects, streams and filters are too much to reimplement; `usvg` would also resolve SVG but pulls in text shaping; DXF ASCII is simple and the AAMA subset is small |
 | 2026-11-16 | Tiled PDFs are put back together by matching shapes across pages (the shift each page applies), not by a grid the user types | Works with no input for Rustle3D's own tiles and for the common "whole drawing on every page, clipped" layout; files that really split pieces across pages are refused with a clear error and `page` |
+| 2026-11-17 | M14: the path tracer walks a BVH of our own in a compute shader; no hardware ray queries | wgpu 30 enables them only through an `unsafe` experimental-features token, and `unsafe` is denied; the compute BVH runs on every backend, including software Vulkan for tests |
+| 2026-11-17 | Procedural studios (rectangular soft boxes that turn with the camera, a seamless backdrop) instead of shipped HDRI files | No asset licensing or download; soft boxes are sampled directly (next event estimation), so few samples are noisy; the look stays the same from every angle. The user's own HDRI can come later |
+| 2026-11-17 | Our own denoiser (à-trous wavelet filter with SVGF's variance guidance) instead of Intel Open Image Denoise | OIDN is a C++ library with large binaries per platform and needs FFI (`unsafe`); a guided wavelet filter in WGSL runs on every GPU backend |
+| 2026-11-17 | `Fabric::look()` (colour, sheen and its roughness, specular, translucency) replaces `Fabric::appearance()` | The 3D view, the photo and the glTF export read one table, so they agree on a fabric |
+| 2026-11-17 | The app renders photos on a thread of its own on the views' GPU device; the 3D view draws the latest image (`ImageBlit`) | Cancelling and refining never block the UI; batches of about 40 ms of GPU time keep the views' frames smooth |

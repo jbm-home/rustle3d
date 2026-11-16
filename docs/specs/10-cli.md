@@ -25,9 +25,14 @@ nothing is written. Scripts can refer to earlier results
   [--page n]`: copy a DXF-AAMA (or plain DXF), SVG or PDF pattern into
   the project's `imports/` folder, import its pieces (the
   `import.pattern` action, one undo step) and save (see 07).
-- `r3d render <project> --view board|3d --out file.png [--size WxH]`: the
-  3D view shows the cached drape when it matches the document, otherwise
-  the starting positions; the JSON output says which (`"drape"`).
+- `r3d render <project> --view board|3d|photo --out file.png [--size WxH]`:
+  the 3D view and the photo show the cached drape when it matches the
+  document, otherwise the starting positions; the JSON output says which
+  (`"drape"`). A photo (M14, spec 14) takes `--quality quick|good|best`,
+  `--lighting studio|soft|dramatic`, `--camera
+  front|three-quarter|side|back`, `--frame garment|body`, `--samples N`,
+  `--bounces N` and `--no-denoise`; its output adds the samples and the
+  seconds taken.
 - `r3d mcp --project path`: MCP server over a folder; `r3d mcp --attach
   [--endpoint file]`: relay to the project open in the app (see 09).
 - `r3d export <project> --format svg|pdf|dxf|glb|obj [--paper a4|letter|single]

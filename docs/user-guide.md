@@ -7,7 +7,7 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-16 (M13).
+Last updated: 2026-11-17 (M14).
 -->
 
 Rustle3D is a free, open-source desktop app for making clothes: draw the
@@ -115,6 +115,29 @@ app.)
 - **Arrange around the body** places every piece in seam order at the
   waist.
 
+## Photos
+**Photo** (the camera button at the top right of the 3D view) makes a
+photorealistic image of the garment on the body, as the 3D view shows it
+now: the same angle and zoom, the cloth where it is. Choose:
+- **Quality**: **Quick** (a first look in seconds), **Good** (clean
+  enough to show, the usual choice) or **Best** (for print and close-ups;
+  it takes several times longer).
+- **Lighting**: **Studio** (a main light, a softer one on the other side
+  and a light from behind, on a light grey backdrop), **Soft** (large
+  soft lights on a white backdrop, few shadows, like a shop's product
+  photos) or **Dramatic** (one hard light on a dark backdrop).
+- **Size**: as the 3D view, 1920 × 1080, 1080 × 1350 (portrait, for
+  social media), 2048 × 2048 or 3840 × 2160 (4K).
+- **Advanced** (folded): samples per pixel (more is cleaner and slower),
+  light bounces, and whether to remove the remaining noise.
+
+The image appears in the 3D view and gets cleaner as it renders, with
+its progress at the bottom. **Stop** keeps the image as it is; **Save
+image…** saves it as a PNG file; **×** goes back to the live 3D view
+(turning, simulating, editing). The photo takes a snapshot: the drape
+can keep running underneath. The garment's colour in the photo is its
+true colour under neutral light.
+
 ## Export
 **Export** in the top bar, then choose where to save:
 - **Pattern, SVG at 1:1**: one drawing at real size, for vector editors
@@ -168,6 +191,9 @@ Protocol):
   agent. Configure the agent to run `r3d mcp --attach`.
 - **Without the app**: `r3d mcp --project My.r3d` serves a project
   headless.
+- An agent can look at its work: a picture of the pattern, of the 3D
+  view, or a photo like the app's (`render_photo`). From the command
+  line: `r3d render My.r3d --view photo --out photo.png`.
 Everything the app does is a command that an agent can run too.
 
 ## Files
@@ -181,6 +207,9 @@ DXF-AAMA; garments go out as glTF and OBJ: open formats only.
   during the drape.
 - A point's handles cannot be edited after it is drawn yet; use Bend on
   the edge.
+- Photos: the fabric has no visible weave or print yet, and the cloth
+  is a single thin layer (no thickness at the hem). Your own studio
+  lighting (an HDRI image) cannot be loaded yet.
 - Import: a PDF whose pages each hold a different part of the pattern
   (rather than the same drawing shifted) cannot be put back together;
   binary DXF files and protected PDFs cannot be read. Grading rules are
