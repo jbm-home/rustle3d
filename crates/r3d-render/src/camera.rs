@@ -29,6 +29,16 @@ impl Default for OrbitCamera {
 }
 
 impl OrbitCamera {
+    /// The default framing, looking at the body from `yaw` (radians: 0 =
+    /// from the front, π/2 = from its left side, π = from the back).
+    pub fn facing(yaw: f32) -> Self {
+        Self {
+            yaw,
+            pitch: 0.05,
+            ..Self::default()
+        }
+    }
+
     pub fn eye(&self) -> Vec3 {
         let pitch = self.pitch.clamp(-1.4, 1.4);
         self.target
@@ -106,6 +116,14 @@ impl OrbitCamera {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn facing_looks_from_that_side() {
+        let front = OrbitCamera::facing(0.0).eye();
+        assert!(front.z > 3.0 && front.x.abs() < 1e-5);
+        let left = OrbitCamera::facing(std::f32::consts::FRAC_PI_2).eye();
+        assert!(left.x > 3.0);
+    }
 
     #[test]
     fn rays_go_through_projected_points() {

@@ -105,6 +105,17 @@ impl CanvasColors {
     }
 }
 
+/// Where the 3D view looks at the body from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CameraSide {
+    Front,
+    ThreeQuarter,
+    /// The body's left side.
+    Left,
+    Back,
+    Right,
+}
+
 /// What a view shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ViewKind {
@@ -1155,6 +1166,23 @@ impl Engine {
             .and_then(|g| g.views.get_mut(&view))
         {
             v.board_view = None;
+        }
+        Ok(())
+    }
+
+    /// Look at the body from one side, framed head to toe.
+    #[frb(sync)]
+    pub fn look_from(&self, side: CameraSide) -> Result<(), ApiError> {
+        use std::f32::consts::{FRAC_PI_2, PI};
+        let yaw = match side {
+            CameraSide::Front => 0.0,
+            CameraSide::ThreeQuarter => OrbitCamera::default().yaw,
+            CameraSide::Left => FRAC_PI_2,
+            CameraSide::Back => PI,
+            CameraSide::Right => -FRAC_PI_2,
+        };
+        if let Some(g) = self.graphics()?.as_mut() {
+            g.camera = OrbitCamera::facing(yaw);
         }
         Ok(())
     }

@@ -66,6 +66,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PatternChange dco_decode_box_autoadd_pattern_change(dynamic raw);
 
   @protected
+  CameraSide dco_decode_camera_side(dynamic raw);
+
+  @protected
   CanvasColors dco_decode_canvas_colors(dynamic raw);
 
   @protected
@@ -166,6 +169,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PatternChange sse_decode_box_autoadd_pattern_change(
     SseDeserializer deserializer,
   );
+
+  @protected
+  CameraSide sse_decode_camera_side(SseDeserializer deserializer);
 
   @protected
   CanvasColors sse_decode_canvas_colors(SseDeserializer deserializer);
@@ -282,6 +288,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     PatternChange self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_camera_side(CameraSide self, SseSerializer serializer);
 
   @protected
   void sse_encode_canvas_colors(CanvasColors self, SseSerializer serializer);

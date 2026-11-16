@@ -90,6 +90,9 @@ class _ShellState extends State<Shell> {
   void _showBody() =>
       showBodyPanel(context, widget.engine, widget.libraryDir, _refresh);
 
+  void _look(CameraSide side) =>
+      _guard(() => widget.engine.lookFrom(side: side));
+
   /// The step's main action, from the guide banner.
   void _stepAction() {
     switch (_step) {
@@ -293,6 +296,14 @@ class _ShellState extends State<Shell> {
         const SingleActivator(LogicalKeyboardKey.keyD): () => _setTool('draw'),
         const SingleActivator(LogicalKeyboardKey.keyS): () => _setTool('sew'),
         const SingleActivator(LogicalKeyboardKey.backspace): _deleteSelected,
+        const SingleActivator(LogicalKeyboardKey.digit1): () =>
+            _look(CameraSide.front),
+        const SingleActivator(LogicalKeyboardKey.digit2): () =>
+            _look(CameraSide.left),
+        const SingleActivator(LogicalKeyboardKey.digit3): () =>
+            _look(CameraSide.back),
+        const SingleActivator(LogicalKeyboardKey.digit4): () =>
+            _look(CameraSide.threeQuarter),
         const SingleActivator(LogicalKeyboardKey.space): () =>
             _setRunning(!(_sim?.running ?? false)),
       },
@@ -356,10 +367,17 @@ class _ShellState extends State<Shell> {
                         child: _ViewCard(
                           title: '3D',
                           icon: Icons.view_in_ar_outlined,
-                          trailing: _SimControls(
-                            status: _sim,
-                            onRun: _setRunning,
-                            onRestart: _restart,
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _CameraBar(onLook: _look),
+                              const SizedBox(width: Space.s),
+                              _SimControls(
+                                status: _sim,
+                                onRun: _setRunning,
+                                onRestart: _restart,
+                              ),
+                            ],
                           ),
                           child: RustView(
                             engine: widget.engine,
@@ -1351,6 +1369,57 @@ class _StatusBar extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Look at the body from the front, the side, the back or three quarters.
+class _CameraBar extends StatelessWidget {
+  const _CameraBar({required this.onLook});
+
+  final ValueChanged<CameraSide> onLook;
+
+  static const _sides = [
+    (CameraSide.front, 'Front', '1'),
+    (CameraSide.left, 'Side', '2'),
+    (CameraSide.back, 'Back', '3'),
+    (CameraSide.threeQuarter, '¾', '4'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: p.surface.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: p.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final (side, label, key) in _sides)
+            Tooltip(
+              message:
+                  'View from the ${label == '¾' ? 'three-quarter angle' : label.toLowerCase()}  $key',
+              child: TextButton(
+                onPressed: () => onLook(side),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  minimumSize: const Size(36, 32),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  foregroundColor: p.textMuted,
+                  shape: const StadiumBorder(),
+                ),
+                child: Text(
+                  label,
+                  style: ts(fontSize: 12.5, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

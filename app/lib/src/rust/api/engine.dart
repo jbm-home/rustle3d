@@ -9,7 +9,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `adjust_by`, `cloth_hit`, `edited`, `err`, `extend_stroke`, `form`, `graphics`, `new`, `new`, `pick_cloth`, `poisoned`, `rebuild`, `resync_if_due`, `rgba`, `selected`, `sim`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Engine>>
 abstract class Engine implements RustOpaqueInterface {
@@ -40,6 +40,9 @@ abstract class Engine implements RustOpaqueInterface {
 
   /// Fit the board to the pattern again.
   void fitBoard({required int view});
+
+  /// Look at the body from one side, framed head to toe.
+  void lookFrom({required CameraSide side});
 
   /// Open the project folder at `path`, creating it if it does not exist.
   static Engine open({required String path}) =>
@@ -169,6 +172,17 @@ class ApiError implements FrbException {
           code == other.code &&
           args == other.args &&
           text == other.text;
+}
+
+/// Where the 3D view looks at the body from.
+enum CameraSide {
+  front,
+  threeQuarter,
+
+  /// The body's left side.
+  left,
+  back,
+  right,
 }
 
 /// Canvas colours as `0xAARRGGBB` (Flutter's `Color.toARGB32()`).
