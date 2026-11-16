@@ -19,6 +19,68 @@ impl CubicBez {
         Self { p0, p1, p2, p3 }
     }
 
+    /// The straight segment `a → b` as a cubic, with the same uniform
+    /// parametrisation as the line (`eval(t) = a + t (b − a)`).
+    pub fn line(a: DVec2, b: DVec2) -> Self {
+        Self::new(a, a.lerp(b, 1.0 / 3.0), a.lerp(b, 2.0 / 3.0), b)
+    }
+
+    /// The same curve walked from `p3` to `p0`.
+    pub fn reversed(&self) -> Self {
+        Self::new(self.p3, self.p2, self.p1, self.p0)
+    }
+
+    /// The part of the curve between parameters `lo ≤ hi` (in `[0, 1]`).
+    pub fn sub(&self, lo: f64, hi: f64) -> Self {
+        let right = if lo > 0.0 { self.split(lo).1 } else { *self };
+        if hi >= 1.0 {
+            return right;
+        }
+        let s = if lo < 1.0 {
+            (hi - lo) / (1.0 - lo)
+        } else {
+            0.0
+        };
+        right.split(s.clamp(0.0, 1.0)).0
+    }
+
+    /// Where this curve crosses `other`: `(t, u)` parameter pairs on each,
+    /// accurate to about `tolerance` (mm) in position. Both curves are
+    /// flattened and their segments intersected; touching ends count, so
+    /// a crossing at a shared flattening vertex may be reported twice
+    /// (callers merge crossings closer than their own tolerance). Overlapping
+    /// collinear pieces are not reported.
+    pub fn crossings(&self, other: &CubicBez, tolerance: f64) -> Vec<(f64, f64)> {
+        let flat = |c: &CubicBez| {
+            let n = c.flatten_segment_count(tolerance);
+            (0..=n)
+                .map(|i| {
+                    let t = i as f64 / n as f64;
+                    (t, c.eval(t))
+                })
+                .collect::<Vec<_>>()
+        };
+        let (a, b) = (flat(self), flat(other));
+        let mut out = Vec::new();
+        for wa in a.windows(2) {
+            let [(ta0, p), (ta1, p2)] = [wa[0], wa[1]];
+            for wb in b.windows(2) {
+                let [(tb0, q), (tb1, q2)] = [wb[0], wb[1]];
+                let (r, s) = (p2 - p, q2 - q);
+                let denom = r.perp_dot(s);
+                if denom.abs() <= f64::EPSILON * r.length() * s.length() {
+                    continue;
+                }
+                let x = (q - p).perp_dot(s) / denom;
+                let y = (q - p).perp_dot(r) / denom;
+                if (0.0..=1.0).contains(&x) && (0.0..=1.0).contains(&y) {
+                    out.push((ta0 + x * (ta1 - ta0), tb0 + y * (tb1 - tb0)));
+                }
+            }
+        }
+        out
+    }
+
     /// Point at parameter `t ∈ [0, 1]`.
     pub fn eval(&self, t: f64) -> DVec2 {
         let mt = 1.0 - t;
@@ -137,6 +199,44 @@ mod tests {
             DVec2::new(20.0, 0.0),
             DVec2::new(30.0, 0.0),
         )
+    }
+
+    #[test]
+    fn crossings_of_a_line_and_an_arch() {
+        let arch = CubicBez::new(
+            DVec2::new(0.0, 0.0),
+            DVec2::new(0.0, 100.0),
+            DVec2::new(100.0, 100.0),
+            DVec2::new(100.0, 0.0),
+        );
+        let line = CubicBez::line(DVec2::new(-10.0, 50.0), DVec2::new(110.0, 50.0));
+        let mut found = line.crossings(&arch, 1e-3);
+        found.dedup_by(|a, b| (a.0 - b.0).abs() < 1e-9);
+        assert_eq!(found.len(), 2);
+        for (t, u) in found {
+            assert!(line.eval(t).distance(arch.eval(u)) < 1e-2);
+            assert!((arch.eval(u).y - 50.0).abs() < 1e-2);
+        }
+    }
+
+    #[test]
+    fn sub_curve_matches_the_curve() {
+        let c = CubicBez::new(
+            DVec2::new(0.0, 0.0),
+            DVec2::new(5.0, 40.0),
+            DVec2::new(35.0, -20.0),
+            DVec2::new(40.0, 10.0),
+        );
+        let s = c.sub(0.2, 0.7);
+        assert!(s.p0.distance(c.eval(0.2)) < 1e-12);
+        assert!(s.p3.distance(c.eval(0.7)) < 1e-12);
+        assert!(s.eval(0.5).distance(c.eval(0.45)) < 1e-9);
+        assert!(
+            CubicBez::line(DVec2::ZERO, DVec2::X)
+                .eval(0.25)
+                .distance(DVec2::new(0.25, 0.0))
+                < 1e-12
+        );
     }
 
     #[test]

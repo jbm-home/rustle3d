@@ -77,6 +77,7 @@ fn sample() -> Project {
                 angle_deg: 0.0,
                 top_cm: 104.0,
                 offset_mm: 30.0,
+                centre_x_mm: Some(200.0),
             }),
         },
     );

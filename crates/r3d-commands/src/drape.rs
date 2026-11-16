@@ -319,8 +319,12 @@ impl Laid {
     }
 }
 
-/// Horizontal centre of a laid panel on the pattern (mm).
+/// The pattern abscissa of a laid panel that goes to its placement
+/// angle (mm): the placement's, or the panel's horizontal centre.
 fn centre_x(l: &Laid) -> f64 {
+    if let Some(x) = l.place.centre_x_mm {
+        return x;
+    }
     let lo = l.mesh.vertices.iter().fold(f64::MAX, |m, v| m.min(v.x));
     let hi = l.mesh.vertices.iter().fold(f64::MIN, |m, v| m.max(v.x));
     (lo + hi) / 2.0

@@ -15,6 +15,30 @@ pub enum SegmentSpec {
     Cubic { c1: Vec2, c2: Vec2, to: Vec2 },
 }
 
+/// Check and convert a path's segments (mm).
+pub(crate) fn path_segments(
+    field: &'static str,
+    segments: &[SegmentSpec],
+) -> Result<Vec<PathSegment>, CommandError> {
+    segments
+        .iter()
+        .map(|s| match s {
+            SegmentSpec::Line { to } => {
+                finite(field, to).map(|()| PathSegment::Line { to: v(*to) })
+            }
+            SegmentSpec::Cubic { c1, c2, to } => {
+                finite(field, &[c1[0], c1[1], c2[0], c2[1], to[0], to[1]]).map(|()| {
+                    PathSegment::Cubic {
+                        c1: v(*c1),
+                        c2: v(*c2),
+                        to: v(*to),
+                    }
+                })
+            }
+        })
+        .collect()
+}
+
 /// Apply `f` to every point of a line (used for translation and mirroring).
 pub(crate) fn mapped(line: &InternalLine, f: impl Fn(DVec2) -> DVec2) -> InternalLine {
     InternalLine {
@@ -61,24 +85,7 @@ impl CommandSpec for InternalLineAdd {
         if self.segments.is_empty() {
             return Err(CommandError::invalid("segments", Invalid::Empty));
         }
-        let segments = self
-            .segments
-            .iter()
-            .map(|s| match s {
-                SegmentSpec::Line { to } => {
-                    finite("segments", to).map(|()| PathSegment::Line { to: v(*to) })
-                }
-                SegmentSpec::Cubic { c1, c2, to } => {
-                    finite("segments", &[c1[0], c1[1], c2[0], c2[1], to[0], to[1]]).map(|()| {
-                        PathSegment::Cubic {
-                            c1: v(*c1),
-                            c2: v(*c2),
-                            to: v(*to),
-                        }
-                    })
-                }
-            })
-            .collect::<Result<_, _>>()?;
+        let segments = path_segments("segments", &self.segments)?;
         let id = tx.new_internal_line_id();
         tx.put_internal_line(
             id,

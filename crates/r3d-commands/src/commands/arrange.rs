@@ -97,6 +97,7 @@ impl CommandSpec for GarmentArrange {
                 angle_deg: 360.0 * i as f64 / n,
                 top_cm,
                 offset_mm: panel.placement.map_or(30.0, |pl| pl.offset_mm),
+                centre_x_mm: None,
             });
             tx.put_panel(id, panel);
         }

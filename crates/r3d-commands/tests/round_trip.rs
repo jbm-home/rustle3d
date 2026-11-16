@@ -126,6 +126,18 @@ fn every_command_round_trips() {
     h.round_trip(json!({"type": "internal_line.remove", "line": line}));
     h.round_trip(json!({"type": "edge.set_curve", "edge": edge, "curve": {"kind": "line"}}));
     h.round_trip(json!({"type": "panel.delete", "panel": panel, "confirm": true}));
+    let path = h.round_trip(json!({
+        "type": "panel.create_path", "name": "Bodice", "start": [2000, 0], "segments": [
+            {"kind": "line", "to": [2300, 0]},
+            {"kind": "cubic", "c1": [2350, 200], "c2": [2250, 400], "to": [2300, 600]},
+            {"kind": "line", "to": [2000, 600]}
+        ]
+    }));
+    // The closing edge back to the start is added.
+    assert_eq!(path.created.len(), 1 + 4 + 4);
+    let cut = h.round_trip(json!({"type": "panel.cut", "panel": path.created[0],
+        "start": [2150, 650], "segments": [{"kind": "cubic", "c1": [2100, 400], "c2": [2200, 200], "to": [2150, -50]}]}));
+    assert_eq!(cut.created.len(), 2);
 
     let registered: BTreeSet<_> = Command::registry().iter().map(|i| i.name).collect();
     let missing: Vec<_> = registered.difference(&h.covered).collect();

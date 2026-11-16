@@ -1053,6 +1053,37 @@ impl Engine {
         }))
     }
 
+    /// The editable edge within `max_mm` of pattern point `at`, and how far
+    /// along it that point is (mm). Linked mirror copies follow their
+    /// source, so their edges are left out.
+    fn edge_spot(
+        &self,
+        at: r3d_geom::DVec2,
+        max_mm: f64,
+    ) -> Result<Option<(EdgeId, f64, f64)>, ApiError> {
+        let ws = self.workspace()?;
+        let project = ws.session().project();
+        let scene = BoardScene::from_project(project, &[]);
+        Ok(scene
+            .edge_at(at, max_mm)
+            .filter(|e| {
+                project
+                    .panel(e.panel)
+                    .is_some_and(|p| p.mirror_of.is_none())
+            })
+            .map(|e| {
+                let length = project.edge_length(e.id).unwrap_or_default();
+                (e.id, offset_along(&e.points, at), length)
+            }))
+    }
+
+    /// Run a step and return the first ID it created.
+    fn run_created(&self, step: serde_json::Value) -> Result<Option<String>, ApiError> {
+        let out: serde_json::Value = serde_json::from_str(&self.run(step.to_string())?)
+            .map_err(|e| ApiError::new("internal", e.to_string()))?;
+        Ok(out["created"][0].as_str().map(str::to_owned))
+    }
+
     /// Add a notch on the edge within `max_mm` of pattern point (`x_mm`,
     /// `y_mm`), where that point is along it (`notch.add`). Returns the
     /// notch, or `None` off the edges (and on linked mirror copies, which
@@ -1064,27 +1095,35 @@ impl Engine {
         y_mm: f64,
         max_mm: f64,
     ) -> Result<Option<String>, ApiError> {
-        let at = r3d_geom::DVec2::new(x_mm, y_mm);
-        let found = {
-            let ws = self.workspace()?;
-            let project = ws.session().project();
-            let scene = BoardScene::from_project(project, &[]);
-            scene
-                .edge_at(at, max_mm)
-                .filter(|e| {
-                    project
-                        .panel(e.panel)
-                        .is_some_and(|p| p.mirror_of.is_none())
-                })
-                .map(|e| (e.id, offset_along(&e.points, at)))
-        };
-        let Some((edge, offset)) = found else {
+        let Some((edge, offset, _)) = self.edge_spot(r3d_geom::DVec2::new(x_mm, y_mm), max_mm)?
+        else {
             return Ok(None);
         };
-        let step = serde_json::json!({ "type": "notch.add", "edge": edge, "offset_mm": offset });
-        let out: serde_json::Value = serde_json::from_str(&self.run(step.to_string())?)
-            .map_err(|e| ApiError::new("internal", e.to_string()))?;
-        Ok(out["created"][0].as_str().map(str::to_owned))
+        self.run_created(
+            serde_json::json!({ "type": "notch.add", "edge": edge, "offset_mm": offset }),
+        )
+    }
+
+    /// Insert a point on the edge within `max_mm` of pattern point
+    /// (`x_mm`, `y_mm`), where that point is along it (`edge.split`; the
+    /// curve keeps its shape). Returns the new point, or `None` off the
+    /// edges or within `max_mm` of an edge's ends.
+    #[frb(sync)]
+    pub fn add_point_near(
+        &self,
+        x_mm: f64,
+        y_mm: f64,
+        max_mm: f64,
+    ) -> Result<Option<String>, ApiError> {
+        let Some((edge, offset, length)) =
+            self.edge_spot(r3d_geom::DVec2::new(x_mm, y_mm), max_mm)?
+        else {
+            return Ok(None);
+        };
+        if offset < max_mm || offset > length - max_mm {
+            return Ok(None);
+        }
+        self.run_created(serde_json::json!({ "type": "edge.split", "edge": edge, "at_mm": offset }))
     }
 
     /// Start drawing on the garment at (`x`, `y`) of a 3D view. Returns
@@ -1469,6 +1508,7 @@ impl Engine {
                     "angle_deg": (from.angle_deg + swept).round(),
                     "top_cm": (from.top_cm + f64::from(target.y - anchor.y) * 100.0).round().max(1.0),
                     "offset_mm": from.offset_mm,
+                    "centre_x_mm": from.centre_x_mm,
                 });
                 self.run(step.to_string())?;
                 self.rebuild(false)?;

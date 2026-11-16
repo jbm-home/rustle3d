@@ -376,6 +376,7 @@ impl Draft<'_, '_> {
             angle_deg,
             top_cm,
             offset_mm,
+            centre_x_mm: None,
         }
         .apply(self.tx)?;
         Ok(())

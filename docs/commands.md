@@ -289,6 +289,133 @@ Create a panel from a closed polygon. Returns the panel, then its points, then i
 
 </details>
 
+### `panel.create_path`
+
+Create a panel from a closed path of straight and cubic Bézier edges (mm), like internal_line.add but closed. Must form a simple outline; stored counter-clockwise. Returns the panel, then its points, then its edges.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "SegmentSpec": {
+      "description": "One segment of an internal line, starting where the previous one ended.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "line",
+              "type": "string"
+            },
+            "to": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "to"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "c1": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "c2": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "kind": {
+              "const": "cubic",
+              "type": "string"
+            },
+            "to": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "c1",
+            "c2",
+            "to"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Create a panel from a closed path of straight and curved edges.",
+  "properties": {
+    "grain_angle_deg": {
+      "default": 90.0,
+      "description": "Grainline angle in degrees from +X. Defaults to 90 (vertical).",
+      "format": "double",
+      "type": "number"
+    },
+    "name": {
+      "description": "Panel name. Defaults to \"Panel N\".",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "segments": {
+      "description": "The edges in order, each starting where the previous one ended. The\nlast one should end at `start`; if it does not, a straight edge\ncloses the outline.",
+      "items": {
+        "$ref": "#/$defs/SegmentSpec"
+      },
+      "type": "array"
+    },
+    "start": {
+      "description": "First point of the outline (mm).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+    }
+  },
+  "required": [
+    "start",
+    "segments"
+  ],
+  "title": "PanelCreatePath",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `panel.rename`
 
 Rename a panel.
@@ -602,6 +729,14 @@ Place a panel around the body (or around an arm, for sleeves) for the 3D simulat
       "default": "body",
       "description": "What the panel is wrapped around: `body` (default), `left_arm` or\n`right_arm` (sleeves), or `flat` (not wrapped: a flat sheet facing\noutward, `offset_mm` from the body's axis)."
     },
+    "centre_x_mm": {
+      "description": "The pattern abscissa (mm) that goes to the angle. Defaults to the\npanel's horizontal centre; the pieces of a cut panel keep the\nwhole's.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
     "offset_mm": {
       "default": 30.0,
       "description": "Distance from the body at the start of the simulation (mm,\ndefault 30).",
@@ -663,6 +798,143 @@ Delete a panel with its points, edges, notches and internal lines. Linked mirror
     "panel"
   ],
   "title": "PanelDelete",
+  "type": "object"
+}
+```
+
+</details>
+
+### `panel.cut`
+
+Cut a panel in two along an open path of straight and cubic segments (mm) that crosses its outline exactly twice, its ends outside the panel (without `panel`, the one panel it crosses). The two pieces are sewn together along the cut. The larger piece keeps the panel's ID, its seams and pins; the other is a new panel with the same garment, grain and seam allowance, moved 20 mm away on the board and placed where it was around the body. Notches, internal lines and pins go to the piece they are on; a sewn edge that is cut is split with its partner, and the seam with them. Returns the new panel, then the seams along the cut.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "PanelId": {
+      "description": "Identifier of a panel, e.g. `panel:1`.",
+      "pattern": "^panel:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "SegmentSpec": {
+      "description": "One segment of an internal line, starting where the previous one ended.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "line",
+              "type": "string"
+            },
+            "to": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "to"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "c1": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "c2": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "kind": {
+              "const": "cubic",
+              "type": "string"
+            },
+            "to": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "c1",
+            "c2",
+            "to"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Cut a panel in two along a straight or curved line.",
+  "properties": {
+    "name": {
+      "description": "Name of the new piece. Defaults to the panel's name followed by \" 2\".",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "panel": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PanelId"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The panel to cut. If omitted, the one panel the line crosses."
+    },
+    "segments": {
+      "description": "The cut line's segments; it ends outside the panel too.",
+      "items": {
+        "$ref": "#/$defs/SegmentSpec"
+      },
+      "type": "array"
+    },
+    "start": {
+      "description": "Start of the cut line (mm), outside the panel.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+    }
+  },
+  "required": [
+    "start",
+    "segments"
+  ],
+  "title": "PanelCut",
   "type": "object"
 }
 ```

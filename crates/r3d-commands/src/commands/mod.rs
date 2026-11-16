@@ -2,6 +2,7 @@
 
 mod arrange;
 mod avatar;
+mod cut;
 mod edge;
 mod garment;
 mod internal_line;
@@ -19,6 +20,7 @@ mod template;
 
 pub use arrange::*;
 pub use avatar::*;
+pub use cut::*;
 pub use edge::*;
 pub use garment::*;
 pub use internal_line::*;

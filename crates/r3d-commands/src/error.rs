@@ -38,6 +38,10 @@ pub enum Invalid {
     NotSeamEnd,
     #[error("must be one of the seam's two edges")]
     NotSeamSide,
+    #[error("must cross the panel's outline exactly twice, both ends outside the panel")]
+    NotAcross,
+    #[error("has a linked mirror copy: unlink it first")]
+    Mirrored,
 }
 
 impl Invalid {
@@ -59,6 +63,8 @@ impl Invalid {
             Invalid::Inverted => "invalid.inverted",
             Invalid::NotSeamEnd => "invalid.not_seam_end",
             Invalid::NotSeamSide => "invalid.not_seam_side",
+            Invalid::NotAcross => "invalid.not_across",
+            Invalid::Mirrored => "invalid.mirrored",
         }
     }
 }

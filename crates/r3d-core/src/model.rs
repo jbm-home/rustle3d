@@ -153,6 +153,10 @@ pub struct Placement {
     pub top_cm: f64,
     /// Distance between the body and the panel when it starts (mm).
     pub offset_mm: f64,
+    /// The pattern abscissa (mm) that goes to `angle_deg`; `None`: the
+    /// panel's horizontal centre. The pieces of a cut panel keep the
+    /// whole's, so each starts where it was.
+    pub centre_x_mm: Option<f64>,
 }
 
 /// One side of a seam: a whole edge, walked from its start point unless
