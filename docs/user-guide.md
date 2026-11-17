@@ -7,7 +7,7 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-17 (M14).
+Last updated: 2026-11-17 (M14; long sleeves, mirrored seams, agent status).
 -->
 
 Rustle3D is a free, open-source desktop app for making clothes: draw the
@@ -88,7 +88,9 @@ linked mirror copy must be unlinked first.
 
 ## Sewing
 - With **Sew** (S), click two edges. Matching arrows on both edges show
-  how they join; a mismatch in length is flagged in red.
+  how they join; a mismatch in length is flagged in red. An edge sewn to
+  the same edge on its mirror copy (a centre front or back) joins it end
+  to matching end.
 - **Gathered**: in an edge's card, a seam can be gathered: the longer side
   is gathered evenly onto the shorter one (a skirt into a waistband, a
   sleeve cap). The ratio is shown (for example 2 : 1).
@@ -111,7 +113,9 @@ app.)
 - **⇧-drag** a hem on the garment to lengthen or shorten it; **⇧-drag** a
   seam to take it in or let it out. The pattern follows.
 - **⌘-drag** a piece to move it around the body, or set its place in the
-  inspector (around the body, an arm, or flat; angle and height).
+  inspector (around the body, an arm, or flat; angle and height). A
+  sleeve placed on an arm starts down the upper arm and, past the elbow,
+  down the forearm, so long sleeves drape too.
 - **Arrange around the body** places every piece in seam order at the
   waist.
 
@@ -187,8 +191,10 @@ part of the same drawing).
 Rustle3D can be driven by an AI agent through MCP (Model Context
 Protocol):
 - **In the app**: the **Agents** button lets one agent edit the open
-  project; you see every change live and can undo it, or disconnect the
-  agent. Configure the agent to run `r3d mcp --attach`.
+  project; it reads "Agent connected" while one is attached, even during
+  a long action such as a drape. You see every change live and can undo
+  it, or disconnect the agent. Configure the agent to run
+  `r3d mcp --attach`.
 - **Without the app**: `r3d mcp --project My.r3d` serves a project
   headless.
 - An agent can look at its work: a picture of the pattern, of the 3D

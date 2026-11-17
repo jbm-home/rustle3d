@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard, TryLockError};
 use std::time::Instant;
 
 use flutter_rust_bridge::frb;
@@ -665,15 +665,24 @@ impl Engine {
         Ok(())
     }
 
-    /// How many changes agents have made: the UI refreshes when it moves.
-    /// Cheap while nothing changed (asked every frame; the project is only
-    /// locked after a change, as an agent may hold it for a while).
+    /// How many changes agents have made that the UI can show: it
+    /// refreshes when this moves. Asked several times a second, so it never
+    /// waits: while an agent holds the project (a long action such as
+    /// `simulate`), its latest changes are counted once it lets go.
     #[frb(sync)]
     pub fn agent_changes(&self) -> Result<u64, ApiError> {
         let changes = self.agent_changes.load(Ordering::SeqCst);
-        if self.agent_changes_seen.swap(changes, Ordering::SeqCst) != changes {
-            self.forget_missing(self.workspace()?.session().project())?;
+        let seen = self.agent_changes_seen.load(Ordering::SeqCst);
+        if seen == changes {
+            return Ok(seen);
         }
+        let ws = match self.ws.try_lock() {
+            Ok(ws) => ws,
+            Err(TryLockError::WouldBlock) => return Ok(seen),
+            Err(TryLockError::Poisoned(_)) => return Err(poisoned()),
+        };
+        self.forget_missing(ws.session().project())?;
+        self.agent_changes_seen.store(changes, Ordering::SeqCst);
         Ok(changes)
     }
 

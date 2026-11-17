@@ -58,7 +58,7 @@ pub struct Piece {
 }
 
 /// The dress form garments are draped on: the fitted body (m), its
-/// profile, its upper arms and its distance field. Building one takes a
+/// profile, its arms and its distance field. Building one takes a
 /// fraction of a second, so callers keep it for as long as the
 /// measurements do not change.
 #[derive(Debug, Clone)]
@@ -69,19 +69,24 @@ pub struct Form {
     /// `PROFILE_STEP` from the floor and every 360° / `ANGLE_BINS` around
     /// (angle 0 = front, as placements count), arms left out.
     radial: Vec<[f32; ANGLE_BINS]>,
-    /// The left (+x) and right upper arms.
+    /// The left (+x) and right arms.
     arms: [Arm; 2],
     collider: StaticMesh,
 }
 
-/// An upper arm: a straight axis from the shoulder towards the elbow, and
-/// how far the arm reaches from it.
+/// An arm: an axis down the upper arm to the elbow, then down the
+/// forearm, and how far the arm reaches from it.
 #[derive(Debug, Clone)]
 struct Arm {
-    /// A point on the axis (m).
+    /// A point on the upper arm's axis (m).
     point: Vec3,
-    /// Unit direction down the arm.
+    /// Unit direction down the upper arm.
     down: Vec3,
+    /// Distance from `point` down the upper arm to the elbow (m), where the
+    /// axis turns to `fore`.
+    elbow: f32,
+    /// Unit direction down the forearm.
+    fore: Vec3,
     /// Largest distance of the arm's surface from the axis (m), every
     /// `PROFILE_STEP` along it from `point - REACH_FROM * down`.
     reach: Vec<f32>,
@@ -98,7 +103,9 @@ const ARM_REACH_M: f32 = 0.3;
 /// between these heights, points farther out than `ARM_SIDE` are the arm.
 const UPPER_ARM_HEIGHTS: (f32, f32) = (0.69, 0.79);
 const ARM_SIDE: f32 = 0.13;
-/// Points closer than this to an upper arm's axis, below the shoulder
+/// The forearm, likewise: between the wrist and the elbow.
+const FOREARM_HEIGHTS: (f32, f32) = (0.60, 0.66);
+/// Points closer than this to an arm's axis, below the shoulder
 /// (`SHOULDER` of stature), belong to the arm (m; the arm itself measures
 /// 5–6 cm from its axis, the torso 13 cm or more).
 const ARM_RADIUS_M: f32 = 0.08;
@@ -132,32 +139,66 @@ impl Arm {
     /// The arm on `side` (+1 left, −1 right) of a body of `height` (m),
     /// without an avatar: a typical A pose.
     fn default(side: f32, height: f32) -> Self {
+        let down = Vec3::new(side * 0.6, -0.8, 0.0);
         Self {
             point: Vec3::new(side * 0.17 * height, 0.72 * height, 0.0),
-            down: Vec3::new(side * 0.6, -0.8, 0.0),
+            down,
+            elbow: 0.0,
+            fore: down,
             reach: Vec::new(),
         }
     }
 
-    /// Find the upper arm on `side` of a body (A pose).
+    /// The point `t` along the axis, and the axis's direction there.
+    fn axis(&self, t: f32) -> (Vec3, Vec3) {
+        if t <= self.elbow {
+            (self.point + self.down * t, self.down)
+        } else {
+            let elbow = self.point + self.down * self.elbow;
+            (elbow + self.fore * (t - self.elbow), self.fore)
+        }
+    }
+
+    /// Find the arm on `side` of a body (A pose).
     fn find(positions: &[Vec3], height: f32, side: f32) -> Self {
-        let (lo, hi) = UPPER_ARM_HEIGHTS;
-        let upper: Vec<Vec3> = positions
-            .iter()
-            .copied()
-            .filter(|p| side * p.x > ARM_SIDE * height && p.y > lo * height && p.y < hi * height)
-            .collect();
-        if upper.len() < 3 {
+        let segment = |(lo, hi): (f32, f32), start: Vec3| {
+            let points: Vec<Vec3> = positions
+                .iter()
+                .copied()
+                .filter(|p| {
+                    side * p.x > ARM_SIDE * height && p.y > lo * height && p.y < hi * height
+                })
+                .collect();
+            (points.len() >= 3).then(|| {
+                let centre = points.iter().copied().sum::<Vec3>() / points.len() as f32;
+                let axis = principal_axis(&points, centre, start);
+                (centre, if axis.y > 0.0 { -axis } else { axis })
+            })
+        };
+        let Some((point, down)) =
+            segment(UPPER_ARM_HEIGHTS, Vec3::new(side, -1.0, 0.0).normalize())
+        else {
             return Self::default(side, height);
-        }
-        let point = upper.iter().copied().sum::<Vec3>() / upper.len() as f32;
-        let mut down = principal_axis(&upper, point, Vec3::new(side, -1.0, 0.0).normalize());
-        if down.y > 0.0 {
-            down = -down;
-        }
+        };
+        // The elbow: where the upper arm's axis comes closest to the
+        // forearm's. Without a forearm (or parallel to it) the axis goes on
+        // straight.
+        let (elbow, fore) = segment(FOREARM_HEIGHTS, down)
+            .and_then(|(centre, fore)| {
+                let b = down.dot(fore);
+                let w = point - centre;
+                let parallel = 1.0 - b * b;
+                (parallel > 1e-4).then(|| {
+                    let t = (b * fore.dot(w) - down.dot(w)) / parallel;
+                    (t.max(0.0), fore)
+                })
+            })
+            .unwrap_or((0.0, down));
         let mut arm = Self {
             point,
             down,
+            elbow,
+            fore,
             reach: Vec::new(),
         };
         for p in positions {
@@ -175,11 +216,17 @@ impl Arm {
     }
 
     /// Where `p` is along the axis and how far from it, if it is part of
-    /// this upper arm.
+    /// this arm.
     fn holds(&self, p: Vec3, height: f32) -> Option<(f32, f32)> {
         let q = p - self.point;
         let t = q.dot(self.down);
-        let r = (q - self.down * t).length();
+        let (t, r) = if t <= self.elbow {
+            (t, (q - self.down * t).length())
+        } else {
+            let q = q - self.down * self.elbow;
+            let s = q.dot(self.fore).max(0.0);
+            (self.elbow + s, (q - self.fore * s).length())
+        };
         (r < ARM_RADIUS_M && p.y < SHOULDER * height).then_some((t, r))
     }
 
@@ -362,9 +409,10 @@ fn wrap_body(l: &Laid, form: Option<&Form>, around: &dyn Fn(f32) -> f32) -> Vec<
         .collect()
 }
 
-/// Start positions of a panel wrapped around the upper arm on `side` (+1
+/// Start positions of a panel wrapped around the arm on `side` (+1
 /// left, −1 right), like a sleeve: its top on the arm's axis at the
-/// placement height, running down the arm, its horizontal centre at the
+/// placement height, running down the upper arm, then the forearm past
+/// the elbow, its horizontal centre at the
 /// placement angle (0 = the outside of the arm). The radius is the larger
 /// of the arm's (plus the gap) and the sleeve's own (its width / 2π).
 ///
@@ -376,13 +424,16 @@ fn wrap_arm(l: &Laid, form: Option<&Form>, side: f32) -> Vec<Vec3> {
         Some(a) => a.clone(),
         None => Arm::default(side, DEFAULT_HEIGHT_M),
     };
-    let d = arm.down;
-    let out = (Vec3::X * side - d * (d.x * side)).normalize_or(Vec3::X * side);
-    let front = (Vec3::Z - d * d.z - out * out.z).normalize_or(Vec3::Z);
-    let across = -side * front;
+    // The directions out from the axis (away from the body) and across it
+    // (towards the back on the left arm), for an axis going down `d`.
+    let frame = |d: Vec3| {
+        let out = (Vec3::X * side - d * (d.x * side)).normalize_or(Vec3::X * side);
+        let front = (Vec3::Z - d * d.z - out * out.z).normalize_or(Vec3::Z);
+        (out, -side * front)
+    };
     let top_y = l.place.top_cm as f32 / 100.0;
-    let t_top = if d.y.abs() > 1e-3 {
-        (top_y - arm.point.y) / d.y
+    let t_top = if arm.down.y.abs() > 1e-3 {
+        (top_y - arm.point.y) / arm.down.y
     } else {
         0.0
     };
@@ -398,7 +449,9 @@ fn wrap_arm(l: &Laid, form: Option<&Form>, side: f32) -> Vec<Vec3> {
             let own = (l.width_below(below) / std::f32::consts::TAU).max(1e-3);
             let r = (arm.reach_between(t - 0.02, t + 0.02) + gap).max(own);
             let theta = angle0 + ((v.x - centre) / 1000.0) as f32 / r;
-            arm.point + d * t + (out * theta.cos() + across * theta.sin()) * r
+            let (on_axis, d) = arm.axis(t);
+            let (out, across) = frame(d);
+            on_axis + (out * theta.cos() + across * theta.sin()) * r
         })
         .collect()
 }

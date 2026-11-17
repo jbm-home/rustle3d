@@ -109,6 +109,44 @@ fn extreme_girth(
     }
 }
 
+/// Heights above the floor (m) that lower garments are drafted and
+/// placed from (the waist's is in [`Measurements`]).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Heights {
+    /// The hips: the largest girth.
+    pub hips: f32,
+    /// The crotch: where the torso parts into the legs. `None` if the legs
+    /// are not apart below the hips.
+    pub crotch: Option<f32>,
+}
+
+/// Where the legs part: below it, no section loop goes around the body's
+/// vertical axis. Searched between this fraction of the stature (the
+/// thighs) and the hips.
+const THIGHS: f32 = 0.35;
+
+/// Find the hips and the crotch of a body (positions in metres, feet at
+/// y = 0).
+pub fn heights(positions: &[Vec3], triangles: &[[u32; 3]]) -> Heights {
+    let height = positions.iter().map(|p| p.y).fold(0.0, f32::max);
+    let hips = extreme_girth(positions, triangles, height, HIPS_BAND, true).1;
+    let torso = |y: f32| girth_at(positions, triangles, y, 0.0).is_some();
+    let (mut apart, mut joined) = (THIGHS * height, hips);
+    let crotch = (!torso(apart) && torso(joined)).then(|| {
+        // Bisection to 0.1 mm.
+        while joined - apart > 1e-4 {
+            let mid = (apart + joined) / 2.0;
+            if torso(mid) {
+                joined = mid;
+            } else {
+                apart = mid;
+            }
+        }
+        joined
+    });
+    Heights { hips, crotch }
+}
+
 /// Anatomical reference points of the mesh, found once on the base body;
 /// morph targets move them along with the body.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

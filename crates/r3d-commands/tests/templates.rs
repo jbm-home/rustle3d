@@ -112,6 +112,23 @@ fn a_t_shirt_hangs_from_the_shoulders() {
 }
 
 #[test]
+fn long_sleeves_follow_the_forearms() {
+    // Past the elbow a sleeve starts around the forearm, not along the
+    // upper arm's axis carried on (which left it off the arm, crumpled,
+    // its seams open).
+    let mut s = Session::new(Project::new("Untitled"));
+    common::women_m(&mut s);
+    run(
+        &mut s,
+        json!({"type": "template.apply", "template": "t_shirt",
+            "sizes": {"sleeve_cm": 50}}),
+    );
+    let (low, high) = drape(&s, 300);
+    eprintln!("long sleeves: {low:.3}..{high:.3}");
+    assert!(high > 1.35 && high < 1.50, "top at {high}");
+}
+
+#[test]
 fn a_dress_hangs_from_the_shoulders() {
     let s = draft("dress");
     assert_eq!(s.project().panels().len(), 2);

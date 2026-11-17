@@ -33,9 +33,10 @@ abstract class Engine implements RustOpaqueInterface {
     required double maxMm,
   });
 
-  /// How many changes agents have made: the UI refreshes when it moves.
-  /// Cheap while nothing changed (asked every frame; the project is only
-  /// locked after a change, as an agent may hold it for a while).
+  /// How many changes agents have made that the UI can show: it
+  /// refreshes when this moves. Asked several times a second, so it never
+  /// waits: while an agent holds the project (a long action such as
+  /// `simulate`), its latest changes are counted once it lets go.
   BigInt agentChanges();
 
   AgentStatus agentStatus();

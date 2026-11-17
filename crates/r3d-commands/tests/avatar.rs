@@ -38,6 +38,14 @@ fn avatar_is_validated_fitted_and_undoable() {
     assert_eq!(got["preset"], "Women M");
     let achieved = got["achieved"]["waist_cm"].as_f64().unwrap();
     assert!((achieved - m["body"]["waist_cm"].as_f64().unwrap()).abs() < 1.5);
+    // A 168 cm body: the waist, then the hips (the widest tape, low on the
+    // seat), then the crotch, about where general anthropometry has them
+    // (0.63, 0.50 and 0.46 of the stature).
+    let at = |k: &str| got["heights_cm"][k].as_f64().unwrap();
+    let (waist, hips, crotch) = (at("waist"), at("hips"), at("crotch"));
+    assert!(waist > 100.0 && waist < 112.0, "waist at {waist}");
+    assert!(hips > 78.0 && hips < waist - 15.0, "hips at {hips}");
+    assert!(crotch > 72.0 && crotch < hips, "crotch at {crotch}");
 
     s.undo().unwrap();
     assert!(s.project().avatar().is_none());

@@ -9,8 +9,10 @@ immediately whether the seam is consistent.
 ## Status (2026-11-15)
 
 Implemented: whole-edge seams (`seam.add` / `remove` / `flip`, and
-`seam.take_in` for fitting); `b.reversed` left out is chosen so both sides
-walk the same way on the pattern; the Sew tool (S) sews the two edges
+`seam.take_in` for fitting); `b.reversed` left out is chosen so an edge
+and its linked mirror image meet mirrored point to mirrored point (a
+centre seam; since 2026-11-17), other edges walk both the same way on
+the pattern; the Sew tool (S) sews the two edges
 clicked on the pattern; seams are drawn on the board, both sides in one
 colour; the inspector shows the picked edge's seam partner and length
 difference, with flip / unpick. Not yet: partial edges and chains,

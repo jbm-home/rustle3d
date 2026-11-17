@@ -392,7 +392,7 @@ pub fn body_model() -> Result<&'static r3d_avatar::model::BodyModel, CommandErro
 pub struct AvatarGet {}
 
 impl Described for AvatarGet {
-    const SUMMARY: &'static str = "The avatar's requested measurements, its preset, and the measurements the fitted 3D body actually reaches (they can differ slightly for extreme sizes). Null when there is no avatar.";
+    const SUMMARY: &'static str = "The avatar's requested measurements, its preset, the measurements the fitted 3D body actually reaches (they can differ slightly for extreme sizes), and the heights above the floor (cm) of its waist (narrowest girth), hips (largest girth) and crotch, to draft and place skirts and trousers (panel.place top_cm). Null when there is no avatar.";
 }
 
 impl QuerySpec for AvatarGet {
@@ -400,8 +400,13 @@ impl QuerySpec for AvatarGet {
         let Some(avatar) = p.avatar() else {
             return Ok(Value::Null);
         };
-        let fit = r3d_avatar::fit::fit(body_model()?, &avatar.body);
+        let model = body_model()?;
+        let fit = r3d_avatar::fit::fit(model, &avatar.body);
         let a = fit.achieved;
+        let h = r3d_avatar::measure::heights(
+            &r3d_avatar::fit::fitted_positions(model, &fit),
+            model.triangles(),
+        );
         let r1 = |v: f32| (v as f64 * 10.0).round() / 10.0;
         Ok(serde_json::json!({
             "body": avatar.body,
@@ -411,6 +416,11 @@ impl QuerySpec for AvatarGet {
                 "bust_cm": r1(a.bust_cm),
                 "waist_cm": r1(a.waist_cm),
                 "hips_cm": r1(a.hips_cm),
+            },
+            "heights_cm": {
+                "waist": r1(a.waist_height_cm),
+                "hips": r1(h.hips * 100.0),
+                "crotch": h.crotch.map(|c| r1(c * 100.0)),
             },
         }))
     }

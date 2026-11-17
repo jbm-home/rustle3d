@@ -1,6 +1,7 @@
 // The main window: top bar, tool rail, the 2D board and the 3D view side by
 // side, the inspector and the status bar (docs/ux.md §4).
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:file_selector/file_selector.dart';
@@ -76,6 +77,11 @@ class _ShellState extends State<Shell> {
   AgentStatus _agent = AgentStatus.off;
   BigInt _agentChanges = BigInt.zero;
 
+  /// Asks for both several times a second: an agent connects and works
+  /// while the views may be still (its long actions hold the project, so
+  /// nothing redraws).
+  Timer? _agentPoll;
+
   /// The guided flow's current step, and whether the guide is shown.
   late GuideStep _step;
   bool _guide = true;
@@ -84,6 +90,10 @@ class _ShellState extends State<Shell> {
   void initState() {
     super.initState();
     _refresh();
+    _agentPoll = Timer.periodic(
+      const Duration(milliseconds: 200),
+      (_) => _pollAgents(),
+    );
     _step = GuideStep.firstFor(
       panels: (_summary['counts']?['panels'] as int?) ?? 0,
       seams: _seams.length,
@@ -91,6 +101,24 @@ class _ShellState extends State<Shell> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _maybeTour();
     });
+  }
+
+  @override
+  void dispose() {
+    _agentPoll?.cancel();
+    super.dispose();
+  }
+
+  /// An agent's change: show it at once; and whether one is connected.
+  void _pollAgents() {
+    if (!mounted) return;
+    final changes = _guard(widget.engine.agentChanges);
+    if (changes != null && changes != _agentChanges) {
+      _agentChanges = changes;
+      _refresh();
+    }
+    final agent = _guard(widget.engine.agentStatus) ?? AgentStatus.off;
+    if (agent != _agent) setState(() => _agent = agent);
   }
 
   /// Go to a step of the guided flow: its tool becomes the active one.
@@ -241,18 +269,11 @@ class _ShellState extends State<Shell> {
         setState(() => _photo = now);
       }
     }
-    // An agent's change: show it at once.
-    final changes = _guard(widget.engine.agentChanges);
-    if (changes != null && changes != _agentChanges) {
-      _agentChanges = changes;
-      _refresh();
-    }
     final elapsed = _clock.elapsedMilliseconds;
     if (elapsed >= 500) {
       setState(() {
         _fps = _frames * 1000 / elapsed;
         _sim = _guard(widget.engine.simulationStatus);
-        _agent = _guard(widget.engine.agentStatus) ?? AgentStatus.off;
       });
       _frames = 0;
       _clock.reset();

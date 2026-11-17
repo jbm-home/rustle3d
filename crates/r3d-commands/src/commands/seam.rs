@@ -2,6 +2,7 @@ use r3d_core::{EdgeId, Seam, SeamId, SeamSide, Transaction};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use super::mirror::mirror_twin;
 use super::not_sewn;
 use crate::error::{CommandError, Invalid};
 use crate::spec::{CommandOutput, CommandSpec, Described};
@@ -12,9 +13,10 @@ use crate::spec::{CommandOutput, CommandSpec, Described};
 pub struct SeamSideSpec {
     pub edge: EdgeId,
     /// Walk this edge from its end point instead of its start. Omitted:
-    /// `false` for side `a`; for side `b`, the direction that walks both
-    /// sides the same way on the pattern (what sewing two panels laid side
-    /// by side needs).
+    /// `false` for side `a`; for side `b`, an edge sewn to its linked
+    /// mirror image meets it mirrored point to mirrored point (a centre
+    /// seam), other edges are walked both the same way on the pattern
+    /// (what sewing two panels laid side by side needs).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reversed: Option<bool>,
 }
@@ -28,7 +30,7 @@ pub struct SeamAdd {
 }
 
 impl Described for SeamAdd {
-    const SUMMARY: &'static str = "Sew two whole edges together. Points are matched along the edges, start to start unless a side is reversed; leave b.reversed out to have it chosen (both sides walked the same way on the pattern), and use seam.flip if the seam looks twisted. An edge can be in one seam only. Returns the seam.";
+    const SUMMARY: &'static str = "Sew two whole edges together. Points are matched along the edges, start to start unless a side is reversed; leave b.reversed out to have it chosen (an edge and its linked mirror image meet mirrored point to mirrored point; other edges are walked both the same way on the pattern), and use seam.flip if the seam looks twisted. An edge can be in one seam only. Returns the seam.";
 }
 
 impl CommandSpec for SeamAdd {
@@ -47,13 +49,20 @@ impl CommandSpec for SeamAdd {
             Some(r) => r,
             None => {
                 let p = tx.project();
-                let chord = |e: EdgeId| -> Option<r3d_geom::DVec2> {
-                    let edge = p.edge(e)?;
-                    Some(p.point(edge.end)?.pos - p.point(edge.start)?.pos)
-                };
-                let walked_a =
-                    chord(self.a.edge).unwrap_or_default() * if a_reversed { -1.0 } else { 1.0 };
-                chord(self.b.edge).unwrap_or_default().dot(walked_a) < 0.0
+                let twins = |x: EdgeId, y: EdgeId| mirror_twin(p, x).is_some_and(|(t, _)| t == y);
+                if twins(self.a.edge, self.b.edge) || twins(self.b.edge, self.a.edge) {
+                    // A reflection reverses a contour: an edge's start
+                    // mirrors its twin's end.
+                    !a_reversed
+                } else {
+                    let chord = |e: EdgeId| -> Option<r3d_geom::DVec2> {
+                        let edge = p.edge(e)?;
+                        Some(p.point(edge.end)?.pos - p.point(edge.start)?.pos)
+                    };
+                    let walked_a = chord(self.a.edge).unwrap_or_default()
+                        * if a_reversed { -1.0 } else { 1.0 };
+                    chord(self.b.edge).unwrap_or_default().dot(walked_a) < 0.0
+                }
             }
         };
         let id = tx.new_seam_id();

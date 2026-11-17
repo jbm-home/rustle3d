@@ -123,6 +123,54 @@ fn seam_direction_is_chosen_when_left_out() {
 }
 
 #[test]
+fn an_edge_meets_its_mirror_image_point_to_mirrored_point() {
+    // The back crotch of a trouser leg, sewn to the same curve on the
+    // linked mirror copy: hip to hip, crotch point to crotch point. Both
+    // edges run mostly sideways, one left and one right, so walking them
+    // the same way on the pattern would sew the hip to the crotch point.
+    let mut s = Session::new(Project::new("t"));
+    let leg = run(
+        &mut s,
+        json!({"type": "panel.create_path", "start": [82, 0], "segments": [
+            {"kind": "line", "to": [312, 0]},
+            {"kind": "line", "to": [375, 780]},
+            {"kind": "line", "to": [330, 1000]},
+            {"kind": "line", "to": [140, 1020]},
+            {"kind": "line", "to": [110, 810]},
+            {"kind": "cubic", "c1": [95, 750], "c2": [60, 728], "to": [0, 728]},
+            {"kind": "line", "to": [82, 0]}]}),
+    )
+    .unwrap();
+    let panel = leg["created"][0].as_str().unwrap();
+    let copy = run(&mut s, json!({"type": "panel.mirror", "panel": panel})).unwrap();
+    let copy = copy["created"][0].as_str().unwrap();
+    let crotch = |s: &mut Session, panel: &str, from: f64| -> (String, bool) {
+        let p = run(s, json!({"type": "panel.get", "panel": panel})).unwrap();
+        let e = p["edges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|e| e["curve"]["kind"] == "cubic")
+            .unwrap();
+        let starts_at_hip = (e["start"]["pos"][1].as_f64().unwrap() - from).abs() < 1e-9;
+        (e["id"].as_str().unwrap().to_owned(), starts_at_hip)
+    };
+    let (a, a_from_hip) = crotch(&mut s, panel, 810.0);
+    let (b, b_from_hip) = crotch(&mut s, copy, 810.0);
+    assert!(a_from_hip && !b_from_hip);
+    let out = run(
+        &mut s,
+        json!({"type": "seam.add", "a": {"edge": a}, "b": {"edge": b}}),
+    )
+    .unwrap();
+    let id: r3d_core::SeamId = out["created"][0].as_str().unwrap().parse().unwrap();
+    assert!(
+        s.project().seams()[&id].b.reversed,
+        "hip sewn to the crotch point"
+    );
+}
+
+#[test]
 fn arrange_places_panels_around_in_seam_order() {
     let mut s = Session::new(Project::new("t"));
     common::a_line_skirt(&mut s);

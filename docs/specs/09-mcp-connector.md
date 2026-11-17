@@ -2,7 +2,7 @@
 
 Provenance: maintainer's functional brief (2026-11-14); Model Context Protocol specification (open).
 
-## Status (2026-11-16)
+## Status (2026-11-17)
 
 Implemented: headless (M2) and attached (M9). Attached: the app's Agents
 menu allows agents (off by default; nothing listens before); the app
@@ -11,7 +11,11 @@ token to `agent.json` in its support folder. `r3d mcp --attach
 [--endpoint file]` reads it, sends `R3D-ATTACH <token>` and relays stdio;
 a wrong token is refused. One agent at a time; its changes are saved,
 go into the app's undo history and show at once (pattern, inspector,
-live drape). The app shows "Agent connected" and can disconnect it.
+live drape). The app shows "Agent connected" and can disconnect it; it
+asks for the status and the agent's changes on a timer, as the views do
+not redraw while an agent's long action holds the project, and never
+waits for the project to ask. `avatar_get` gives the body's waist, hips
+and crotch heights, to place hand-drafted skirts and trousers.
 `render_3d` and `render_photo` in attached mode still draw the cached or
 starting drape, not the app's live one; a long action (e.g. `simulate`) holds the project
 while it runs.

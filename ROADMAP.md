@@ -369,6 +369,20 @@ Built (2026-11-17), demo `./demos/m14/demo.sh`; algorithms and papers in
   thickness; skinning to the avatar skeleton once avatars are animated;
   presets for Godot, Unity and Unreal.
 
+## Found in use (to triage)
+From an agent drafting trousers and a shirt over MCP, attached to the
+app (2026-11-17). Fixed the same day: the Agents button stuck on
+"waiting", mirrored centre seams sewn twisted, long sleeves left off the
+forearm, and `avatar.get` now gives the waist, hips and crotch heights.
+Still open:
+- **No trousers or shirt templates**; trousers placed around the body
+  with sewn inseams do separate onto the legs, so a template is within
+  reach.
+- **One garment per project**: a shirt and trousers share one fabric
+  and colour (see "layers and multiple garments" below).
+- **Textures**: let users add their own (prints, weaves) and offer a
+  default set. Depends on UVs from the pattern (see Later).
+
 ## Later (architecture kept ready, not scheduled)
 Grading and sizes · animated avatars · layers
 and multiple garments · trims (buttons, zippers) · textures and prints with

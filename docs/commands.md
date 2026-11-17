@@ -694,12 +694,12 @@ Place a panel around the body (or around an arm, for sleeves) for the 3D simulat
         },
         {
           "const": "left_arm",
-          "description": "The left upper arm (the body's left, +x): a cylinder around the arm.",
+          "description": "The left arm (the body's left, +x): wrapped around the upper arm,\nthen the forearm past the elbow.",
           "type": "string"
         },
         {
           "const": "right_arm",
-          "description": "The right upper arm (−x).",
+          "description": "The right arm (−x).",
           "type": "string"
         },
         {
@@ -1505,7 +1505,7 @@ Remove an internal line.
 
 ### `seam.add`
 
-Sew two whole edges together. Points are matched along the edges, start to start unless a side is reversed; leave b.reversed out to have it chosen (both sides walked the same way on the pattern), and use seam.flip if the seam looks twisted. An edge can be in one seam only. Returns the seam.
+Sew two whole edges together. Points are matched along the edges, start to start unless a side is reversed; leave b.reversed out to have it chosen (an edge and its linked mirror image meet mirrored point to mirrored point; other edges are walked both the same way on the pattern), and use seam.flip if the seam looks twisted. An edge can be in one seam only. Returns the seam.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -1525,7 +1525,7 @@ Sew two whole edges together. Points are matched along the edges, start to start
           "$ref": "#/$defs/EdgeId"
         },
         "reversed": {
-          "description": "Walk this edge from its end point instead of its start. Omitted:\n`false` for side `a`; for side `b`, the direction that walks both\nsides the same way on the pattern (what sewing two panels laid side\nby side needs).",
+          "description": "Walk this edge from its end point instead of its start. Omitted:\n`false` for side `a`; for side `b`, an edge sewn to its linked\nmirror image meets it mirrored point to mirrored point (a centre\nseam), other edges are walked both the same way on the pattern\n(what sewing two panels laid side by side needs).",
           "type": [
             "boolean",
             "null"
@@ -2534,7 +2534,7 @@ Length (mm) along a panel contour from one point to another, walking in contour 
 
 ### `avatar.get`
 
-The avatar's requested measurements, its preset, and the measurements the fitted 3D body actually reaches (they can differ slightly for extreme sizes). Null when there is no avatar.
+The avatar's requested measurements, its preset, the measurements the fitted 3D body actually reaches (they can differ slightly for extreme sizes), and the heights above the floor (cm) of its waist (narrowest girth), hips (largest girth) and crotch, to draft and place skirts and trousers (panel.place top_cm). Null when there is no avatar.
 
 <details><summary>Parameters (JSON schema)</summary>
 

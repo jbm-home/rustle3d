@@ -15,7 +15,8 @@ every panel evenly in the order the seams join them, at the avatar's
 waist. Panels start wrapped at the larger of the body's and the garment's
 own radius. Since 2026-11-16 a placement can wrap a panel around the left
 or right upper arm instead (sleeves; `panel.place` `around`), its top on
-the arm's axis at the given height; `garment.arrange` keeps such
+the arm's axis at the given height; since 2026-11-17 the axis turns at
+the elbow to follow the forearm, so long sleeves start around it; `garment.arrange` keeps such
 placements; or lay it flat, facing outward at a distance from the body's
 axis (`flat`: a bag hanging from pins). The inspector sets a piece's
 placement, and ⌘-drag in 3D moves a piece around the body. Schema v8

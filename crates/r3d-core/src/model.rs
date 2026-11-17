@@ -154,9 +154,10 @@ pub enum Around {
     /// The torso and legs: a vertical cylinder around the body's axis.
     #[default]
     Body,
-    /// The left upper arm (the body's left, +x): a cylinder around the arm.
+    /// The left arm (the body's left, +x): wrapped around the upper arm,
+    /// then the forearm past the elbow.
     LeftArm,
-    /// The right upper arm (−x).
+    /// The right arm (−x).
     RightArm,
     /// Not wrapped: a flat sheet facing outward at the placement angle,
     /// `offset_mm` from the body's vertical axis (a bag hanging in front
