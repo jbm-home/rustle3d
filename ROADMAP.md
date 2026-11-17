@@ -29,13 +29,27 @@ can be tested through MCP as soon as they exist.
 | M13 | Pattern interchange: DXF, SVG and PDF ✅ | 2–3 wk | A pattern drawn elsewhere is imported from DXF-AAMA, SVG or PDF, edited, sewn and exported back |
 | M14 | Photorealistic rendering ✅ | 4–6 wk | A path-traced studio image of the draped garment |
 | M16 | Zero-copy views on Windows and Linux | 1–2 wk | The garment drapes as smoothly on Windows and Linux as on macOS |
-| M15 | Game-ready export | 3–4 wk | LODs + baked wrinkle normal maps, imported in Godot/Unity/Unreal |
+| M17 | GPU cloth solver | 3–4 wk | A T-shirt drapes at 60 fps; a dress stays interactive |
+| M18 | Trousers and shirt templates | 1–2 wk | A first-time user makes trousers and a shirt from templates |
+| M19 | Layers and multiple garments | 3–4 wk | A shirt tucked into trousers, each in its own fabric and colour |
+| M20 | Trims: buttons and zippers | 2–3 wk | A shirt that buttons and trousers with a fly zipper, draped closed |
+| M21 | Textures and prints | 2–3 wk | A striped shirt whose stripes follow the grainline on every piece |
+| M22 | Grading and sizes | 2–3 wk | A shirt graded from 36 to 46, each size draped on a matching avatar |
+| M23 | Animated avatars | 3–4 wk | The avatar walks and the garment follows |
+| M24 | Fit maps | 1–2 wk | Tight spots on a garment show in colour on the avatar |
+| M15 | Game-ready export | 3–4 wk | LODs + baked wrinkle normal maps + skinning, imported in Godot/Unity/Unreal |
 
 M10 came before M9: the first-time user test, not the export, decided
-what v0.1 needed. After v0.1 the order is M9, M11, M12, M13, M14, M16, M15. M12 came out of the
-M11 test: the drafting tools settle before imported patterns need them.
-M16 came before M15: the GUI stack review of 2026-11-17 kept Flutter
-(architecture §7.1) and found the views slow wherever they are read back.
+what v0.1 needed. After v0.1 the order is M9, M11, M12, M13, M14, M16,
+M17–M24, M15. M12 came out of the M11 test: the drafting tools settle
+before imported patterns need them. M16 came before M15: the GUI stack
+review of 2026-11-17 kept Flutter (architecture §7.1) and found the views
+slow wherever they are read back. M17–M24 came before M15 on 2026-11-17:
+the points found in use (templates, several garments, textures) and the
+garment features they lead to come first, and the export then ships them
+with skinning to an animated avatar. The GPU solver leads because every
+later milestone adds cloth to simulate (physics.md §7: the T-shirt is at
+70 ms per frame against a 33 ms target).
 
 ---
 
@@ -382,29 +396,65 @@ through the CPU every frame, which makes the views slow there.
   animations running, input latency under one frame, on Windows and
   native Linux.
 
+## M17 — GPU cloth solver
+The CPU solver misses its budget beyond a skirt (physics.md §7), and
+M19–M23 all add cloth or motion.
+- A second backend behind the `Solver` trait, in `r3d-sim` with wgpu
+  compute (no GUI dependency): GPU XPBD over the existing colour sets,
+  or Vertex Block Descent [physics.md 12] if a spike shows it converges
+  better at the same cost. The choice is made on measurements.
+- Collisions with the avatar SDF and self-collision on the GPU.
+- The CPU backend stays: deterministic regression tests, and machines
+  without a usable GPU.
+- Pass: T-shirt ≥ 60 fps and dress ≥ 30 fps on the reference machines;
+  the same reference scenes pass the regression checks on both backends.
+
+## M18 — Trousers and shirt templates
+Found by an agent drafting trousers and a shirt over MCP (2026-11-17):
+trousers placed around the body with sewn inseams already separate onto
+the legs.
+- Trousers and shirt (collar, cuffs, sleeves) templates in the guided
+  flow, sized from the avatar's measurements.
+
+## M19 — Layers and multiple garments
+Today one project holds one garment: a shirt and trousers share one
+fabric and colour.
+- Several garments per project, each with its own fabric and colour;
+  a layer order so the outer garment drapes over the inner one (a shirt
+  tucked in or worn out).
+
+## M20 — Trims: buttons and zippers
+- Buttons and buttonholes, zippers, placed on the pattern and simulated
+  as closures; open and close them in 3D.
+
+## M21 — Textures and prints
+- UVs from the pattern pieces, aligned with the grainline.
+- Users add their own textures (prints, weaves) and the app offers a
+  default set; they show in the 3D view, the photo renderer and the
+  exports.
+
+## M22 — Grading and sizes
+- A size range on the pattern: grade rules move the key points from
+  one size to the next (e.g. waist +10 mm, armhole lower by 5 mm), and
+  every size is generated from the base size.
+- Drape each size on an avatar with matching measurements; export the
+  graded nest (DXF-AAMA, PDF).
+
+## M23 — Animated avatars
+- A skeleton for the avatar and a few motions (walk, turn, raise arms);
+  the cloth follows the moving body. Animation assets under a
+  redistributable licence only (CLAUDE.md §1).
+
+## M24 — Fit maps
+- Stress and strain shown in colour on the draped garment, to find
+  where it is tight or loose.
+
 ## M15 — Game-ready export
 - Decimated LODs, wrinkle detail baked into normal maps, back faces or
-  thickness; skinning to the avatar skeleton once avatars are animated;
-  presets for Godot, Unity and Unreal.
-
-## Found in use (to triage)
-From an agent drafting trousers and a shirt over MCP, attached to the
-app (2026-11-17). Fixed the same day: the Agents button stuck on
-"waiting", mirrored centre seams sewn twisted, long sleeves left off the
-forearm, and `avatar.get` now gives the waist, hips and crotch heights.
-Still open:
-- **No trousers or shirt templates**; trousers placed around the body
-  with sewn inseams do separate onto the legs, so a template is within
-  reach.
-- **One garment per project**: a shirt and trousers share one fabric
-  and colour (see "layers and multiple garments" below).
-- **Textures**: let users add their own (prints, weaves) and offer a
-  default set. Depends on UVs from the pattern (see Later).
+  thickness; skinning to the avatar skeleton (M23); presets for Godot,
+  Unity and Unreal.
 
 ## Later (architecture kept ready, not scheduled)
-Grading and sizes · animated avatars · layers
-and multiple garments · trims (buttons, zippers) · textures and prints with
-UVs from the pattern · fit maps (stress/strain) · material calibration from
-measurements · GPU solver backend / Vertex Block Descent · OpenUSD export ·
-finer cloth mesh with a strain limit (smaller folds; physics.md §7) ·
-picking points and notches in 3D · signed packages.
+Material calibration from measurements · OpenUSD
+export · finer cloth mesh with a strain limit (smaller folds;
+physics.md §7) · picking points and notches in 3D · signed packages.
