@@ -8,7 +8,7 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use glam::{Vec2, Vec3};
 use r3d_sim::collide::StaticMesh;
 use r3d_sim::scene::{Particle, Triangle};
-use r3d_sim::{FabricPreset, SimScene, Solver};
+use r3d_sim::{CpuSolver, FabricPreset, SimScene, Solver};
 
 /// A closed UV sphere.
 fn sphere(center: Vec3, radius: f32) -> StaticMesh {
@@ -49,7 +49,7 @@ fn sphere(center: Vec3, radius: f32) -> StaticMesh {
 }
 
 /// An `n × n` sheet of 1 m above a sphere, already falling for 1 s.
-fn draping(n: usize) -> Solver {
+fn draping(n: usize) -> CpuSolver {
     let mut particles = Vec::with_capacity(n * n);
     for j in 0..n {
         for i in 0..n {
@@ -75,7 +75,7 @@ fn draping(n: usize) -> Solver {
             }
         }
     }
-    let mut solver = Solver::new(SimScene {
+    let mut solver = CpuSolver::new(SimScene {
         particles,
         triangles,
         fabrics: vec![FabricPreset::Cotton.params()],
@@ -84,7 +84,7 @@ fn draping(n: usize) -> Solver {
         ..SimScene::default()
     });
     for _ in 0..60 {
-        solver.step(1.0 / 60.0);
+        solver.step(1.0 / 60.0).unwrap();
     }
     solver
 }
@@ -94,7 +94,7 @@ fn frame(c: &mut Criterion) {
     group.sample_size(20);
     for (name, n) in [("4k particles", 64), ("10k particles", 100)] {
         let mut solver = draping(n);
-        group.bench_function(name, |b| b.iter(|| solver.step(1.0 / 60.0)));
+        group.bench_function(name, |b| b.iter(|| solver.step(1.0 / 60.0).unwrap()));
     }
     group.finish();
 }

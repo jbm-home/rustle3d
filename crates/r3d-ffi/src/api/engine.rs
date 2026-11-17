@@ -12,7 +12,7 @@ use flutter_rust_bridge::frb;
 
 use r3d_commands::drape::{self, Drape, Form};
 use r3d_commands::{Script, Step, Workspace};
-use r3d_sim::Solver;
+use r3d_sim::{CpuSolver, Solver};
 
 use crate::cloth::{
     Adjust, CORNER_PICK_PX, ClothHit, EDGE_PICK_MM, EDGE_PICK_PX, Held, Hit, PICK_PX, RESYNC_EVERY,
@@ -502,11 +502,11 @@ impl Engine {
         if drape.pieces.is_empty() {
             thread.clear();
         } else {
-            let mut solver = Solver::new(drape.scene.clone());
+            let mut solver = CpuSolver::new(drape.scene.clone());
             if carry {
                 solver.continue_at(now.time);
             }
-            thread.load(solver);
+            thread.load(Box::new(solver));
             if carry && now.running {
                 thread.set_running(true);
             }

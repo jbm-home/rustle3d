@@ -22,7 +22,7 @@ use r3d_geom::DVec2;
 use r3d_geom::mesh::mesh_polygon;
 use r3d_sim::collide::StaticMesh;
 use r3d_sim::scene::{Particle, Triangle};
-use r3d_sim::{FabricPreset, SUBSTEPS, SimScene, Solver, StepStats};
+use r3d_sim::{CpuSolver, FabricPreset, SUBSTEPS, SimScene, Solver, StepStats};
 
 use crate::error::CommandError;
 use crate::queries::body_model;
@@ -922,17 +922,20 @@ pub struct Simulated {
     pub stats: StepStats,
 }
 
-/// Simulate `frames` frames of 1/60 s from the starting positions.
+/// Simulate `frames` frames of 1/60 s from the starting positions, on the
+/// CPU backend: deterministic, so a cached drape can be reproduced.
 pub fn simulate(project: &Project, frames: u32) -> Result<Simulated, CommandError> {
     let form = Form::of_project(project)?;
     let drape = prepare(project, form.as_ref())?;
     if drape.pieces.is_empty() {
         return Err(CommandError::NothingToSimulate);
     }
-    let mut solver = Solver::new(drape.scene.clone());
+    let mut solver = CpuSolver::new(drape.scene.clone());
     let start = Instant::now();
     for _ in 0..frames {
-        solver.step(1.0 / 60.0);
+        solver
+            .step(1.0 / 60.0)
+            .map_err(|e| internal(e.to_string()))?;
     }
     let ms_per_frame = start.elapsed().as_secs_f64() * 1000.0 / f64::from(frames.max(1));
     Ok(Simulated {

@@ -12,6 +12,7 @@ publish.workspace = true
 glam.workspace = true
 rayon.workspace = true
 serde.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true

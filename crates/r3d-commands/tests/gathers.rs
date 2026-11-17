@@ -7,7 +7,7 @@ mod common;
 use r3d_commands::drape::{DEFAULT_SPACING_MM, Form, build};
 use r3d_commands::{Session, Step};
 use r3d_core::Project;
-use r3d_sim::Solver;
+use r3d_sim::{CpuSolver, Solver};
 use serde_json::{Value, json};
 
 fn run(s: &mut Session, v: Value) -> Value {
@@ -73,9 +73,9 @@ fn a_skirt_gathered_into_a_waistband_drapes_closed() {
     let form = Form::of_project(s.project()).unwrap().unwrap();
     let drape = build(s.project(), Some(&form), DEFAULT_SPACING_MM).unwrap();
     let collider = drape.scene.collider.clone().unwrap();
-    let mut solver = Solver::new(drape.scene);
+    let mut solver = CpuSolver::new(drape.scene);
     for _ in 0..180 {
-        solver.step(1.0 / 60.0);
+        solver.step(1.0 / 60.0).unwrap();
     }
     let p = solver.positions();
     assert!(p.iter().all(|v| v.is_finite()));

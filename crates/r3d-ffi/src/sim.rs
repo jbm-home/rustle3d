@@ -16,7 +16,7 @@ const FRAME_DT: f32 = 1.0 / 60.0;
 
 enum Control {
     /// Replace the solver (paused) with this one.
-    Load(Box<Solver>),
+    Load(Box<dyn Solver>),
     Run(bool),
     /// Hold the cloth around a particle (and run).
     Grab(usize),
@@ -39,6 +39,9 @@ pub(crate) struct Published {
     pub step_ms: f64,
     /// Largest distance between sewn points (m).
     pub max_seam_gap: f32,
+    /// Why the solver stopped stepping (its device failed); the positions
+    /// are those of its last good step.
+    pub failed: Option<String>,
 }
 
 pub(crate) struct SimThread {
@@ -74,7 +77,7 @@ impl SimThread {
     }
 
     /// Load a new solver, paused, replacing the current one.
-    pub fn load(&self, solver: Solver) {
+    pub fn load(&self, solver: Box<dyn Solver>) {
         let positions = solver.positions().to_vec();
         self.publish_now(|p| {
             *p = Published {
@@ -83,7 +86,7 @@ impl SimThread {
                 ..Published::default()
             }
         });
-        let _ = self.tx.send(Control::Load(Box::new(solver)));
+        let _ = self.tx.send(Control::Load(solver));
     }
 
     pub fn set_running(&self, running: bool) {
@@ -129,9 +132,16 @@ impl Drop for SimThread {
     }
 }
 
-fn publish(out: &Mutex<Published>, solver: Option<&Solver>, running: bool, step_ms: f64) {
+fn publish(
+    out: &Mutex<Published>,
+    solver: Option<&dyn Solver>,
+    running: bool,
+    step_ms: f64,
+    failed: Option<&String>,
+) {
     let mut p = out.lock().unwrap_or_else(PoisonError::into_inner);
     p.loaded = solver.is_some();
+    p.failed = failed.cloned();
     p.running = running && solver.is_some();
     p.step_ms = step_ms;
     match solver {
@@ -146,7 +156,8 @@ fn publish(out: &Mutex<Published>, solver: Option<&Solver>, running: bool, step_
 }
 
 fn run(rx: &Receiver<Control>, out: &Mutex<Published>) {
-    let mut solver: Option<Box<Solver>> = None;
+    let mut solver: Option<Box<dyn Solver>> = None;
+    let mut failed: Option<String> = None;
     let mut running = false;
     let mut step_ms = 0.0;
     let frame = Duration::from_secs_f32(FRAME_DT);
@@ -169,6 +180,7 @@ fn run(rx: &Receiver<Control>, out: &Mutex<Published>) {
         match message {
             Some(Control::Load(s)) => {
                 solver = Some(s);
+                failed = None;
                 running = false;
             }
             Some(Control::Run(r)) => {
@@ -196,20 +208,25 @@ fn run(rx: &Receiver<Control>, out: &Mutex<Published>) {
             }
             Some(Control::Clear) => {
                 solver = None;
+                failed = None;
                 running = false;
             }
             Some(Control::Stop) => return,
             None => {
-                if let Some(s) = solver.as_mut() {
+                if let Some(s) = solver.as_mut()
+                    && failed.is_none()
+                {
                     let start = Instant::now();
-                    s.step(FRAME_DT);
-                    step_ms = start.elapsed().as_secs_f64() * 1000.0;
+                    match s.step(FRAME_DT) {
+                        Ok(()) => step_ms = start.elapsed().as_secs_f64() * 1000.0,
+                        Err(e) => failed = Some(e.to_string()),
+                    }
                 }
                 // Late frames drop simulated time rather than catch up.
                 next = (next + frame).max(Instant::now());
             }
         }
-        publish(out, solver.as_deref(), running, step_ms);
+        publish(out, solver.as_deref(), running, step_ms, failed.as_ref());
     }
 }
 
@@ -219,15 +236,15 @@ mod tests {
     use super::*;
     use glam::Vec2;
     use r3d_sim::scene::{Particle, Triangle};
-    use r3d_sim::{FabricPreset, SimScene};
+    use r3d_sim::{CpuSolver, FabricPreset, SimScene};
 
-    fn triangle() -> Solver {
+    fn triangle() -> Box<dyn Solver> {
         let p = |x: f32, y: f32| Particle {
             position: Vec3::new(x, 1.0, y),
             rest: Vec2::new(x, y),
             pinned: false,
         };
-        Solver::new(SimScene {
+        Box::new(CpuSolver::new(SimScene {
             particles: vec![p(0.0, 0.0), p(0.1, 0.0), p(0.0, 0.1)],
             triangles: vec![Triangle {
                 vertices: [0, 1, 2],
@@ -236,7 +253,7 @@ mod tests {
             }],
             fabrics: vec![FabricPreset::Cotton.params()],
             ..SimScene::default()
-        })
+        }))
     }
 
     fn wait_for(sim: &SimThread, what: impl Fn(&Published) -> bool) -> Published {

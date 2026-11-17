@@ -25,16 +25,18 @@ const RADIUS_PER_SPACING: f32 = 0.4;
 /// Pairs closer than this many radii along the cloth do not collide.
 const EXCLUDE_RADII: f32 = 4.0;
 /// Extra distance when gathering candidates, for motion within a frame (m).
-const MARGIN: f32 = 0.01;
+pub const MARGIN: f32 = 0.01;
 
-pub(crate) struct SelfCollision {
-    radius: f32,
+/// What self-collision needs to know of the cloth, fixed for a scene.
+#[derive(Debug, Clone, Default)]
+pub struct SelfContact {
+    /// Particle radius (m).
+    pub radius: f32,
     /// For each particle, the particles near it on the cloth (sorted).
-    excluded: Vec<Vec<u32>>,
+    pub excluded: Vec<Vec<u32>>,
     /// For each particle, the others sewn to it (its seam group, empty
     /// for most particles).
-    sewn: Vec<Vec<u32>>,
-    pairs: Vec<[u32; 2]>,
+    pub sewn: Vec<Vec<u32>>,
 }
 
 /// Entry of the bounded Dijkstra search (min-heap on distance).
@@ -57,7 +59,7 @@ impl Ord for Visit {
     }
 }
 
-impl SelfCollision {
+impl SelfContact {
     /// `rest`: flat pattern positions; `triangles` and `seams` give the
     /// cloth's connectivity. Indices are assumed valid.
     pub fn new(rest: &[Vec2], triangles: &[[u32; 3]], seams: &[[u32; 2]]) -> Self {
@@ -115,7 +117,6 @@ impl SelfCollision {
             radius,
             excluded,
             sewn: seam_groups(n, seams),
-            pairs: Vec::new(),
         }
     }
 
@@ -157,9 +158,9 @@ impl SelfCollision {
         x[i] += delta;
     }
 
-    /// Gather the pairs that may touch during the next frame.
-    pub fn refresh(&mut self, x: &[Vec3], w: &[f32]) {
-        self.pairs.clear();
+    /// Gather into `pairs` those that may touch during the next frame.
+    pub fn candidates(&self, x: &[Vec3], w: &[f32], pairs: &mut Vec<[u32; 2]>) {
+        pairs.clear();
         if self.radius <= 0.0 {
             return;
         }
@@ -186,19 +187,19 @@ impl SelfCollision {
                             {
                                 continue;
                             }
-                            self.pairs.push([iu, ju]);
+                            pairs.push([iu, ju]);
                         }
                     }
                 }
             }
         }
-        self.pairs.sort_unstable();
+        pairs.sort_unstable();
     }
 
-    /// Push apart the candidate pairs that overlap.
-    pub fn solve(&self, x: &mut [Vec3], w: &[f32]) {
+    /// Push apart the candidate `pairs` that overlap.
+    pub fn solve(&self, pairs: &[[u32; 2]], x: &mut [Vec3], w: &[f32]) {
         let min = 2.0 * self.radius;
-        for [a, b] in &self.pairs {
+        for [a, b] in pairs {
             let (a, b) = (*a as usize, *b as usize);
             let d = x[b] - x[a];
             let len = d.length();
@@ -216,12 +217,7 @@ impl SelfCollision {
     }
 
     #[cfg(test)]
-    pub fn radius(&self) -> f32 {
-        self.radius
-    }
-
-    #[cfg(test)]
-    pub fn is_excluded(&self, a: u32, b: u32) -> bool {
+    fn is_excluded(&self, a: u32, b: u32) -> bool {
         self.excluded[a as usize].binary_search(&b).is_ok()
     }
 }
@@ -284,14 +280,14 @@ mod tests {
     #[test]
     fn near_on_the_cloth_is_excluded_far_is_not() {
         let (rest, tris) = strip(20);
-        let s = SelfCollision::new(&rest, &tris, &[]);
-        assert!((s.radius() - 0.004).abs() < 1e-6);
+        let s = SelfContact::new(&rest, &tris, &[]);
+        assert!((s.radius - 0.004).abs() < 1e-6);
         // Reach 4 radii = 16 mm: 1 cm and the 1.4 cm diagonal are in, 3 cm
         // along the strip is out.
         assert!(s.is_excluded(0, 2) && s.is_excluded(0, 3));
         assert!(!s.is_excluded(0, 6) && !s.is_excluded(0, 40));
         // A seam joining both ends makes them neighbours.
-        let s = SelfCollision::new(&rest, &tris, &[[0, 40]]);
+        let s = SelfContact::new(&rest, &tris, &[[0, 40]]);
         assert!(s.is_excluded(0, 40) && s.is_excluded(2, 40));
     }
 
@@ -303,17 +299,18 @@ mod tests {
         let (rest2, tris2) = strip(20);
         rest.extend(rest2);
         tris.extend(tris2.iter().map(|t| t.map(|v| v + 42)));
-        let mut s = SelfCollision::new(&rest, &tris, &[[0, 42]]);
+        let s = SelfContact::new(&rest, &tris, &[[0, 42]]);
         let mut x: Vec<Vec3> = (0..84).map(|i| Vec3::new(i as f32, 1.0, 0.0)).collect();
         x[0] = Vec3::ZERO;
         x[42] = Vec3::new(0.0, 0.0, 0.0005);
         x[20] = Vec3::new(0.001, 0.0, 0.0);
         let w = vec![1.0; 84];
-        s.refresh(&x, &w);
-        s.solve(&mut x, &w);
+        let mut pairs = Vec::new();
+        s.candidates(&x, &w, &mut pairs);
+        s.solve(&pairs, &mut x, &w);
         // Pushed apart, and the seam stayed as it was: both sides moved
         // together, as one particle of twice the mass.
-        assert!(x[20].distance(x[0]) > 1.9 * s.radius() - 1e-6);
+        assert!(x[20].distance(x[0]) > 1.9 * s.radius - 1e-6);
         assert!((x[42] - x[0]).distance(Vec3::new(0.0, 0.0, 0.0005)) < 1e-6);
         assert!(x[20].x - 0.001 > 1.9 * (0.0 - x[0].x));
     }

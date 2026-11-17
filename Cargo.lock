@@ -2064,6 +2064,7 @@ dependencies = [
  "glam",
  "rayon",
  "serde",
+ "thiserror",
 ]
 
 [[package]]

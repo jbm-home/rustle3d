@@ -6,7 +6,7 @@ mod common;
 
 use r3d_commands::{Session, Step};
 use r3d_core::Project;
-use r3d_sim::Solver;
+use r3d_sim::{CpuSolver, Solver};
 
 #[test]
 fn skirt_template_closes_and_stays_on_the_body() {
@@ -41,10 +41,10 @@ fn skirt_template_closes_and_stays_on_the_body() {
         drape.scene.seams.len()
     );
 
-    let mut solver = Solver::new(drape.scene);
+    let mut solver = CpuSolver::new(drape.scene);
     let start = std::time::Instant::now();
     for _ in 0..120 {
-        solver.step(1.0 / 60.0);
+        solver.step(1.0 / 60.0).unwrap();
     }
     let per_frame = start.elapsed() / 120;
     let p = solver.positions();
@@ -77,9 +77,9 @@ fn a_pin_holds_the_cloth_where_it_says() {
     let drape = build(s.project(), Some(&form), DEFAULT_SPACING_MM).unwrap();
     let held = drape.pins[0].1.clone();
     assert!(held.len() > 3, "{held:?}");
-    let mut solver = Solver::new(drape.scene);
+    let mut solver = CpuSolver::new(drape.scene);
     for _ in 0..60 {
-        solver.step(1.0 / 60.0);
+        solver.step(1.0 / 60.0).unwrap();
     }
     let at = solver.positions()[held[0]];
     assert!(
@@ -96,9 +96,9 @@ fn edits_carry_the_drape_over_without_a_jump() {
     let front = common::a_line_skirt(&mut s);
     let form = Form::of_project(s.project()).unwrap().unwrap();
     let old = build(s.project(), Some(&form), DEFAULT_SPACING_MM).unwrap();
-    let mut solver = Solver::new(old.scene.clone());
+    let mut solver = CpuSolver::new(old.scene.clone());
     for _ in 0..90 {
-        solver.step(1.0 / 60.0);
+        solver.step(1.0 / 60.0).unwrap();
     }
     let draped = solver.positions().to_vec();
 
@@ -149,18 +149,18 @@ fn edits_carry_the_drape_over_without_a_jump() {
     }
     // ...and once it has hung for a second, the longer skirt is lower than
     // the same drape without the change.
-    let lowest = |s: &Solver, piece: &r3d_commands::drape::Piece| {
+    let lowest = |s: &CpuSolver, piece: &r3d_commands::drape::Piece| {
         piece
             .particles
             .clone()
             .map(|i| s.positions()[i].y)
             .fold(f32::MAX, f32::min)
     };
-    let mut longer = Solver::new(new.scene.clone());
+    let mut longer = CpuSolver::new(new.scene.clone());
     longer.continue_at(solver.time());
     for _ in 0..60 {
-        solver.step(1.0 / 60.0);
-        longer.step(1.0 / 60.0);
+        solver.step(1.0 / 60.0).unwrap();
+        longer.step(1.0 / 60.0).unwrap();
     }
     let (before, after) = (lowest(&solver, front_old), lowest(&longer, front_new));
     assert!(after < before - 0.02, "{before} -> {after}");
