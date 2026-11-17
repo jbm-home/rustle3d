@@ -10,7 +10,8 @@ differently. If needed, I can fine-tune it with understandable sliders.
 - Built-in presets: **Cotton, Denim, Jersey, Silk, Wool** with our own
   documented parameters (density, thickness, warp/weft stretch, shear,
   stretch limit, warp/weft bending, friction, damping).
-- A material is assigned per panel. A project has a material library (built-in
+- A material is assigned per garment (spec 17: a project holds several,
+  each in its own fabric). Later: a project material library (built-in
   presets copied in on first use, plus custom ones).
 - Custom materials: duplicate a preset and edit it. Parameters are validated
   (positive, within physical ranges).

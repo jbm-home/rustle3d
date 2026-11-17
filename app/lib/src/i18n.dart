@@ -106,6 +106,7 @@ extension Messages on BuildContext {
       'invalid.not_simple' => l.errNotSimple,
       'invalid.not_across' => l.errNotAcross,
       'invalid.mirrored' => l.errMirrored,
+      'invalid.last_garment' => l.errLastGarment,
       'file.io' || 'write_failed' => l.errFileIo,
       'read_failed' => l.errReadFile,
       'import_malformed' => l.errImportMalformed(arg('format')),

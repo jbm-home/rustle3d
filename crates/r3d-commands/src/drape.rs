@@ -17,7 +17,7 @@ use std::time::Instant;
 
 use glam::{Vec2, Vec3};
 use r3d_avatar::fit::{fit, fitted_positions};
-use r3d_core::{Around, EdgeId, Fabric, PanelId, PinId, Project};
+use r3d_core::{Around, EdgeId, Fabric, GarmentId, PanelId, PinId, Project};
 use r3d_geom::DVec2;
 use r3d_geom::mesh::mesh_polygon;
 use r3d_sim::collide::StaticMesh;
@@ -495,10 +495,47 @@ pub(crate) fn arm_drop(project: &Project) -> Result<f64, CommandError> {
     Ok(f64::from(-arm.down.y))
 }
 
-/// How far out the body reaches at angle `theta`, anywhere between heights
-/// `top` and `top - below` (m).
-fn body_radius(form: Option<&Form>, top: f32, below: f32, theta: f32) -> f32 {
-    form.map_or(DEFAULT_BODY_RADIUS_M, |f| f.radial.reach(top, below, theta))
+/// What a garment's pieces start around: the body, how many garments
+/// are worn under it, and whether others are draped with it.
+struct Under<'a> {
+    form: Option<&'a Form>,
+    depth: usize,
+    /// How many of the garments under it have sleeves: only those push a
+    /// sleeve out (a sleeve started 25 mm wide of a bare arm slid up it).
+    sleeves_under: usize,
+    /// More than one garment is draped. Pieces around the body then start
+    /// just outside it near their own height rather than at their
+    /// placement offset outside everything above them: both open gaps at
+    /// the seams (the panels keep their widths), and a seam closing across
+    /// a gap cuts straight through the other garments.
+    several: bool,
+}
+
+/// A garment starts this much farther out per garment worn under it (m),
+/// so the layers start in order. Two layers' particles repel each other
+/// within two particle radii (`r3d_sim::selfcollide`: 0.4 of the 25 mm
+/// spacing each): at 8 mm apart they were pushed past each other at once.
+/// The same distance keeps a garment from fitting closely over another:
+/// a shirt cannot be tucked into fitted trousers yet (docs/physics.md).
+const LAYER_GAP_M: f32 = 0.025;
+
+impl Under<'_> {
+    /// How far out the body reaches at angle `theta`, anywhere between
+    /// heights `top` and `top - below` (m).
+    fn radius(&self, top: f32, below: f32, theta: f32) -> f32 {
+        self.form
+            .map_or(DEFAULT_BODY_RADIUS_M, |f| f.radial.reach(top, below, theta))
+    }
+
+    /// The leg on `side` (+1 left).
+    fn leg(&self, side: f32) -> Option<&Leg> {
+        self.form.and_then(|f| f.legs.get(usize::from(side < 0.0)))
+    }
+
+    /// How much farther out than alone the garment starts (m).
+    fn layered(&self) -> f32 {
+        LAYER_GAP_M * self.depth as f32
+    }
 }
 
 /// Leftmost and rightmost points of a closed polygon at height `y` (same
@@ -523,6 +560,9 @@ fn span_at(polygon: &[DVec2], y: f64) -> f64 {
 /// A placed panel, meshed, before it is positioned in 3D.
 struct Laid {
     panel: PanelId,
+    /// Its garment's place among the garments simulated, next to the
+    /// body first.
+    layer: usize,
     place: r3d_core::Placement,
     boundary: Vec<DVec2>,
     /// Index in `boundary` of each contour edge's first sample.
@@ -556,9 +596,13 @@ fn centre_x(l: &Laid) -> f64 {
 /// radius is the larger of the body's (plus the gap) and the garment's own
 /// (`around`: circumference at a height / 2π), so the panels start just
 /// touching.
-fn wrap_body(l: &Laid, form: Option<&Form>, around: &dyn Fn(f32) -> f32) -> Vec<Vec3> {
+fn wrap_body(l: &Laid, under: &Under, around: &dyn Fn(f32) -> f32) -> Vec<Vec3> {
     let centre = centre_x(l);
-    let gap = (l.place.offset_mm / 1000.0) as f32;
+    let gap = if under.several {
+        LIMB_CLEARANCE_M
+    } else {
+        (l.place.offset_mm / 1000.0) as f32
+    };
     let top_y = l.place.top_cm as f32 / 100.0;
     let angle0 = (l.place.angle_deg as f32).to_radians();
     l.mesh
@@ -573,8 +617,17 @@ fn wrap_body(l: &Laid, form: Option<&Form>, around: &dyn Fn(f32) -> f32) -> Vec<
             let own = (around(y) / std::f32::consts::TAU).max(1e-3);
             let arc = ((v.x - centre) / 1000.0) as f32;
             let mut r = own;
+            // Alone, a garment starts outside everything above it (a skirt
+            // over the hips); among others, outside the body near its own
+            // height, as below the shoulders that is wide of the body and
+            // the side seams then start far apart.
+            let (from, span) = if under.several {
+                (y + LEG_REACH_SPAN_M, 2.0 * LEG_REACH_SPAN_M)
+            } else {
+                (top_y, below)
+            };
             for _ in 0..2 {
-                r = (body_radius(form, top_y, below, angle0 + arc / r) + gap).max(own);
+                r = (under.radius(from, span, angle0 + arc / r) + gap).max(own) + under.layered();
             }
             let theta = angle0 + arc / r;
             Vec3::new(r * theta.sin(), y, r * theta.cos())
@@ -598,8 +651,8 @@ fn wrap_body(l: &Laid, form: Option<&Form>, around: &dyn Fn(f32) -> f32) -> Vec<
 /// The pattern is seen from outside, as on the body: on the left arm its
 /// right (+x) goes towards the back, on the right arm towards the front,
 /// so a sleeve and its mirror copy dress both arms alike.
-fn wrap_arm(l: &Laid, form: Option<&Form>, side: f32) -> Vec<Vec3> {
-    let arm = match form.and_then(|f| f.arms.get(usize::from(side < 0.0))) {
+fn wrap_arm(l: &Laid, under: &Under, side: f32) -> Vec<Vec3> {
+    let arm = match under.form.and_then(|f| f.arms.get(usize::from(side < 0.0))) {
         Some(a) => a.clone(),
         None => Arm::default(side, DEFAULT_HEIGHT_M),
     };
@@ -624,7 +677,8 @@ fn wrap_arm(l: &Laid, form: Option<&Form>, side: f32) -> Vec<Vec3> {
         .map(|v| {
             let below = ((l.top - v.y) / 1000.0) as f32;
             let t = t_top + below;
-            let r = (l.width_below(below) / std::f32::consts::TAU).max(1e-3);
+            let r = (l.width_below(below) / std::f32::consts::TAU).max(1e-3)
+                + LAYER_GAP_M * under.sleeves_under as f32;
             let theta = angle0 + ((v.x - centre) / 1000.0) as f32 / r;
             let (on_axis, d) = arm.axis(t);
             let (out, across) = frame(d);
@@ -643,24 +697,29 @@ fn wrap_arm(l: &Laid, form: Option<&Form>, side: f32) -> Vec<Vec3> {
 /// their widths, so their side seams meet; just outside the body, or at
 /// the radius of both legs' pieces together. The two blend over
 /// `CROTCH_BLEND_M`. Around the leg, the cloth stays on its side of the
-/// median plane, pressed flat against it where it would cross, and there
-/// in front of the body (or behind it): the two legs start apart.
+/// median plane, pressed flat against it where it would cross, and above
+/// the crotch in front of the body (or behind it): the two legs start
+/// apart. Pushed out there below the crotch too, where nothing lies
+/// between the legs, the back crotch point started 18 cm behind the
+/// front one and their seam swept through the gap.
 fn wrap_leg(
     l: &Laid,
-    form: Option<&Form>,
+    under: &Under,
     side: f32,
     around_leg: &dyn Fn(f32) -> f32,
     around_hips: &dyn Fn(f32) -> f32,
 ) -> Vec<Vec3> {
     let default;
-    let leg = match form.and_then(|f| f.legs.get(usize::from(side < 0.0))) {
+    let leg = match under.leg(side) {
         Some(leg) => leg,
         None => {
             default = Leg::default(side, DEFAULT_HEIGHT_M);
             &default
         }
     };
-    let crotch = form.map_or(CROTCH_FRACTION * DEFAULT_HEIGHT_M, |f| f.crotch);
+    let crotch = under
+        .form
+        .map_or(CROTCH_FRACTION * DEFAULT_HEIGHT_M, |f| f.crotch);
     let centre = centre_x(l);
     let top_y = l.place.top_cm as f32 / 100.0;
     let angle0 = (l.place.angle_deg as f32).to_radians();
@@ -668,7 +727,9 @@ fn wrap_leg(
     // at the back: the inner edge lies on +x where that is the median.
     let inner_on_plus = side * angle0.cos() < 0.0;
     let outside = |y: f32, angle: f32| {
-        body_radius(form, y + LEG_REACH_SPAN_M, 2.0 * LEG_REACH_SPAN_M, angle) + LIMB_CLEARANCE_M
+        under.radius(y + LEG_REACH_SPAN_M, 2.0 * LEG_REACH_SPAN_M, angle)
+            + LIMB_CLEARANCE_M
+            + under.layered()
     };
     l.mesh
         .vertices
@@ -682,12 +743,16 @@ fn wrap_leg(
                 let arc = ((v.x - centre) / 1000.0) as f32;
                 let mut r = own;
                 for _ in 0..2 {
-                    r = (leg.reach(y, angle0 + arc / r) + LIMB_CLEARANCE_M).max(own);
+                    r = (leg.reach(y, angle0 + arc / r) + LIMB_CLEARANCE_M).max(own)
+                        + under.layered();
                 }
                 let theta = angle0 + arc / r;
                 let (x, z) = (axis.x + r * theta.sin(), axis.z + r * theta.cos());
                 if side * x >= MEDIAN_GAP_M {
                     Vec3::new(x, y, z)
+                } else if y < crotch {
+                    // Nothing lies between the legs below the crotch.
+                    Vec3::new(side * MEDIAN_GAP_M, y, z)
                 } else if theta.cos() >= 0.0 {
                     Vec3::new(side * MEDIAN_GAP_M, y, z.max(outside(y, 0.0)))
                 } else {
@@ -701,9 +766,9 @@ fn wrap_leg(
             }
             let inner = span_ends(&l.boundary, v.y)
                 .map_or(centre, |(lo, hi)| if inner_on_plus { hi } else { lo });
+            let own = (around_hips(y) / std::f32::consts::TAU).max(1e-3);
             let share = ((v.x - inner) / 1000.0) as f32 / around_leg(y).max(1e-3);
             let theta = angle0 + std::f32::consts::PI * share;
-            let own = (around_hips(y) / std::f32::consts::TAU).max(1e-3);
             let r = outside(y, theta).max(own);
             let on_body = Vec3::new(r * theta.sin(), y, r * theta.cos());
             on_leg.lerp(on_body, blend)
@@ -775,13 +840,29 @@ pub fn build(
 ) -> Result<Drape, CommandError> {
     let spacing = spacing_mm.max(2.0);
     let counts = segment_counts(project, spacing);
-    let garment = project
-        .default_garment()
-        .and_then(|g| project.garments().get(&g));
-    let fabric = fabric_preset(garment.map(|g| g.fabric).unwrap_or_default()).params();
+    // One fabric per garment, and the garments simulated (those with a
+    // placed panel) in their layers.
+    let garments = project.garments_by_layer();
+    let fabrics = garments
+        .iter()
+        .map(|id| {
+            let fabric = project.garments().get(id).map(|g| g.fabric);
+            fabric_preset(fabric.unwrap_or_default()).params()
+        })
+        .collect();
+    let worn: Vec<GarmentId> = garments
+        .iter()
+        .copied()
+        .filter(|g| {
+            project
+                .panels()
+                .values()
+                .any(|p| p.garment == *g && p.placement.is_some())
+        })
+        .collect();
 
     let mut scene = SimScene {
-        fabrics: vec![fabric],
+        fabrics,
         ground: true,
         ..SimScene::default()
     };
@@ -814,6 +895,7 @@ pub fn build(
         let top = mesh.vertices.iter().fold(f64::MIN, |m, v| m.max(v.y));
         laid.push(Laid {
             panel: *panel_id,
+            layer: worn.iter().position(|g| *g == panel.garment).unwrap_or(0),
             place,
             boundary,
             starts,
@@ -821,17 +903,62 @@ pub fn build(
             top,
         });
     }
-    // The garment's circumference at a height around the body or a leg:
-    // all the panels wrapped around it side by side.
-    let around = |kind: Around, y: f32| {
+    // A garment's circumference at a height around the body or a leg: all
+    // its panels wrapped around it side by side.
+    let around = |layer: usize, kind: Around, y: f32| {
         laid.iter()
-            .filter(|l| l.place.around == kind)
+            .filter(|l| l.layer == layer && l.place.around == kind)
             .map(|l| l.width_below(l.place.top_cm as f32 / 100.0 - y))
             .sum::<f32>()
     };
-    let around_hips = |y: f32| around(Around::LeftLeg, y) + around(Around::RightLeg, y);
+    // Start positions, garment by garment, each a little farther out
+    // than the ones under it.
+    let mut starts: Vec<Vec<Vec3>> = vec![Vec::new(); laid.len()];
+    for layer in 0..worn.len() {
+        let sleeves_under = (0..layer)
+            .filter(|below| {
+                laid.iter().any(|l| {
+                    l.layer == *below
+                        && matches!(l.place.around, Around::LeftArm | Around::RightArm)
+                })
+            })
+            .count();
+        let under = Under {
+            form,
+            depth: layer,
+            sleeves_under,
+            several: worn.len() > 1,
+        };
+        let around_hips =
+            |y: f32| around(layer, Around::LeftLeg, y) + around(layer, Around::RightLeg, y);
+        for (l, start) in laid.iter().zip(&mut starts) {
+            if l.layer != layer {
+                continue;
+            }
+            *start = match l.place.around {
+                Around::Body => wrap_body(l, &under, &|y| around(layer, Around::Body, y)),
+                Around::LeftArm => wrap_arm(l, &under, 1.0),
+                Around::RightArm => wrap_arm(l, &under, -1.0),
+                Around::LeftLeg => wrap_leg(
+                    l,
+                    &under,
+                    1.0,
+                    &|y| around(layer, Around::LeftLeg, y),
+                    &around_hips,
+                ),
+                Around::RightLeg => wrap_leg(
+                    l,
+                    &under,
+                    -1.0,
+                    &|y| around(layer, Around::RightLeg, y),
+                    &around_hips,
+                ),
+                Around::Flat => lay_flat(l),
+            };
+        }
+    }
 
-    for l in &laid {
+    for (l, start) in laid.iter().zip(starts) {
         let Some(panel) = project.panel(l.panel) else {
             continue;
         };
@@ -847,22 +974,6 @@ pub fn build(
             edge_vertices.insert(*e, verts);
         }
 
-        let start = match l.place.around {
-            Around::Body => wrap_body(l, form, &|y| around(Around::Body, y)),
-            Around::LeftArm => wrap_arm(l, form, 1.0),
-            Around::RightArm => wrap_arm(l, form, -1.0),
-            Around::LeftLeg => {
-                wrap_leg(l, form, 1.0, &|y| around(Around::LeftLeg, y), &around_hips)
-            }
-            Around::RightLeg => wrap_leg(
-                l,
-                form,
-                -1.0,
-                &|y| around(Around::RightLeg, y),
-                &around_hips,
-            ),
-            Around::Flat => lay_flat(l),
-        };
         scene.particles.extend(
             mesh.vertices
                 .iter()
@@ -880,11 +991,16 @@ pub fn build(
         });
         let grain = (panel.grain_angle_deg as f32).to_radians();
         let warp = Vec2::new(grain.cos(), grain.sin());
+        let fabric = garments
+            .iter()
+            .position(|g| *g == panel.garment)
+            .and_then(|k| u16::try_from(k).ok())
+            .unwrap_or(0);
         scene
             .triangles
             .extend(mesh.triangles.iter().map(|t| Triangle {
                 vertices: t.map(|i| offset + i),
-                fabric: 0,
+                fabric,
                 warp,
             }));
     }
@@ -1285,20 +1401,23 @@ pub fn scene3d(
     form: Option<&Form>,
 ) -> r3d_io::scene3d::Scene3d {
     use r3d_io::scene3d::{Material3d, Mesh3d, Scene3d};
-    let garment = project
-        .default_garment()
-        .and_then(|id| project.garments().get(&id));
-    let fabric = garment.map(|g| g.fabric).unwrap_or_default();
-    let look = fabric.look();
-    let rgb = garment.map_or(look.rgb, |g| g.rgb());
-    let mut materials = vec![Material3d {
-        name: format!("{fabric:?}"),
-        rgb,
-        sheen: look.sheen,
-        sheen_roughness: look.sheen_roughness,
-        roughness: look.roughness,
-        double_sided: true,
-    }];
+    // One material per garment, named after it.
+    let garments = project.garments_by_layer();
+    let mut materials: Vec<Material3d> = garments
+        .iter()
+        .filter_map(|id| project.garments().get(id))
+        .map(|g| {
+            let look = g.fabric.look();
+            Material3d {
+                name: g.name.clone(),
+                rgb: g.rgb(),
+                sheen: look.sheen,
+                sheen_roughness: look.sheen_roughness,
+                roughness: look.roughness,
+                double_sided: true,
+            }
+        })
+        .collect();
     let pieces = drape
         .pieces
         .iter()
@@ -1312,10 +1431,14 @@ pub fn scene3d(
                 positions: at.iter().map(|p| p.to_array()).collect(),
                 uvs: rest.iter().map(|p| [p.rest.x, -p.rest.y]).collect(),
                 indices: piece.indices.clone(),
-                material: 0,
+                material: project
+                    .panel(piece.panel)
+                    .and_then(|p| garments.iter().position(|g| *g == p.garment))
+                    .unwrap_or(0),
             })
         })
         .collect();
+    let avatar_material = materials.len();
     let avatar = form.map(|f| {
         materials.push(Material3d {
             name: "Avatar".into(),
@@ -1330,7 +1453,7 @@ pub fn scene3d(
             positions: f.positions.iter().map(|p| p.to_array()).collect(),
             uvs: Vec::new(),
             indices: f.triangles.iter().flatten().copied().collect(),
-            material: 1,
+            material: avatar_material,
         }
     });
     Scene3d {

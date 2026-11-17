@@ -2067,9 +2067,219 @@ Set the garment's colour as #RRGGBB, or clear it to use the fabric's usual colou
 
 </details>
 
+### `garment.add`
+
+Add a garment to the project, in its own fabric and colour, worn over the others (see garment.set_layer). Move pieces into it with panel.set_garment; template.apply on a project with pieces makes one by itself. Returns the garment's id.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "Fabric": {
+      "description": "The built-in fabrics (physical and visual presets).",
+      "enum": [
+        "cotton",
+        "denim",
+        "jersey",
+        "silk",
+        "wool"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Add a garment, worn over the others.",
+  "properties": {
+    "color": {
+      "description": "`#RRGGBB`, or omitted to use the fabric's usual colour.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "fabric": {
+      "$ref": "#/$defs/Fabric",
+      "default": "cotton",
+      "description": "Defaults to cotton."
+    },
+    "name": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "GarmentAdd",
+  "type": "object"
+}
+```
+
+</details>
+
+### `garment.rename`
+
+Rename a garment.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "GarmentId": {
+      "description": "Identifier of a garment, e.g. `garment:1`.",
+      "pattern": "^garment:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Rename a garment.",
+  "properties": {
+    "garment": {
+      "$ref": "#/$defs/GarmentId"
+    },
+    "name": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "garment",
+    "name"
+  ],
+  "title": "GarmentRename",
+  "type": "object"
+}
+```
+
+</details>
+
+### `garment.remove`
+
+Delete a garment and all its pieces (as panel.delete does each). The project keeps at least one garment. Destructive: requires "confirm": true.
+
+**Destructive**: requires `"confirm": true`.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "GarmentId": {
+      "description": "Identifier of a garment, e.g. `garment:1`.",
+      "pattern": "^garment:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Delete a garment with its pieces.",
+  "properties": {
+    "confirm": {
+      "default": false,
+      "description": "Must be `true`: deleting is destructive (still undoable).",
+      "type": "boolean"
+    },
+    "garment": {
+      "$ref": "#/$defs/GarmentId"
+    }
+  },
+  "required": [
+    "garment"
+  ],
+  "title": "GarmentRemove",
+  "type": "object"
+}
+```
+
+</details>
+
+### `garment.set_layer`
+
+Choose where a garment is worn among the others: layer 0 is next to the body, the others move to make room. The garment worn over another drapes over it: a shirt under trousers is tucked in, over them it is worn out.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "GarmentId": {
+      "description": "Identifier of a garment, e.g. `garment:1`.",
+      "pattern": "^garment:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Choose where a garment is worn among the others.",
+  "properties": {
+    "garment": {
+      "$ref": "#/$defs/GarmentId"
+    },
+    "layer": {
+      "description": "0 next to the body; the garments from there on move up or down to\nmake room. A shirt tucked into trousers is under them (a lower\nlayer), a shirt worn out over them.",
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "garment",
+    "layer"
+  ],
+  "title": "GarmentSetLayer",
+  "type": "object"
+}
+```
+
+</details>
+
+### `panel.set_garment`
+
+Move a piece to another garment; its linked mirror copies (and the piece it mirrors) move with it. The piece then drapes in that garment's fabric, colour and layer.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "GarmentId": {
+      "description": "Identifier of a garment, e.g. `garment:1`.",
+      "pattern": "^garment:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "PanelId": {
+      "description": "Identifier of a panel, e.g. `panel:1`.",
+      "pattern": "^panel:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Move a piece to another garment.",
+  "properties": {
+    "garment": {
+      "$ref": "#/$defs/GarmentId"
+    },
+    "panel": {
+      "$ref": "#/$defs/PanelId"
+    }
+  },
+  "required": [
+    "panel",
+    "garment"
+  ],
+  "title": "PanelSetGarment",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `template.apply`
 
-Draft a starter garment (t_shirt, shirt, trousers, dress, straight_skirt, a_line_skirt, tote_bag) from sizes in cm, the avatar's measurements filling in any left out: its pieces are drawn, sewn, placed around the body and given a fabric, ready to simulate and edit. A project without panels takes the template's name. Returns the panels, seams and notches.
+Draft a starter garment (t_shirt, shirt, trousers, dress, straight_skirt, a_line_skirt, tote_bag) from sizes in cm, the avatar's measurements filling in any left out: its pieces are drawn, sewn, placed around the body and given a fabric, ready to simulate and edit. A project without panels takes the template's name, and so does its garment; in a project with pieces the template becomes a garment of its own, worn over the others (see garment.set_layer). Returns the garment if one was added, then the panels, seams and notches.
 
 <details><summary>Parameters (JSON schema)</summary>
 

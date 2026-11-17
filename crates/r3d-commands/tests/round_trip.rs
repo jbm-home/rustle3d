@@ -84,6 +84,12 @@ fn every_command_round_trips() {
     h.round_trip(json!({"type": "panel.place", "panel": panel, "angle_deg": 0, "top_cm": 104}));
     h.round_trip(json!({"type": "garment.set_fabric", "fabric": "denim"}));
     h.round_trip(json!({"type": "garment.set_color", "color": "#335577"}));
+    let jacket = h.round_trip(json!({"type": "garment.add", "name": "Jacket",
+        "fabric": "wool", "color": "#223344"}));
+    let jacket = jacket.created[0].to_string();
+    h.round_trip(json!({"type": "garment.rename", "garment": jacket, "name": "Coat"}));
+    h.round_trip(json!({"type": "panel.set_garment", "panel": panel, "garment": jacket}));
+    h.round_trip(json!({"type": "garment.set_layer", "garment": jacket, "layer": 0}));
     let poly_edge = poly.created[5].to_string();
     let other_edge = rect.created[7].to_string();
     let seam = h.round_trip(json!({"type": "seam.add",
@@ -125,7 +131,9 @@ fn every_command_round_trips() {
     h.round_trip(json!({"type": "panel.unlink", "panel": copy}));
     h.round_trip(json!({"type": "internal_line.remove", "line": line}));
     h.round_trip(json!({"type": "edge.set_curve", "edge": edge, "curve": {"kind": "line"}}));
-    h.round_trip(json!({"type": "panel.delete", "panel": panel, "confirm": true}));
+    h.round_trip(json!({"type": "panel.delete", "panel": copy, "confirm": true}));
+    // The jacket's piece goes with it.
+    h.round_trip(json!({"type": "garment.remove", "garment": jacket, "confirm": true}));
     let path = h.round_trip(json!({
         "type": "panel.create_path", "name": "Bodice", "start": [2000, 0], "segments": [
             {"kind": "line", "to": [2300, 0]},

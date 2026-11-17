@@ -346,13 +346,6 @@ class _ShellState extends State<Shell> {
     }
   }
 
-  /// The running drape follows the new fabric (the engine carries edits
-  /// over).
-  void _setFabric(String fabric) {
-    _run({'type': 'garment.set_fabric', 'fabric': fabric});
-    _refresh();
-  }
-
   /// The first edge picked with the Sew tool.
   String? _sewFrom;
 
@@ -1117,7 +1110,6 @@ class _ShellState extends State<Shell> {
                           summary: _summary,
                           edge: _edge,
                           seams: _seams,
-                          onFabric: _setFabric,
                           pins: _pins,
                           onUnpin: (pin) {
                             _guard(() => widget.engine.unpin(pin: pin));
@@ -1463,16 +1455,21 @@ class _IconAction extends StatelessWidget {
 
   final IconData icon;
   final String tip;
-  final VoidCallback onTap;
+
+  /// `null` greys the action out.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
+    final color = onTap == null
+        ? p.textMuted.withValues(alpha: 0.35)
+        : p.textMuted;
     return Tooltip(
       message: tip,
       child: IconButton(
         onPressed: onTap,
-        icon: Icon(icon, size: 19, color: p.textMuted),
+        icon: Icon(icon, size: 19, color: color),
         style: IconButton.styleFrom(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(Tokens.radius(context, 0.5)),
@@ -1892,7 +1889,6 @@ class _Inspector extends StatelessWidget {
     required this.summary,
     required this.edge,
     required this.seams,
-    required this.onFabric,
     required this.pins,
     required this.onUnpin,
     required this.run,
@@ -1905,7 +1901,6 @@ class _Inspector extends StatelessWidget {
   final Map<String, dynamic> summary;
   final String? edge;
   final List<dynamic> seams;
-  final ValueChanged<String> onFabric;
   final List<dynamic> pins;
   final ValueChanged<String> onUnpin;
   final ValueChanged<Map<String, Object?>> run;
@@ -1914,6 +1909,7 @@ class _Inspector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
+    final garments = (summary['garments'] as List<dynamic>?) ?? const [];
     return Container(
       decoration: BoxDecoration(
         color: p.surface,
@@ -1928,13 +1924,14 @@ class _Inspector extends StatelessWidget {
           child: switch (selection.length) {
             0 => _EmptyInspector(
               summary: summary,
-              onFabric: onFabric,
+              run: run,
               onArrange: () => run({'type': 'garment.arrange'}),
               pins: pins,
               onUnpin: onUnpin,
             ),
             1 when panel != null => _PanelInspector(
               panel: panel!,
+              garments: garments,
               points: points,
               edge: edge,
               seams: seams,
@@ -1952,14 +1949,14 @@ class _Inspector extends StatelessWidget {
 class _EmptyInspector extends StatelessWidget {
   const _EmptyInspector({
     required this.summary,
-    required this.onFabric,
+    required this.run,
     required this.onArrange,
     required this.pins,
     required this.onUnpin,
   });
 
   final Map<String, dynamic> summary;
-  final ValueChanged<String> onFabric;
+  final ValueChanged<Map<String, Object?>> run;
   final VoidCallback onArrange;
   final List<dynamic> pins;
   final ValueChanged<String> onUnpin;
@@ -2005,13 +2002,9 @@ class _EmptyInspector extends StatelessWidget {
         const SizedBox(height: Space.xl),
         Divider(color: p.border, height: 1),
         const SizedBox(height: Space.l),
-        _FabricPicker(
-          current:
-              ((summary['garments'] as List<dynamic>?)?.firstOrNull
-                      as Map<String, dynamic>?)?['fabric']
-                  as String? ??
-              'cotton',
-          onPick: onFabric,
+        _GarmentList(
+          garments: (summary['garments'] as List<dynamic>?) ?? const [],
+          run: run,
         ),
         const SizedBox(height: Space.l),
         OutlinedButton.icon(
@@ -2110,6 +2103,7 @@ class _MultiInspector extends StatelessWidget {
 class _PanelInspector extends StatelessWidget {
   const _PanelInspector({
     required this.panel,
+    required this.garments,
     required this.points,
     required this.edge,
     required this.seams,
@@ -2118,6 +2112,9 @@ class _PanelInspector extends StatelessWidget {
   });
 
   final Map<String, dynamic> panel;
+
+  /// The project's garments, to move the piece to another.
+  final List<dynamic> garments;
   final List<PickedPoint> points;
   final String? edge;
   final List<dynamic> seams;
@@ -2209,6 +2206,22 @@ class _PanelInspector extends StatelessWidget {
             'angle_deg': v.roundToDouble(),
           }),
         ),
+        if (garments.length > 1) ...[
+          const SizedBox(height: Space.xl),
+          DropdownButtonFormField<String>(
+            initialValue: panel['garment'] as String?,
+            decoration: InputDecoration(labelText: l.pieceGarment),
+            items: [
+              for (final g in garments)
+                DropdownMenuItem(
+                  value: g['id'] as String,
+                  child: Text(g['name'] as String),
+                ),
+            ],
+            onChanged: (to) =>
+                run({'type': 'panel.set_garment', 'panel': id, 'garment': to}),
+          ),
+        ],
         const SizedBox(height: Space.xl),
         _PlacementCard(
           placement: panel['placement'] as Map<String, dynamic>?,
@@ -2762,6 +2775,151 @@ class _SimControls extends StatelessWidget {
             icon: Icons.restart_alt_rounded,
             tip: context.l.restartTip,
             onTap: onRestart,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The project's garments from the body out: each one's fabric, its
+/// layer, and a way to delete it; and a way to add one.
+class _GarmentList extends StatelessWidget {
+  const _GarmentList({required this.garments, required this.run});
+
+  /// As `project.summary` lists them, next to the body first.
+  final List<dynamic> garments;
+  final ValueChanged<Map<String, Object?>> run;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final l = context.l;
+    final several = garments.length > 1;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          l.garments,
+          style: ts(fontSize: 14, fontWeight: FontWeight.w600, color: p.text),
+        ),
+        if (several) ...[
+          const SizedBox(height: Space.xs),
+          Text(
+            l.garmentsHint,
+            style: ts(fontSize: 12.5, height: 1.45, color: p.textMuted),
+          ),
+        ],
+        for (final (i, g) in garments.indexed) ...[
+          const SizedBox(height: Space.m),
+          _GarmentCard(
+            garment: g as Map<String, dynamic>,
+            layer: i,
+            count: garments.length,
+            run: run,
+          ),
+        ],
+        const SizedBox(height: Space.m),
+        OutlinedButton.icon(
+          onPressed: () => run({
+            'type': 'garment.add',
+            'name': l.garmentNewName(garments.length + 1),
+          }),
+          icon: const Icon(Icons.add_rounded, size: 18),
+          label: Text(l.addGarment),
+        ),
+      ],
+    );
+  }
+}
+
+/// One garment: its name and layer, moved under or over its neighbours,
+/// deleted, and its fabric.
+class _GarmentCard extends StatelessWidget {
+  const _GarmentCard({
+    required this.garment,
+    required this.layer,
+    required this.count,
+    required this.run,
+  });
+
+  final Map<String, dynamic> garment;
+
+  /// Its place in the list, 0 next to the body.
+  final int layer;
+  final int count;
+  final ValueChanged<Map<String, Object?>> run;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final l = context.l;
+    final id = garment['id'] as String;
+    void setLayer(int to) =>
+        run({'type': 'garment.set_layer', 'garment': id, 'layer': to});
+    return Container(
+      padding: const EdgeInsets.all(Space.m),
+      decoration: BoxDecoration(
+        border: Border.all(color: p.border),
+        borderRadius: BorderRadius.circular(Tokens.radius(context)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      garment['name'] as String,
+                      style: ts(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                        color: p.text,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (count > 1)
+                      Text(
+                        layer == 0 ? l.garmentNextToBody : l.garmentOver,
+                        style: ts(fontSize: 12, color: p.textMuted),
+                      ),
+                  ],
+                ),
+              ),
+              if (count > 1) ...[
+                _IconAction(
+                  icon: Icons.arrow_upward_rounded,
+                  tip: l.garmentMoveIn,
+                  onTap: layer > 0 ? () => setLayer(layer - 1) : null,
+                ),
+                _IconAction(
+                  icon: Icons.arrow_downward_rounded,
+                  tip: l.garmentMoveOut,
+                  onTap: layer < count - 1 ? () => setLayer(layer + 1) : null,
+                ),
+                _IconAction(
+                  icon: Icons.delete_outline_rounded,
+                  tip: l.garmentRemove,
+                  onTap: () => run({
+                    'type': 'garment.remove',
+                    'garment': id,
+                    'confirm': true,
+                  }),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: Space.s),
+          _FabricPicker(
+            current: garment['fabric'] as String? ?? 'cotton',
+            onPick: (fabric) => run({
+              'type': 'garment.set_fabric',
+              'garment': id,
+              'fabric': fabric,
+            }),
           ),
         ],
       ),

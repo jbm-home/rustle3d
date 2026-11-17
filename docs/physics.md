@@ -271,6 +271,39 @@ starts:
 Trousers hold at the waist by friction alone (no ease there): the CPU and
 GPU contact solvers settle them about 3 cm apart, both at rest.
 
+### Several garments (M19)
+
+Each garment has its fabric (one `FabricParams` per garment, triangles
+indexed by their piece's garment). Garments start in layer order, each
+`LAYER_GAP_M` (25 mm) further out per garment under it; with several
+garments, pieces around the body start just outside it (5 mm) near their
+own height, not at their placement offset outside everything above them:
+both open the side seams (12–22 cm on the shirt), and a seam closing
+across a gap cuts straight through the garment underneath.
+
+Close layers do not work yet. Self-collision keeps particles two radii
+apart (§5: 0.4 of the spacing each, 20 mm at 25 mm): two layers 8 mm
+apart were pushed past each other at once, and fitted trousers cannot
+leave 2 cm for a shirt under their waist. Tried for a shirt tucked into
+trousers, all measured on the first frame:
+- the trousers started around the shirt, spread around the larger circle
+  (stretched 20–47 %): they snapped back through it;
+- the trousers kept their widths (side seams apart): the seams closed
+  straight across, through the shirt;
+- the shirt started gathered inside the trousers, at their natural size,
+  with compression made 100 to 10⁴ times softer than stretch: the shirt
+  was still pushed out within a frame (the softer compression made no
+  difference and was not kept).
+Worn over the trousers, the shirt drapes with closed seams but the two
+show through each other where they touch. The way forward is thin
+cloth–cloth contact (vertex–triangle, with a thickness of millimetres)
+between garments, in both solvers.
+
+Below the crotch, cloth pressed against the median plane stays where it
+is (nothing lies between the legs): pushed in front of or behind the body
+as above the crotch, the back crotch point started 18 cm behind the front
+one and the inseam swept through the gap.
+
 ### Self-collision
 
 - **Current** (`selfcollide`): particle–particle repulsion [7]. Each

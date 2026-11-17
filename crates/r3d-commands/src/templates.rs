@@ -13,9 +13,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::commands::{
-    CurveSpec, EdgeSetCurve, GarmentSetFabric, NotchAdd, PanelCreatePolygon, PanelMirror,
-    PanelPlace, PanelSetSeamAllowance, PinAdd, ProjectRename, SeamAdd, SeamSideSpec,
-    mirrored_source, waist_height_cm,
+    CurveSpec, EdgeSetCurve, GarmentAdd, GarmentRename, GarmentSetFabric, NotchAdd,
+    PanelCreatePolygon, PanelMirror, PanelPlace, PanelSetGarment, PanelSetSeamAllowance, PinAdd,
+    ProjectRename, SeamAdd, SeamSideSpec, mirrored_source, waist_height_cm,
 };
 use crate::drape::arm_drop;
 use crate::error::{CommandError, positive};
@@ -470,16 +470,41 @@ pub fn draft(
         Template::ToteBag | Template::Trousers => Fabric::Denim,
         _ => Fabric::Cotton,
     };
-    GarmentSetFabric {
-        garment: None,
-        fabric,
-    }
-    .apply(d.tx)?;
+    let title = template.title().to_owned();
     if fresh {
-        ProjectRename {
-            name: template.title().to_owned(),
+        // The project's garment becomes this one.
+        let garment = d.tx.project().default_garment();
+        GarmentSetFabric { garment, fabric }.apply(d.tx)?;
+        if let Some(garment) = garment {
+            GarmentRename {
+                garment,
+                name: title.clone(),
+            }
+            .apply(d.tx)?;
+        }
+        ProjectRename { name: title }.apply(d.tx)?;
+    } else {
+        // A garment of its own, worn over the others.
+        let out = GarmentAdd {
+            name: title,
+            fabric,
+            color: None,
         }
         .apply(d.tx)?;
+        if let Some(AnyId::Garment(garment)) = out.created.first().copied() {
+            let pieces: Vec<PanelId> = d
+                .created
+                .iter()
+                .filter_map(|a| match a {
+                    AnyId::Panel(p) => Some(*p),
+                    _ => None,
+                })
+                .collect();
+            for panel in pieces {
+                PanelSetGarment { panel, garment }.apply(d.tx)?;
+            }
+            d.created.insert(0, AnyId::Garment(garment));
+        }
     }
     Ok(d.created)
 }

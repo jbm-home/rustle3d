@@ -212,14 +212,13 @@ fn mesh(positions: Vec<Vec3>, indices: Vec<u32>) -> Mesh {
     mesh
 }
 
-/// The garment as the 3D views show it.
+/// The garments as the 3D views show them.
 struct Dressed {
     avatar: Option<Mesh>,
-    pieces: Vec<Mesh>,
+    /// Each piece with its garment's fabric and colour.
+    pieces: Vec<(Mesh, Fabric, Option<String>)>,
     /// Style lines on the cloth.
     lines: Vec<Mesh>,
-    fabric: Fabric,
-    color: Option<String>,
     /// `simulated` (the cached drape) or `start`.
     state: &'static str,
 }
@@ -237,16 +236,18 @@ impl Dressed {
             "start"
         };
         let positions = cached.unwrap_or(start);
-        let garment = project
-            .default_garment()
-            .and_then(|id| project.garments().get(&id));
         let pieces = built
             .pieces
             .iter()
             .filter_map(|p| {
-                Some(mesh(
-                    positions.get(p.particles.clone())?.to_vec(),
-                    p.indices.clone(),
+                let garment = project.garment_of(p.panel);
+                Some((
+                    mesh(
+                        positions.get(p.particles.clone())?.to_vec(),
+                        p.indices.clone(),
+                    ),
+                    garment.map(|g| g.fabric).unwrap_or_default(),
+                    garment.and_then(|g| g.color.clone()),
                 ))
             })
             .collect();
@@ -260,8 +261,6 @@ impl Dressed {
                 .map(|f| mesh(f.positions, f.triangles.iter().flatten().copied().collect())),
             pieces,
             lines,
-            fabric: garment.map(|g| g.fabric).unwrap_or_default(),
-            color: garment.and_then(|g| g.color.clone()),
             state,
         })
     }
@@ -303,7 +302,6 @@ pub fn render(
         }
         View::Garment => {
             let dressed = Dressed::of(ws)?;
-            let fabric = Material::fabric(dressed.fabric, dressed.color.as_deref());
             let mut draws: Vec<Draw<'_>> = Vec::with_capacity(dressed.pieces.len() + 1);
             if let Some(a) = &dressed.avatar {
                 draws.push(Draw {
@@ -311,9 +309,9 @@ pub fn render(
                     material: Material::mannequin(&theme),
                 });
             }
-            draws.extend(dressed.pieces.iter().map(|m| Draw {
+            draws.extend(dressed.pieces.iter().map(|(m, fabric, color)| Draw {
                 mesh: m,
-                material: fabric,
+                material: Material::fabric(*fabric, color.as_deref()),
             }));
             draws.extend(dressed.lines.iter().map(|mesh| Draw {
                 mesh,
@@ -342,11 +340,16 @@ pub fn render(
         View::Photo(options) => {
             let start = std::time::Instant::now();
             let dressed = Dressed::of(ws)?;
-            let surface = Surface::fabric(dressed.fabric, dressed.color.as_deref());
-            let cloth: Vec<(&Mesh, Surface)> =
-                dressed.pieces.iter().map(|m| (m, surface)).collect();
+            let cloth: Vec<(&Mesh, Surface)> = dressed
+                .pieces
+                .iter()
+                .map(|(m, fabric, color)| (m, Surface::fabric(*fabric, color.as_deref())))
+                .collect();
             let scene = PhotoScene::new(&cloth, dressed.avatar.as_ref());
-            let mut points = dressed.pieces.iter().flat_map(|m| m.positions.iter());
+            let mut points = dressed
+                .pieces
+                .iter()
+                .flat_map(|(m, _, _)| m.positions.iter());
             let garment = points
                 .next()
                 .map(|first| points.fold((*first, *first), |(lo, hi), p| (lo.min(*p), hi.max(*p))));

@@ -12,8 +12,8 @@ use std::path::PathBuf;
 use glam::DVec2;
 use r3d_core::file::{self, SCHEMA_VERSION};
 use r3d_core::{
-    Around, Avatar, Body, Edge, EdgeCurve, InternalLine, Notch, Panel, PathSegment, Pin, Placement,
-    Point, Project, Seam, SeamSide, Transaction,
+    Around, Avatar, Body, Edge, EdgeCurve, Fabric, Garment, InternalLine, Notch, Panel,
+    PathSegment, Pin, Placement, Point, Project, Seam, SeamSide, Transaction,
 };
 
 fn golden_dir(version: u32) -> PathBuf {
@@ -79,6 +79,16 @@ fn sample() -> Project {
                 offset_mm: 30.0,
                 centre_x_mm: Some(200.0),
             }),
+        },
+    );
+    let outer = tx.new_garment_id();
+    tx.put_garment(
+        outer,
+        Garment {
+            name: "Jacket".into(),
+            fabric: Fabric::Wool,
+            color: Some("#334455".into()),
+            layer: 1,
         },
     );
     let pin = tx.new_pin_id();

@@ -907,6 +907,39 @@ class LFr extends L {
   String get fabric => 'Tissu';
 
   @override
+  String get garments => 'Vêtements';
+
+  @override
+  String get garmentsHint =>
+      'Portés du corps vers l’extérieur : un vêtement se drape par-dessus ceux qui le précèdent dans la liste.';
+
+  @override
+  String get garmentNextToBody => 'Contre le corps';
+
+  @override
+  String get garmentOver => 'Porté par-dessus le précédent';
+
+  @override
+  String get garmentMoveIn => 'Le porter dessous';
+
+  @override
+  String get garmentMoveOut => 'Le porter dessus';
+
+  @override
+  String get garmentRemove => 'Supprimer le vêtement et ses pièces';
+
+  @override
+  String get addGarment => 'Ajouter un vêtement';
+
+  @override
+  String garmentNewName(int number) {
+    return 'Vêtement $number';
+  }
+
+  @override
+  String get pieceGarment => 'Vêtement';
+
+  @override
   String get fabricCotton => 'Coton';
 
   @override
@@ -1241,6 +1274,9 @@ class LFr extends L {
   @override
   String get errMirrored =>
       'Cette pièce a une copie miroir liée : déliez d’abord la copie.';
+
+  @override
+  String get errLastGarment => 'Un projet garde au moins un vêtement.';
 
   @override
   String get errFileIo =>

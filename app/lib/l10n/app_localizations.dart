@@ -1645,6 +1645,66 @@ abstract class L {
   /// **'Fabric'**
   String get fabric;
 
+  /// No description provided for @garments.
+  ///
+  /// In en, this message translates to:
+  /// **'Garments'**
+  String get garments;
+
+  /// No description provided for @garmentsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Worn from the body out: a garment drapes over the ones above it in the list.'**
+  String get garmentsHint;
+
+  /// No description provided for @garmentNextToBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Next to the body'**
+  String get garmentNextToBody;
+
+  /// No description provided for @garmentOver.
+  ///
+  /// In en, this message translates to:
+  /// **'Worn over the one above'**
+  String get garmentOver;
+
+  /// No description provided for @garmentMoveIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Wear it under'**
+  String get garmentMoveIn;
+
+  /// No description provided for @garmentMoveOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Wear it over'**
+  String get garmentMoveOut;
+
+  /// No description provided for @garmentRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the garment and its pieces'**
+  String get garmentRemove;
+
+  /// No description provided for @addGarment.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a garment'**
+  String get addGarment;
+
+  /// No description provided for @garmentNewName.
+  ///
+  /// In en, this message translates to:
+  /// **'Garment {number}'**
+  String garmentNewName(int number);
+
+  /// No description provided for @pieceGarment.
+  ///
+  /// In en, this message translates to:
+  /// **'Garment'**
+  String get pieceGarment;
+
   /// No description provided for @fabricCotton.
   ///
   /// In en, this message translates to:
@@ -2208,6 +2268,12 @@ abstract class L {
   /// In en, this message translates to:
   /// **'This piece has a linked mirror copy: unlink the copy first.'**
   String get errMirrored;
+
+  /// No description provided for @errLastGarment.
+  ///
+  /// In en, this message translates to:
+  /// **'A project keeps at least one garment.'**
+  String get errLastGarment;
 
   /// No description provided for @errFileIo.
   ///

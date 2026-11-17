@@ -156,6 +156,11 @@ command_registry! {
     "garment.set_fabric" => GarmentSetFabric,
     "garment.arrange" => GarmentArrange,
     "garment.set_color" => GarmentSetColor,
+    "garment.add" => GarmentAdd,
+    "garment.rename" => GarmentRename,
+    "garment.remove" => GarmentRemove,
+    "garment.set_layer" => GarmentSetLayer,
+    "panel.set_garment" => PanelSetGarment,
     "template.apply" => TemplateApply,
     "pattern.import" => PatternImport,
 }

@@ -66,8 +66,8 @@ pub struct Avatar {
     pub preset: Option<String>,
 }
 
-/// A group of panels worn together. v0.1 uses a single garment, but the
-/// model does not assume it.
+/// A group of panels worn together, in one fabric and colour. A project
+/// holds one or more, worn in layers.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Garment {
@@ -76,6 +76,10 @@ pub struct Garment {
     pub fabric: Fabric,
     /// Display colour as `#RRGGBB`; `None` uses the fabric's usual colour.
     pub color: Option<String>,
+    /// Where it is worn among the garments: 0 next to the body, higher
+    /// over it (a shirt tucked into trousers is below them). Garments
+    /// with the same layer are ordered by id.
+    pub layer: u32,
 }
 
 /// The built-in fabrics (physical and visual presets).
@@ -346,6 +350,7 @@ impl Project {
                 name: DEFAULT_GARMENT_NAME.to_owned(),
                 fabric: Fabric::default(),
                 color: None,
+                layer: 0,
             },
         );
         Self {
@@ -439,5 +444,18 @@ impl Project {
     /// The garment new panels go to: the first one.
     pub fn default_garment(&self) -> Option<GarmentId> {
         self.garments.keys().next().copied()
+    }
+
+    /// The garment a panel belongs to.
+    pub fn garment_of(&self, panel: PanelId) -> Option<&Garment> {
+        self.panel(panel)
+            .and_then(|p| self.garments.get(&p.garment))
+    }
+
+    /// The garments from the one worn next to the body to the outermost.
+    pub fn garments_by_layer(&self) -> Vec<GarmentId> {
+        let mut ids: Vec<GarmentId> = self.garments.keys().copied().collect();
+        ids.sort_by_key(|id| (self.garments.get(id).map_or(0, |g| g.layer), *id));
+        ids
     }
 }

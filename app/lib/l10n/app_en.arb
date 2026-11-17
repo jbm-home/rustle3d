@@ -476,6 +476,23 @@
   "aroundArmAngle": "Around the arm (0 = outside)",
   "topHeight": "Top height",
   "fabric": "Fabric",
+  "garments": "Garments",
+  "garmentsHint": "Worn from the body out: a garment drapes over the ones above it in the list.",
+  "garmentNextToBody": "Next to the body",
+  "garmentOver": "Worn over the one above",
+  "garmentMoveIn": "Wear it under",
+  "garmentMoveOut": "Wear it over",
+  "garmentRemove": "Delete the garment and its pieces",
+  "addGarment": "Add a garment",
+  "garmentNewName": "Garment {number}",
+  "@garmentNewName": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "pieceGarment": "Garment",
   "fabricCotton": "Cotton",
   "fabricCottonBlurb": "Crisp and breathable",
   "fabricDenim": "Denim",
@@ -653,6 +670,7 @@
   "errNotSimple": "The outline must not cross itself.",
   "errNotAcross": "The cut must cross one piece from side to side: start and end outside it.",
   "errMirrored": "This piece has a linked mirror copy: unlink the copy first.",
+  "errLastGarment": "A project keeps at least one garment.",
   "errFileIo": "Could not read or write the project files.",
   "errImportMalformed": "This file cannot be read as {format}.",
   "@errImportMalformed": {

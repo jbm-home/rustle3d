@@ -42,6 +42,8 @@ pub enum Invalid {
     NotAcross,
     #[error("has a linked mirror copy: unlink it first")]
     Mirrored,
+    #[error("is the project's only garment")]
+    LastGarment,
 }
 
 impl Invalid {
@@ -65,6 +67,7 @@ impl Invalid {
             Invalid::NotSeamSide => "invalid.not_seam_side",
             Invalid::NotAcross => "invalid.not_across",
             Invalid::Mirrored => "invalid.mirrored",
+            Invalid::LastGarment => "invalid.last_garment",
         }
     }
 }

@@ -21,7 +21,7 @@ pub struct TemplateApply {
 }
 
 impl Described for TemplateApply {
-    const SUMMARY: &'static str = "Draft a starter garment (t_shirt, shirt, trousers, dress, straight_skirt, a_line_skirt, tote_bag) from sizes in cm, the avatar's measurements filling in any left out: its pieces are drawn, sewn, placed around the body and given a fabric, ready to simulate and edit. A project without panels takes the template's name. Returns the panels, seams and notches.";
+    const SUMMARY: &'static str = "Draft a starter garment (t_shirt, shirt, trousers, dress, straight_skirt, a_line_skirt, tote_bag) from sizes in cm, the avatar's measurements filling in any left out: its pieces are drawn, sewn, placed around the body and given a fabric, ready to simulate and edit. A project without panels takes the template's name, and so does its garment; in a project with pieces the template becomes a garment of its own, worn over the others (see garment.set_layer). Returns the garment if one was added, then the panels, seams and notches.";
 }
 
 impl CommandSpec for TemplateApply {

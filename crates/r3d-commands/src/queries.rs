@@ -99,12 +99,15 @@ impl QuerySpec for ProjectSummary {
         to_value(&SummaryOut {
             name: p.name().to_owned(),
             display_unit: p.display_unit(),
+            // Next to the body first.
             garments: p
-                .garments()
-                .iter()
+                .garments_by_layer()
+                .into_iter()
+                .filter_map(|id| Some((id, p.garments().get(&id)?)))
                 .map(|(id, g)| {
                     serde_json::json!({
                         "id": id, "name": g.name, "fabric": g.fabric, "color": g.color,
+                        "layer": g.layer,
                     })
                 })
                 .collect(),

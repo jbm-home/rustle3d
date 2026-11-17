@@ -11,7 +11,7 @@ Last updated: 2026-11-17 (M14; long sleeves, mirrored seams, agent status;
 rename, delete, export and import projects; smooth views on Windows;
 cloth comes to rest; pieces arranged side by side by width; M17,
 draping on the graphics card; M18, shirt and trousers templates, pieces
-placed on a leg).
+placed on a leg; M19, several garments in layers).
 -->
 
 Rustle3D is a free, open-source desktop app for making clothes: draw the
@@ -107,12 +107,19 @@ linked mirror copy must be unlinked first.
   is gathered evenly onto the shorter one (a skirt into a waistband, a
   sleeve cap). The ratio is shown (for example 2 : 1).
 
-## Fabric
-With nothing selected, the panel on the right shows the garment: pick a
-fabric (cotton, denim, jersey, silk, wool). Fabric changes how the
-garment hangs and looks; the drape follows. (A custom colour can be set
-by an agent or the command line, `garment.set_color`; not yet in the
-app.)
+## Fabric and garments
+With nothing selected, the panel on the right lists the project's
+garments: pick each one's fabric (cotton, denim, jersey, silk, wool).
+Fabric changes how a garment hangs and looks; the drape follows. (A
+custom colour can be set by an agent or the command line,
+`garment.set_color`; not yet in the app.)
+
+A project can hold several garments, for example trousers and a shirt.
+Start a second template from the project (or **Add a garment**): it
+comes as a garment of its own, worn over the others. The list goes from
+the body out; the arrows wear a garment under or over its neighbour. To
+move a piece to another garment, pick it in the piece's **Garment**
+menu. Deleting a garment deletes its pieces too (undo brings them back).
 
 ## Draping (3D)
 - **Simulate** (Space) drapes the garment: the seams close and the cloth
@@ -238,6 +245,9 @@ DXF-AAMA; garments go out as glTF and OBJ: open formats only.
   when the app does not run on the one that shows the window.
 - On the men's body presets, a heavy skirt (denim) can slide off the hips
   during the drape.
+- Garments worn close together can show through each other where they
+  touch, and a shirt cannot be tucked into fitted trousers yet: layers of
+  cloth keep about 2 cm apart in the simulation.
 - A point's handles cannot be edited after it is drawn yet; use Bend on
   the edge.
 - Photos: the fabric has no visible weave or print yet, and the cloth

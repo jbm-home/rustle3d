@@ -1061,13 +1061,13 @@ impl Engine {
             width: v.width,
             height: v.height,
         };
-        let garment = project
-            .default_garment()
-            .and_then(|id| project.garments().get(&id));
-        let fabric = Material::fabric(
-            garment.map(|g| g.fabric).unwrap_or_default(),
-            garment.and_then(|g| g.color.as_deref()),
-        );
+        let fabric = |panel: PanelId| {
+            let garment = project.garment_of(panel);
+            Material::fabric(
+                garment.map(|g| g.fabric).unwrap_or_default(),
+                garment.and_then(|g| g.color.as_deref()),
+            )
+        };
         let published = self
             .sim
             .lock()
@@ -1106,9 +1106,9 @@ impl Engine {
         }
         for (panel, mesh) in &pieces {
             let material = if selected.contains(panel) {
-                fabric.tinted(theme.selection, 0.45)
+                fabric(*panel).tinted(theme.selection, 0.45)
             } else {
-                fabric
+                fabric(*panel)
             };
             draws.push(Draw { mesh, material });
         }
@@ -1189,13 +1189,13 @@ impl Engine {
             ));
         }
         self.refresh_avatar(g, project)?;
-        let garment = project
-            .default_garment()
-            .and_then(|id| project.garments().get(&id));
-        let surface = Surface::fabric(
-            garment.map(|g| g.fabric).unwrap_or_default(),
-            garment.and_then(|g| g.color.as_deref()),
-        );
+        let surface = |panel: PanelId| {
+            let garment = project.garment_of(panel);
+            Surface::fabric(
+                garment.map(|g| g.fabric).unwrap_or_default(),
+                garment.and_then(|g| g.color.as_deref()),
+            )
+        };
         let published = self
             .sim
             .lock()
@@ -1211,7 +1211,7 @@ impl Engine {
             .map(|d| piece_meshes(d, &published.positions))
             .unwrap_or_default();
         let subject = Subject {
-            cloth: cloth.into_iter().map(|(_, m)| (m, surface)).collect(),
+            cloth: cloth.into_iter().map(|(p, m)| (m, surface(p))).collect(),
             body: g.avatar.as_ref().map(|(_, m)| m.clone()),
             camera: g.camera,
         };

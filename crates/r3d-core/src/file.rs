@@ -20,7 +20,7 @@ use crate::model::Project;
 /// Identifies a Rustle3D project file.
 pub const FORMAT: &str = "rustle3d.project";
 /// Version written by this build.
-pub const SCHEMA_VERSION: u32 = 8;
+pub const SCHEMA_VERSION: u32 = 9;
 
 type Migration = fn(Value) -> Result<Value, FileError>;
 
@@ -33,6 +33,7 @@ const MIGRATIONS: &[Migration] = &[
     migrate_v5_to_v6,
     migrate_v6_to_v7,
     migrate_v7_to_v8,
+    migrate_v8_to_v9,
 ];
 
 fn object<'a>(
@@ -42,6 +43,28 @@ fn object<'a>(
     value.as_object_mut().ok_or_else(|| FileError::Json {
         detail: format!("{what} is not an object"),
     })
+}
+
+/// v9 orders the garments in layers (until then, by id: in practice one
+/// garment).
+fn migrate_v8_to_v9(mut project: Value) -> Result<Value, FileError> {
+    if let Some(garments) = object(&mut project, "project")?.get_mut("garments") {
+        let garments = object(garments, "garments")?;
+        let number = |key: &str| {
+            key.rsplit(':')
+                .next()
+                .and_then(|n| n.parse::<u64>().ok())
+                .unwrap_or(u64::MAX)
+        };
+        let mut keys: Vec<String> = garments.keys().cloned().collect();
+        keys.sort_by_key(|k| number(k));
+        for (layer, key) in keys.iter().enumerate() {
+            if let Some(garment) = garments.get_mut(key) {
+                object(garment, "garment")?.insert("layer".into(), Value::from(layer));
+            }
+        }
+    }
+    Ok(project)
 }
 
 /// v8 lets a placement say which pattern abscissa goes to its angle

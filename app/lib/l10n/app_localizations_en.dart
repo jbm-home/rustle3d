@@ -895,6 +895,39 @@ class LEn extends L {
   String get fabric => 'Fabric';
 
   @override
+  String get garments => 'Garments';
+
+  @override
+  String get garmentsHint =>
+      'Worn from the body out: a garment drapes over the ones above it in the list.';
+
+  @override
+  String get garmentNextToBody => 'Next to the body';
+
+  @override
+  String get garmentOver => 'Worn over the one above';
+
+  @override
+  String get garmentMoveIn => 'Wear it under';
+
+  @override
+  String get garmentMoveOut => 'Wear it over';
+
+  @override
+  String get garmentRemove => 'Delete the garment and its pieces';
+
+  @override
+  String get addGarment => 'Add a garment';
+
+  @override
+  String garmentNewName(int number) {
+    return 'Garment $number';
+  }
+
+  @override
+  String get pieceGarment => 'Garment';
+
+  @override
   String get fabricCotton => 'Cotton';
 
   @override
@@ -1228,6 +1261,9 @@ class LEn extends L {
   @override
   String get errMirrored =>
       'This piece has a linked mirror copy: unlink the copy first.';
+
+  @override
+  String get errLastGarment => 'A project keeps at least one garment.';
 
   @override
   String get errFileIo => 'Could not read or write the project files.';

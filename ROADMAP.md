@@ -31,7 +31,7 @@ can be tested through MCP as soon as they exist.
 | M16 | Zero-copy views on Windows ✅ and Linux | 1–2 wk | The garment drapes as smoothly on Windows and Linux as on macOS |
 | M17 | GPU cloth solver ✅ | 3–4 wk | A T-shirt drapes at 60 fps; a dress stays interactive |
 | M18 | Trousers and shirt templates ✅ | 1–2 wk | A first-time user makes trousers and a shirt from templates |
-| M19 | Layers and multiple garments | 3–4 wk | A shirt tucked into trousers, each in its own fabric and colour |
+| M19 | Layers and multiple garments (tucked in: open) | 3–4 wk | A shirt tucked into trousers, each in its own fabric and colour |
 | M20 | Trims: buttons and zippers | 2–3 wk | A shirt that buttons and trousers with a fly zipper, draped closed |
 | M21 | Textures and prints | 2–3 wk | A striped shirt whose stripes follow the grainline on every piece |
 | M22 | Grading and sizes | 2–3 wk | A shirt graded from 36 to 46, each size draped on a matching avatar |
@@ -451,9 +451,22 @@ Plan as written:
 - Trousers and shirt (collar, cuffs, sleeves) templates in the guided
   flow, sized from the avatar's measurements.
 
-## M19 — Layers and multiple garments
+## M19 — Layers and multiple garments (2026-11-17: tucked in still open)
 Today one project holds one garment: a shirt and trousers share one
 fabric and colour.
+- Done: several garments per project, each with its own fabric and
+  colour (drape, 3D view, photos, glTF/OBJ materials); a layer order
+  (`garment.set_layer`), the outer garment starting over the inner one;
+  templates added to a project become garments of their own; the
+  garments list in the inspector; schema v9 (spec 17).
+- Open: close layers. A shirt worn over trousers drapes with closed
+  seams but they show through each other where they touch, and a shirt
+  cannot be tucked in: self-collision keeps layers about 2 cm apart
+  (particle radius 0.4 × spacing). Three start poses were measured and
+  failed (physics.md, "Several garments"). Next: thin cloth–cloth
+  contacts (vertex–triangle) between garments, CPU and GPU.
+
+Plan as written:
 - Several garments per project, each with its own fabric and colour;
   a layer order so the outer garment drapes over the inner one (a shirt
   tucked in or worn out).
