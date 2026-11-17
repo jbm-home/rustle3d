@@ -1986,7 +1986,7 @@ Choose what the garment is made of: cotton, denim, jersey, silk or wool. Sets ho
 
 ### `garment.arrange`
 
-Place every panel around the body for the simulation, evenly spaced in the order the seams join them (a panel's right side continues into the next panel), tops at the avatar's waist (its narrowest girth) unless top_cm is given. Panels placed on an arm (sleeves) or flat keep their placement. Re-run it after adding panels or seams.
+Place every panel around the body for the simulation, side by side in the order the seams join them (a panel's right side continues into the next panel; each takes a share of the turn in proportion to its width), tops at the avatar's waist (its narrowest girth) unless top_cm is given. Panels placed on an arm (sleeves) or flat keep their placement. Re-run it after adding panels or seams.
 
 <details><summary>Parameters (JSON schema)</summary>
 

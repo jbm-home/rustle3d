@@ -184,10 +184,10 @@ fn arrange_places_panels_around_in_seam_order() {
         panel.placement.unwrap()
     };
     let names = ["Front", "Back left", "Back right"];
-    let template = names.map(|n| place(&s, n).angle_deg);
     run(&mut s, json!({"type": "garment.arrange"})).unwrap();
-    // Same arrangement as the template's own: front, then the back sewn to
-    // its right side, then the mirrored back.
-    assert_eq!(names.map(|n| place(&s, n).angle_deg), template);
+    // Front, then the back sewn to its right side, then the mirrored back,
+    // side by side by width: the front is half the hem, each back a
+    // quarter, so the centre backs meet at 180° at the hem.
+    assert_eq!(names.map(|n| place(&s, n).angle_deg), [0.0, 135.0, 225.0]);
     assert!((place(&s, "Front").top_cm - 110.0).abs() < 1e-9);
 }

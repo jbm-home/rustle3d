@@ -8,7 +8,8 @@ shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
 Last updated: 2026-11-17 (M14; long sleeves, mirrored seams, agent status;
-rename, delete, export and import projects; smooth views on Windows).
+rename, delete, export and import projects; smooth views on Windows;
+cloth comes to rest; pieces arranged side by side by width).
 -->
 
 Rustle3D is a free, open-source desktop app for making clothes: draw the
@@ -123,8 +124,8 @@ app.)
   inspector (around the body, an arm, or flat; angle and height). A
   sleeve placed on an arm starts down the upper arm and, past the elbow,
   down the forearm, so long sleeves drape too.
-- **Arrange around the body** places every piece in seam order at the
-  waist.
+- **Arrange around the body** places every piece side by side in seam
+  order at the waist, each taking room in proportion to its width.
 
 ## Photos
 **Photo** (the camera button at the top right of the 3D view) makes a

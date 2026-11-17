@@ -31,7 +31,7 @@ pub struct GarmentArrange {
 }
 
 impl Described for GarmentArrange {
-    const SUMMARY: &'static str = "Place every panel around the body for the simulation, evenly spaced in the order the seams join them (a panel's right side continues into the next panel), tops at the avatar's waist (its narrowest girth) unless top_cm is given. Panels placed on an arm (sleeves) or flat keep their placement. Re-run it after adding panels or seams.";
+    const SUMMARY: &'static str = "Place every panel around the body for the simulation, side by side in the order the seams join them (a panel's right side continues into the next panel; each takes a share of the turn in proportion to its width), tops at the avatar's waist (its narrowest girth) unless top_cm is given. Panels placed on an arm (sleeves) or flat keep their placement. Re-run it after adding panels or seams.";
 }
 
 fn off_body(p: &Project, panel: PanelId) -> bool {
@@ -74,6 +74,36 @@ fn ring(p: &Project) -> Vec<PanelId> {
     order
 }
 
+/// Placement angles (degrees) for body panels side by side around the
+/// body, in this order: each takes a share of the turn in proportion to
+/// its width, the first centred at 0°. Spaced evenly instead, a wide
+/// front and two narrow backs left a gap at the centre back that the seam
+/// closed straight across, between the legs.
+fn side_by_side(p: &Project, order: &[PanelId]) -> Vec<f64> {
+    let widths: Vec<f64> = order
+        .iter()
+        .map(|id| {
+            p.panel_bounding_box(*id)
+                .map_or(0.0, |b| (b.max.x - b.min.x).max(0.0))
+        })
+        .collect();
+    let total: f64 = widths.iter().sum();
+    if total <= 0.0 {
+        let n = order.len().max(1) as f64;
+        return (0..order.len()).map(|i| 360.0 * i as f64 / n).collect();
+    }
+    let first = widths.first().copied().unwrap_or_default();
+    let mut before = 0.0;
+    widths
+        .iter()
+        .map(|w| {
+            let angle = 360.0 * (before + w / 2.0 - first / 2.0) / total;
+            before += w;
+            angle
+        })
+        .collect()
+}
+
 impl CommandSpec for GarmentArrange {
     fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
         let p = tx.project();
@@ -85,16 +115,15 @@ impl CommandSpec for GarmentArrange {
             None => waist_height_cm(p)?,
         };
         let order = ring(p);
-        let n = order.len().max(1) as f64;
         let panels: Vec<_> = order
             .iter()
-            .enumerate()
-            .filter_map(|(i, id)| Some((*id, p.panel(*id)?.clone(), i)))
+            .zip(side_by_side(p, &order))
+            .filter_map(|(id, angle)| Some((*id, p.panel(*id)?.clone(), angle)))
             .collect();
-        for (id, mut panel, i) in panels {
+        for (id, mut panel, angle_deg) in panels {
             panel.placement = Some(Placement {
                 around: Around::Body,
-                angle_deg: 360.0 * i as f64 / n,
+                angle_deg,
                 top_cm,
                 offset_mm: panel.placement.map_or(30.0, |pl| pl.offset_mm),
                 centre_x_mm: None,

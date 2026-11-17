@@ -359,9 +359,11 @@ impl Draft<'_, '_> {
         angle_deg: f64,
         top_cm: f64,
     ) -> Result<(), CommandError> {
-        self.place_at(piece, around, angle_deg, top_cm, 30.0)
+        self.place_at(piece, around, angle_deg, top_cm, 30.0, None)
     }
 
+    /// Place a piece with the pattern's vertical line `centre_x_mm` (by
+    /// default the piece's horizontal centre) at `angle_deg`.
     fn place_at(
         &mut self,
         piece: &Piece,
@@ -369,6 +371,7 @@ impl Draft<'_, '_> {
         angle_deg: f64,
         top_cm: f64,
         offset_mm: f64,
+        centre_x_mm: Option<f64>,
     ) -> Result<(), CommandError> {
         PanelPlace {
             panel: piece.id,
@@ -376,7 +379,7 @@ impl Draft<'_, '_> {
             angle_deg,
             top_cm,
             offset_mm,
-            centre_x_mm: None,
+            centre_x_mm,
         }
         .apply(self.tx)?;
         Ok(())
@@ -511,8 +514,19 @@ fn skirt(d: &mut Draft, s: &Sizes, body: &Body, flare: f64) -> Result<(), Comman
     d.sew(back.edge(1)?, right.edge(1)?)?;
     let top = waist_height_cm(d.tx.project())?;
     d.place(&front, Around::Body, 0.0, top)?;
-    d.place(&back, Around::Body, 120.0, top)?;
-    d.place(&right, Around::Body, 240.0, top)?;
+    // The backs start with their centre-back edges side by side at 180°,
+    // where the seam spans the gap between the legs: a gap left there at
+    // the start (backs placed by their middles at 120° and 240°, as if the
+    // pieces were equal) was closed straight across, between the legs, and
+    // the back caught there in a fold. Gaps at the side seams close over
+    // the hips instead.
+    let bbox = |piece: &Piece| d.tx.project().panel_bounding_box(piece.id);
+    let (Some(left_box), Some(right_box)) = (bbox(&back), bbox(&right)) else {
+        return Err(internal("a skirt piece has no outline".into()));
+    };
+    let (left_cb, right_cb) = (left_box.max.x, right_box.min.x);
+    d.place_at(&back, Around::Body, 180.0, top, 30.0, Some(left_cb))?;
+    d.place_at(&right, Around::Body, 180.0, top, 30.0, Some(right_cb))?;
     Ok(())
 }
 
@@ -753,13 +767,14 @@ fn tote_bag(d: &mut Draft, s: &Sizes) -> Result<(), CommandError> {
     for k in [0, 1, 4, 8, 11] {
         d.sew_walking(front.edge(k)?, back.edge(k)?, false)?;
     }
-    d.place_at(&front, Around::Flat, 0.0, TOTE_TOP_CM, TOTE_OUT_MM)?;
+    d.place_at(&front, Around::Flat, 0.0, TOTE_TOP_CM, TOTE_OUT_MM, None)?;
     d.place_at(
         &back,
         Around::Flat,
         0.0,
         TOTE_TOP_CM,
         TOTE_OUT_MM - TOTE_LAYERS_MM,
+        None,
     )?;
     // The pins hold the front's tab tops where the bag starts (the flat
     // layout: x across, y up, z out), so it hangs as it was laid.

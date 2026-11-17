@@ -279,15 +279,22 @@ fn a_skirt_cut_along_a_princess_line_drapes_like_the_whole() {
                 "c2": [x - 40.0, bb.min.y + 200.0], "to": [x - 40.0, bb.min.y - 50.0]}]}),
     );
     let (cut_top, cut_hem, cut_reach) = drape(&s);
-    // Same place on the body, same flare. The whole front stretches more
-    // under its own weight than the two halves (the solver's known creep,
-    // docs/physics.md), so the cut skirt's hem may hang higher, not lower.
+    // Same place on the body, same flare. Where the waist comes to rest on
+    // the hips varies by a couple of centimetres with how the garment
+    // closed, so the hem is compared by the skirt's length, not its
+    // height. The whole front stretches more under its own weight than the
+    // two halves (the solver's known creep, docs/physics.md), so the cut
+    // skirt may be shorter, not longer.
     assert!((cut_top - top).abs() < 0.03, "waist {cut_top} vs {top}");
     assert!(
         (cut_reach - reach).abs() < 0.03,
         "reach {cut_reach} vs {reach}"
     );
-    assert!(cut_hem > hem - 0.01, "hem {cut_hem} vs {hem}");
+    let (length, cut_length) = (top - hem, cut_top - cut_hem);
+    assert!(
+        cut_length < length + 0.01,
+        "length {cut_length} vs {length}"
+    );
 }
 
 #[test]

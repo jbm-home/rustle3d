@@ -112,6 +112,31 @@ fn a_t_shirt_hangs_from_the_shoulders() {
 }
 
 #[test]
+fn a_t_shirt_comes_to_rest() {
+    // Edges held out of the body used to let go of the particles they had
+    // pushed off the skin; they fell back and were pushed again every
+    // substep, and the shirt kept fluttering (12 cm/s on average, for
+    // ever). Settled cloth moves about 1 mm/s.
+    let s = draft("t_shirt");
+    let form = Form::of_project(s.project()).unwrap().unwrap();
+    let drape = build(s.project(), Some(&form), DEFAULT_SPACING_MM).unwrap();
+    let mut solver = Solver::new(drape.scene);
+    for _ in 0..240 {
+        solver.step(1.0 / 60.0);
+    }
+    let before = solver.positions().to_vec();
+    solver.step(1.0 / 60.0);
+    let speed = solver
+        .positions()
+        .iter()
+        .zip(&before)
+        .map(|(a, b)| a.distance(*b) * 60.0)
+        .sum::<f32>()
+        / before.len() as f32;
+    assert!(speed < 0.01, "still moving at {speed} m/s on average");
+}
+
+#[test]
 fn long_sleeves_follow_the_forearms() {
     // Past the elbow a sleeve starts around the forearm, not along the
     // upper arm's axis carried on (which left it off the arm, crumpled,

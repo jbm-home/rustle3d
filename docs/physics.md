@@ -167,9 +167,18 @@ after 4 s; the skirt still holds at the waist.
   2 mm into the body, which showed through a tight dress or T-shirt. Mesh
   edges whose two particles touch the body are now sampled at their middle
   too, and both ends are pushed out (by inverse mass) so the middle keeps
-  the same distance. Only touching edges are sampled, serially after the
+  the same distance. Only edges whose ends are near the body (within
+  their contact distance + 5 mm) are sampled, serially after the
   parallel particle pass (≈ 6 % more per step on the dress); the template
   tests check triangle middles as well as particles.
+- Those edges first required both ends *touching* the body. Pushing the
+  ends out took them off the skin, so the edge let go, they fell back
+  and were pushed again: every substep, a push turned into velocity and
+  the garment never came to rest (a T-shirt fluttered as if in a draught,
+  12 cm/s on average for ever). The 5 mm band keeps an edge holding the
+  ends it pushed out, and a particle's pushes from its ~6 edges are
+  averaged (constraint averaging [7] §4.2), not summed. Settled cloth now
+  moves ≈ 1 mm/s; a template test checks the T-shirt comes to rest.
 - **Friction** against the body is Coulomb friction in positions [7]: the
   sliding of a contact in a substep is cancelled up to μ_b × the depth the
   particle was pushed out (its normal force), so cloth holds where it
@@ -204,6 +213,26 @@ and the hem bunched up 7 cm when they relaxed.
 An earlier fixed flare (radius growing 0.35 m per metre) started an A-line
 hem at 2.5 m around for 1.56 m of cloth: the seams pulled it in and the hem
 buckled inward. With the garment's own width it hangs as an A-line.
+
+Where a seam must close a gap at the start, it pulls the cloth straight
+across the gap, inside the circle. The skirts placed their two backs by
+their middles at 120° and 240°, as if the three pieces were equal: the
+front is half the hem, so a 30° gap opened at the centre back, and the
+seam closed it between the legs, where the back caught in a fold. The
+fold went unnoticed while the cloth kept fluttering (§5): the flutter
+shook it partly loose.
+
+- The skirt templates now place their backs by their centre-back edges,
+  side by side at 180° (`centre_x_mm`): the seam over the gap between the
+  legs starts closed, and the gaps the flare leaves at the waist close
+  at the side seams, over the hips. The back hangs free.
+- `garment.arrange` places pieces side by side, each taking a share of
+  the turn in proportion to its width (backs at 135° and 225°: centre
+  backs meeting at the hem). Higher up the body's reach sets a larger
+  radius, so they overlap a little there rather than gap; the waist
+  starts looser than the templates' and a slight inward dip remains at
+  the centre-back hem. Placing each piece by its seamed edges in general
+  is left for later.
 
 ### Self-collision
 

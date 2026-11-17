@@ -11,7 +11,7 @@
 //! - seams: zero-length distances whose compliance ramps down while the
 //!   garment closes;
 //! - contacts with the body and the ground, with friction; mesh edges
-//!   between two particles touching the body are kept out of it at their
+//!   between two particles near the body are kept out of it at their
 //!   middle too (a straight edge cuts into a convex body such as the bust);
 //! - self-collision between distant parts of the cloth (`selfcollide`);
 //! - grab: the user pulls a patch of cloth towards a moving target with a
@@ -36,6 +36,11 @@ const GRAVITY: Vec3 = Vec3::new(0.0, -9.81, 0.0);
 /// surface, and so are the avatar's: without this margin the body pokes
 /// through between cloth vertices.
 const SKIN: f32 = 0.0025;
+/// Particles this much farther from the body than their contact distance
+/// still count as near it, for the edges between them (m). Wider than an
+/// edge's sag across the body (~1 mm for 25 mm edges over the bust), so an
+/// edge that pushed its ends out keeps holding them there.
+const NEAR: f32 = 0.005;
 /// Particles within this distance of the grabbed one move with it (m).
 pub const GRAB_RADIUS: f32 = 0.03;
 /// Compliance of the grab (m/N): firm, but the cloth can still resist.
@@ -89,8 +94,12 @@ pub struct Solver {
     seams: Vec<[u32; 2]>,
     /// Mesh edges (each once, sorted).
     edges: Vec<[u32; 2]>,
-    /// Particles touching the body after the last contact pass.
-    touching: Vec<bool>,
+    /// Particles near the body (within their contact distance + [`NEAR`])
+    /// in the last contact pass.
+    near: Vec<bool>,
+    /// Per particle: the sum and count of its edges' pushes out of the
+    /// body in a substep (reused buffer).
+    edge_push: Vec<(Vec3, u32)>,
     collider: Option<StaticMesh>,
     self_collision: SelfCollision,
     grab: Option<Grab>,
@@ -241,7 +250,8 @@ impl Solver {
             ),
             seams,
             edges: mesh_edges,
-            touching: vec![false; n],
+            near: vec![false; n],
+            edge_push: vec![(Vec3::ZERO, 0); n],
             grab: None,
             collider: scene.collider,
             ground: scene.ground,
@@ -385,11 +395,11 @@ impl Solver {
         self.x
             .par_iter_mut()
             .zip(&self.prev)
-            .zip(self.touching.par_iter_mut())
+            .zip(self.near.par_iter_mut())
             .enumerate()
             .with_min_len(64)
-            .for_each(|(i, ((x, prev), touching))| {
-                *touching = false;
+            .for_each(|(i, ((x, prev), near))| {
+                *near = false;
                 let (Some(w), Some(thickness), Some(friction)) =
                     (w.get(i), thickness.get(i), friction.get(i))
                 else {
@@ -406,12 +416,14 @@ impl Solver {
                 let distance = thickness + SKIN;
                 if let Some(body) = collider
                     && let Some(c) = body.sample(*x)
-                    && c.distance < distance
+                    && c.distance < distance + NEAR
                 {
-                    let depth = distance - c.distance;
-                    *x += c.normal * depth;
-                    contact = Some((c.normal, depth));
-                    *touching = true;
+                    *near = true;
+                    if c.distance < distance {
+                        let depth = distance - c.distance;
+                        *x += c.normal * depth;
+                        contact = Some((c.normal, depth));
+                    }
                 }
                 if ground && x.y < *thickness {
                     let depth = *thickness - x.y;
@@ -434,18 +446,26 @@ impl Solver {
         self.collide_edges();
     }
 
-    /// Edges whose two particles touch the body: keep their middle out of
-    /// it too, pushing both ends outward (by their inverse masses). Cloth
-    /// edges (~25 mm) are chords: across a convex part of the body their
-    /// middle sinks in while their ends rest on the skin. Only touching
-    /// edges are sampled, so the cost follows the contact area.
+    /// Edges whose two particles are near the body: keep their middle out
+    /// of it too, pushing both ends outward (by their inverse masses).
+    /// Cloth edges (~25 mm) are chords: across a convex part of the body
+    /// their middle sinks in while their ends rest on the skin. Only edges
+    /// near the body are sampled, so the cost follows the contact area.
+    ///
+    /// The edges stay active while their ends are near ([`NEAR`]), not only
+    /// touching: gated on touching, an edge pushed its ends off the skin,
+    /// let go of them, they fell back and were pushed again, every
+    /// substep, and the garment never came to rest. A particle ends about
+    /// six edges: their pushes are averaged (constraint averaging, Macklin
+    /// et al. 2014 §4.2), not summed.
     fn collide_edges(&mut self) {
         let Some(body) = self.collider.as_ref() else {
             return;
         };
+        self.edge_push.fill((Vec3::ZERO, 0));
         for [a, b] in &self.edges {
             let (a, b) = (*a as usize, *b as usize);
-            if !(self.touching[a] && self.touching[b]) {
+            if !(self.near[a] && self.near[b]) {
                 continue;
             }
             let (wa, wb) = (self.w[a], self.w[b]);
@@ -460,8 +480,17 @@ impl Solver {
                 // Moving a by 2δ·wa/(wa+wb) and b by 2δ·wb/(wa+wb) moves
                 // the middle by δ.
                 let push = c.normal * (2.0 * (distance - c.distance) / (wa + wb));
-                self.x[a] += push * wa;
-                self.x[b] += push * wb;
+                for (i, wi) in [(a, wa), (b, wb)] {
+                    if let Some((sum, count)) = self.edge_push.get_mut(i) {
+                        *sum += push * wi;
+                        *count += 1;
+                    }
+                }
+            }
+        }
+        for (x, (sum, count)) in self.x.iter_mut().zip(&self.edge_push) {
+            if *count > 0 {
+                *x += *sum / *count as f32;
             }
         }
     }
