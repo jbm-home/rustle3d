@@ -9,7 +9,7 @@ use r3d_commands::{Query, Session, Step, Workspace};
 use r3d_core::{Body, Project};
 use r3d_render::board::BoardView;
 use r3d_render::offscreen::{PNG_FORMAT, render_png};
-use r3d_render::{BoardRenderer, BoardScene, Gpu, Target};
+use r3d_render::{BoardRenderer, BoardScene, Target};
 
 use super::engine::{ApiError, CanvasColors, err};
 
@@ -77,7 +77,7 @@ fn pattern_png(
     colors: &CanvasColors,
 ) -> Result<Vec<u8>, ApiError> {
     let theme = colors.to_theme()?;
-    let gpu = Gpu::headless().map_err(|e| ApiError::new("gpu", e.to_string()))?;
+    let gpu = crate::surface::ui_gpu().map_err(|e| ApiError::new("gpu", e.to_string()))?;
     let scene = BoardScene::from_project(project, &[]);
     let view = BoardView::fit(scene.bounds(), width, height);
     let mut renderer = BoardRenderer::new(&gpu, PNG_FORMAT);

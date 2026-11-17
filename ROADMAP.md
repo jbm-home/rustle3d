@@ -461,4 +461,6 @@ fabric and colour.
 ## Later (architecture kept ready, not scheduled)
 Material calibration from measurements · OpenUSD
 export · finer cloth mesh with a strain limit (smaller folds;
-physics.md §7) · picking points and notches in 3D · signed packages.
+physics.md §7) · picking points and notches in 3D · signed packages ·
+a loading indicator while a project opens (opening runs on the UI
+thread and blocks it for a moment; move it off and show progress).

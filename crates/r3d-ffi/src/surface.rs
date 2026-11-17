@@ -27,14 +27,29 @@ pub(crate) fn set_ui_adapter(luid: i64) {
     }
 }
 
-/// The GPU for the views: the UI's adapter when it is known and found,
-/// otherwise the default one.
+/// The app's GPU device, made once and shared by every view, engine and
+/// thumbnail.
+static APP_GPU: Mutex<Option<Gpu>> = Mutex::new(None);
+
+/// The app's GPU: on the UI's adapter when it is known and found,
+/// otherwise the default one. Made on first use and kept for the life of
+/// the process: a device per thumbnail, made and dropped on worker
+/// threads, hung the app on Windows (the GPU driver, unloading on a
+/// thread's exit, waited for another thread under the loader lock).
 pub(crate) fn ui_gpu() -> Result<Gpu, r3d_render::RenderError> {
-    let luid = UI_ADAPTER.lock().ok().and_then(|slot| *slot);
-    match luid.and_then(gpu_on_adapter) {
-        Some(gpu) => Ok(gpu),
-        None => Gpu::headless(),
+    let mut slot = APP_GPU
+        .lock()
+        .map_err(|_| r3d_render::RenderError::Device("GPU lock poisoned".into()))?;
+    if let Some(gpu) = slot.as_ref() {
+        return Ok(gpu.clone());
     }
+    let luid = UI_ADAPTER.lock().ok().and_then(|slot| *slot);
+    let gpu = match luid.and_then(gpu_on_adapter) {
+        Some(gpu) => gpu,
+        None => Gpu::headless()?,
+    };
+    *slot = Some(gpu.clone());
+    Ok(gpu)
 }
 
 /// The texture descriptor of a UI surface of `width × height`.
