@@ -1,8 +1,8 @@
 // A view rendered by the Rust core into a GPU texture shared with Flutter
-// (no copy, macOS), or elsewhere into a texture of its own whose pixels are
-// read back and shown as an image (Linux, Windows: shared textures come
-// later). The widget re-renders it every frame and forwards pointer input
-// to the engine.
+// (no copy: macOS, Windows), or elsewhere into a texture of its own whose
+// pixels are read back and shown as an image (Linux for now, or when the
+// texture cannot be shared). The widget re-renders it every frame and
+// forwards pointer input to the engine.
 
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -17,6 +17,18 @@ import '../i18n.dart';
 import '../rust/api/engine.dart';
 
 const _channel = MethodChannel('dev.rustle3d/texture');
+
+/// Tell the engine which GPU the UI composites on (Windows), so the views
+/// render on it and share their textures. Call before the first view.
+Future<void> prepareSharedTextures() async {
+  if (!Platform.isWindows) return;
+  try {
+    final luid = await _channel.invokeMethod<int>('adapter');
+    if (luid != null) setUiAdapter(luid: luid);
+  } on PlatformException {
+    // No adapter: the views read their pixels back.
+  }
+}
 
 /// What a board tool (Polygon, Notch, Curve) does with the pointer, in
 /// pattern coordinates (mm) with the board's millimetres per pixel.
@@ -93,14 +105,20 @@ class _RustViewState extends State<RustView>
   int? _textureId;
   int? _viewId;
 
-  /// Shared textures (macOS); otherwise the pixels are copied.
-  /// `--dart-define=R3D_COPY_PIXELS=true` tries the copied path on macOS.
-  static final bool _shared =
-      Platform.isMacOS && !const bool.fromEnvironment('R3D_COPY_PIXELS');
+  /// Shared textures (macOS, Windows); otherwise the pixels are copied.
+  /// `--dart-define=R3D_COPY_PIXELS=true` tries the copied path there.
+  /// Turned off for the session when a texture cannot be shared (e.g.
+  /// the engine's GPU is not the one the UI composites on).
+  static bool _shared =
+      (Platform.isMacOS || Platform.isWindows) &&
+      !const bool.fromEnvironment('R3D_COPY_PIXELS');
 
   /// The last frame read back (copied mode), and a read in flight.
   ui.Image? _image;
   bool _reading = false;
+
+  /// A frame is rendering (shared mode).
+  bool _rendering = false;
   Size _physical = Size.zero;
   double _ratio = 1;
   bool _creating = false;
@@ -215,13 +233,24 @@ class _RustViewState extends State<RustView>
     final textureId = created?['textureId'] as int?;
     final surface = created?['surface'] as int?;
     if (mounted && textureId != null && surface != null) {
-      _viewId = widget.engine.attachView(
-        kind: widget.kind,
-        surface: BigInt.from(surface),
-        width: physical.width.round(),
-        height: physical.height.round(),
-      );
-      setState(() => _textureId = textureId);
+      try {
+        _viewId = widget.engine.attachView(
+          kind: widget.kind,
+          surface: BigInt.from(surface),
+          width: physical.width.round(),
+          height: physical.height.round(),
+        );
+        setState(() => _textureId = textureId);
+      } on ApiError catch (e) {
+        if (e.code != 'ui_surface') rethrow;
+        // Read the pixels back instead, from now on.
+        _channel.invokeMethod('dispose', {'textureId': textureId});
+        _shared = false;
+        _physical = Size.zero;
+        _creating = false;
+        if (mounted) setState(() {});
+        return;
+      }
     }
     _creating = false;
   }
@@ -235,17 +264,41 @@ class _RustViewState extends State<RustView>
       return;
     }
     final texture = _textureId;
-    if (texture == null) return;
-    final ms = widget.engine.renderView(view: view);
-    _channel.invokeMethod('frame', {'textureId': texture});
-    widget.onFrameTime?.call(ms);
+    if (texture == null || _rendering) return;
+    _render(view, texture);
+  }
+
+  /// Shared mode: render off the UI thread, then hand the frame to the
+  /// compositor; one frame at a time.
+  Future<void> _render(int view, int texture) async {
+    _rendering = true;
+    try {
+      final ms = await widget.engine.renderView(view: view);
+      if (!mounted || view != _viewId) return;
+      _channel.invokeMethod('frame', {'textureId': texture});
+      widget.onFrameTime?.call(ms);
+    } on ApiError {
+      // The view went away while it rendered.
+    } finally {
+      _rendering = false;
+    }
   }
 
   /// Copied mode: render, read the pixels back and show them; one frame
   /// at a time.
   Future<void> _readBack(int view) async {
     _reading = true;
-    final ms = widget.engine.renderView(view: view);
+    final double ms;
+    try {
+      ms = await widget.engine.renderView(view: view);
+    } on ApiError {
+      _reading = false;
+      return;
+    }
+    if (!mounted || view != _viewId) {
+      _reading = false;
+      return;
+    }
     widget.onFrameTime?.call(ms);
     final size = _physical;
     final pixels = await widget.engine.readView(view: view);

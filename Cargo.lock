@@ -2076,6 +2076,7 @@ dependencies = [
  "objc2-core-foundation",
  "objc2-io-surface",
  "objc2-metal",
+ "pollster",
  "r3d-avatar",
  "r3d-commands",
  "r3d-core",
@@ -2087,6 +2088,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "wgpu",
+ "windows",
 ]
 
 [[package]]

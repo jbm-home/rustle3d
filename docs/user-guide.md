@@ -8,7 +8,7 @@ shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
 Last updated: 2026-11-17 (M14; long sleeves, mirrored seams, agent status;
-rename, delete, export and import projects).
+rename, delete, export and import projects; smooth views on Windows).
 -->
 
 Rustle3D is a free, open-source desktop app for making clothes: draw the
@@ -219,6 +219,10 @@ Patterns come in from DXF, SVG and PDF and go out as SVG, PDF and
 DXF-AAMA; garments go out as glTF and OBJ: open formats only.
 
 ## Known limits
+- On Linux, the pattern and the 3D views are less smooth than on macOS
+  and Windows (their images are copied through the processor each
+  frame). The same happens on a computer with several graphics cards
+  when the app does not run on the one that shows the window.
 - On the men's body presets, a heavy skirt (denim) can slide off the hips
   during the drape.
 - A point's handles cannot be edited after it is drawn yet; use Bend on

@@ -278,8 +278,19 @@ animations, onboarding. It has its own GPU renderer, so the UI looks the
 same on macOS, Windows and Linux, and it has mature accessibility, i18n and
 animation support. The 2D board and the 3D view are rendered by
 `r3d-render` (Rust, native wgpu with Metal/D3D12/Vulkan) into a GPU texture
-that Flutter composites without copying (shared IOSurface/Metal texture,
-D3D12 shared handle, Vulkan dma-buf). Pointer and keyboard events on these
+that Flutter composites without copying. The runner creates the texture on
+the compositor's side and hands its handle to `r3d-ffi` (`surface.rs`),
+which opens the same memory on wgpu's device:
+- macOS: an IOSurface, wrapped as a Metal texture;
+- Windows: a D3D11 texture on Flutter's adapter, shared through an NT
+  handle that wgpu opens as a D3D12 resource (ANGLE opens it on its side).
+  The views' device is created on that adapter, found by the LUID the
+  runner reports; each frame leaves the texture in the common state;
+- Linux: planned (a Vulkan dma-buf behind an `FlTextureGL`).
+Elsewhere, or when a texture cannot be opened (another GPU, WSL, a
+software GPU), the view renders into a texture of its own that is read
+back. Frames render off the UI thread (an asynchronous `render_view`), so
+waiting for the GPU never costs the UI a frame. Pointer and keyboard events on these
 views go to Rust. Dart talks to the Rust core through `flutter_rust_bridge`,
 using the same JSON-serializable commands, queries and events as the CLI
 and MCP.
@@ -498,4 +509,5 @@ code stays **i18n-ready** for more:
 | 2026-11-17 | `Fabric::look()` (colour, sheen and its roughness, specular, translucency) replaces `Fabric::appearance()` | The 3D view, the photo and the glTF export read one table, so they agree on a fabric |
 | 2026-11-17 | Whole-project operations (rename, delete, zip export/import) in `r3d_commands::projects`; `zip` crate (MIT) with deflate only (`flate2` on `miniz_oxide`, already in the tree) | Rename goes through `project.rename`, so the folder and the document agree; the start screen needs them on closed projects, outside any session; zip is the format users send each other, and the crate's other codecs (bzip2, zstd, lzma, AES) are not needed |
 | 2026-11-17 | The app renders photos on a thread of its own on the views' GPU device; the 3D view draws the latest image (`ImageBlit`) | Cancelling and refining never block the UI; batches of about 40 ms of GPU time keep the views' frames smooth |
+| 2026-11-17 | Zero-copy views on Windows: a shared D3D11 texture (NT handle) opened by wgpu's D3D12 device on Flutter's adapter; `render_view` becomes asynchronous; `windows` crate (MIT/Apache-2.0, the version wgpu-hal uses) in `r3d-ffi` | Views were read back through the CPU every frame (36 fps on the T-shirt demo); shared, they reach 60 fps. Blocking the UI thread on the GPU made it miss one vsync in 14 |
 | 2026-11-17 | Flutter confirmed after a review of the GUI stack; Iced replaces Slint as plan B; Bevy and egui stay out | The 3D is ours (wgpu), Flutter only composites it: smooth on macOS (zero-copy), slower on Windows and WSL where views are read back, which zero-copy sharing fixes without a rewrite. Slint's licences are not permissive |

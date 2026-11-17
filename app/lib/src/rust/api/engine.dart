@@ -11,6 +11,12 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
 
+/// The GPU adapter the UI composites on (Windows: its LUID), so the views
+/// render on it and share their textures without a copy. Call it before
+/// the first view; the views of an engine stay on the GPU they started on.
+void setUiAdapter({required PlatformInt64 luid}) =>
+    RustLib.instance.api.crateApiEngineSetUiAdapter(luid: luid);
+
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Engine>>
 abstract class Engine implements RustOpaqueInterface {
   /// Add a notch on the edge within `max_mm` of pattern point (`x_mm`,
@@ -46,7 +52,8 @@ abstract class Engine implements RustOpaqueInterface {
   void allowAgents({required String libraryDir, required bool allow});
 
   /// Attach a view rendering into a UI texture (`surface`: platform handle
-  /// from the UI side, an `IOSurfaceRef` pointer on macOS), or without
+  /// from the UI side, an `IOSurfaceRef` pointer on macOS, a shared NT
+  /// handle on Windows), or without
   /// one into a texture of its own, read back with `read_view`. Returns
   /// the view id.
   int attachView({
@@ -164,7 +171,8 @@ abstract class Engine implements RustOpaqueInterface {
 
   /// Render a view and wait until the GPU is done, so the UI never shows
   /// a half-drawn frame. Returns the CPU + GPU time in milliseconds.
-  double renderView({required int view});
+  /// Asynchronous for the UI: the wait never blocks its thread.
+  Future<double> renderView({required int view});
 
   /// Start the simulation again from the pattern: the pieces around the
   /// body, paused.

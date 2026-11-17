@@ -11,10 +11,12 @@ import 'src/rust/api/engine.dart';
 import 'src/rust/frb_generated.dart';
 import 'src/shell.dart';
 import 'src/start_screen.dart';
+import 'src/views/rust_view.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await RustLib.init();
+  await prepareSharedTextures();
   final store = await ProjectStore.open();
   // Review aids for screenshots (scripts/app-screenshot.sh):
   // --dart-define=R3D_DEMO=t_shirt opens a fresh project from that template;

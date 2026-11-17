@@ -28,7 +28,7 @@ can be tested through MCP as soon as they exist.
 | M12 | Drafting tools 2: curve family, cut ✅ | 2–3 wk | Draw a curved piece in one go, cut a bodice along a curved princess line into two pieces sewn together |
 | M13 | Pattern interchange: DXF, SVG and PDF ✅ | 2–3 wk | A pattern drawn elsewhere is imported from DXF-AAMA, SVG or PDF, edited, sewn and exported back |
 | M14 | Photorealistic rendering ✅ | 4–6 wk | A path-traced studio image of the draped garment |
-| M16 | Zero-copy views on Windows and Linux | 1–2 wk | The garment drapes as smoothly on Windows and Linux as on macOS |
+| M16 | Zero-copy views on Windows ✅ and Linux | 1–2 wk | The garment drapes as smoothly on Windows and Linux as on macOS |
 | M17 | GPU cloth solver | 3–4 wk | A T-shirt drapes at 60 fps; a dress stays interactive |
 | M18 | Trousers and shirt templates | 1–2 wk | A first-time user makes trousers and a shirt from templates |
 | M19 | Layers and multiple garments | 3–4 wk | A shirt tucked into trousers, each in its own fabric and colour |
@@ -382,12 +382,16 @@ Built (2026-11-17), demo `./demos/m14/demo.sh`; algorithms and papers in
   the edges.
 
 ## M16 — Zero-copy views on Windows and Linux
-Today only macOS shares the views' texture with Flutter (IOSurface);
-Windows and Linux render into a texture of their own and read it back
-through the CPU every frame, which makes the views slow there.
-- Windows: `r3d-render` draws into a shared D3D12 texture; the runner
-  hands its DXGI shared handle to Flutter's texture registrar (GPU
-  surface), which composites it without a copy.
+macOS shares the views' texture with Flutter (IOSurface); Linux renders
+into a texture of its own and reads it back through the CPU every frame,
+which makes the views slow there.
+- Windows ✅ (2026-11-17): the runner creates a shared D3D11 texture on
+  Flutter's adapter and registers its NT handle as a GPU surface; wgpu
+  opens it as a D3D12 resource on a device on the same adapter (LUID).
+  `render_view` is asynchronous, so the UI thread never waits for the
+  GPU. Release build, T-shirt demo draping, RTX 2080 at 60 Hz: UI 59.9
+  fps (build 0.7 ms median), a 3D frame every 16.7 ms; read back, the
+  same scene ran at 36 fps.
 - Linux: a Vulkan texture exported as a dma-buf, imported by the GTK
   runner as an EGL image behind an `FlTextureGL`.
 - `unsafe` kept to the sharing code in `r3d-ffi`, as for the IOSurface;

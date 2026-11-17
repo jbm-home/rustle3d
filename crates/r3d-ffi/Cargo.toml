@@ -24,6 +24,7 @@ r3d-render.workspace = true
 r3d-sim.workspace = true
 glam.workspace = true
 flutter_rust_bridge = "=2.13.0"
+pollster.workspace = true
 serde_json.workspace = true
 wgpu.workspace = true
 
@@ -33,6 +34,12 @@ objc2 = "0.6"
 objc2-core-foundation = "0.3"
 objc2-io-surface = { version = "0.3", features = ["IOSurfaceRef", "IOSurfaceTypes", "objc2-core-foundation"] }
 objc2-metal = { version = "0.3", features = ["objc2-io-surface"] }
+
+# Zero-copy texture sharing with the Flutter compositor (D3D12 opens the
+# runner's shared D3D11 texture). The version wgpu-hal uses, so the COM
+# types are the same.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Direct3D12", "Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common"] }
 
 [dev-dependencies]
 tempfile.workspace = true

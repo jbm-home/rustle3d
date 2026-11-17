@@ -70,7 +70,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 2045030275;
+  int get rustContentHash => -181424338;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -200,7 +200,7 @@ abstract class RustLibApi extends BaseApi {
 
   void crateApiEngineEngineRelease({required Engine that});
 
-  double crateApiEngineEngineRenderView({
+  Future<double> crateApiEngineEngineRenderView({
     required Engine that,
     required int view,
   });
@@ -335,6 +335,8 @@ abstract class RustLibApi extends BaseApi {
     required String name,
     required String bodyJson,
   });
+
+  void crateApiEngineSetUiAdapter({required PlatformInt64 luid});
 
   String crateApiTemplatesTemplateList({required String bodyJson});
 
@@ -1144,20 +1146,25 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "Engine_release", argNames: ["that"]);
 
   @override
-  double crateApiEngineEngineRenderView({
+  Future<double> crateApiEngineEngineRenderView({
     required Engine that,
     required int view,
   }) {
-    return handler.executeSync(
-      SyncTask(
-        callFfi: () {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEngine(
             that,
             serializer,
           );
           sse_encode_u_32(view, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 25)!;
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 25,
+            port: port_,
+          );
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_f_64,
@@ -2116,13 +2123,36 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  void crateApiEngineSetUiAdapter({required PlatformInt64 luid}) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_i_64(luid, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 56)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiEngineSetUiAdapterConstMeta,
+        argValues: [luid],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEngineSetUiAdapterConstMeta =>
+      const TaskConstMeta(debugName: "set_ui_adapter", argNames: ["luid"]);
+
+  @override
   String crateApiTemplatesTemplateList({required String bodyJson}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(bodyJson, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 56)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 57)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -2156,7 +2186,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 57,
+            funcId: 58,
             port: port_,
           );
         },
@@ -2348,6 +2378,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   int dco_decode_i_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
+  }
+
+  @protected
+  PlatformInt64 dco_decode_i_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dcoDecodeI64(raw);
   }
 
   @protected
@@ -2733,6 +2769,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   int sse_decode_i_32(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getInt32();
+  }
+
+  @protected
+  PlatformInt64 sse_decode_i_64(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getPlatformInt64();
   }
 
   @protected
@@ -3182,6 +3224,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putPlatformInt64(self);
+  }
+
+  @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.length, serializer);
@@ -3490,7 +3538,8 @@ class EngineImpl extends RustOpaque implements Engine {
       );
 
   /// Attach a view rendering into a UI texture (`surface`: platform handle
-  /// from the UI side, an `IOSurfaceRef` pointer on macOS), or without
+  /// from the UI side, an `IOSurfaceRef` pointer on macOS, a shared NT
+  /// handle on Windows), or without
   /// one into a texture of its own, read back with `read_view`. Returns
   /// the view id.
   int attachView({
@@ -3655,7 +3704,8 @@ class EngineImpl extends RustOpaque implements Engine {
 
   /// Render a view and wait until the GPU is done, so the UI never shows
   /// a half-drawn frame. Returns the CPU + GPU time in milliseconds.
-  double renderView({required int view}) => RustLib.instance.api
+  /// Asynchronous for the UI: the wait never blocks its thread.
+  Future<double> renderView({required int view}) => RustLib.instance.api
       .crateApiEngineEngineRenderView(that: this, view: view);
 
   /// Start the simulation again from the pattern: the pieces around the

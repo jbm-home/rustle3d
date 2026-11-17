@@ -230,6 +230,9 @@ struct View {
     target: wgpu::TextureView,
     width: u32,
     height: u32,
+    /// Renders into a texture the UI composites (left in the common state
+    /// after each frame for the compositor's device).
+    shared: bool,
     /// Board pan/zoom chosen by the user; `None` fits the pattern.
     board_view: Option<BoardView>,
 }
@@ -251,7 +254,7 @@ struct Graphics {
 
 impl Graphics {
     fn new() -> Result<Self, ApiError> {
-        let gpu = Gpu::headless().map_err(|e| ApiError::new("gpu", e.to_string()))?;
+        let gpu = crate::surface::ui_gpu().map_err(|e| ApiError::new("gpu", e.to_string()))?;
         let format = wgpu::TextureFormat::Bgra8Unorm;
         Ok(Self {
             board: BoardRenderer::new(&gpu, format),
@@ -265,6 +268,14 @@ impl Graphics {
             blit: None,
         })
     }
+}
+
+/// The GPU adapter the UI composites on (Windows: its LUID), so the views
+/// render on it and share their textures without a copy. Call it before
+/// the first view; the views of an engine stay on the GPU they started on.
+#[frb(sync)]
+pub fn set_ui_adapter(luid: i64) {
+    crate::surface::set_ui_adapter(luid);
 }
 
 /// A fabric choice for the UI.
@@ -799,7 +810,8 @@ impl Engine {
     }
 
     /// Attach a view rendering into a UI texture (`surface`: platform handle
-    /// from the UI side, an `IOSurfaceRef` pointer on macOS), or without
+    /// from the UI side, an `IOSurfaceRef` pointer on macOS, a shared NT
+    /// handle on Windows), or without
     /// one into a texture of its own, read back with `read_view`. Returns
     /// the view id.
     #[frb(sync)]
@@ -844,6 +856,7 @@ impl Engine {
                 target,
                 width,
                 height,
+                shared: surface.is_some(),
                 board_view: None,
             },
         );
@@ -891,7 +904,7 @@ impl Engine {
 
     /// Render a view and wait until the GPU is done, so the UI never shows
     /// a half-drawn frame. Returns the CPU + GPU time in milliseconds.
-    #[frb(sync)]
+    /// Asynchronous for the UI: the wait never blocks its thread.
     pub fn render_view(&self, view: u32) -> Result<f64, ApiError> {
         let start = Instant::now();
         self.resync_if_due()?;
@@ -933,6 +946,23 @@ impl Engine {
                     self.render_garment(g, project, &selected, view)?;
                 }
             }
+        }
+        if let Some(v) = g.views.get(&view).filter(|v| v.shared) {
+            // The compositor reads the texture on its own device: leave it
+            // in the common state, uncompressed (D3D12; no-op on Metal).
+            let mut encoder = g
+                .gpu
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+            encoder.transition_resources(
+                std::iter::empty(),
+                std::iter::once(wgpu::TextureTransition {
+                    texture: &v.texture,
+                    selector: None,
+                    state: wgpu::TextureUses::PRESENT,
+                }),
+            );
+            g.gpu.queue.submit([encoder.finish()]);
         }
         g.gpu
             .device
