@@ -363,7 +363,8 @@ mod tests {
     use super::*;
     use proptest::prelude::*;
 
-    /// Distance from `p` to the fitted path.
+    /// Distance from `p` to the fitted path. The cubics are flattened far
+    /// below the tests' 1e-6 slack, so the measure itself adds no error.
     fn distance_to(path: &[Fitted], p: DVec2) -> f64 {
         let mut best = f64::MAX;
         for f in path {
@@ -371,7 +372,7 @@ mod tests {
                 Fitted::Line(a, b) => vec![*a, *b],
                 Fitted::Cubic(c) => {
                     let mut v = vec![c.p0];
-                    c.flatten_into(1e-4, &mut v);
+                    c.flatten_into(1e-8, &mut v);
                     v
                 }
             };
