@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 19fdbbf3f7c6be6a2d56ea4602b207f381249e77639168393b332d770c4f61e8 # shrinks to amp = 18.353753438834172, freq = 0.5852595567094312, len = 236.6578444848564, samples = 36, tol = 0.05361208056317963
+cc 6a685d0f3216db4a7137c714676d42af783c0f8e14a93053f0f39cfa579a3ccc # shrinks to amp = 71.3378208349885, freq = 0.525951017356516, len = 317.81328192147555, samples = 191, tol = 0.19219915315797526

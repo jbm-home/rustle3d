@@ -363,24 +363,43 @@ mod tests {
     use super::*;
     use proptest::prelude::*;
 
-    /// Distance from `p` to the fitted path. The cubics are flattened far
-    /// below the tests' 1e-6 slack, so the measure itself adds no error.
+    /// Distance from `p` to the fitted path, measured on the curves
+    /// themselves: flattening is capped in segments, so on a long cubic it
+    /// cannot reach the precision the tests' 1e-6 slack needs.
     fn distance_to(path: &[Fitted], p: DVec2) -> f64 {
-        let mut best = f64::MAX;
-        for f in path {
-            let pts = match f {
-                Fitted::Line(a, b) => vec![*a, *b],
-                Fitted::Cubic(c) => {
-                    let mut v = vec![c.p0];
-                    c.flatten_into(1e-8, &mut v);
-                    v
-                }
-            };
-            for w in pts.windows(2) {
-                best = best.min(distance_to_segment(p, w[0], w[1]));
+        path.iter()
+            .map(|f| match f {
+                Fitted::Line(a, b) => distance_to_segment(p, *a, *b),
+                Fitted::Cubic(c) => distance_to_cubic(c, p),
+            })
+            .fold(f64::MAX, f64::min)
+    }
+
+    /// Nearest point by coarse sampling, then golden-section search around
+    /// the best sample.
+    fn distance_to_cubic(c: &CubicBez, p: DVec2) -> f64 {
+        const SAMPLES: usize = 512;
+        let dist = |t: f64| c.eval(t).distance(p);
+        let best = (0..=SAMPLES)
+            .min_by(|&i, &j| {
+                dist(i as f64 / SAMPLES as f64).total_cmp(&dist(j as f64 / SAMPLES as f64))
+            })
+            .unwrap_or(0);
+        let step = 1.0 / SAMPLES as f64;
+        let (mut lo, mut hi) = (
+            (best as f64 * step - step).max(0.0),
+            (best as f64 * step + step).min(1.0),
+        );
+        let g = (5f64.sqrt() - 1.0) / 2.0;
+        for _ in 0..100 {
+            let (m1, m2) = (hi - g * (hi - lo), lo + g * (hi - lo));
+            if dist(m1) < dist(m2) {
+                hi = m2;
+            } else {
+                lo = m1;
             }
         }
-        best
+        dist(0.5 * (lo + hi))
     }
 
     fn connected(path: &[Fitted], closed: bool) -> bool {
