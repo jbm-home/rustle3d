@@ -28,11 +28,14 @@ can be tested through MCP as soon as they exist.
 | M12 | Drafting tools 2: curve family, cut ✅ | 2–3 wk | Draw a curved piece in one go, cut a bodice along a curved princess line into two pieces sewn together |
 | M13 | Pattern interchange: DXF, SVG and PDF ✅ | 2–3 wk | A pattern drawn elsewhere is imported from DXF-AAMA, SVG or PDF, edited, sewn and exported back |
 | M14 | Photorealistic rendering ✅ | 4–6 wk | A path-traced studio image of the draped garment |
+| M16 | Zero-copy views on Windows and Linux | 1–2 wk | The garment drapes as smoothly on Windows and Linux as on macOS |
 | M15 | Game-ready export | 3–4 wk | LODs + baked wrinkle normal maps, imported in Godot/Unity/Unreal |
 
 M10 came before M9: the first-time user test, not the export, decided
-what v0.1 needed. After v0.1 the order is M9, M11, M12, M13, M14, M15. M12 came out of the
+what v0.1 needed. After v0.1 the order is M9, M11, M12, M13, M14, M16, M15. M12 came out of the
 M11 test: the drafting tools settle before imported patterns need them.
+M16 came before M15: the GUI stack review of 2026-11-17 kept Flutter
+(architecture §7.1) and found the views slow wherever they are read back.
 
 ---
 
@@ -364,6 +367,21 @@ Built (2026-11-17), demo `./demos/m14/demo.sh`; algorithms and papers in
   the user's own HDRI, textures and weave normal maps, cloth thickness at
   the edges.
 
+## M16 — Zero-copy views on Windows and Linux
+Today only macOS shares the views' texture with Flutter (IOSurface);
+Windows and Linux render into a texture of their own and read it back
+through the CPU every frame, which makes the views slow there.
+- Windows: `r3d-render` draws into a shared D3D12 texture; the runner
+  hands its DXGI shared handle to Flutter's texture registrar (GPU
+  surface), which composites it without a copy.
+- Linux: a Vulkan texture exported as a dma-buf, imported by the GTK
+  runner as an EGL image behind an `FlTextureGL`.
+- `unsafe` kept to the sharing code in `r3d-ffi`, as for the IOSurface;
+  the readback stays as the fallback (WSL, software GPUs).
+- Pass: in release builds, 60 fps with the 3D view draping and UI
+  animations running, input latency under one frame, on Windows and
+  native Linux.
+
 ## M15 — Game-ready export
 - Decimated LODs, wrinkle detail baked into normal maps, back faces or
   thickness; skinning to the avatar skeleton once avatars are animated;
@@ -389,5 +407,4 @@ and multiple garments · trims (buttons, zippers) · textures and prints with
 UVs from the pattern · fit maps (stress/strain) · material calibration from
 measurements · GPU solver backend / Vertex Block Descent · OpenUSD export ·
 finer cloth mesh with a strain limit (smaller folds; physics.md §7) ·
-picking points and notches in 3D · zero-copy textures on Linux and
-Windows · signed packages.
+picking points and notches in 3D · signed packages.
