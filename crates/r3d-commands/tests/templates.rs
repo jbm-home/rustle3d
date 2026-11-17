@@ -86,8 +86,10 @@ fn the_list_fills_sizes_from_the_avatar() {
     );
     let list = run(&mut s, json!({"type": "template.list"}));
     assert_eq!(list[0]["sizes"]["chest_cm"], 104.0);
-    assert_eq!(list[1]["template"], "dress");
+    assert_eq!(list[1]["template"], "shirt");
+    assert_eq!(list[2]["template"], "trousers");
     assert_eq!(list[2]["sizes"]["waist_cm"], 90.0);
+    assert!(list[2]["sizes"].get("sleeve_cm").is_none());
 }
 
 #[test]
@@ -151,6 +153,91 @@ fn long_sleeves_follow_the_forearms() {
     let (low, high) = drape(&s, 300);
     eprintln!("long sleeves: {low:.3}..{high:.3}");
     assert!(high > 1.35 && high < 1.50, "top at {high}");
+}
+
+#[test]
+fn a_shirt_has_a_collar_and_cuffs() {
+    let s = draft("shirt");
+    let p = s.project();
+    assert_eq!(p.name(), "Shirt");
+    // Two fronts, a back, two sleeves, two cuffs, a collar.
+    assert_eq!(p.panels().len(), 8);
+    assert_eq!(p.seams().len(), 18);
+    let (low, high) = drape(&s, 180);
+    eprintln!("shirt: {low:.3}..{high:.3}");
+    // The collar stands at the base of the neck; the hem below the hips.
+    assert!(high > 1.42 && high < 1.52, "top at {high}");
+    assert!(low > 0.65 && low < 0.85, "hem at {low}");
+}
+
+#[test]
+fn trousers_hang_from_the_waist_one_leg_in_each_leg() {
+    // Trousers wrapped around the body started with each inseam sewn
+    // across the gap between the legs; around the legs, each leg of the
+    // trousers starts and stays on its own side.
+    let s = draft("trousers");
+    let p = s.project();
+    assert_eq!(p.name(), "Trousers");
+    assert_eq!(p.panels().len(), 4);
+    assert_eq!(p.seams().len(), 6);
+    let form = Form::of_project(p).unwrap().unwrap();
+    let built = build(p, Some(&form), DEFAULT_SPACING_MM).unwrap();
+    let mut solver = CpuSolver::new(built.scene.clone());
+    for _ in 0..180 {
+        solver.step(1.0 / 60.0).unwrap();
+    }
+    let positions = solver.positions();
+    for piece in &built.pieces {
+        let panel = p.panel(piece.panel).unwrap();
+        let side = if panel.name.ends_with("left") {
+            1.0
+        } else {
+            -1.0
+        };
+        let below_crotch = positions[piece.particles.clone()]
+            .iter()
+            .filter(|q| q.y < 0.7);
+        for q in below_crotch {
+            assert!(side * q.x > 0.0, "{} crosses over at {q}", panel.name);
+        }
+    }
+    let (low, high) = drape(&s, 180);
+    eprintln!("trousers: {low:.3}..{high:.3}");
+    // The waist stays at the waist (1.04 m), the hem just above the floor.
+    assert!(high > 1.0, "trousers slid down: top at {high}");
+    assert!(low > 0.02 && low < 0.2, "hem at {low}");
+}
+
+/// The standard men's L body, with `template` drafted on it.
+fn mens(template: &str) -> Session {
+    let mut s = Session::new(Project::new("Untitled"));
+    run(
+        &mut s,
+        json!({"type": "avatar.set", "body": {"masculinity": 1, "height_cm": 182,
+            "bust_cm": 106, "waist_cm": 94, "hips_cm": 104}}),
+    );
+    run(
+        &mut s,
+        json!({"type": "template.apply", "template": template}),
+    );
+    s
+}
+
+#[test]
+fn trousers_fit_a_mens_body() {
+    let (low, high) = drape(&mens("trousers"), 180);
+    eprintln!("men's trousers: {low:.3}..{high:.3}");
+    assert!(high > 1.05, "trousers slid down: top at {high}");
+    assert!(low > 0.02 && low < 0.2, "hem at {low}");
+}
+
+#[test]
+fn a_shirt_fits_a_mens_body() {
+    // A men's sleeve started open at the elbow (outside the arm's reach)
+    // and its seams caught a fold closing it.
+    let (low, high) = drape(&mens("shirt"), 180);
+    eprintln!("men's shirt: {low:.3}..{high:.3}");
+    assert!(high > 1.5 && high < 1.65, "top at {high}");
 }
 
 #[test]

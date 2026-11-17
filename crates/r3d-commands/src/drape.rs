@@ -65,12 +65,15 @@ pub struct Piece {
 pub struct Form {
     pub positions: Vec<Vec3>,
     pub triangles: Vec<[u32; 3]>,
-    /// The body's distance from its vertical axis (m), every
-    /// `PROFILE_STEP` from the floor and every 360° / `ANGLE_BINS` around
-    /// (angle 0 = front, as placements count), arms left out.
-    radial: Vec<[f32; ANGLE_BINS]>,
+    /// The body's distance from its vertical axis, arms left out.
+    radial: Profile,
     /// The left (+x) and right arms.
     arms: [Arm; 2],
+    /// The left (+x) and right legs.
+    legs: [Leg; 2],
+    /// Height of the crotch (m): the lowest body point on the median
+    /// plane, below which the legs are apart.
+    crotch: f32,
     collider: StaticMesh,
 }
 
@@ -88,7 +91,8 @@ struct Arm {
     /// Unit direction down the forearm.
     fore: Vec3,
     /// Largest distance of the arm's surface from the axis (m), every
-    /// `PROFILE_STEP` along it from `point - REACH_FROM * down`.
+    /// `PROFILE_STEP` along it from `point - REACH_FROM * down`: the wrist
+    /// is where it is smallest.
     reach: Vec<f32>,
 }
 
@@ -112,8 +116,171 @@ const ARM_RADIUS_M: f32 = 0.08;
 const SHOULDER: f32 = 0.78;
 /// The arm profile starts this far up the axis from its point (m).
 const REACH_FROM: f32 = 0.5;
-/// Arm reach assumed between measured rows and without an avatar (m).
-const DEFAULT_ARM_RADIUS_M: f32 = 0.05;
+/// Where to look for the wrist: this far past the elbow along the
+/// forearm (m; a forearm is 0.14–0.15 of stature).
+const WRIST_SEARCH: (f32, f32) = (0.12, 0.32);
+/// Cloth narrower than a leg starts this far out from it (m).
+const LIMB_CLEARANCE_M: f32 = 0.005;
+/// A leg's axis runs through the middle of the thigh and of the shin at
+/// these fractions of stature: well below the crotch (about 0.46 of
+/// stature; a male body's genitals reach down to 0.40) and above the
+/// ankle.
+const LEG_SLICES: (f32, f32) = (0.34, 0.10);
+/// Half the height of a slice (m).
+const LEG_SLICE_M: f32 = 0.015;
+/// Leg reach assumed without an avatar (m).
+const DEFAULT_LEG_RADIUS_M: f32 = 0.07;
+/// Cloth around a leg starts at least this far from the body's median
+/// plane (m), so the two trouser legs start apart, the left on the left.
+const MEDIAN_GAP_M: f32 = 0.006;
+/// Around a leg, the cloth clears the body this far above and below its
+/// own height (m).
+const LEG_REACH_SPAN_M: f32 = 0.03;
+/// The crotch as a fraction of stature, without an avatar; on one, the
+/// lowest body point within `MEDIAN_POINT_M` of the median plane above
+/// `CROTCH_ABOVE` of stature (the feet touch the plane in some poses).
+const CROTCH_FRACTION: f32 = 0.46;
+const MEDIAN_POINT_M: f32 = 0.01;
+const CROTCH_ABOVE: f32 = 0.3;
+/// A trouser leg goes from around the leg to around the body over this
+/// height above the crotch (m).
+const CROTCH_BLEND_M: f32 = 0.08;
+
+/// How far a body part reaches from a vertical axis (m): every
+/// `PROFILE_STEP` from the floor and every 360° / `ANGLE_BINS` around
+/// (angle 0 = front, as placements count).
+#[derive(Debug, Clone, Default)]
+struct Profile(Vec<[f32; ANGLE_BINS]>);
+
+impl Profile {
+    /// The profile of `points`, each a height and an offset (x, z) from
+    /// the axis at that height.
+    fn new(height: f32, points: impl Iterator<Item = (f32, Vec2)>) -> Self {
+        let steps = (height / PROFILE_STEP).ceil() as usize;
+        let mut radial = vec![[0.0f32; ANGLE_BINS]; steps + 1];
+        for (y, d) in points {
+            let k = (y / PROFILE_STEP).round().max(0.0) as usize;
+            if let Some(row) = radial.get_mut(k) {
+                let bin = &mut row[angle_bin(d.x.atan2(d.y))];
+                *bin = bin.max(d.length());
+            }
+        }
+        // Few vertices fall in each 1 cm × 10° cell: fill the gaps (max over
+        // ±2 cm and ±30°), then smooth the steps (twice the mean of
+        // neighbours), so the start pose is a smooth surface.
+        let rows = radial.len();
+        let at = |r: &[[f32; ANGLE_BINS]], k: usize, b: usize, dk: usize, db: usize| {
+            let k = (k + dk).saturating_sub(2).min(rows.saturating_sub(1));
+            r.get(k)
+                .map_or(0.0, |row| row[(b + ANGLE_BINS + db - 3) % ANGLE_BINS])
+        };
+        let mut smooth: Vec<[f32; ANGLE_BINS]> = (0..rows)
+            .map(|k| {
+                std::array::from_fn(|b| {
+                    (0..5)
+                        .flat_map(|dk| (0..7).map(move |db| (dk, db)))
+                        .map(|(dk, db)| at(&radial, k, b, dk, db))
+                        .fold(0.0, f32::max)
+                })
+            })
+            .collect();
+        for _ in 0..2 {
+            for row in &mut smooth {
+                let r = *row;
+                *row = std::array::from_fn(|b| {
+                    (r[(b + ANGLE_BINS - 1) % ANGLE_BINS] + r[b] + r[(b + 1) % ANGLE_BINS]) / 3.0
+                });
+            }
+        }
+        Self(smooth)
+    }
+
+    /// How far out the profile reaches at angle `theta`, anywhere between
+    /// heights `top` and `top - below` (m): a garment hangs outside
+    /// everything above it.
+    fn reach(&self, top: f32, below: f32, theta: f32) -> f32 {
+        let last = self.0.len().saturating_sub(1);
+        let index = |y: f32| ((y / PROFILE_STEP).round().max(0.0) as usize).min(last);
+        let bin = angle_bin(theta);
+        self.0
+            .get(index(top - below)..=index(top))
+            .map_or(0.0, |rows| {
+                rows.iter().map(|row| row[bin]).fold(0.0, f32::max)
+            })
+    }
+}
+
+/// A leg: a straight axis from the middle of the thigh to the middle of
+/// the shin, carried on up to the waist, and how far that half of the
+/// body reaches from it.
+#[derive(Debug, Clone)]
+struct Leg {
+    /// A point on the axis (m).
+    point: Vec3,
+    /// Unit direction down the leg.
+    down: Vec3,
+    /// The body on this leg's side, around the axis.
+    profile: Profile,
+}
+
+impl Leg {
+    /// The leg on `side` (+1 left, −1 right) of a body of `height` (m),
+    /// without an avatar.
+    fn default(side: f32, height: f32) -> Self {
+        Self {
+            point: Vec3::new(side * 0.06 * height, 0.36 * height, 0.0),
+            down: Vec3::new(side * 0.07, -1.0, 0.0).normalize(),
+            profile: Profile::default(),
+        }
+    }
+
+    /// The axis at height `y`.
+    fn centre(&self, y: f32) -> Vec3 {
+        if self.down.y.abs() < 1e-3 {
+            return self.point;
+        }
+        self.point + self.down * ((y - self.point.y) / self.down.y)
+    }
+
+    /// Find the leg on `side` of a body; `body` holds the points that are
+    /// not arms or hands. The middle of a slice is the middle of its
+    /// bounding box: the vertices are not spread evenly around a leg.
+    fn find(body: &[Vec3], height: f32, side: f32) -> Self {
+        let middle = |fraction: f32| {
+            let y = fraction * height;
+            let (lo, hi) = body
+                .iter()
+                .filter(|p| side * p.x > 0.0 && (p.y - y).abs() < LEG_SLICE_M)
+                .fold((Vec3::MAX, Vec3::MIN), |(lo, hi), p| {
+                    (lo.min(*p), hi.max(*p))
+                });
+            (lo.x <= hi.x).then(|| Vec3::new((lo.x + hi.x) / 2.0, y, (lo.z + hi.z) / 2.0))
+        };
+        let (Some(thigh), Some(shin)) = (middle(LEG_SLICES.0), middle(LEG_SLICES.1)) else {
+            return Self::default(side, height);
+        };
+        let mut leg = Self {
+            point: thigh,
+            down: (shin - thigh).normalize_or(Vec3::NEG_Y),
+            profile: Profile::default(),
+        };
+        let half = body.iter().filter(|p| side * p.x > 0.0).map(|p| {
+            let c = leg.centre(p.y);
+            (p.y, Vec2::new(p.x - c.x, p.z - c.z))
+        });
+        leg.profile = Profile::new(height, half);
+        leg
+    }
+
+    /// How far this half of the body reaches from the axis at `theta`
+    /// near height `y` (m).
+    fn reach(&self, y: f32, theta: f32) -> f32 {
+        let r = self
+            .profile
+            .reach(y + LEG_REACH_SPAN_M, 2.0 * LEG_REACH_SPAN_M, theta);
+        if r > 0.0 { r } else { DEFAULT_LEG_RADIUS_M }
+    }
+}
 
 fn angle_bin(theta: f32) -> usize {
     let t = theta.rem_euclid(std::f32::consts::TAU) / std::f32::consts::TAU;
@@ -201,18 +368,56 @@ impl Arm {
             fore,
             reach: Vec::new(),
         };
+        arm.measure(positions, height);
+        // The forearm's band is short and thick: its principal axis can be
+        // off by tens of degrees, and the reach measured from it then
+        // makes the wrist look as thick as the elbow. Aim the forearm from
+        // the elbow at the middle of the wrist (its thinnest part) instead.
+        if let Some(wrist) = arm.wrist(positions, height) {
+            let elbow_point = arm.point + arm.down * arm.elbow;
+            arm.fore = (wrist - elbow_point).normalize_or(arm.fore);
+            arm.measure(positions, height);
+        }
+        arm
+    }
+
+    /// Tabulate how far the arm reaches from its axis.
+    fn measure(&mut self, positions: &[Vec3], height: f32) {
+        self.reach.clear();
         for p in positions {
-            if let Some((t, r)) = arm.holds(*p, height) {
+            if let Some((t, r)) = self.holds(*p, height) {
                 let k = ((t + REACH_FROM) / PROFILE_STEP).round().max(0.0) as usize;
-                if arm.reach.len() <= k {
-                    arm.reach.resize(k + 1, 0.0);
+                if self.reach.len() <= k {
+                    self.reach.resize(k + 1, 0.0);
                 }
-                if let Some(slot) = arm.reach.get_mut(k) {
+                if let Some(slot) = self.reach.get_mut(k) {
                     *slot = slot.max(r);
                 }
             }
         }
-        arm
+    }
+
+    /// The middle of the wrist: of the arm's points around the thinnest
+    /// part of the forearm (`WRIST_SEARCH` past the elbow), the bounding
+    /// box's centre.
+    fn wrist(&self, positions: &[Vec3], height: f32) -> Option<Vec3> {
+        let index = |t: f32| ((t + REACH_FROM) / PROFILE_STEP).round().max(0.0) as usize;
+        let (from, to) = WRIST_SEARCH;
+        let (k, _) = (index(self.elbow + from)..=index(self.elbow + to))
+            .filter_map(|k| Some((k, *self.reach.get(k)?)))
+            .filter(|(_, r)| *r > 0.0)
+            .min_by(|a, b| a.1.total_cmp(&b.1))?;
+        let t = k as f32 * PROFILE_STEP - REACH_FROM;
+        let (lo, hi) = positions
+            .iter()
+            .filter(|p| {
+                self.holds(**p, height)
+                    .is_some_and(|(s, _)| (s - t).abs() < PROFILE_STEP * 1.5)
+            })
+            .fold((Vec3::MAX, Vec3::MIN), |(lo, hi), p| {
+                (lo.min(*p), hi.max(*p))
+            });
+        (lo.x <= hi.x).then(|| (lo + hi) / 2.0)
     }
 
     /// Where `p` is along the axis and how far from it, if it is part of
@@ -229,75 +434,35 @@ impl Arm {
         };
         (r < ARM_RADIUS_M && p.y < SHOULDER * height).then_some((t, r))
     }
-
-    /// How far the arm reaches from its axis between `t0` and `t1` along
-    /// it (m).
-    fn reach_between(&self, t0: f32, t1: f32) -> f32 {
-        let index = |t: f32| ((t + REACH_FROM) / PROFILE_STEP).round().max(0.0) as usize;
-        let measured = self
-            .reach
-            .get(index(t0.min(t1))..=index(t0.max(t1)).min(self.reach.len().saturating_sub(1)))
-            .map_or(0.0, |rows| rows.iter().copied().fold(0.0, f32::max));
-        if measured > 0.0 {
-            measured
-        } else {
-            DEFAULT_ARM_RADIUS_M
-        }
-    }
 }
 
 impl Form {
     pub fn new(positions: Vec<Vec3>, triangles: Vec<[u32; 3]>) -> Self {
         let height = positions.iter().map(|p| p.y).fold(0.0, f32::max);
         let arms = [1.0, -1.0].map(|side| Arm::find(&positions, height, side));
-        let steps = (height / PROFILE_STEP).ceil() as usize;
-        let mut radial = vec![[0.0f32; ANGLE_BINS]; steps + 1];
-        for p in &positions {
-            let r = Vec2::new(p.x, p.z).length();
-            let k = (p.y / PROFILE_STEP).round().max(0.0) as usize;
-            let on_arm = arms.iter().any(|a| a.holds(*p, height).is_some());
-            if r < ARM_REACH_M
-                && !on_arm
-                && let Some(row) = radial.get_mut(k)
-            {
-                let bin = &mut row[angle_bin(p.x.atan2(p.z))];
-                *bin = bin.max(r);
-            }
-        }
-        // Few vertices fall in each 1 cm × 10° cell: fill the gaps (max over
-        // ±2 cm and ±30°), then smooth the steps (twice the mean of
-        // neighbours), so the start pose is a smooth surface.
-        let rows = radial.len();
-        let at = |r: &[[f32; ANGLE_BINS]], k: usize, b: usize, dk: usize, db: usize| {
-            let k = (k + dk).saturating_sub(2).min(rows.saturating_sub(1));
-            r.get(k)
-                .map_or(0.0, |row| row[(b + ANGLE_BINS + db - 3) % ANGLE_BINS])
-        };
-        let mut smooth: Vec<[f32; ANGLE_BINS]> = (0..rows)
-            .map(|k| {
-                std::array::from_fn(|b| {
-                    (0..5)
-                        .flat_map(|dk| (0..7).map(move |db| (dk, db)))
-                        .map(|(dk, db)| at(&radial, k, b, dk, db))
-                        .fold(0.0, f32::max)
-                })
+        let body: Vec<Vec3> = positions
+            .iter()
+            .copied()
+            .filter(|p| {
+                Vec2::new(p.x, p.z).length() < ARM_REACH_M
+                    && !arms.iter().any(|a| a.holds(*p, height).is_some())
             })
             .collect();
-        for _ in 0..2 {
-            for row in &mut smooth {
-                let r = *row;
-                *row = std::array::from_fn(|b| {
-                    (r[(b + ANGLE_BINS - 1) % ANGLE_BINS] + r[b] + r[(b + 1) % ANGLE_BINS]) / 3.0
-                });
-            }
-        }
-        let radial = smooth;
+        let radial = Profile::new(height, body.iter().map(|p| (p.y, Vec2::new(p.x, p.z))));
+        let legs = [1.0, -1.0].map(|side| Leg::find(&body, height, side));
+        let crotch = body
+            .iter()
+            .filter(|p| p.x.abs() < MEDIAN_POINT_M && p.y > CROTCH_ABOVE * height)
+            .map(|p| p.y)
+            .fold(CROTCH_FRACTION * height, f32::min);
         let collider = StaticMesh::new(positions.clone(), triangles.clone(), BODY_VOXEL);
         Self {
             positions,
             triangles,
             radial,
             arms,
+            legs,
+            crotch,
             collider,
         }
     }
@@ -313,25 +478,32 @@ impl Form {
     }
 }
 
-/// How far out the body reaches at angle `theta`, anywhere between heights
-/// `top` and `top - below` (m): a garment hangs outside everything above
-/// it.
-fn body_radius(form: Option<&Form>, top: f32, below: f32, theta: f32) -> f32 {
-    let Some(form) = form else {
-        return DEFAULT_BODY_RADIUS_M;
+/// How much lower a panel on an arm is placed per metre further down the
+/// arm: `wrap_arm` measures along the upper arm's axis from the height
+/// it is given, so a cuff below a sleeve `len` long starts `len × drop`
+/// below the sleeve's top.
+pub(crate) fn arm_drop(project: &Project) -> Result<f64, CommandError> {
+    let arm = match project.avatar() {
+        Some(avatar) => {
+            let model = body_model()?;
+            let positions = fitted_positions(model, &fit(model, &avatar.body));
+            let height = positions.iter().map(|p| p.y).fold(0.0, f32::max);
+            Arm::find(&positions, height, 1.0)
+        }
+        None => Arm::default(1.0, DEFAULT_HEIGHT_M),
     };
-    let last = form.radial.len().saturating_sub(1);
-    let index = |y: f32| ((y / PROFILE_STEP).round().max(0.0) as usize).min(last);
-    let bin = angle_bin(theta);
-    form.radial
-        .get(index(top - below)..=index(top))
-        .map_or(0.0, |rows| {
-            rows.iter().map(|row| row[bin]).fold(0.0, f32::max)
-        })
+    Ok(f64::from(-arm.down.y))
 }
 
-/// Horizontal span of a closed polygon at height `y` (same units).
-fn span_at(polygon: &[DVec2], y: f64) -> f64 {
+/// How far out the body reaches at angle `theta`, anywhere between heights
+/// `top` and `top - below` (m).
+fn body_radius(form: Option<&Form>, top: f32, below: f32, theta: f32) -> f32 {
+    form.map_or(DEFAULT_BODY_RADIUS_M, |f| f.radial.reach(top, below, theta))
+}
+
+/// Leftmost and rightmost points of a closed polygon at height `y` (same
+/// units), if it reaches that height.
+fn span_ends(polygon: &[DVec2], y: f64) -> Option<(f64, f64)> {
     let (mut lo, mut hi) = (f64::MAX, f64::MIN);
     for (a, b) in polygon.iter().zip(polygon.iter().cycle().skip(1)) {
         if (a.y - y) * (b.y - y) <= 0.0 && a.y != b.y {
@@ -340,7 +512,12 @@ fn span_at(polygon: &[DVec2], y: f64) -> f64 {
             hi = hi.max(x);
         }
     }
-    if hi >= lo { hi - lo } else { 0.0 }
+    (hi >= lo).then_some((lo, hi))
+}
+
+/// Horizontal span of a closed polygon at height `y` (same units).
+fn span_at(polygon: &[DVec2], y: f64) -> f64 {
+    span_ends(polygon, y).map_or(0.0, |(lo, hi)| hi - lo)
 }
 
 /// A placed panel, meshed, before it is positioned in 3D.
@@ -359,10 +536,6 @@ impl Laid {
     /// Width of the panel `below` its top (m).
     fn width_below(&self, below: f32) -> f32 {
         (span_at(&self.boundary, self.top - f64::from(below) * 1000.0) / 1000.0) as f32
-    }
-
-    fn on_body(&self) -> bool {
-        self.place.around == Around::Body
     }
 }
 
@@ -413,8 +586,14 @@ fn wrap_body(l: &Laid, form: Option<&Form>, around: &dyn Fn(f32) -> f32) -> Vec<
 /// left, −1 right), like a sleeve: its top on the arm's axis at the
 /// placement height, running down the upper arm, then the forearm past
 /// the elbow, its horizontal centre at the
-/// placement angle (0 = the outside of the arm). The radius is the larger
-/// of the arm's (plus the gap) and the sleeve's own (its width / 2π).
+/// placement angle (0 = the outside of the arm). The radius is the
+/// sleeve's own (its width / 2π): it starts as a closed tube, and where
+/// the arm is thicker the collisions push it out. Starting outside the
+/// arm's reach (as on the body, or with only a small gap) opened a narrow
+/// sleeve or cuff into a part of a tube, which its seam then closed across
+/// the arm, catching a fold; the reach, the farthest point from an axis
+/// that is not quite centred, also overstates the arm near the elbow and
+/// the wrist.
 ///
 /// The pattern is seen from outside, as on the body: on the left arm its
 /// right (+x) goes towards the back, on the right arm towards the front,
@@ -437,7 +616,6 @@ fn wrap_arm(l: &Laid, form: Option<&Form>, side: f32) -> Vec<Vec3> {
     } else {
         0.0
     };
-    let gap = (l.place.offset_mm / 1000.0) as f32;
     let angle0 = (l.place.angle_deg as f32).to_radians();
     let centre = centre_x(l);
     l.mesh
@@ -446,12 +624,89 @@ fn wrap_arm(l: &Laid, form: Option<&Form>, side: f32) -> Vec<Vec3> {
         .map(|v| {
             let below = ((l.top - v.y) / 1000.0) as f32;
             let t = t_top + below;
-            let own = (l.width_below(below) / std::f32::consts::TAU).max(1e-3);
-            let r = (arm.reach_between(t - 0.02, t + 0.02) + gap).max(own);
+            let r = (l.width_below(below) / std::f32::consts::TAU).max(1e-3);
             let theta = angle0 + ((v.x - centre) / 1000.0) as f32 / r;
             let (on_axis, d) = arm.axis(t);
             let (out, across) = frame(d);
             on_axis + (out * theta.cos() + across * theta.sin()) * r
+        })
+        .collect()
+}
+
+/// Start positions of a panel wrapped around the leg on `side` (+1 left,
+/// −1 right), like a trouser leg. Below the crotch, as a sleeve: around
+/// the leg's axis, the piece's crease (`centre_x_mm`) at the placement
+/// angle, the leg's pieces a closed tube unless the leg reaches farther
+/// (then just outside it). Above the crotch, around the body: the
+/// piece's inner edge (centre front or back) at the placement angle, the
+/// leg's pieces sharing the half turn out to the side in proportion to
+/// their widths, so their side seams meet; just outside the body, or at
+/// the radius of both legs' pieces together. The two blend over
+/// `CROTCH_BLEND_M`. Around the leg, the cloth stays on its side of the
+/// median plane, pressed flat against it where it would cross, and there
+/// in front of the body (or behind it): the two legs start apart.
+fn wrap_leg(
+    l: &Laid,
+    form: Option<&Form>,
+    side: f32,
+    around_leg: &dyn Fn(f32) -> f32,
+    around_hips: &dyn Fn(f32) -> f32,
+) -> Vec<Vec3> {
+    let default;
+    let leg = match form.and_then(|f| f.legs.get(usize::from(side < 0.0))) {
+        Some(leg) => leg,
+        None => {
+            default = Leg::default(side, DEFAULT_HEIGHT_M);
+            &default
+        }
+    };
+    let crotch = form.map_or(CROTCH_FRACTION * DEFAULT_HEIGHT_M, |f| f.crotch);
+    let centre = centre_x(l);
+    let top_y = l.place.top_cm as f32 / 100.0;
+    let angle0 = (l.place.angle_deg as f32).to_radians();
+    // Pattern +x runs towards the body's left at the front and its right
+    // at the back: the inner edge lies on +x where that is the median.
+    let inner_on_plus = side * angle0.cos() < 0.0;
+    let outside = |y: f32, angle: f32| {
+        body_radius(form, y + LEG_REACH_SPAN_M, 2.0 * LEG_REACH_SPAN_M, angle) + LIMB_CLEARANCE_M
+    };
+    l.mesh
+        .vertices
+        .iter()
+        .map(|v| {
+            let below = ((l.top - v.y) / 1000.0) as f32;
+            let y = top_y - below;
+            let on_leg = {
+                let axis = leg.centre(y);
+                let own = (around_leg(y) / std::f32::consts::TAU).max(1e-3);
+                let arc = ((v.x - centre) / 1000.0) as f32;
+                let mut r = own;
+                for _ in 0..2 {
+                    r = (leg.reach(y, angle0 + arc / r) + LIMB_CLEARANCE_M).max(own);
+                }
+                let theta = angle0 + arc / r;
+                let (x, z) = (axis.x + r * theta.sin(), axis.z + r * theta.cos());
+                if side * x >= MEDIAN_GAP_M {
+                    Vec3::new(x, y, z)
+                } else if theta.cos() >= 0.0 {
+                    Vec3::new(side * MEDIAN_GAP_M, y, z.max(outside(y, 0.0)))
+                } else {
+                    let back = outside(y, std::f32::consts::PI);
+                    Vec3::new(side * MEDIAN_GAP_M, y, z.min(-back))
+                }
+            };
+            let blend = ((y - crotch) / CROTCH_BLEND_M).clamp(0.0, 1.0);
+            if blend <= 0.0 {
+                return on_leg;
+            }
+            let inner = span_ends(&l.boundary, v.y)
+                .map_or(centre, |(lo, hi)| if inner_on_plus { hi } else { lo });
+            let share = ((v.x - inner) / 1000.0) as f32 / around_leg(y).max(1e-3);
+            let theta = angle0 + std::f32::consts::PI * share;
+            let own = (around_hips(y) / std::f32::consts::TAU).max(1e-3);
+            let r = outside(y, theta).max(own);
+            let on_body = Vec3::new(r * theta.sin(), y, r * theta.cos());
+            on_leg.lerp(on_body, blend)
         })
         .collect()
 }
@@ -566,14 +821,15 @@ pub fn build(
             top,
         });
     }
-    // The garment's circumference at a height: all its body panels side by
-    // side.
-    let around = |y: f32| {
+    // The garment's circumference at a height around the body or a leg:
+    // all the panels wrapped around it side by side.
+    let around = |kind: Around, y: f32| {
         laid.iter()
-            .filter(|l| l.on_body())
+            .filter(|l| l.place.around == kind)
             .map(|l| l.width_below(l.place.top_cm as f32 / 100.0 - y))
             .sum::<f32>()
     };
+    let around_hips = |y: f32| around(Around::LeftLeg, y) + around(Around::RightLeg, y);
 
     for l in &laid {
         let Some(panel) = project.panel(l.panel) else {
@@ -592,9 +848,19 @@ pub fn build(
         }
 
         let start = match l.place.around {
-            Around::Body => wrap_body(l, form, &around),
+            Around::Body => wrap_body(l, form, &|y| around(Around::Body, y)),
             Around::LeftArm => wrap_arm(l, form, 1.0),
             Around::RightArm => wrap_arm(l, form, -1.0),
+            Around::LeftLeg => {
+                wrap_leg(l, form, 1.0, &|y| around(Around::LeftLeg, y), &around_hips)
+            }
+            Around::RightLeg => wrap_leg(
+                l,
+                form,
+                -1.0,
+                &|y| around(Around::RightLeg, y),
+                &around_hips,
+            ),
             Around::Flat => lay_flat(l),
         };
         scene.particles.extend(

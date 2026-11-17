@@ -10,7 +10,8 @@ Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
 Last updated: 2026-11-17 (M14; long sleeves, mirrored seams, agent status;
 rename, delete, export and import projects; smooth views on Windows;
 cloth comes to rest; pieces arranged side by side by width; M17,
-draping on the graphics card).
+draping on the graphics card; M18, shirt and trousers templates, pieces
+placed on a leg).
 -->
 
 Rustle3D is a free, open-source desktop app for making clothes: draw the
@@ -21,9 +22,11 @@ and Linux, and an AI agent can drive it too.
 ## Getting started
 
 ### The start screen
-- **What will you make?** Pick a template: T-shirt, dress, straight
-  skirt, A-line skirt or tote bag (the easiest start), or a blank
-  project. Templates are drafted to the body's measurements.
+- **What will you make?** Pick a template: T-shirt, shirt (long sleeves,
+  cuffs and a stand collar), trousers, dress, straight skirt, A-line
+  skirt or tote bag (the easiest start), or a blank project. Templates
+  are drafted to the body's measurements. For a shirt, the sleeve length
+  includes the cuff; trousers are measured from the waist to the hem.
 - **Recent projects** show a thumbnail; **All projects** lists the rest.
   You can also open a project from anywhere on disk, or open the projects
   folder.
@@ -122,9 +125,11 @@ app.)
 - **⇧-drag** a hem on the garment to lengthen or shorten it; **⇧-drag** a
   seam to take it in or let it out. The pattern follows.
 - **⌘-drag** a piece to move it around the body, or set its place in the
-  inspector (around the body, an arm, or flat; angle and height). A
-  sleeve placed on an arm starts down the upper arm and, past the elbow,
-  down the forearm, so long sleeves drape too.
+  inspector (around the body, an arm, a leg, or flat; angle and height).
+  A sleeve placed on an arm starts down the upper arm and, past the
+  elbow, down the forearm, so long sleeves drape too. A trouser piece
+  placed on a leg starts around that leg below the crotch and around
+  that side of the hips above it; place its top at the waist.
 - **Arrange around the body** places every piece side by side in seam
   order at the waist, each taking room in proportion to its width.
 - The drape runs on the graphics card, about five times faster than on

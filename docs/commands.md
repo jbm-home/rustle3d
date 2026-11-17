@@ -703,6 +703,16 @@ Place a panel around the body (or around an arm, for sleeves) for the 3D simulat
           "type": "string"
         },
         {
+          "const": "left_leg",
+          "description": "The left leg (+x), like a trouser leg: wrapped around the leg's\naxis, and above the crotch around the body's left half.",
+          "type": "string"
+        },
+        {
+          "const": "right_leg",
+          "description": "The right leg (−x).",
+          "type": "string"
+        },
+        {
           "const": "flat",
           "description": "Not wrapped: a flat sheet facing outward at the placement angle,\n`offset_mm` from the body's vertical axis (a bag hanging in front\nof the body).",
           "type": "string"
@@ -720,14 +730,14 @@ Place a panel around the body (or around an arm, for sleeves) for the 3D simulat
   "description": "Place a panel around the body for the simulation.",
   "properties": {
     "angle_deg": {
-      "description": "Angle around the body (degrees): 0 front, 90 the body's left side,\n180 back, 270 right side. Around an arm: 0 the outside of the arm,\n180 the side facing the body.",
+      "description": "Angle around the body (degrees): 0 front, 90 the body's left side,\n180 back, 270 right side. Around an arm: 0 the outside of the arm,\n180 the side facing the body. Around a leg, as around the body,\ncentred on the leg.",
       "format": "double",
       "type": "number"
     },
     "around": {
       "$ref": "#/$defs/Around",
       "default": "body",
-      "description": "What the panel is wrapped around: `body` (default), `left_arm` or\n`right_arm` (sleeves), or `flat` (not wrapped: a flat sheet facing\noutward, `offset_mm` from the body's axis)."
+      "description": "What the panel is wrapped around: `body` (default), `left_arm` or\n`right_arm` (sleeves), `left_leg` or `right_leg` (trouser legs:\naround the leg, and above the crotch around that half of the body),\nor `flat` (not wrapped: a flat sheet facing outward, `offset_mm`\nfrom the body's axis)."
     },
     "centre_x_mm": {
       "description": "The pattern abscissa (mm) that goes to the angle. Defaults to the\npanel's horizontal centre; the pieces of a cut panel keep the\nwhole's.",
@@ -739,7 +749,7 @@ Place a panel around the body (or around an arm, for sleeves) for the 3D simulat
     },
     "offset_mm": {
       "default": 30.0,
-      "description": "Distance from the body at the start of the simulation (mm,\ndefault 30).",
+      "description": "Distance from the body at the start of the simulation (mm,\ndefault 30). Around an arm or a leg a panel starts as a closed tube\ninstead (around a leg, just outside it if the leg is thicker).",
       "format": "double",
       "type": "number"
     },
@@ -2059,7 +2069,7 @@ Set the garment's colour as #RRGGBB, or clear it to use the fabric's usual colou
 
 ### `template.apply`
 
-Draft a starter garment (t_shirt, dress, straight_skirt, a_line_skirt, tote_bag) from sizes in cm, the avatar's measurements filling in any left out: its pieces are drawn, sewn, placed around the body and given a fabric, ready to simulate and edit. A project without panels takes the template's name. Returns the panels, seams and notches.
+Draft a starter garment (t_shirt, shirt, trousers, dress, straight_skirt, a_line_skirt, tote_bag) from sizes in cm, the avatar's measurements filling in any left out: its pieces are drawn, sewn, placed around the body and given a fabric, ready to simulate and edit. A project without panels takes the template's name. Returns the panels, seams and notches.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -2079,7 +2089,7 @@ Draft a starter garment (t_shirt, dress, straight_skirt, a_line_skirt, tote_bag)
           ]
         },
         "ease_cm": {
-          "description": "Room added to the body measurements (hips for skirts, chest for\ntops).",
+          "description": "Room added to the body measurements (hips for skirts and trousers,\nchest for tops).",
           "format": "double",
           "type": [
             "number",
@@ -2095,7 +2105,7 @@ Draft a starter garment (t_shirt, dress, straight_skirt, a_line_skirt, tote_bag)
           ]
         },
         "length_cm": {
-          "description": "Garment length: waist to hem for skirts, neck to hem for tops.",
+          "description": "Garment length: waist to hem for skirts and trousers, neck to hem\nfor tops.",
           "format": "double",
           "type": [
             "number",
@@ -2103,7 +2113,7 @@ Draft a starter garment (t_shirt, dress, straight_skirt, a_line_skirt, tote_bag)
           ]
         },
         "sleeve_cm": {
-          "description": "Sleeve length, from the top of the shoulder.",
+          "description": "Sleeve length, from the top of the shoulder (with the cuff, on a\nshirt).",
           "format": "double",
           "type": [
             "number",
@@ -2148,6 +2158,16 @@ Draft a starter garment (t_shirt, dress, straight_skirt, a_line_skirt, tote_bag)
           "type": "string"
         },
         {
+          "const": "shirt",
+          "description": "A shirt: two fronts, a back, long sleeves with cuffs and a stand\ncollar.",
+          "type": "string"
+        },
+        {
+          "const": "trousers",
+          "description": "Trousers: a front and a back for each leg, from the waist to the\nankle.",
+          "type": "string"
+        },
+        {
           "const": "dress",
           "description": "A sleeveless dress: front and back from the neck to the knee,\nshaped at the waist, flared at the hem.",
           "type": "string"
@@ -2171,7 +2191,7 @@ Draft a starter garment (t_shirt, dress, straight_skirt, a_line_skirt, tote_bag)
     },
     "template": {
       "$ref": "#/$defs/Template",
-      "description": "`t_shirt`, `dress`, `straight_skirt`, `a_line_skirt` or `tote_bag`."
+      "description": "`t_shirt`, `shirt`, `trousers`, `dress`, `straight_skirt`,\n`a_line_skirt` or `tote_bag`."
     }
   },
   "required": [

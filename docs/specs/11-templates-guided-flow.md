@@ -2,9 +2,10 @@
 
 Provenance: maintainer's functional brief (2026-11-14); general garment-making knowledge (basic garment blocks drafted from body measurements).
 
-## Status (2026-11-16)
+## Status (2026-11-17)
 
-Implemented: T-shirt, dress, straight skirt, A-line skirt and tote bag as
+Implemented: T-shirt, shirt, trousers, dress, straight skirt, A-line
+skirt and tote bag as
 Rust recipes in `r3d_commands::templates` (`template.apply`,
 `template.list`; sizes in cm, filled in from the avatar); the start screen
 with rendered thumbnails and a sizes sheet per body; the step bar with a
@@ -12,7 +13,11 @@ goal, an action and a highlighted tool per step; the Learn panel (task
 cards; "Show me" points at the views, tools and panels involved with
 the tour's coach marks, and never changes the project; keys and button
 names in bold);
-a first-launch tour. Not yet: sizes on a body silhouette (plain fields for
+a first-launch tour. The shirt (M18) has two fronts sewn at the centre
+front (buttons come with M20), a back, long sleeves with cuffs and a
+stand collar; the trousers a front and a back per leg, placed on the
+legs (`left_leg`, `right_leg`), a straight-leg block without darts whose
+back crotch point is lowered until both inseams match. Not yet: sizes on a body silhouette (plain fields for
 now). Templates are recipes in code
 rather than data files: the drafts compute curves and lengths (e.g. the
 sleeve cap is solved to the armhole's length).
@@ -23,7 +28,7 @@ knowing pattern making, and I learn along the way.
 
 ## Behavior
 - **Starter templates** (our own drafts): straight skirt, A-line skirt,
-  T-shirt, simple dress, tote bag. Each one is a parametric recipe: given a
+  T-shirt, shirt, trousers, simple dress, tote bag. Each one is a parametric recipe: given a
   few measurements (waist, hip, length, chest…) it generates panels, notches,
   seams, arrangement and a default material, through ordinary commands.
 - **Guided flow** for new garments: a step bar *Measurements → Pattern → Sew →

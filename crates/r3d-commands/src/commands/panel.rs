@@ -533,19 +533,23 @@ impl CommandSpec for PanelDelete {
 pub struct PanelPlace {
     pub panel: PanelId,
     /// What the panel is wrapped around: `body` (default), `left_arm` or
-    /// `right_arm` (sleeves), or `flat` (not wrapped: a flat sheet facing
-    /// outward, `offset_mm` from the body's axis).
+    /// `right_arm` (sleeves), `left_leg` or `right_leg` (trouser legs:
+    /// around the leg, and above the crotch around that half of the body),
+    /// or `flat` (not wrapped: a flat sheet facing outward, `offset_mm`
+    /// from the body's axis).
     #[serde(default)]
     pub around: Around,
     /// Angle around the body (degrees): 0 front, 90 the body's left side,
     /// 180 back, 270 right side. Around an arm: 0 the outside of the arm,
-    /// 180 the side facing the body.
+    /// 180 the side facing the body. Around a leg, as around the body,
+    /// centred on the leg.
     pub angle_deg: f64,
     /// Height of the panel's top above the floor (cm). Around an arm, the
     /// top goes to the arm at that height and the panel runs down the arm.
     pub top_cm: f64,
     /// Distance from the body at the start of the simulation (mm,
-    /// default 30).
+    /// default 30). Around an arm or a leg a panel starts as a closed tube
+    /// instead (around a leg, just outside it if the leg is thicker).
     #[serde(default = "default_offset")]
     pub offset_mm: f64,
     /// The pattern abscissa (mm) that goes to the angle. Defaults to the

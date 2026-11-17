@@ -159,6 +159,11 @@ pub enum Around {
     LeftArm,
     /// The right arm (−x).
     RightArm,
+    /// The left leg (+x), like a trouser leg: wrapped around the leg's
+    /// axis, and above the crotch around the body's left half.
+    LeftLeg,
+    /// The right leg (−x).
+    RightLeg,
     /// Not wrapped: a flat sheet facing outward at the placement angle,
     /// `offset_mm` from the body's vertical axis (a bag hanging in front
     /// of the body).
@@ -173,7 +178,8 @@ pub struct Placement {
     pub around: Around,
     /// Angle around the body (degrees): 0 = front, 90 = the body's left
     /// side, 180 = back, 270 = right side. Around an arm: 0 = the outside
-    /// of the arm, 180 = the side facing the body. The panel's centre goes
+    /// of the arm, 180 = the side facing the body. Around a leg, as around
+    /// the body, with the leg's axis as the centre. The panel's centre goes
     /// there.
     pub angle_deg: f64,
     /// Height of the panel's top above the floor (cm). Around an arm, the

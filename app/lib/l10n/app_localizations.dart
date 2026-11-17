@@ -217,6 +217,30 @@ abstract class L {
   /// **'Front, back and short sleeves, in jersey.'**
   String get templateTShirtBlurb;
 
+  /// No description provided for @templateShirt.
+  ///
+  /// In en, this message translates to:
+  /// **'Shirt'**
+  String get templateShirt;
+
+  /// No description provided for @templateShirtBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Long sleeves with cuffs and a stand collar.'**
+  String get templateShirtBlurb;
+
+  /// No description provided for @templateTrousers.
+  ///
+  /// In en, this message translates to:
+  /// **'Trousers'**
+  String get templateTrousers;
+
+  /// No description provided for @templateTrousersBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Straight legs from the waist to the ankle.'**
+  String get templateTrousersBlurb;
+
   /// No description provided for @templateDress.
   ///
   /// In en, this message translates to:
@@ -1578,6 +1602,18 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Right arm'**
   String get aroundRightArm;
+
+  /// No description provided for @aroundLeftLeg.
+  ///
+  /// In en, this message translates to:
+  /// **'Left leg'**
+  String get aroundLeftLeg;
+
+  /// No description provided for @aroundRightLeg.
+  ///
+  /// In en, this message translates to:
+  /// **'Right leg'**
+  String get aroundRightLeg;
 
   /// No description provided for @aroundFlat.
   ///

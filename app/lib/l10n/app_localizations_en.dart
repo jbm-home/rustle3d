@@ -70,6 +70,20 @@ class LEn extends L {
   String get templateTShirtBlurb => 'Front, back and short sleeves, in jersey.';
 
   @override
+  String get templateShirt => 'Shirt';
+
+  @override
+  String get templateShirtBlurb =>
+      'Long sleeves with cuffs and a stand collar.';
+
+  @override
+  String get templateTrousers => 'Trousers';
+
+  @override
+  String get templateTrousersBlurb =>
+      'Straight legs from the waist to the ankle.';
+
+  @override
   String get templateDress => 'Dress';
 
   @override
@@ -858,6 +872,12 @@ class LEn extends L {
 
   @override
   String get aroundRightArm => 'Right arm';
+
+  @override
+  String get aroundLeftLeg => 'Left leg';
+
+  @override
+  String get aroundRightLeg => 'Right leg';
 
   @override
   String get aroundFlat => 'Flat';

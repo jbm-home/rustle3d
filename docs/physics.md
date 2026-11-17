@@ -242,6 +242,35 @@ shook it partly loose.
   the centre-back hem. Placing each piece by its seamed edges in general
   is left for later.
 
+Sleeves and trouser legs (M18). Around an arm a panel starts as a closed
+tube at its own width / 2π, and the collisions push it out where the arm
+is thicker. Starting outside the arm's reach (plus the placement offset,
+or even 5 mm) opened a 23 cm cuff into a 145° part of a tube, and a
+men's sleeve 15 cm wide at the elbow; the seams closed them across the
+arm in a few frames and caught a fold on one arm. The reach (the
+farthest arm point from an axis not quite centred) overstates the arm.
+The forearm's axis now aims from the elbow at the middle of the wrist,
+the thinnest part of the forearm: the principal axis of the short band
+below the elbow was off by tens of degrees. Around a leg (`left_leg`, `right_leg`) a trouser piece
+starts:
+- below the crotch, as a sleeve around the leg's axis: the line through
+  the middles of the thigh (0.34 of stature) and the shin (0.10), slices'
+  bounding boxes. A principal axis of a thigh band tilted the legs: a
+  male body's genitals reach down to 0.40 of stature, and a shorter band
+  was too squat to have one. The reach is the body's on that side near
+  the piece's own height (±3 cm), not everything above it as for a skirt;
+  the hips then started the legs twice as wide as they are cut;
+- above the crotch (the lowest body point on the median plane), around
+  the body: the piece's centre front or back edge at 0° or 180°, the
+  front and back of a leg sharing the half turn in proportion to their
+  widths so the side seams meet. Wrapping the whole piece around its
+  leg's axis there covered half a ring: the side seams started 10–40 cm
+  apart and pulled the waist down to the hips on a male body;
+- blended over 8 cm above the crotch; cloth that would cross the median
+  plane is pressed flat 6 mm from it, in front of (or behind) the body.
+Trousers hold at the waist by friction alone (no ease there): the CPU and
+GPU contact solvers settle them about 3 cm apart, both at rest.
+
 ### Self-collision
 
 - **Current** (`selfcollide`): particle–particle repulsion [7]. Each

@@ -71,6 +71,8 @@ fn starter_garments_drape_on_the_gpu_as_on_the_cpu() {
     };
     for template in [
         "t_shirt",
+        "shirt",
+        "trousers",
         "dress",
         "straight_skirt",
         "a_line_skirt",
@@ -84,8 +86,12 @@ fn starter_garments_drape_on_the_gpu_as_on_the_cpu() {
         );
         let on_cpu = drape(&mut CpuSolver::new(scene.clone()), &scene, 180);
         eprintln!("{template}: gpu {on_gpu:.3?}, cpu {on_cpu:.3?}");
+        // Trousers hang from the waist by friction alone: the two contact
+        // solvers let them settle about 3 cm apart (both at rest by 180
+        // frames).
+        let within = if template == "trousers" { 0.04 } else { 0.02 };
         assert!(
-            (on_gpu.0 - on_cpu.0).abs() < 0.02 && (on_gpu.1 - on_cpu.1).abs() < 0.02,
+            (on_gpu.0 - on_cpu.0).abs() < within && (on_gpu.1 - on_cpu.1).abs() < within,
             "{template}: gpu {on_gpu:?} vs cpu {on_cpu:?}"
         );
     }

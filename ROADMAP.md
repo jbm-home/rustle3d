@@ -30,7 +30,7 @@ can be tested through MCP as soon as they exist.
 | M14 | Photorealistic rendering ✅ | 4–6 wk | A path-traced studio image of the draped garment |
 | M16 | Zero-copy views on Windows ✅ and Linux | 1–2 wk | The garment drapes as smoothly on Windows and Linux as on macOS |
 | M17 | GPU cloth solver ✅ | 3–4 wk | A T-shirt drapes at 60 fps; a dress stays interactive |
-| M18 | Trousers and shirt templates | 1–2 wk | A first-time user makes trousers and a shirt from templates |
+| M18 | Trousers and shirt templates ✅ | 1–2 wk | A first-time user makes trousers and a shirt from templates |
 | M19 | Layers and multiple garments | 3–4 wk | A shirt tucked into trousers, each in its own fabric and colour |
 | M20 | Trims: buttons and zippers | 2–3 wk | A shirt that buttons and trousers with a fly zipper, draped closed |
 | M21 | Textures and prints | 2–3 wk | A striped shirt whose stripes follow the grainline on every piece |
@@ -432,10 +432,22 @@ Plan as written:
 - Pass: T-shirt ≥ 60 fps and dress ≥ 30 fps on the reference machines;
   the same reference scenes pass the regression checks on both backends.
 
-## M18 — Trousers and shirt templates
+## M18 — Trousers and shirt templates ✅ (2026-11-17)
 Found by an agent drafting trousers and a shirt over MCP (2026-11-17):
 trousers placed around the body with sewn inseams already separate onto
 the legs.
+- Done: `shirt` (two fronts, back, long sleeves, cuffs, stand collar) and
+  `trousers` (front and back per leg) templates, sized from the avatar;
+  on the start screen. New placements `left_leg` and `right_leg`: around
+  the leg below the crotch, around that side of the hips above it
+  (physics.md, starting positions). Sleeves and cuffs start as closed
+  tubes around the arm.
+- Every seam closed and no cloth in the body: women's M and men's L on
+  the CPU, women's M on the GPU.
+- Not yet: buttons on the shirt's front and cuffs (M20; the fronts are
+  sewn shut), a waistband and fly (M20), darts.
+
+Plan as written:
 - Trousers and shirt (collar, cuffs, sleeves) templates in the guided
   flow, sized from the avatar's measurements.
 

@@ -2260,6 +2260,8 @@ class _PlacementCard extends StatelessWidget {
     ('body', l.aroundBody),
     ('left_arm', l.aroundLeftArm),
     ('right_arm', l.aroundRightArm),
+    ('left_leg', l.aroundLeftLeg),
+    ('right_leg', l.aroundRightLeg),
     ('flat', l.aroundFlat),
   ];
 
@@ -2330,9 +2332,7 @@ class _PlacementCard extends StatelessWidget {
         ),
         const SizedBox(height: Space.l),
         _SliderRow(
-          label: around == 'body' || around == 'flat'
-              ? l.aroundAngle
-              : l.aroundArmAngle,
+          label: around.endsWith('_arm') ? l.aroundArmAngle : l.aroundAngle,
           value: angle.clamp(0, 359),
           min: 0,
           max: 359,

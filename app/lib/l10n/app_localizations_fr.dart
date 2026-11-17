@@ -71,6 +71,20 @@ class LFr extends L {
       'Devant, dos et manches courtes, en jersey.';
 
   @override
+  String get templateShirt => 'Chemise';
+
+  @override
+  String get templateShirtBlurb =>
+      'Manches longues à poignets et col officier.';
+
+  @override
+  String get templateTrousers => 'Pantalon';
+
+  @override
+  String get templateTrousersBlurb =>
+      'Jambes droites, de la taille à la cheville.';
+
+  @override
   String get templateDress => 'Robe';
 
   @override
@@ -870,6 +884,12 @@ class LFr extends L {
 
   @override
   String get aroundRightArm => 'Bras droit';
+
+  @override
+  String get aroundLeftLeg => 'Jambe gauche';
+
+  @override
+  String get aroundRightLeg => 'Jambe droite';
 
   @override
   String get aroundFlat => 'À plat';

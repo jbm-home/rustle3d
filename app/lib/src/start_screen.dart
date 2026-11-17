@@ -20,6 +20,8 @@ import 'rust/api/templates.dart';
 /// What the start screen offers, in order: the `template.apply` ids.
 const _templates = [
   ('t_shirt', Icons.checkroom_rounded),
+  ('shirt', Icons.dry_cleaning_outlined),
+  ('trousers', Icons.accessibility_new_rounded),
   ('dress', Icons.dry_cleaning_rounded),
   ('straight_skirt', Icons.straighten_rounded),
   ('a_line_skirt', Icons.change_history_rounded),
@@ -29,6 +31,8 @@ const _templates = [
 /// A template's title and blurb.
 (String, String) _templateText(L l, String id) => switch (id) {
   't_shirt' => (l.templateTShirt, l.templateTShirtBlurb),
+  'shirt' => (l.templateShirt, l.templateShirtBlurb),
+  'trousers' => (l.templateTrousers, l.templateTrousersBlurb),
   'dress' => (l.templateDress, l.templateDressBlurb),
   'straight_skirt' => (l.templateStraightSkirt, l.templateStraightSkirtBlurb),
   'a_line_skirt' => (l.templateALineSkirt, l.templateALineSkirtBlurb),
