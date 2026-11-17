@@ -8,6 +8,7 @@
 
 import 'api/engine.dart';
 import 'api/library.dart';
+import 'api/projects.dart';
 import 'api/templates.dart';
 
 import 'dart:async';

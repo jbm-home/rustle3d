@@ -295,6 +295,90 @@ abstract class L {
   /// **'Projects folder'**
   String get projectsFolder;
 
+  /// No description provided for @importProjectZip.
+  ///
+  /// In en, this message translates to:
+  /// **'Import .zip…'**
+  String get importProjectZip;
+
+  /// No description provided for @importProjectZipTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a project someone sent you as a .zip archive'**
+  String get importProjectZipTip;
+
+  /// No description provided for @projectZipFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Project archives'**
+  String get projectZipFiles;
+
+  /// No description provided for @projectOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Project options'**
+  String get projectOptions;
+
+  /// No description provided for @renameProject.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename…'**
+  String get renameProject;
+
+  /// No description provided for @exportProjectZip.
+  ///
+  /// In en, this message translates to:
+  /// **'Export as .zip…'**
+  String get exportProjectZip;
+
+  /// No description provided for @deleteProject.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete…'**
+  String get deleteProject;
+
+  /// No description provided for @renameProjectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename the project'**
+  String get renameProjectTitle;
+
+  /// No description provided for @rename.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get rename;
+
+  /// No description provided for @deleteProjectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete “{name}”?'**
+  String deleteProjectTitle(String name);
+
+  /// No description provided for @deleteProjectBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The project folder and everything in it (pattern, body, exports) will be deleted from this computer. This cannot be undone.'**
+  String get deleteProjectBody;
+
+  /// No description provided for @deleteProjectConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'I understand that this project will be deleted for good'**
+  String get deleteProjectConfirm;
+
+  /// No description provided for @projectDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted “{name}”.'**
+  String projectDeleted(String name);
+
+  /// No description provided for @projectExported.
+  ///
+  /// In en, this message translates to:
+  /// **'Exported “{name}” to {file}.'**
+  String projectExported(String name, String file);
+
   /// No description provided for @appVersion.
   ///
   /// In en, this message translates to:
@@ -2154,6 +2238,24 @@ abstract class L {
   /// In en, this message translates to:
   /// **'A project already exists there.'**
   String get errAlreadyExists;
+
+  /// No description provided for @errArchiveInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'This file is not a readable .zip archive.'**
+  String get errArchiveInvalid;
+
+  /// No description provided for @errArchiveNoProject.
+  ///
+  /// In en, this message translates to:
+  /// **'This archive holds no Rustle3D project.'**
+  String get errArchiveNoProject;
+
+  /// No description provided for @errArchiveTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'This archive is too large to import (more than {limit} MB once unpacked).'**
+  String errArchiveTooLarge(String limit);
 
   /// No description provided for @photo.
   ///

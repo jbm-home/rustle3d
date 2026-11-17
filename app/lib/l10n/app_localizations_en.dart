@@ -114,6 +114,57 @@ class LEn extends L {
   String get projectsFolder => 'Projects folder';
 
   @override
+  String get importProjectZip => 'Import .zip…';
+
+  @override
+  String get importProjectZipTip =>
+      'Add a project someone sent you as a .zip archive';
+
+  @override
+  String get projectZipFiles => 'Project archives';
+
+  @override
+  String get projectOptions => 'Project options';
+
+  @override
+  String get renameProject => 'Rename…';
+
+  @override
+  String get exportProjectZip => 'Export as .zip…';
+
+  @override
+  String get deleteProject => 'Delete…';
+
+  @override
+  String get renameProjectTitle => 'Rename the project';
+
+  @override
+  String get rename => 'Rename';
+
+  @override
+  String deleteProjectTitle(String name) {
+    return 'Delete “$name”?';
+  }
+
+  @override
+  String get deleteProjectBody =>
+      'The project folder and everything in it (pattern, body, exports) will be deleted from this computer. This cannot be undone.';
+
+  @override
+  String get deleteProjectConfirm =>
+      'I understand that this project will be deleted for good';
+
+  @override
+  String projectDeleted(String name) {
+    return 'Deleted “$name”.';
+  }
+
+  @override
+  String projectExported(String name, String file) {
+    return 'Exported “$name” to $file.';
+  }
+
+  @override
   String appVersion(String version) {
     return 'Version $version';
   }
@@ -1196,6 +1247,17 @@ class LEn extends L {
 
   @override
   String get errAlreadyExists => 'A project already exists there.';
+
+  @override
+  String get errArchiveInvalid => 'This file is not a readable .zip archive.';
+
+  @override
+  String get errArchiveNoProject => 'This archive holds no Rustle3D project.';
+
+  @override
+  String errArchiveTooLarge(String limit) {
+    return 'This archive is too large to import (more than $limit MB once unpacked).';
+  }
 
   @override
   String get photo => 'Photo';

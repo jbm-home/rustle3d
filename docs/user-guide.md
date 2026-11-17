@@ -7,7 +7,8 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-17 (M14; long sleeves, mirrored seams, agent status).
+Last updated: 2026-11-17 (M14; long sleeves, mirrored seams, agent status;
+rename, delete, export and import projects).
 -->
 
 Rustle3D is a free, open-source desktop app for making clothes: draw the
@@ -24,6 +25,12 @@ and Linux, and an AI agent can drive it too.
 - **Recent projects** show a thumbnail; **All projects** lists the rest.
   You can also open a project from anywhere on disk, or open the projects
   folder.
+- The **⋯** button on a project's card renames it, exports it as a .zip
+  file (to send it to someone or keep a copy), or deletes it. Deleting
+  asks first: tick the box saying you understand, then **Delete**. The
+  project folder is deleted for good, not moved to the trash.
+- **Import .zip…** adds a project someone sent you as a .zip file and
+  opens it.
 - Links to rustle3d.com for news and updates.
 
 ### The guided flow
@@ -205,6 +212,9 @@ Everything the app does is a command that an agent can run too.
 ## Files
 Projects are saved as you work, in Documents › Rustle3D. They are
 folders with plain JSON files, so they work with version control.
+Renaming a project also renames its folder, when no other project has
+that name. A project exported as .zip holds its folder (pattern, body,
+exports), without the cache the app rebuilds by itself.
 Patterns come in from DXF, SVG and PDF and go out as SVG, PDF and
 DXF-AAMA; garments go out as glTF and OBJ: open formats only.
 

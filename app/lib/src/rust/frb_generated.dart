@@ -5,6 +5,7 @@
 
 import 'api/engine.dart';
 import 'api/library.dart';
+import 'api/projects.dart';
 import 'api/templates.dart';
 
 import 'dart:async';
@@ -69,7 +70,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -1154729378;
+  int get rustContentHash => 2045030275;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -300,11 +301,33 @@ abstract class RustLibApi extends BaseApi {
     required String name,
   });
 
+  void crateApiProjectsDeleteProject({required String path});
+
+  Future<void> crateApiProjectsExportProjectZip({
+    required String path,
+    required String archive,
+  });
+
+  String crateApiProjectsFreeProjectPath({
+    required String parent,
+    required String name,
+  });
+
+  Future<String> crateApiProjectsImportProjectZip({
+    required String archive,
+    required String parent,
+  });
+
   Future<Uint8List> crateApiTemplatesProjectThumbnail({
     required String path,
     required int width,
     required int height,
     required CanvasColors colors,
+  });
+
+  String crateApiProjectsRenameProject({
+    required String path,
+    required String name,
   });
 
   void crateApiLibrarySaveBodyPreset({
@@ -1869,6 +1892,129 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  void crateApiProjectsDeleteProject({required String path}) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(path, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 49)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_api_error,
+        ),
+        constMeta: kCrateApiProjectsDeleteProjectConstMeta,
+        argValues: [path],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiProjectsDeleteProjectConstMeta =>
+      const TaskConstMeta(debugName: "delete_project", argNames: ["path"]);
+
+  @override
+  Future<void> crateApiProjectsExportProjectZip({
+    required String path,
+    required String archive,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(path, serializer);
+          sse_encode_String(archive, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 50,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_api_error,
+        ),
+        constMeta: kCrateApiProjectsExportProjectZipConstMeta,
+        argValues: [path, archive],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiProjectsExportProjectZipConstMeta =>
+      const TaskConstMeta(
+        debugName: "export_project_zip",
+        argNames: ["path", "archive"],
+      );
+
+  @override
+  String crateApiProjectsFreeProjectPath({
+    required String parent,
+    required String name,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(parent, serializer);
+          sse_encode_String(name, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 51)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiProjectsFreeProjectPathConstMeta,
+        argValues: [parent, name],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiProjectsFreeProjectPathConstMeta =>
+      const TaskConstMeta(
+        debugName: "free_project_path",
+        argNames: ["parent", "name"],
+      );
+
+  @override
+  Future<String> crateApiProjectsImportProjectZip({
+    required String archive,
+    required String parent,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(archive, serializer);
+          sse_encode_String(parent, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 52,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_api_error,
+        ),
+        constMeta: kCrateApiProjectsImportProjectZipConstMeta,
+        argValues: [archive, parent],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiProjectsImportProjectZipConstMeta =>
+      const TaskConstMeta(
+        debugName: "import_project_zip",
+        argNames: ["archive", "parent"],
+      );
+
+  @override
   Future<Uint8List> crateApiTemplatesProjectThumbnail({
     required String path,
     required int width,
@@ -1886,7 +2032,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 49,
+            funcId: 53,
             port: port_,
           );
         },
@@ -1908,6 +2054,36 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  String crateApiProjectsRenameProject({
+    required String path,
+    required String name,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(path, serializer);
+          sse_encode_String(name, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 54)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_api_error,
+        ),
+        constMeta: kCrateApiProjectsRenameProjectConstMeta,
+        argValues: [path, name],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiProjectsRenameProjectConstMeta =>
+      const TaskConstMeta(
+        debugName: "rename_project",
+        argNames: ["path", "name"],
+      );
+
+  @override
   void crateApiLibrarySaveBodyPreset({
     required String libraryDir,
     required String name,
@@ -1920,7 +2096,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(libraryDir, serializer);
           sse_encode_String(name, serializer);
           sse_encode_String(bodyJson, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 50)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 55)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -1946,7 +2122,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(bodyJson, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 51)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 56)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -1980,7 +2156,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 52,
+            funcId: 57,
             port: port_,
           );
         },

@@ -12,6 +12,7 @@
 //! - [`Step`]: one entry of a script — a command, a query, undo/redo or an
 //!   atomic batch.
 //! - [`Session`]: a project plus its history; executes all of the above.
+//! - [`projects`]: whole project folders: rename, delete, zip archives.
 //!
 //! See `docs/architecture.md` §4 and the generated `docs/commands.md`.
 
@@ -21,6 +22,7 @@ pub mod docs;
 pub mod drape;
 pub mod error;
 pub mod history;
+pub mod projects;
 pub mod queries;
 pub mod registry;
 pub mod script;

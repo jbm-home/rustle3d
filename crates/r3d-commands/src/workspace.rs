@@ -27,6 +27,14 @@ pub enum WorkspaceError {
     Read { path: String, detail: String },
     #[error(transparent)]
     Import(#[from] r3d_io::import::ImportError),
+    #[error("not a readable zip archive: {detail}")]
+    Archive { detail: String },
+    #[error(
+        "the archive holds no Rustle3D project (one project.json, at the top or in one folder)"
+    )]
+    NotAProjectArchive,
+    #[error("the archive unpacks to more than {limit_mb} MB")]
+    ArchiveTooLarge { limit_mb: u64 },
 }
 
 impl Localizable for WorkspaceError {
@@ -44,6 +52,13 @@ impl Localizable for WorkspaceError {
                 .arg("path", path)
                 .arg("detail", detail),
             Self::Import(e) => e.message(),
+            Self::Archive { detail } => {
+                Message::new("archive.invalid", self.to_string()).arg("detail", detail)
+            }
+            Self::NotAProjectArchive => Message::new("archive.no_project", self.to_string()),
+            Self::ArchiveTooLarge { limit_mb } => {
+                Message::new("archive.too_large", self.to_string()).arg("limit_mb", limit_mb)
+            }
         }
     }
 }

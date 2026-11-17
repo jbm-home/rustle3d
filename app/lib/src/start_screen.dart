@@ -1,6 +1,6 @@
 // The start screen: start a garment from a template (drafted to the body's
-// measurements), start blank, or reopen a recent project (docs/ux.md §1,
-// docs/specs/11).
+// measurements), start blank, reopen a recent project, or rename, export,
+// delete and import whole projects (docs/ux.md §1, docs/specs/06 and 11).
 
 import 'dart:convert';
 
@@ -129,6 +129,48 @@ Future<void> _launch(BuildContext context, Uri target) async {
 Future<String?> _pickProject(BuildContext context) =>
     getDirectoryPath(confirmButtonText: context.l.open);
 
+/// Ask for a project archive (`.zip`) and unpack it into the projects
+/// folder; returns the new project's folder.
+Future<String?> _importZip(BuildContext context, ProjectStore store) async {
+  final file = await openFile(
+    acceptedTypeGroups: [
+      XTypeGroup(label: context.l.projectZipFiles, extensions: const ['zip']),
+    ],
+  );
+  if (file == null || !context.mounted) return null;
+  try {
+    final path = await store.importZip(file.path);
+    store.remember(path);
+    return path;
+  } on ApiError catch (e) {
+    if (context.mounted) _toast(context, context.error(e));
+    return null;
+  }
+}
+
+/// The "Import .zip…" button: the imported project opens.
+class _ImportZipButton extends StatelessWidget {
+  const _ImportZipButton({required this.store, required this.onOpen});
+
+  final ProjectStore store;
+  final ValueChanged<String> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: context.l.importProjectZipTip,
+      child: TextButton.icon(
+        onPressed: () async {
+          final path = await _importZip(context, store);
+          if (path != null) onOpen(path);
+        },
+        icon: const Icon(Icons.unarchive_outlined, size: 18),
+        label: Text(context.l.importProjectZip),
+      ),
+    );
+  }
+}
+
 class _StartScreenState extends State<StartScreen> {
   late List<RecentProject> _projects = widget.store.all();
   final _thumbs = _Thumbs();
@@ -162,8 +204,8 @@ class _StartScreenState extends State<StartScreen> {
     if (path != null) widget.onOpen(path);
   }
 
-  void _allProjects() {
-    Navigator.of(context).push(
+  Future<void> _allProjects() async {
+    await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => _AllProjectsPage(
           store: widget.store,
@@ -176,6 +218,12 @@ class _StartScreenState extends State<StartScreen> {
         ),
       ),
     );
+    // Projects may have been renamed or deleted there.
+    _refresh();
+  }
+
+  void _refresh() {
+    if (mounted) setState(() => _projects = widget.store.all());
   }
 
   @override
@@ -258,6 +306,10 @@ class _StartScreenState extends State<StartScreen> {
                             ),
                             label: Text(l.openFromDisk),
                           ),
+                          _ImportZipButton(
+                            store: widget.store,
+                            onOpen: widget.onOpen,
+                          ),
                           if (_projects.length > _recentCount)
                             TextButton.icon(
                               onPressed: _allProjects,
@@ -277,9 +329,11 @@ class _StartScreenState extends State<StartScreen> {
                       else
                         _ProjectGrid(
                           projects: _projects.take(_recentCount),
+                          store: widget.store,
                           thumbs: _thumbs,
                           dark: widget.dark,
                           onOpen: widget.onOpen,
+                          onChanged: _refresh,
                         ),
                       _SectionTitle(l.sectionNew),
                       Wrap(
@@ -374,19 +428,26 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-/// Projects as cards: a picture of the pattern, the name, when it changed.
+/// Projects as cards: a picture of the pattern, the name, when it changed,
+/// and a menu to rename, export or delete the project.
 class _ProjectGrid extends StatelessWidget {
   const _ProjectGrid({
     required this.projects,
+    required this.store,
     required this.thumbs,
     required this.dark,
     required this.onOpen,
+    required this.onChanged,
   });
 
   final Iterable<RecentProject> projects;
+  final ProjectStore store;
   final _Thumbs thumbs;
   final bool dark;
   final ValueChanged<String> onOpen;
+
+  /// A project was renamed or deleted.
+  final VoidCallback onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -401,14 +462,296 @@ class _ProjectGrid extends StatelessWidget {
             icon: Icons.folder_outlined,
             picture: thumbs.project(project, dark),
             onTap: () => onOpen(project.path),
+            menu: _ProjectMenu(
+              project: project,
+              store: store,
+              onChanged: onChanged,
+            ),
           ),
       ],
     );
   }
 }
 
+enum _ProjectAction { rename, export, delete }
+
+/// A project card's menu: rename, export as .zip, delete.
+class _ProjectMenu extends StatelessWidget {
+  const _ProjectMenu({
+    required this.project,
+    required this.store,
+    required this.onChanged,
+  });
+
+  final RecentProject project;
+  final ProjectStore store;
+  final VoidCallback onChanged;
+
+  Future<void> _rename(BuildContext context) async {
+    final renamed = await showDialog<bool>(
+      context: context,
+      builder: (_) => _RenameProjectDialog(project: project, store: store),
+    );
+    if (renamed == true) onChanged();
+  }
+
+  Future<void> _export(BuildContext context) async {
+    final l = context.l;
+    final location = await getSaveLocation(
+      suggestedName: '${project.name}.zip',
+      acceptedTypeGroups: [
+        XTypeGroup(label: l.projectZipFiles, extensions: const ['zip']),
+      ],
+    );
+    if (location == null || !context.mounted) return;
+    final path = location.path.toLowerCase().endsWith('.zip')
+        ? location.path
+        : '${location.path}.zip';
+    try {
+      await store.exportZip(project.path, path);
+      if (context.mounted) {
+        _toast(context, l.projectExported(project.name, path));
+      }
+    } on ApiError catch (e) {
+      if (context.mounted) _toast(context, context.error(e));
+    }
+  }
+
+  Future<void> _delete(BuildContext context) async {
+    final l = context.l;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => _DeleteProjectDialog(name: project.name),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      store.delete(project.path);
+      _toast(context, l.projectDeleted(project.name));
+      onChanged();
+    } on ApiError catch (e) {
+      _toast(context, context.error(e));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final l = context.l;
+    return PopupMenuButton<_ProjectAction>(
+      tooltip: l.projectOptions,
+      icon: Icon(Icons.more_horiz_rounded, size: 18, color: p.textMuted),
+      padding: EdgeInsets.zero,
+      onSelected: (action) => switch (action) {
+        _ProjectAction.rename => _rename(context),
+        _ProjectAction.export => _export(context),
+        _ProjectAction.delete => _delete(context),
+      },
+      itemBuilder: (_) => [
+        for (final (action, icon, label, color) in [
+          (
+            _ProjectAction.rename,
+            Icons.drive_file_rename_outline_rounded,
+            l.renameProject,
+            p.text,
+          ),
+          (
+            _ProjectAction.export,
+            Icons.archive_outlined,
+            l.exportProjectZip,
+            p.text,
+          ),
+          (
+            _ProjectAction.delete,
+            Icons.delete_outline_rounded,
+            l.deleteProject,
+            p.danger,
+          ),
+        ])
+          PopupMenuItem(
+            value: action,
+            child: Row(
+              children: [
+                Icon(icon, size: 18, color: color),
+                const SizedBox(width: Space.s),
+                Text(label, style: ts(color: color)),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// A small dialog: a title, the content, then the buttons on the right.
+class _SmallDialog extends StatelessWidget {
+  const _SmallDialog({
+    required this.title,
+    required this.children,
+    required this.actions,
+  });
+
+  final String title;
+  final List<Widget> children;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(kRadius * 1.4),
+      ),
+      child: SizedBox(
+        width: 440,
+        child: Padding(
+          padding: const EdgeInsets.all(Space.xl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: ts(fontSize: 20, fontWeight: FontWeight.w700)),
+              const SizedBox(height: Space.l),
+              ...children,
+              const SizedBox(height: Space.xl),
+              Row(
+                children: [
+                  const Spacer(),
+                  for (final (i, action) in actions.indexed) ...[
+                    if (i > 0) const SizedBox(width: Space.s),
+                    action,
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A new name for a project; pops `true` once renamed.
+class _RenameProjectDialog extends StatefulWidget {
+  const _RenameProjectDialog({required this.project, required this.store});
+
+  final RecentProject project;
+  final ProjectStore store;
+
+  @override
+  State<_RenameProjectDialog> createState() => _RenameProjectDialogState();
+}
+
+class _RenameProjectDialogState extends State<_RenameProjectDialog> {
+  late final _name = TextEditingController(text: widget.project.name)
+    ..selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: widget.project.name.length,
+    );
+  String? _error;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  void _rename() {
+    final name = _name.text.trim();
+    if (name == widget.project.name) {
+      Navigator.pop(context, false);
+      return;
+    }
+    try {
+      widget.store.rename(widget.project.path, name);
+      Navigator.pop(context, true);
+    } on ApiError catch (e) {
+      setState(() => _error = context.error(e));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final l = context.l;
+    return _SmallDialog(
+      title: l.renameProjectTitle,
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: Text(l.cancel),
+        ),
+        FilledButton(onPressed: _rename, child: Text(l.rename)),
+      ],
+      children: [
+        TextField(
+          controller: _name,
+          autofocus: true,
+          onSubmitted: (_) => _rename(),
+          decoration: InputDecoration(
+            labelText: l.fieldName,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: Space.m),
+          Text(_error!, style: ts(fontSize: 13, color: p.danger)),
+        ],
+      ],
+    );
+  }
+}
+
+/// Asks before deleting a project: the Delete button stays off until the
+/// box saying it is for good is ticked. Pops `true` to delete.
+class _DeleteProjectDialog extends StatefulWidget {
+  const _DeleteProjectDialog({required this.name});
+
+  final String name;
+
+  @override
+  State<_DeleteProjectDialog> createState() => _DeleteProjectDialogState();
+}
+
+class _DeleteProjectDialogState extends State<_DeleteProjectDialog> {
+  bool _understood = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final l = context.l;
+    return _SmallDialog(
+      title: l.deleteProjectTitle(widget.name),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: Text(l.cancel),
+        ),
+        FilledButton.icon(
+          style: FilledButton.styleFrom(backgroundColor: p.danger),
+          onPressed: _understood ? () => Navigator.pop(context, true) : null,
+          icon: const Icon(Icons.delete_outline_rounded, size: 18),
+          label: Text(l.delete),
+        ),
+      ],
+      children: [
+        Text(
+          l.deleteProjectBody,
+          style: ts(fontSize: 14, color: p.textMuted, height: 1.4),
+        ),
+        const SizedBox(height: Space.m),
+        CheckboxListTile(
+          value: _understood,
+          onChanged: (v) => setState(() => _understood = v ?? false),
+          title: Text(l.deleteProjectConfirm, style: ts(fontSize: 14)),
+          controlAffinity: ListTileControlAffinity.leading,
+          contentPadding: EdgeInsets.zero,
+        ),
+      ],
+    );
+  }
+}
+
 /// Every project, with opening one from anywhere on disk.
-class _AllProjectsPage extends StatelessWidget {
+class _AllProjectsPage extends StatefulWidget {
   const _AllProjectsPage({
     required this.store,
     required this.thumbs,
@@ -422,10 +765,18 @@ class _AllProjectsPage extends StatelessWidget {
   final ValueChanged<String> onOpen;
 
   @override
+  State<_AllProjectsPage> createState() => _AllProjectsPageState();
+}
+
+class _AllProjectsPageState extends State<_AllProjectsPage> {
+  late List<RecentProject> _projects = widget.store.all();
+
+  @override
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
     final l = context.l;
-    final projects = store.all();
+    final store = widget.store;
+    final onOpen = widget.onOpen;
     return Scaffold(
       body: Column(
         children: [
@@ -457,6 +808,7 @@ class _AllProjectsPage extends StatelessWidget {
                     icon: const Icon(Icons.folder_open_outlined, size: 18),
                     label: Text(l.openFromDisk),
                   ),
+                  _ImportZipButton(store: store, onOpen: onOpen),
                   TextButton.icon(
                     onPressed: () =>
                         _launch(context, Uri.directory(store.projectsDir)),
@@ -475,16 +827,19 @@ class _AllProjectsPage extends StatelessWidget {
                   constraints: const BoxConstraints(maxWidth: 1080),
                   child: SizedBox(
                     width: double.infinity,
-                    child: projects.isEmpty
+                    child: _projects.isEmpty
                         ? Text(
                             l.recentEmpty,
                             style: ts(fontSize: 13, color: p.textMuted),
                           )
                         : _ProjectGrid(
-                            projects: projects,
-                            thumbs: thumbs,
-                            dark: dark,
+                            projects: _projects,
+                            store: store,
+                            thumbs: widget.thumbs,
+                            dark: widget.dark,
                             onOpen: onOpen,
+                            onChanged: () =>
+                                setState(() => _projects = store.all()),
                           ),
                   ),
                 ),
@@ -632,6 +987,7 @@ class _PictureCard extends StatelessWidget {
     required this.icon,
     required this.picture,
     required this.onTap,
+    this.menu,
   });
 
   final String title;
@@ -639,6 +995,9 @@ class _PictureCard extends StatelessWidget {
   final IconData icon;
   final Future<Uint8List> picture;
   final VoidCallback onTap;
+
+  /// Shown at the end of the title's line.
+  final Widget? menu;
 
   @override
   Widget build(BuildContext context) {
@@ -683,6 +1042,8 @@ class _PictureCard extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (menu case final menu?)
+                      SizedBox.square(dimension: 24, child: menu),
                   ],
                 ),
                 const SizedBox(height: 6),

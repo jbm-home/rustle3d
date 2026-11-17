@@ -1,5 +1,6 @@
-// Where projects and the user's libraries live, the recent projects, and
-// making a new project (from a template or blank).
+// Where projects and the user's libraries live, the recent projects,
+// making a new project (from a template or blank), and renaming, deleting,
+// exporting and importing whole projects.
 
 import 'dart:convert';
 import 'dart:io';
@@ -8,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'rust/api/engine.dart';
 import 'rust/api/library.dart';
+import 'rust/api/projects.dart';
 
 /// A project folder found in the projects folder.
 class RecentProject {
@@ -51,8 +53,10 @@ class ProjectStore {
   }
 
   /// Remember that the project at [path] was opened.
-  void remember(String path) {
-    final paths = [path, ..._openedPaths().where((p) => p != path)];
+  void remember(String path) =>
+      _writeOpened([path, ..._openedPaths().where((p) => p != path)]);
+
+  void _writeOpened(List<String> paths) {
     try {
       _recentFile
         ..createSync(recursive: true)
@@ -61,6 +65,29 @@ class ProjectStore {
       // Not remembered: it is still listed if it is in the projects folder.
     }
   }
+
+  /// Rename the project at [path] (closed) to [name]; returns its folder,
+  /// renamed to match when that name is free.
+  String rename(String path, String name) {
+    final renamed = renameProject(path: path, name: name);
+    _writeOpened([for (final p in _openedPaths()) p == path ? renamed : p]);
+    return renamed;
+  }
+
+  /// Delete the project at [path] (closed) for good.
+  void delete(String path) {
+    deleteProject(path: path);
+    _writeOpened(_openedPaths().where((p) => p != path).toList());
+  }
+
+  /// Pack the project at [path] into the zip archive [archive].
+  Future<void> exportZip(String path, String archive) =>
+      exportProjectZip(path: path, archive: archive);
+
+  /// Unpack the project in the zip archive [archive] into the projects
+  /// folder; returns its folder.
+  Future<String> importZip(String archive) =>
+      importProjectZip(archive: archive, parent: projectsDir);
 
   /// The project in the folder at [path], if it reads as one.
   static RecentProject? read(String path) {
@@ -96,17 +123,6 @@ class ProjectStore {
     return found;
   }
 
-  /// A folder path for a new project called [name] that does not exist yet.
-  String freePath(String name) {
-    final safe = name.replaceAll(RegExp(r'[/\\:*?"<>|]'), ' ').trim();
-    final stem = safe.isEmpty ? 'Untitled' : safe;
-    var path = '$projectsDir/$stem.r3d';
-    for (var n = 2; Directory(path).existsSync(); n++) {
-      path = '$projectsDir/$stem $n.r3d';
-    }
-    return path;
-  }
-
   /// The standard body new projects start with.
   Map<String, dynamic> standardBody() {
     final presets = jsonDecode(bodyPresets(libraryDir: libraryDir)) as List;
@@ -125,7 +141,7 @@ class ProjectStore {
     Map<String, double> sizes = const {},
     Map<String, String> pieceNames = const {},
   }) {
-    final path = freePath(name);
+    final path = freeProjectPath(parent: projectsDir, name: name);
     final engine = Engine.open(path: path);
     try {
       engine.run(

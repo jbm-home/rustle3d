@@ -40,6 +40,44 @@
     }
   },
   "projectsFolder": "Projects folder",
+  "importProjectZip": "Import .zip…",
+  "importProjectZipTip": "Add a project someone sent you as a .zip archive",
+  "projectZipFiles": "Project archives",
+  "projectOptions": "Project options",
+  "renameProject": "Rename…",
+  "exportProjectZip": "Export as .zip…",
+  "deleteProject": "Delete…",
+  "renameProjectTitle": "Rename the project",
+  "rename": "Rename",
+  "deleteProjectTitle": "Delete “{name}”?",
+  "@deleteProjectTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteProjectBody": "The project folder and everything in it (pattern, body, exports) will be deleted from this computer. This cannot be undone.",
+  "deleteProjectConfirm": "I understand that this project will be deleted for good",
+  "projectDeleted": "Deleted “{name}”.",
+  "@projectDeleted": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "projectExported": "Exported “{name}” to {file}.",
+  "@projectExported": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "file": {
+        "type": "String"
+      }
+    }
+  },
   "appVersion": "Version {version}",
   "@appVersion": {
     "placeholders": {
@@ -624,6 +662,16 @@
   "errTooNew": "This project was made by a newer version of Rustle3D.",
   "errCorrupted": "This project file is damaged.",
   "errAlreadyExists": "A project already exists there.",
+  "errArchiveInvalid": "This file is not a readable .zip archive.",
+  "errArchiveNoProject": "This archive holds no Rustle3D project.",
+  "errArchiveTooLarge": "This archive is too large to import (more than {limit} MB once unpacked).",
+  "@errArchiveTooLarge": {
+    "placeholders": {
+      "limit": {
+        "type": "String"
+      }
+    }
+  },
   "photo": "Photo",
   "photoTip": "Render a photorealistic image of the garment",
   "photoTitle": "Render a photo",

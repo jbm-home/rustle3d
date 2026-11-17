@@ -116,6 +116,57 @@ class LFr extends L {
   String get projectsFolder => 'Dossier des projets';
 
   @override
+  String get importProjectZip => 'Importer un .zip…';
+
+  @override
+  String get importProjectZipTip =>
+      'Ajouter un projet reçu sous forme d’archive .zip';
+
+  @override
+  String get projectZipFiles => 'Archives de projet';
+
+  @override
+  String get projectOptions => 'Options du projet';
+
+  @override
+  String get renameProject => 'Renommer…';
+
+  @override
+  String get exportProjectZip => 'Exporter en .zip…';
+
+  @override
+  String get deleteProject => 'Supprimer…';
+
+  @override
+  String get renameProjectTitle => 'Renommer le projet';
+
+  @override
+  String get rename => 'Renommer';
+
+  @override
+  String deleteProjectTitle(String name) {
+    return 'Supprimer « $name » ?';
+  }
+
+  @override
+  String get deleteProjectBody =>
+      'Le dossier du projet et tout son contenu (patron, corps, exports) seront supprimés de cet ordinateur. Cette action est irréversible.';
+
+  @override
+  String get deleteProjectConfirm =>
+      'Je comprends que ce projet sera supprimé définitivement';
+
+  @override
+  String projectDeleted(String name) {
+    return '« $name » supprimé.';
+  }
+
+  @override
+  String projectExported(String name, String file) {
+    return '« $name » exporté dans $file.';
+  }
+
+  @override
   String appVersion(String version) {
     return 'Version $version';
   }
@@ -1210,6 +1261,19 @@ class LFr extends L {
 
   @override
   String get errAlreadyExists => 'Un projet existe déjà à cet endroit.';
+
+  @override
+  String get errArchiveInvalid =>
+      'Ce fichier n’est pas une archive .zip lisible.';
+
+  @override
+  String get errArchiveNoProject =>
+      'Cette archive ne contient pas de projet Rustle3D.';
+
+  @override
+  String errArchiveTooLarge(String limit) {
+    return 'Cette archive est trop volumineuse pour être importée (plus de $limit Mo une fois décompressée).';
+  }
 
   @override
   String get photo => 'Photo';
