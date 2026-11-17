@@ -105,12 +105,8 @@ class _Rustle3dAppState extends State<Rustle3dApp> {
   }
 
   /// Back to the start screen; the project is already saved.
-  void _home() {
-    final engine = _engine;
-    setState(() => _engine = null);
-    // Let the views detach from the engine before it goes.
-    WidgetsBinding.instance.addPostFrameCallback((_) => engine?.dispose());
-  }
+  /// The shell disposes its engine once it has faded out.
+  void _home() => setState(() => _engine = null);
 
   final _messenger = GlobalKey<ScaffoldMessengerState>();
 

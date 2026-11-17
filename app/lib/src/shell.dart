@@ -31,6 +31,9 @@ class Shell extends StatefulWidget {
     required this.onHome,
   });
 
+  /// The open project. The shell owns it: it disposes it when it goes,
+  /// after its views (they leave first, at the end of the transition
+  /// back to the start screen).
   final Engine engine;
 
   /// The user's libraries (body presets).
@@ -106,6 +109,7 @@ class _ShellState extends State<Shell> {
   @override
   void dispose() {
     _agentPoll?.cancel();
+    widget.engine.dispose();
     super.dispose();
   }
 
