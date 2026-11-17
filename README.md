@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/logo-dark.svg">
+    <img src="assets/brand/logo.svg" alt="Rustle3D" height="72">
+  </picture>
+</p>
+
 # Rustle3D
 
 3D garment design and cloth simulation, written in Rust.

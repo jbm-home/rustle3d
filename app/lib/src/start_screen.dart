@@ -497,38 +497,76 @@ class _AllProjectsPage extends StatelessWidget {
   }
 }
 
-/// The app's mark.
+/// The app's mark: a piece of cloth in two panels sewn down the middle.
+/// Drawn from `assets/brand/mark-small.svg` (the version for small sizes),
+/// in its 1024 units.
 class Logo extends StatelessWidget {
   const Logo({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final p = Tokens.of(context);
-    return Container(
-      width: 26,
-      height: 26,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(7),
-        gradient: LinearGradient(
-          colors: [
-            p.accent,
-            Color.lerp(p.accent, const Color(0xFFE879A6), 0.6)!,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        'R',
-        style: ts(
-          color: Colors.white,
-          fontWeight: FontWeight.w700,
-          fontSize: 14,
-        ),
-      ),
-    );
+    return const CustomPaint(size: Size.square(26), painter: _MarkPainter());
   }
+}
+
+class _MarkPainter extends CustomPainter {
+  const _MarkPainter();
+
+  static const _tileTop = Color(0xFF7B5CFF);
+  static const _tileBottom = Color(0xFF5634E6);
+  static const _leftPanel = Color(0xFFD9D0FF);
+  static const _stitch = Color(0xFFD9409A);
+
+  /// The hem's two scallops from the centre to the left edge.
+  static void _leftHem(Path p) => p
+    ..cubicTo(487, 796, 389, 796, 364, 750)
+    ..cubicTo(339, 796, 241, 796, 216, 750);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.scale(size.width / 1024);
+    const square = Rect.fromLTWH(0, 0, 1024, 1024);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(square, const Radius.circular(228)),
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [_tileTop, _tileBottom],
+        ).createShader(square),
+    );
+    canvas
+      ..translate(512, 512)
+      ..scale(1.1)
+      ..translate(-512, -529);
+    final cloth = Path()
+      ..moveTo(256, 262)
+      ..lineTo(768, 262)
+      ..lineTo(808, 750)
+      ..cubicTo(783, 796, 685, 796, 660, 750)
+      ..cubicTo(635, 796, 537, 796, 512, 750);
+    _leftHem(cloth);
+    canvas.drawPath(cloth..close(), Paint()..color = Colors.white);
+    final left = Path()
+      ..moveTo(256, 262)
+      ..lineTo(512, 262)
+      ..lineTo(512, 750);
+    _leftHem(left);
+    canvas.drawPath(left..close(), Paint()..color = _leftPanel);
+    final stitch = Paint()..color = _stitch;
+    for (final y in const [330.0, 470.0, 610.0]) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(486, y, 52, 92),
+          const Radius.circular(26),
+        ),
+        stitch,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_MarkPainter oldDelegate) => false;
 }
 
 /// A hoverable card frame.
