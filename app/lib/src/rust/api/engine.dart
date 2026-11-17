@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `adjust_by`, `cloth_hit`, `corner_at`, `edge_spot`, `edited`, `err`, `extend_stroke`, `forget_missing`, `form`, `frozen_board`, `graphics`, `new`, `new`, `offset_along`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `resync_if_due`, `rgba`, `run_created`, `selected`, `sim`, `to_theme`, `workspace`
+// These functions are ignored because they are not marked as `pub`: `adjust_by`, `cloth_hit`, `corner_at`, `edge_spot`, `edited`, `err`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form`, `frozen_board`, `gpu_solver`, `graphics`, `new`, `new`, `offset_along`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `resync_if_due`, `rgba`, `run_created`, `selected`, `sim`, `solver`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
 
@@ -583,6 +583,9 @@ class SimStatus {
   /// Largest opening of a seam (mm).
   final double maxSeamGapMm;
 
+  /// Where the solver runs: `cpu` or `gpu`.
+  final String backend;
+
   const SimStatus({
     required this.loaded,
     required this.running,
@@ -590,6 +593,7 @@ class SimStatus {
     required this.stepMs,
     required this.particles,
     required this.maxSeamGapMm,
+    required this.backend,
   });
 
   @override
@@ -599,7 +603,8 @@ class SimStatus {
       timeS.hashCode ^
       stepMs.hashCode ^
       particles.hashCode ^
-      maxSeamGapMm.hashCode;
+      maxSeamGapMm.hashCode ^
+      backend.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -611,7 +616,8 @@ class SimStatus {
           timeS == other.timeS &&
           stepMs == other.stepMs &&
           particles == other.particles &&
-          maxSeamGapMm == other.maxSeamGapMm;
+          maxSeamGapMm == other.maxSeamGapMm &&
+          backend == other.backend;
 }
 
 /// What a view shows.

@@ -9,7 +9,8 @@ commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
 Last updated: 2026-11-17 (M14; long sleeves, mirrored seams, agent status;
 rename, delete, export and import projects; smooth views on Windows;
-cloth comes to rest; pieces arranged side by side by width).
+cloth comes to rest; pieces arranged side by side by width; M17,
+draping on the graphics card).
 -->
 
 Rustle3D is a free, open-source desktop app for making clothes: draw the
@@ -126,6 +127,11 @@ app.)
   down the forearm, so long sleeves drape too.
 - **Arrange around the body** places every piece side by side in seam
   order at the waist, each taking room in proportion to its width.
+- The drape runs on the graphics card, about five times faster than on
+  the processor; the status bar says **GPU** and the time of a step.
+  Without a usable graphics card, or if it fails, the drape carries on
+  from where it was on the processor (**CPU**). To use the processor
+  anyway, start the app with the environment variable `R3D_SOLVER=cpu`.
 
 ## Photos
 **Photo** (the camera button at the top right of the 3D view) makes a
@@ -204,7 +210,8 @@ Protocol):
   it, or disconnect the agent. Configure the agent to run
   `r3d mcp --attach`.
 - **Without the app**: `r3d mcp --project My.r3d` serves a project
-  headless.
+  headless. Drapes made there (and with `r3d simulate`) run on the
+  processor, so they give the same result every time.
 - An agent can look at its work: a picture of the pattern, of the 3D
   view, or a photo like the app's (`render_photo`). From the command
   line: `r3d render My.r3d --view photo --out photo.png`.

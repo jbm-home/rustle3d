@@ -2537,8 +2537,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   SimStatus dco_decode_sim_status(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 6)
-      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
     return SimStatus(
       loaded: dco_decode_bool(arr[0]),
       running: dco_decode_bool(arr[1]),
@@ -2546,6 +2546,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       stepMs: dco_decode_f_64(arr[3]),
       particles: dco_decode_u_32(arr[4]),
       maxSeamGapMm: dco_decode_f_64(arr[5]),
+      backend: dco_decode_String(arr[6]),
     );
   }
 
@@ -3000,6 +3001,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_stepMs = sse_decode_f_64(deserializer);
     var var_particles = sse_decode_u_32(deserializer);
     var var_maxSeamGapMm = sse_decode_f_64(deserializer);
+    var var_backend = sse_decode_String(deserializer);
     return SimStatus(
       loaded: var_loaded,
       running: var_running,
@@ -3007,6 +3009,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       stepMs: var_stepMs,
       particles: var_particles,
       maxSeamGapMm: var_maxSeamGapMm,
+      backend: var_backend,
     );
   }
 
@@ -3431,6 +3434,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_f_64(self.stepMs, serializer);
     sse_encode_u_32(self.particles, serializer);
     sse_encode_f_64(self.maxSeamGapMm, serializer);
+    sse_encode_String(self.backend, serializer);
   }
 
   @protected

@@ -1,6 +1,6 @@
 # Cloth physics
 
-Status: living document (2026-11-14); the solver choice is revisable (see
+Status: living document (2026-11-17); the solver choice is revisable (see
 the alternatives below). All algorithms come from the
 published papers listed in §9. Code that implements a method cites the paper
 in its doc comment.
@@ -28,20 +28,23 @@ Alternatives considered:
 |---|---|
 | Implicit Euler / Baraff–Witkin [10] | Needs a linear solve every step. Damping artifacts. Harder to make robust with contact. |
 | Projective Dynamics [11] | Fast with a prefactorized system, but refactorization is needed whenever the topology or pins change (frequent while editing). |
-| Vertex Block Descent [12] | Very promising (stable with large steps, GPU-friendly). It is a planned second backend behind the same trait once the MVP is solid. |
+| Vertex Block Descent [12] | Very promising (stable with large steps, GPU-friendly). Not needed for M17: on the GPU, XPBD's cost is per dispatch, not per particle (§7), so VBD would pay off only by cutting substeps. The lead when later milestones need more. |
 | IPC / C-IPC [13, 14] | Guaranteed intersection-free, but far from interactive at 10k vertices on a CPU. A possible offline "final quality" mode later. |
-| GPU XPBD (wgpu compute) | Planned backend. CPU first because it is easier to debug and keep deterministic. |
+| GPU XPBD (wgpu compute) | Done (M17, `r3d-sim-gpu`, §6): the app's backend. The CPU stays the reference, deterministic for any thread count. |
 
 ### Solver trait
 
 ```rust
-pub trait Solver: Send {
-    fn rebuild(&mut self, scene: &SimScene, carry_over: Option<&PositionMap>);
-    fn step(&mut self, frame_dt: f32, ctrl: &StepControl) -> StepStats;
+pub trait Solver: Send + Debug {
+    fn backend(&self) -> &'static str;               // "cpu" or "gpu"
+    fn step(&mut self, frame_dt: f32) -> Result<(), StepError>;
     fn positions(&self) -> &[Vec3];
-    fn set_material(&mut self, panel: PanelSimId, params: &FabricParams);
-    fn set_pins(&mut self, pins: &[Pin]);
-    fn set_grab(&mut self, grab: Option<GrabTarget>);
+    fn time(&self) -> f32;
+    fn stats(&self) -> StepStats;
+    fn continue_at(&mut self, t: f32);               // after a rebuild
+    fn grab(&mut self, index: usize);
+    fn move_grab(&mut self, target: Vec3);
+    fn release(&mut self);
 }
 ```
 
@@ -49,6 +52,11 @@ pub trait Solver: Send {
 particles (rest positions in 2D and 3D, mass), triangles, per-triangle
 material frame (warp/weft directions from the grainline), seam pairs,
 colliders (avatar SDF, ground plane) and material parameter sets.
+`Model::new` compiles it once into what every backend runs: per-particle
+data, flat constraint arrays with their compliances, the self-contact
+topology. A scene edit rebuilds the solver (pins and materials are part
+of the scene); the cloth carries over (`drape::carry_over`). A step
+returns an error only when a GPU loses its device.
 
 ## 2. Discretization
 
@@ -257,9 +265,10 @@ shook it partly loose.
 ### Known issues
 
 
-- **Real time with little headroom.** The three-piece skirt (1 700
-  particles, 30 substeps) steps in about 14 ms per 16.7 ms frame on an
-  Apple M-series laptop, most of it the serial constraint solve. Next
+- **Real time with little headroom on the CPU.** The three-piece skirt
+  (1 700 particles, 30 substeps) steps in about 14 ms per 16.7 ms frame
+  on an Apple M-series laptop, most of it the serial constraint solve.
+  The app now drapes on the GPU (§6, §7). Next
   speed-up: fewer substeps once convergence improves. With damping set to
   0, kinetic + gravitational energy decreases steadily: the solver is
   stable; a sheet hung by two corners needs about ten seconds to come to
@@ -288,6 +297,45 @@ shook it partly loose.
   positions, velocities, inverse masses), constraints in flat arrays per
   type.
 
+### On the GPU (`r3d-sim-gpu`, M17)
+
+The same model and substep on wgpu compute, one WGSL module with a
+kernel per stage:
+
+- **Constraints in colours.** Membranes, hinges and seams are each split
+  by greedy graph colouring into sets that share no particle (≈ 7, 15
+  and 3 colours on a garment); a colour is one dispatch, so the sweep is
+  still Gauss–Seidel, in colour order instead of index order. The ≈ 1 000
+  dispatches per frame that made per-colour parallelism twice slower on
+  the CPU (above) cost ≈ 4 µs each on a GPU.
+- **Contacts gather.** Body contacts, the edges kept out of the body and
+  self-collision are computed per particle from what it reads (Jacobi),
+  then applied, so no two invocations write one particle; no atomics on
+  positions.
+- **Self-collision.** Candidates come from a spatial hash rebuilt on the
+  GPU once per frame [8] (count, prefix sum, scatter), each particle's
+  list kept sorted by index (32 at most), so a run is deterministic on a
+  given GPU; they are the CPU's pairs exactly (checked). The pushes are
+  gathered and a pair is scaled by 1 / the larger contact count of its
+  two particles, the same on both sides. Averaging each particle by its
+  own count (constraint averaging [7] §4.2) moved the two sides of a pair
+  by unequal impulses: tangled cloth propelled itself (a sheet hung from
+  a held corner whipped at 10 m/s, against 2 m/s on the CPU). Particles
+  sewn together and closed move as one, as on the CPU: each adds the
+  pushes of its welded partners.
+- **Per frame**: one command buffer (the substeps' uniforms in 256-byte
+  slots, dynamic offsets), then positions and velocities read back for
+  the views and the statistics. Device or validation errors become a
+  `StepError`; the app then carries on from the last positions on the
+  CPU.
+- **Rebuilds** (every 100 ms while a pattern edit is dragged during a
+  drape): the kernels are compiled once per device (`GpuContext`, about
+  0.3 s the first time, 25 ms once the driver has cached them) and the
+  body's distance field (~7 MB) is uploaded once while it is the same;
+  a new solver then costs ≈ 5 ms on top of the model's 5 ms.
+- **Where it runs**: the app on its one shared device; headless
+  `simulate` (CLI, MCP) on the CPU, so a cached drape is reproducible.
+
 ## 7. Performance targets
 
 Reference machine: 8+ core desktop or laptop CPU (Apple M-series, recent x86).
@@ -298,9 +346,25 @@ Reference machine: 8+ core desktop or laptop CPU (Apple M-series, recent x86).
 | T-shirt on avatar | ~10k | ≥ 30 fps, 15 substeps (stretch: 60 fps) | 70 ms/frame |
 | Dress | ~20k | ≥ 15 fps interactive; GPU backend later for 60 fps | — |
 
-We are about 2× off: 30 substeps are needed for the membrane to converge
-(§4), and the constraint solve is serial (§6). Leads: fewer substeps with a
-better-converging solver (e.g. Vertex Block Descent [12]), or the GPU.
+The CPU was about 2× off: 30 substeps are needed for the membrane to
+converge (§4), and the constraint solve is serial (§6).
+
+M17 targets the starter garments at the default 25 mm spacing:
+T-shirt ≥ 60 fps, dress ≥ 30 fps. `cargo bench -p r3d-sim-gpu`
+(2026-11-17, RTX 2080 + 16-thread x86 CPU, 30 substeps, after 1 s of
+draping):
+
+| Garment | Particles | CPU | GPU |
+|---|---|---|---|
+| T-shirt | 1 776 | 29.7 ms/frame | 5.4 ms/frame |
+| Dress | 2 264 | 36.7 ms/frame | 5.3 ms/frame |
+
+In the app, sharing the GPU with the views, the T-shirt steps in 7.8 ms
+and the views keep 60 fps. The GPU cost is per dispatch (≈ 42 per
+substep), not per particle: the dress meshed at 2.3k, 4.4k and 6.5k
+particles steps in 5.4, 5.7 and 6.2 ms. Fewer substeps (VBD [12]) or
+fewer colours (one kernel over all constraint kinds) are the next levers.
+Not measured yet: Apple M-series (Metal), Linux (Vulkan).
 
 Budget per 30 fps frame: ≤ 20 ms solver, ≤ 3 ms rebuild of the spatial hash,
 with the rest left for rendering and UI. Rebuilding the scene after a pattern
@@ -318,6 +382,14 @@ benchmarks track these numbers per release.
    frame time within budget (benchmark).
 5. Anisotropy check: the same panel hung by its warp vs its weft gives
    different elongation, in the right order.
+
+The scenes and their checks live in `r3d-sim/tests/reference` and run on
+both backends (the GPU's tests include the module), with stacked sheets
+and a grabbed corner. `r3d-sim-gpu/tests/garments.rs` drapes every
+starter garment on both and checks the template criteria (nothing inside
+the body, triangles not cut into it, seams closed, the T-shirt at rest)
+and that the GPU drape ends within 2 cm of the CPU's (it is within a few
+mm).
 
 ## 9. References
 

@@ -6,9 +6,9 @@ real-time cloth physics. It must stay simple to use and fully drivable by AI
 agents through its command layer (CLI and MCP).
 
 Read `docs/architecture.md` before touching code, `docs/physics.md` before
-touching `r3d-sim`, `docs/rendering.md` before touching `r3d-render`'s photo
-renderer, and the relevant `docs/specs/*.md` before implementing a
-feature. `ROADMAP.md` says which milestone we are on.
+touching `r3d-sim` or `r3d-sim-gpu`, `docs/rendering.md` before touching
+`r3d-render`'s photo renderer, and the relevant `docs/specs/*.md` before
+implementing a feature. `ROADMAP.md` says which milestone we are on.
 
 **Firm vs. flexible.** Only the clean-room rules (section 1) are fixed. They
 protect the project legally. Everything else (engineering conventions,
@@ -102,8 +102,9 @@ cargo fmt --all                              # format
 cargo run -p r3d-cli -- --help               # headless CLI (binary: r3d)
 cargo xtask gen-docs                         # regenerate docs/commands.md (a test checks it)
 UPDATE_GOLDEN=1 cargo test -p r3d-core       # regenerate current-version golden files
-./demos/m14/demo.sh                          # latest milestone demo (one folder per milestone)
-cargo bench -p r3d-sim                       # solver benchmarks (docs/physics.md §7)
+./demos/m17/demo.sh                          # latest milestone demo (one folder per milestone)
+cargo bench -p r3d-sim                       # CPU solver benchmarks (docs/physics.md §7)
+cargo bench -p r3d-sim-gpu                   # GPU vs CPU on the T-shirt and the dress
 cargo run -p r3d-cli -- simulate X.r3d       # headless drape (cached), then: render X.r3d --view 3d|photo --out a.png
 cargo run -p r3d-cli -- mcp --project X.r3d  # MCP server over stdio for agents
 (cd app && flutter run -d macos)             # desktop app (Flutter UI + Rust core)
@@ -120,6 +121,7 @@ If `cargo` is not on `PATH`, run `source ~/.cargo/env` first.
 | `r3d-geom`     | 2D math: Bézier, polylines, offsets, polygon ops, panel triangulation |
 | `r3d-core`     | Document model, typed IDs, versioned JSON + migrations               |
 | `r3d-sim`      | XPBD cloth solver (CPU/rayon) behind a `Solver` trait, collisions    |
+| `r3d-sim-gpu`  | The same solver on wgpu compute (the app's backend)                  |
 | `r3d-io`       | OBJ, glTF, SVG, PDF, DXF-AAMA export; DXF, SVG, PDF pattern import    |
 | `r3d-commands` | Typed commands, validation, JSON schemas, undo/redo, `Session`       |
 | `r3d-render`   | wgpu renderers: 2D board, 3D view, path-traced photos; on-screen and offscreen |

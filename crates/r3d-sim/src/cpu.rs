@@ -244,6 +244,10 @@ impl CpuSolver {
 }
 
 impl Solver for CpuSolver {
+    fn backend(&self) -> &'static str {
+        "cpu"
+    }
+
     fn step(&mut self, frame_dt: f32) -> Result<(), StepError> {
         let h = frame_dt / SUBSTEPS as f32;
         self.model

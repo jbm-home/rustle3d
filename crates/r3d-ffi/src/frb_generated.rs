@@ -3096,6 +3096,7 @@ impl SseDecode for crate::api::engine::SimStatus {
         let mut var_stepMs = <f64>::sse_decode(deserializer);
         let mut var_particles = <u32>::sse_decode(deserializer);
         let mut var_maxSeamGapMm = <f64>::sse_decode(deserializer);
+        let mut var_backend = <String>::sse_decode(deserializer);
         return crate::api::engine::SimStatus {
             loaded: var_loaded,
             running: var_running,
@@ -3103,6 +3104,7 @@ impl SseDecode for crate::api::engine::SimStatus {
             step_ms: var_stepMs,
             particles: var_particles,
             max_seam_gap_mm: var_maxSeamGapMm,
+            backend: var_backend,
         };
     }
 }
@@ -3524,6 +3526,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::engine::SimStatus {
             self.step_ms.into_into_dart().into_dart(),
             self.particles.into_into_dart().into_dart(),
             self.max_seam_gap_mm.into_into_dart().into_dart(),
+            self.backend.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -3909,6 +3912,7 @@ impl SseEncode for crate::api::engine::SimStatus {
         <f64>::sse_encode(self.step_ms, serializer);
         <u32>::sse_encode(self.particles, serializer);
         <f64>::sse_encode(self.max_seam_gap_mm, serializer);
+        <String>::sse_encode(self.backend, serializer);
     }
 }
 

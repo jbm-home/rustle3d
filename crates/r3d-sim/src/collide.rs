@@ -14,7 +14,7 @@ use glam::Vec3;
 use rayon::prelude::*;
 
 /// Nodes per brick side.
-const BRICK: usize = 8;
+pub const BRICK: usize = 8;
 const BRICK_NODES: usize = BRICK * BRICK * BRICK;
 /// Distance from the surface (m) within which the field is computed. A
 /// point deeper inside than this is not seen as inside.
@@ -31,6 +31,24 @@ pub struct StaticMesh {
     /// the surface.
     slots: Vec<u32>,
     values: Vec<f32>,
+}
+
+/// The field's storage, for backends that sample it themselves (a node
+/// `(x, y, z)` is in brick `(x, y, z) / BRICK`, at `local` within it, as
+/// in [`StaticMesh::sample`]).
+#[derive(Debug, Clone, Copy)]
+pub struct Grid<'a> {
+    /// Position of node (0, 0, 0) (m).
+    pub origin: Vec3,
+    /// Node spacing (m).
+    pub voxel: f32,
+    /// Bricks along x, y, z.
+    pub dims: [usize; 3],
+    /// For each brick (x fastest), its slot in `values`, or `u32::MAX`
+    /// when far from the surface.
+    pub slots: &'a [u32],
+    /// `BRICK³` values per slot (x fastest); [`BAND`] far from the surface.
+    pub values: &'a [f32],
 }
 
 /// The surface seen from a query point.
@@ -193,6 +211,16 @@ impl StaticMesh {
             dims,
             slots,
             values,
+        }
+    }
+
+    pub fn grid(&self) -> Grid<'_> {
+        Grid {
+            origin: self.origin,
+            voxel: self.voxel,
+            dims: self.dims,
+            slots: &self.slots,
+            values: &self.values,
         }
     }
 

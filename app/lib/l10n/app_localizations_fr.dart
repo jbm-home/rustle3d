@@ -719,8 +719,8 @@ class LFr extends L {
       'Réglez la sélection dans l’inspecteur · ⌫ supprime · ⌘Z annule';
 
   @override
-  String statsSim(int points, String stepMs, String time) {
-    return 'Tissu $points points · pas $stepMs ms · $time s · ';
+  String statsSim(int points, String backend, String stepMs, String time) {
+    return 'Tissu $points points · pas $backend $stepMs ms · $time s · ';
   }
 
   @override

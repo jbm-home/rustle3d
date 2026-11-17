@@ -77,6 +77,9 @@ pub enum StepError {
 
 /// A cloth solver backend.
 pub trait Solver: Send + std::fmt::Debug {
+    /// Where it runs: `"cpu"` or `"gpu"`.
+    fn backend(&self) -> &'static str;
+
     /// Advance by `frame_dt` seconds. On error the positions stay those
     /// of the last good step.
     fn step(&mut self, frame_dt: f32) -> Result<(), StepError>;

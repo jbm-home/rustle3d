@@ -1,0 +1,663 @@
+// XPBD with small steps on the GPU (Macklin et al. 2016, 2019): the same
+// constraints as the CPU backend (r3d-sim's `cpu.rs`, docs/physics.md §3),
+// one kernel per step of a substep. Constraints of a kind are split into
+// colours (no two in a colour share a particle), so each colour is one
+// parallel dispatch of a Gauss–Seidel sweep. Contacts with the body, edge
+// contacts and self-collision are per particle and gather what they need,
+// so no two invocations write the same particle.
+//
+// Prepended by the Rust side: SKIN, NEAR, BAND, BRICK, MAX_NEIGHBOURS.
+
+struct Step {
+    // xyz: gravity (m/s²), w: substep h (s).
+    gravity_h: vec4f,
+    // x: seam compliance / h², y: grab compliance / h², z: 1 / h².
+    params: vec4f,
+    // xyz: where the grab pulls its particle.
+    grab_target: vec4f,
+}
+
+struct Range {
+    start: u32,
+    count: u32,
+    _pad0: u32,
+    _pad1: u32,
+}
+
+struct Scene {
+    // xyz: SDF origin (m), w: node spacing (m).
+    sdf_origin: vec4f,
+    // xyz: bricks along x, y, z; w: 1 if there is a body.
+    sdf_dims: vec4u,
+    // x: self-collision radius (m), y: hash cell size (m), z: 1 to
+    // collide with the ground, w: candidate reach (m).
+    contact: vec4f,
+    // x: particles, y: hash table size (power of two), z: grabbed
+    // particles.
+    counts: vec4u,
+}
+
+struct Membrane {
+    v: vec4u,
+    // cu.xy, cv.xy
+    coef: vec4f,
+    // warp, weft, shear compliances (m/N)
+    alpha: vec4f,
+}
+
+struct Hinge {
+    v: vec4u,
+    alpha: vec4f,
+}
+
+@group(0) @binding(0) var<uniform> step: Step;
+@group(0) @binding(1) var<uniform> range: Range;
+@group(0) @binding(2) var<uniform> scene: Scene;
+
+@group(1) @binding(0) var<storage, read_write> x: array<vec4f>;
+@group(1) @binding(1) var<storage, read_write> prev: array<vec4f>;
+@group(1) @binding(2) var<storage, read_write> vel: array<vec4f>;
+// Per particle: inverse mass, thickness, friction, damping.
+@group(1) @binding(3) var<storage, read> pdata: array<vec4f>;
+@group(1) @binding(4) var<storage, read> membranes: array<Membrane>;
+@group(1) @binding(5) var<storage, read> hinges: array<Hinge>;
+@group(1) @binding(6) var<storage, read> seams: array<vec2u>;
+@group(1) @binding(7) var<storage, read_write> near: array<u32>;
+// Per particle: xyz a correction; w a count or a mask (see the kernels).
+@group(1) @binding(8) var<storage, read_write> delta: array<vec4f>;
+// Compressed rows: row i is csr[csr[i]] .. csr[csr[i + 1]].
+@group(1) @binding(9) var<storage, read> edge_csr: array<u32>;
+@group(1) @binding(10) var<storage, read> sewn_csr: array<u32>;
+@group(1) @binding(11) var<storage, read> excluded_csr: array<u32>;
+@group(1) @binding(12) var<storage, read> sdf_slots: array<u32>;
+@group(1) @binding(13) var<storage, read> sdf_values: array<f32>;
+// xyz: offset from the target, w: particle index (exact as a float).
+@group(1) @binding(14) var<storage, read> grab: array<vec4f>;
+@group(1) @binding(15) var<storage, read_write> cell_count: array<atomic<u32>>;
+@group(1) @binding(16) var<storage, read_write> cell_start: array<u32>;
+@group(1) @binding(17) var<storage, read_write> sorted: array<u32>;
+@group(1) @binding(18) var<storage, read_write> neighbours: array<u32>;
+@group(1) @binding(19) var<storage, read_write> neighbour_count: array<u32>;
+// Per particle: how many candidates it overlaps this substep.
+@group(1) @binding(20) var<storage, read_write> contacts: array<u32>;
+
+const WG: u32 = 64u;
+
+fn finite(v: f32) -> bool {
+    return v == v && abs(v) < 1e30;
+}
+
+// ---------------------------------------------------------------------------
+// Prediction and velocities
+
+@compute @workgroup_size(WG)
+fn predict(@builtin(global_invocation_id) id: vec3u) {
+    let i = id.x;
+    if i >= scene.counts.x {
+        return;
+    }
+    let p = x[i];
+    prev[i] = p;
+    if pdata[i].x > 0.0 {
+        let h = step.gravity_h.w;
+        let v = vel[i].xyz + step.gravity_h.xyz * h;
+        vel[i] = vec4f(v, 0.0);
+        x[i] = vec4f(p.xyz + v * h, 0.0);
+    }
+}
+
+@compute @workgroup_size(WG)
+fn velocity(@builtin(global_invocation_id) id: vec3u) {
+    let i = id.x;
+    if i >= scene.counts.x {
+        return;
+    }
+    let h = step.gravity_h.w;
+    let v = (x[i].xyz - prev[i].xyz) / h;
+    vel[i] = vec4f(v * max(1.0 - pdata[i].w * h, 0.0), 0.0);
+}
+
+// ---------------------------------------------------------------------------
+// Membranes (Strain Based Dynamics, Müller et al. 2014)
+
+// One XPBD update on three particles; returns the multiplier step (0 if
+// the constraint is degenerate).
+fn dlambda3(c: f32, g: array<vec3f, 3>, w: vec3f, alpha_tilde: f32) -> f32 {
+    let denom = w.x * dot(g[0], g[0]) + w.y * dot(g[1], g[1]) + w.z * dot(g[2], g[2]) + alpha_tilde;
+    if denom <= 1e-12 || !finite(c) {
+        return 0.0;
+    }
+    return -c / denom;
+}
+
+@compute @workgroup_size(WG)
+fn membrane(@builtin(global_invocation_id) id: vec3u) {
+    if id.x >= range.count {
+        return;
+    }
+    let m = membranes[range.start + id.x];
+    let w = vec3f(pdata[m.v.x].x, pdata[m.v.y].x, pdata[m.v.z].x);
+    var p0 = x[m.v.x].xyz;
+    var p1 = x[m.v.y].xyz;
+    var p2 = x[m.v.z].xyz;
+    let cu = m.coef.xy;
+    let cv = m.coef.zw;
+    let inv_h2 = step.params.z;
+    // Stretch along the warp, then the weft.
+    for (var k = 0u; k < 2u; k++) {
+        let coef = select(cu, cv, k == 1u);
+        let alpha = select(m.alpha.x, m.alpha.y, k == 1u) * inv_h2;
+        let f = (p1 - p0) * coef.x + (p2 - p0) * coef.y;
+        let len = length(f);
+        if len > 1e-9 {
+            let n = f / len;
+            let g1 = n * coef.x;
+            let g2 = n * coef.y;
+            let g = array<vec3f, 3>(-(g1 + g2), g1, g2);
+            let dl = dlambda3(len - 1.0, g, w, alpha);
+            p0 += g[0] * (dl * w.x);
+            p1 += g[1] * (dl * w.y);
+            p2 += g[2] * (dl * w.z);
+        }
+    }
+    // Shear.
+    let fu = (p1 - p0) * cu.x + (p2 - p0) * cu.y;
+    let fv = (p1 - p0) * cv.x + (p2 - p0) * cv.y;
+    let g1 = fv * cu.x + fu * cv.x;
+    let g2 = fv * cu.y + fu * cv.y;
+    let g = array<vec3f, 3>(-(g1 + g2), g1, g2);
+    let dl = dlambda3(dot(fu, fv), g, w, m.alpha.z * inv_h2);
+    p0 += g[0] * (dl * w.x);
+    p1 += g[1] * (dl * w.y);
+    p2 += g[2] * (dl * w.z);
+    x[m.v.x] = vec4f(p0, 0.0);
+    x[m.v.y] = vec4f(p1, 0.0);
+    x[m.v.z] = vec4f(p2, 0.0);
+}
+
+// ---------------------------------------------------------------------------
+// Bending: dihedral angle, gradients from Bridson et al. 2003
+
+@compute @workgroup_size(WG)
+fn hinge(@builtin(global_invocation_id) id: vec3u) {
+    if id.x >= range.count {
+        return;
+    }
+    let hg = hinges[range.start + id.x];
+    let p0 = x[hg.v.x].xyz;
+    let p1 = x[hg.v.y].xyz;
+    let p2 = x[hg.v.z].xyz;
+    let p3 = x[hg.v.w].xyz;
+    let n1 = cross(p2 - p0, p3 - p0);
+    let n2 = cross(p3 - p1, p2 - p1);
+    let e = p3 - p2;
+    let l1 = dot(n1, n1);
+    let l2 = dot(n2, n2);
+    let le = length(e);
+    if l1 < 1e-20 || l2 < 1e-20 || le < 1e-10 {
+        return;
+    }
+    let m1 = n1 / sqrt(l1);
+    let m2 = n2 / sqrt(l2);
+    let theta = atan2(dot(cross(m2, m1), e / le), dot(m1, m2));
+    let q1 = n1 / l1;
+    let q2 = n2 / l2;
+    let u0 = q1 * le;
+    let u1 = q2 * le;
+    let u2 = q1 * (dot(p0 - p3, e) / le) + q2 * (dot(p1 - p3, e) / le);
+    let u3 = -q1 * (dot(p0 - p2, e) / le) - q2 * (dot(p1 - p2, e) / le);
+    let w = vec4f(pdata[hg.v.x].x, pdata[hg.v.y].x, pdata[hg.v.z].x, pdata[hg.v.w].x);
+    let denom = w.x * dot(u0, u0) + w.y * dot(u1, u1) + w.z * dot(u2, u2) + w.w * dot(u3, u3)
+        + hg.alpha.x * step.params.z;
+    if denom <= 1e-12 || !finite(theta) {
+        return;
+    }
+    let dl = -theta / denom;
+    x[hg.v.x] = vec4f(p0 + u0 * (dl * w.x), 0.0);
+    x[hg.v.y] = vec4f(p1 + u1 * (dl * w.y), 0.0);
+    x[hg.v.z] = vec4f(p2 + u2 * (dl * w.z), 0.0);
+    x[hg.v.w] = vec4f(p3 + u3 * (dl * w.w), 0.0);
+}
+
+// ---------------------------------------------------------------------------
+// Seams: zero-length distances
+
+@compute @workgroup_size(WG)
+fn seam(@builtin(global_invocation_id) id: vec3u) {
+    if id.x >= range.count {
+        return;
+    }
+    let s = seams[range.start + id.x];
+    let pa = x[s.x].xyz;
+    let pb = x[s.y].xyz;
+    let d = pb - pa;
+    let len = length(d);
+    let wa = pdata[s.x].x;
+    let wb = pdata[s.y].x;
+    let denom = wa + wb + step.params.x;
+    if len <= 1e-9 || denom <= 1e-12 {
+        return;
+    }
+    let n = d / len;
+    let dl = -len / denom;
+    x[s.x] = vec4f(pa - n * (dl * wa), 0.0);
+    x[s.y] = vec4f(pb + n * (dl * wb), 0.0);
+}
+
+// ---------------------------------------------------------------------------
+// Grab: a soft zero-length pull of each held particle to the target
+
+@compute @workgroup_size(WG)
+fn pull(@builtin(global_invocation_id) id: vec3u) {
+    if id.x >= scene.counts.z {
+        return;
+    }
+    let g = grab[id.x];
+    let i = u32(g.w);
+    let w = pdata[i].x;
+    let p = x[i].xyz;
+    x[i] = vec4f(p + (step.grab_target.xyz + g.xyz - p) * (w / (w + step.params.y)), 0.0);
+}
+
+// ---------------------------------------------------------------------------
+// The body's signed distance field (r3d-sim `collide::StaticMesh`)
+
+fn sdf_node(c: vec3u) -> f32 {
+    let b = c / BRICK;
+    let dims = scene.sdf_dims.xyz;
+    if any(b >= dims) {
+        return BAND;
+    }
+    let slot = sdf_slots[(b.z * dims.y + b.y) * dims.x + b.x];
+    if slot == 0xffffffffu {
+        return BAND;
+    }
+    let l = c % BRICK;
+    return sdf_values[slot * BRICK * BRICK * BRICK + (l.z * BRICK + l.y) * BRICK + l.x];
+}
+
+// xyz: outward normal, w: signed distance; w = BAND when out of the band.
+fn sdf_sample(p: vec3f) -> vec4f {
+    let none = vec4f(0.0, 0.0, 0.0, BAND);
+    if scene.sdf_dims.w == 0u {
+        return none;
+    }
+    let q = (p - scene.sdf_origin.xyz) / scene.sdf_origin.w;
+    if min(q.x, min(q.y, q.z)) < 0.0 || max(q.x, max(q.y, q.z)) > 1e7 {
+        return none;
+    }
+    let c = vec3u(q);
+    let f = q - vec3f(c);
+    let c000 = sdf_node(c);
+    let c100 = sdf_node(c + vec3u(1u, 0u, 0u));
+    let c010 = sdf_node(c + vec3u(0u, 1u, 0u));
+    let c110 = sdf_node(c + vec3u(1u, 1u, 0u));
+    let c001 = sdf_node(c + vec3u(0u, 0u, 1u));
+    let c101 = sdf_node(c + vec3u(1u, 0u, 1u));
+    let c011 = sdf_node(c + vec3u(0u, 1u, 1u));
+    let c111 = sdf_node(c + vec3u(1u, 1u, 1u));
+    if min(min(min(c000, c100), min(c010, c110)), min(min(c001, c101), min(c011, c111))) >= BAND {
+        return none;
+    }
+    let x00 = mix(c000, c100, f.x);
+    let x10 = mix(c010, c110, f.x);
+    let x01 = mix(c001, c101, f.x);
+    let x11 = mix(c011, c111, f.x);
+    let y0 = mix(x00, x10, f.y);
+    let y1 = mix(x01, x11, f.y);
+    let distance = mix(y0, y1, f.z);
+    let dx = mix(mix(c100 - c000, c110 - c010, f.y), mix(c101 - c001, c111 - c011, f.y), f.z);
+    let dy = mix(x10 - x00, x11 - x01, f.z);
+    let dz = y1 - y0;
+    let g = vec3f(dx, dy, dz);
+    let l = length(g);
+    if !(l > 1e-12) {
+        return none;
+    }
+    return vec4f(g / l, distance);
+}
+
+// ---------------------------------------------------------------------------
+// Contacts with the body and the ground, with Coulomb friction in
+// positions (Macklin et al. 2014, §6.1)
+
+@compute @workgroup_size(WG)
+fn collide(@builtin(global_invocation_id) id: vec3u) {
+    let i = id.x;
+    if i >= scene.counts.x {
+        return;
+    }
+    near[i] = 0u;
+    let d = pdata[i];
+    if d.x == 0.0 {
+        return;
+    }
+    var p = x[i].xyz;
+    var normal = vec3f(0.0);
+    var depth = 0.0;
+    var touching = false;
+    let distance = d.y + SKIN;
+    let c = sdf_sample(p);
+    if c.w < BAND && c.w < distance + NEAR {
+        near[i] = 1u;
+        if c.w < distance {
+            depth = distance - c.w;
+            p += c.xyz * depth;
+            normal = c.xyz;
+            touching = true;
+        }
+    }
+    if scene.contact.z > 0.5 && p.y < d.y {
+        depth = d.y - p.y;
+        p.y = d.y;
+        normal = vec3f(0.0, 1.0, 0.0);
+        touching = true;
+    }
+    if touching {
+        let moved = p - prev[i].xyz;
+        let tangential = moved - normal * dot(moved, normal);
+        let sliding = length(tangential);
+        if sliding > 0.0 {
+            p -= tangential * min(d.z * depth / sliding, 1.0);
+        }
+    }
+    x[i] = vec4f(p, 0.0);
+}
+
+// Edges between two particles near the body keep their middle out of it,
+// pushing both ends by their inverse masses; a particle's pushes from its
+// edges are averaged (constraint averaging, Macklin et al. 2014 §4.2).
+@compute @workgroup_size(WG)
+fn edges(@builtin(global_invocation_id) id: vec3u) {
+    let a = id.x;
+    if a >= scene.counts.x {
+        return;
+    }
+    var sum = vec3f(0.0);
+    var count = 0u;
+    let wa = pdata[a].x;
+    if near[a] != 0u && wa > 0.0 {
+        let xa = x[a].xyz;
+        for (var k = edge_csr[a]; k < edge_csr[a + 1u]; k++) {
+            let b = edge_csr[k];
+            if near[b] == 0u {
+                continue;
+            }
+            let wb = pdata[b].x;
+            let middle = (xa + x[b].xyz) * 0.5;
+            let distance = (pdata[a].y + pdata[b].y) * 0.5 + SKIN;
+            let c = sdf_sample(middle);
+            if c.w < BAND && c.w < distance {
+                sum += c.xyz * (2.0 * (distance - c.w) / (wa + wb) * wa);
+                count += 1u;
+            }
+        }
+    }
+    delta[a] = vec4f(sum / f32(max(count, 1u)), 0.0);
+}
+
+@compute @workgroup_size(WG)
+fn apply(@builtin(global_invocation_id) id: vec3u) {
+    let i = id.x;
+    if i >= scene.counts.x {
+        return;
+    }
+    x[i] = vec4f(x[i].xyz + delta[i].xyz, 0.0);
+}
+
+// ---------------------------------------------------------------------------
+// Self-collision (Müller et al. 2014): particle spheres, candidates from a
+// spatial hash (Teschner et al. 2003) gathered once per frame.
+
+fn cell_of(p: vec3f) -> vec3i {
+    return vec3i(floor(p / scene.contact.y));
+}
+
+fn hash(c: vec3i) -> u32 {
+    let u = bitcast<vec3u>(c);
+    return ((u.x * 73856093u) ^ (u.y * 19349663u) ^ (u.z * 83492791u)) & (scene.counts.y - 1u);
+}
+
+@compute @workgroup_size(WG)
+fn hash_clear(@builtin(global_invocation_id) id: vec3u) {
+    if id.x < scene.counts.y {
+        atomicStore(&cell_count[id.x], 0u);
+    }
+}
+
+@compute @workgroup_size(WG)
+fn hash_count(@builtin(global_invocation_id) id: vec3u) {
+    if id.x < scene.counts.x {
+        atomicAdd(&cell_count[hash(cell_of(x[id.x].xyz))], 1u);
+    }
+}
+
+const SCAN: u32 = 256u;
+var<workgroup> partial: array<u32, SCAN>;
+
+// Exclusive prefix sum of the cell counts into `cell_start` (one
+// workgroup; each thread scans a chunk); the counts become write cursors.
+@compute @workgroup_size(SCAN)
+fn hash_scan(@builtin(local_invocation_id) lid: vec3u) {
+    let t = lid.x;
+    let size = scene.counts.y;
+    let chunk = size / SCAN;
+    var sum = 0u;
+    for (var k = 0u; k < chunk; k++) {
+        sum += atomicLoad(&cell_count[t * chunk + k]);
+    }
+    partial[t] = sum;
+    workgroupBarrier();
+    // Hillis–Steele inclusive scan of the chunk sums.
+    for (var offset = 1u; offset < SCAN; offset *= 2u) {
+        var v = partial[t];
+        if t >= offset {
+            v += partial[t - offset];
+        }
+        workgroupBarrier();
+        partial[t] = v;
+        workgroupBarrier();
+    }
+    var running = partial[t] - sum;
+    for (var k = 0u; k < chunk; k++) {
+        let c = t * chunk + k;
+        let n = atomicLoad(&cell_count[c]);
+        cell_start[c] = running;
+        atomicStore(&cell_count[c], running);
+        running += n;
+    }
+    if t == SCAN - 1u {
+        cell_start[size] = running;
+    }
+}
+
+@compute @workgroup_size(WG)
+fn hash_scatter(@builtin(global_invocation_id) id: vec3u) {
+    if id.x < scene.counts.x {
+        let slot = atomicAdd(&cell_count[hash(cell_of(x[id.x].xyz))], 1u);
+        sorted[slot] = id.x;
+    }
+}
+
+fn is_excluded(i: u32, j: u32) -> bool {
+    var lo = excluded_csr[i];
+    var hi = excluded_csr[i + 1u];
+    while lo < hi {
+        let mid = (lo + hi) / 2u;
+        let v = excluded_csr[mid];
+        if v == j {
+            return true;
+        }
+        if v < j {
+            lo = mid + 1u;
+        } else {
+            hi = mid;
+        }
+    }
+    return false;
+}
+
+// The candidates of each particle, sorted by index (deterministic, and
+// a cell seen twice through a hash collision adds nothing); past
+// MAX_NEIGHBOURS the highest indices are dropped.
+@compute @workgroup_size(WG)
+fn find_neighbours(@builtin(global_invocation_id) id: vec3u) {
+    let i = id.x;
+    if i >= scene.counts.x {
+        return;
+    }
+    let p = x[i].xyz;
+    let wi = pdata[i].x;
+    let reach2 = scene.contact.w * scene.contact.w;
+    let c = cell_of(p);
+    var list: array<u32, MAX_NEIGHBOURS>;
+    var n = 0u;
+    for (var dz = -1; dz <= 1; dz++) {
+        for (var dy = -1; dy <= 1; dy++) {
+            for (var dx = -1; dx <= 1; dx++) {
+                let h = hash(c + vec3i(dx, dy, dz));
+                for (var k = cell_start[h]; k < cell_start[h + 1u]; k++) {
+                    let j = sorted[k];
+                    if j == i || wi + pdata[j].x == 0.0 {
+                        continue;
+                    }
+                    let d = x[j].xyz - p;
+                    if dot(d, d) > reach2 || is_excluded(i, j) {
+                        continue;
+                    }
+                    // Insert j in order.
+                    var at = n;
+                    for (var s = 0u; s < n; s++) {
+                        if list[s] >= j {
+                            at = s;
+                            break;
+                        }
+                    }
+                    if (at < n && list[at] == j) || at >= MAX_NEIGHBOURS {
+                        continue;
+                    }
+                    var s = min(n, MAX_NEIGHBOURS - 1u);
+                    while s > at {
+                        list[s] = list[s - 1u];
+                        s--;
+                    }
+                    list[at] = j;
+                    n = min(n + 1u, MAX_NEIGHBOURS);
+                }
+            }
+        }
+    }
+    for (var s = 0u; s < n; s++) {
+        neighbours[i * MAX_NEIGHBOURS + s] = list[s];
+    }
+    neighbour_count[i] = n;
+}
+
+// Inverse mass of i with the particles sewn to it that are within a radius
+// (the seam has closed, they move as one); 0 if any is pinned.
+fn welded_w(i: u32, r2: f32) -> f32 {
+    let wi = pdata[i].x;
+    if wi == 0.0 {
+        return 0.0;
+    }
+    var mass = 1.0 / wi;
+    let p = x[i].xyz;
+    for (var k = sewn_csr[i]; k < sewn_csr[i + 1u]; k++) {
+        let j = sewn_csr[k];
+        let d = x[j].xyz - p;
+        if dot(d, d) <= r2 {
+            let wj = pdata[j].x;
+            if wj == 0.0 {
+                return 0.0;
+            }
+            mass += 1.0 / wj;
+        }
+    }
+    return 1.0 / mass;
+}
+
+// Whether i and j overlap and can be pushed apart.
+fn overlaps(i: u32, j: u32) -> bool {
+    let d = x[i].xyz - x[j].xyz;
+    let len = length(d);
+    return len < 2.0 * scene.contact.x && len >= 1e-9 && pdata[i].x + pdata[j].x > 0.0;
+}
+
+@compute @workgroup_size(WG)
+fn self_count(@builtin(global_invocation_id) id: vec3u) {
+    let i = id.x;
+    if i >= scene.counts.x {
+        return;
+    }
+    var count = 0u;
+    for (var s = 0u; s < neighbour_count[i]; s++) {
+        if overlaps(i, neighbours[i * MAX_NEIGHBOURS + s]) {
+            count += 1u;
+        }
+    }
+    contacts[i] = count;
+}
+
+// Each particle's share of the pushes out of its overlapping candidates.
+// A pair is scaled by 1 / the larger contact count of its two particles,
+// the same on both sides: averaging each particle by its own count moved
+// the two sides of a pair by unequal impulses, and tangled cloth (a sheet
+// hanging from a held corner) propelled itself.
+// w: the mask of its welded seam partners (bit k: row entry k; up to 24,
+// exact as a float).
+@compute @workgroup_size(WG)
+fn self_gather(@builtin(global_invocation_id) id: vec3u) {
+    let i = id.x;
+    if i >= scene.counts.x {
+        return;
+    }
+    let r = scene.contact.x;
+    let r2 = r * r;
+    let min_d = 2.0 * r;
+    let p = x[i].xyz;
+    var mask = 0u;
+    let first = sewn_csr[i];
+    for (var k = first; k < sewn_csr[i + 1u] && k - first < 24u; k++) {
+        let d = x[sewn_csr[k]].xyz - p;
+        if dot(d, d) <= r2 {
+            mask |= 1u << (k - first);
+        }
+    }
+    var sum = vec3f(0.0);
+    let ci = contacts[i];
+    if ci > 0u {
+        let wi = welded_w(i, r2);
+        for (var s = 0u; s < neighbour_count[i]; s++) {
+            let j = neighbours[i * MAX_NEIGHBOURS + s];
+            if !overlaps(i, j) {
+                continue;
+            }
+            let wj = welded_w(j, r2);
+            if wi + wj == 0.0 {
+                continue;
+            }
+            let d = p - x[j].xyz;
+            let len = length(d);
+            sum += d / len * ((min_d - len) * wi / (wi + wj) / f32(max(ci, contacts[j])));
+        }
+    }
+    delta[i] = vec4f(sum, f32(mask));
+}
+
+// A particle moves by its own push and those of its welded partners.
+@compute @workgroup_size(WG)
+fn self_apply(@builtin(global_invocation_id) id: vec3u) {
+    let i = id.x;
+    if i >= scene.counts.x {
+        return;
+    }
+    var total = delta[i].xyz;
+    let mask = u32(delta[i].w);
+    let first = sewn_csr[i];
+    for (var k = first; k < sewn_csr[i + 1u] && k - first < 24u; k++) {
+        if (mask & (1u << (k - first))) != 0u {
+            total += delta[sewn_csr[k]].xyz;
+        }
+    }
+    x[i] = vec4f(x[i].xyz + total, 0.0);
+}

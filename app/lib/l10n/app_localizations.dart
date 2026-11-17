@@ -1318,8 +1318,8 @@ abstract class L {
   /// No description provided for @statsSim.
   ///
   /// In en, this message translates to:
-  /// **'Cloth {points} points · step {stepMs} ms · {time} s · '**
-  String statsSim(int points, String stepMs, String time);
+  /// **'Cloth {points} points · {backend} step {stepMs} ms · {time} s · '**
+  String statsSim(int points, String backend, String stepMs, String time);
 
   /// No description provided for @statsRender.
   ///

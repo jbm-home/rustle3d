@@ -29,7 +29,7 @@ can be tested through MCP as soon as they exist.
 | M13 | Pattern interchange: DXF, SVG and PDF ✅ | 2–3 wk | A pattern drawn elsewhere is imported from DXF-AAMA, SVG or PDF, edited, sewn and exported back |
 | M14 | Photorealistic rendering ✅ | 4–6 wk | A path-traced studio image of the draped garment |
 | M16 | Zero-copy views on Windows ✅ and Linux | 1–2 wk | The garment drapes as smoothly on Windows and Linux as on macOS |
-| M17 | GPU cloth solver | 3–4 wk | A T-shirt drapes at 60 fps; a dress stays interactive |
+| M17 | GPU cloth solver ✅ | 3–4 wk | A T-shirt drapes at 60 fps; a dress stays interactive |
 | M18 | Trousers and shirt templates | 1–2 wk | A first-time user makes trousers and a shirt from templates |
 | M19 | Layers and multiple garments | 3–4 wk | A shirt tucked into trousers, each in its own fabric and colour |
 | M20 | Trims: buttons and zippers | 2–3 wk | A shirt that buttons and trousers with a fly zipper, draped closed |
@@ -400,9 +400,28 @@ which makes the views slow there.
   animations running, input latency under one frame, on Windows and
   native Linux.
 
-## M17 — GPU cloth solver
+## M17 — GPU cloth solver ✅ (2026-11-17)
 The CPU solver misses its budget beyond a skirt (physics.md §7), and
 M19–M23 all add cloth or motion.
+- Done: `r3d-sim-gpu`, XPBD on wgpu compute behind the `Solver` trait
+  (a crate of its own, so `r3d-sim` stays free of GPU dependencies);
+  constraints in colour sets, one dispatch per colour; body, edge and
+  self contacts gathered per particle, the self-collision candidates
+  from a spatial hash rebuilt on the GPU every frame. The app drapes on
+  its shared GPU device and falls back to the CPU; headless `simulate`
+  stays on the CPU (deterministic, cached).
+- Measured (RTX 2080, 16-thread CPU, `cargo bench -p r3d-sim-gpu`):
+  T-shirt 5.4 ms per frame (CPU 29.7), dress 5.3 ms (CPU 36.7). In the
+  app, sharing the GPU with the views: 7.8 ms, views at 60 fps.
+- XPBD kept, no VBD spike: the GPU cost is per dispatch, not per
+  particle (the dress at 2.3k → 6.5k particles: 5.4 → 6.2 ms), so VBD
+  would only pay off by cutting substeps, which the pass does not need.
+  It stays the lead when M19–M23 need more.
+- Every reference scene and starter garment passes the same checks on
+  both backends; the GPU drape ends within a few mm of the CPU's.
+- Not measured: Apple M-series (Metal), Linux (Vulkan).
+
+Plan as written:
 - A second backend behind the `Solver` trait, in `r3d-sim` with wgpu
   compute (no GUI dependency): GPU XPBD over the existing colour sets,
   or Vertex Block Descent [physics.md 12] if a spike shows it converges

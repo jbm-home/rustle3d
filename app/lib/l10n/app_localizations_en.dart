@@ -711,8 +711,8 @@ class LEn extends L {
       'Adjust the selection in the inspector · ⌫ deletes · ⌘Z undoes';
 
   @override
-  String statsSim(int points, String stepMs, String time) {
-    return 'Cloth $points points · step $stepMs ms · $time s · ';
+  String statsSim(int points, String backend, String stepMs, String time) {
+    return 'Cloth $points points · $backend step $stepMs ms · $time s · ';
   }
 
   @override

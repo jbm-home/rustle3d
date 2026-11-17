@@ -203,7 +203,7 @@
   "hintDraw": "Dessin : faites glisser sur le vêtement 3D ; la ligne va sur le patron · V pour arrêter",
   "hintIdle": "Patron : glissez un coin ou un bord, cliquez un bord pour sa longueur · 3D : glissez pour tirer le tissu · ⇧-glisser un ourlet ou une couture · ⌘-glisser pour déplacer une pièce · ⌥-clic pour épingler",
   "hintSelection": "Réglez la sélection dans l’inspecteur · ⌫ supprime · ⌘Z annule",
-  "statsSim": "Tissu {points} points · pas {stepMs} ms · {time} s · ",
+  "statsSim": "Tissu {points} points · pas {backend} {stepMs} ms · {time} s · ",
   "statsRender": "Rendu Rust · patron {boardMs} ms · 3D {garmentMs} ms · {fps} i/s",
   "toastSewn": "Cousu. Inversez-le dans l’inspecteur s’il paraît vrillé.",
   "toastPinned": "Épinglé. Retirez l’épingle dans l’inspecteur.",

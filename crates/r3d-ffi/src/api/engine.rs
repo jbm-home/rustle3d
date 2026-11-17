@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, TryLockError};
 use std::time::Instant;
 
@@ -12,7 +12,8 @@ use flutter_rust_bridge::frb;
 
 use r3d_commands::drape::{self, Drape, Form};
 use r3d_commands::{Script, Step, Workspace};
-use r3d_sim::{CpuSolver, Solver};
+use r3d_sim::{CpuSolver, SimScene, Solver};
+use r3d_sim_gpu::{GpuContext, GpuSolver};
 
 use crate::cloth::{
     Adjust, CORNER_PICK_PX, ClothHit, EDGE_PICK_MM, EDGE_PICK_PX, Held, Hit, PICK_PX, RESYNC_EVERY,
@@ -309,6 +310,8 @@ pub struct SimStatus {
     pub particles: u32,
     /// Largest opening of a seam (mm).
     pub max_seam_gap_mm: f64,
+    /// Where the solver runs: `cpu` or `gpu`.
+    pub backend: String,
 }
 
 /// A photo to render (see `Engine::start_photo`).
@@ -382,6 +385,11 @@ pub struct Engine {
     sim: Mutex<Option<SimThread>>,
     /// The loaded simulation's scene (pieces, pattern positions).
     cloth: Mutex<Option<Drape>>,
+    /// Simulate on the CPU only: asked for (`R3D_SOLVER=cpu`), or the
+    /// GPU solver failed in this session.
+    cpu_only: AtomicBool,
+    /// The GPU solver's kernels, compiled on the first drape.
+    sim_gpu: Mutex<Option<GpuContext>>,
     /// The dress form for the current measurements.
     form: Mutex<Option<(Body, Form)>>,
     /// Edits not yet carried into the running simulation.
@@ -432,6 +440,10 @@ impl Engine {
             selected_points: Mutex::new(Vec::new()),
             sim: Mutex::new(None),
             cloth: Mutex::new(None),
+            cpu_only: AtomicBool::new(
+                std::env::var("R3D_SOLVER").is_ok_and(|v| v.eq_ignore_ascii_case("cpu")),
+            ),
+            sim_gpu: Mutex::new(None),
             form: Mutex::new(None),
             sync: Arc::new(Mutex::new(Sync::default())),
             agent_changes: Arc::new(AtomicU64::new(0)),
@@ -502,16 +514,50 @@ impl Engine {
         if drape.pieces.is_empty() {
             thread.clear();
         } else {
-            let mut solver = CpuSolver::new(drape.scene.clone());
+            let mut solver = self.solver(drape.scene.clone());
             if carry {
                 solver.continue_at(now.time);
             }
-            thread.load(Box::new(solver));
+            thread.load(solver);
             if carry && now.running {
                 thread.set_running(true);
             }
         }
         *cloth = Some(drape);
+        Ok(())
+    }
+
+    /// A solver for `scene`: on the app's GPU, or on the CPU when there is
+    /// no usable GPU or it failed before.
+    fn solver(&self, scene: SimScene) -> Box<dyn Solver> {
+        if !self.cpu_only.load(Ordering::Relaxed) {
+            match self.gpu_solver(scene.clone()) {
+                Some(solver) => return Box::new(solver),
+                None => self.cpu_only.store(true, Ordering::Relaxed),
+            }
+        }
+        Box::new(CpuSolver::new(scene))
+    }
+
+    fn gpu_solver(&self, scene: SimScene) -> Option<GpuSolver> {
+        let mut slot = self.sim_gpu.lock().ok()?;
+        if slot.is_none() {
+            let gpu = crate::surface::ui_gpu().ok()?;
+            *slot = Some(GpuContext::new(&gpu.device, &gpu.queue).ok()?);
+        }
+        GpuSolver::new(slot.as_ref()?, scene).ok()
+    }
+
+    /// If the GPU solver failed, carry on from its last positions on the
+    /// CPU, for the rest of the session.
+    fn fall_back_if_failed(&self) -> Result<(), ApiError> {
+        let failed = self
+            .sim()?
+            .as_ref()
+            .is_some_and(|t| t.latest().failed.is_some());
+        if failed && !self.cpu_only.swap(true, Ordering::Relaxed) {
+            self.rebuild(true)?;
+        }
         Ok(())
     }
 
@@ -576,6 +622,7 @@ impl Engine {
             step_ms: p.step_ms,
             particles: p.positions.len() as u32,
             max_seam_gap_mm: f64::from(p.max_seam_gap) * 1000.0,
+            backend: p.backend.into(),
         })
     }
 
@@ -907,6 +954,7 @@ impl Engine {
     /// Asynchronous for the UI: the wait never blocks its thread.
     pub fn render_view(&self, view: u32) -> Result<f64, ApiError> {
         let start = Instant::now();
+        self.fall_back_if_failed()?;
         self.resync_if_due()?;
         let selected = self.selected()?.clone();
         let ws = self.workspace()?;

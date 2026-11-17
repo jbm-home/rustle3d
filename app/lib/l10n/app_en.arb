@@ -371,11 +371,14 @@
   "hintDraw": "Draw: drag on the 3D garment; the line goes on the pattern · V to stop",
   "hintIdle": "Pattern: drag a corner or an edge, click an edge for its length · 3D: drag to pull the cloth · ⇧-drag a hem or a seam · ⌘-drag to move a piece · ⌥-click to pin",
   "hintSelection": "Adjust the selection in the inspector · ⌫ deletes · ⌘Z undoes",
-  "statsSim": "Cloth {points} points · step {stepMs} ms · {time} s · ",
+  "statsSim": "Cloth {points} points · {backend} step {stepMs} ms · {time} s · ",
   "@statsSim": {
     "placeholders": {
       "points": {
         "type": "int"
+      },
+      "backend": {
+        "type": "String"
       },
       "stepMs": {
         "type": "String"

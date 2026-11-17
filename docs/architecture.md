@@ -1,6 +1,6 @@
 # Rustle3D architecture
 
-Status: living document, last updated 2026-11-17.
+Status: living document, last updated 2026-11-17 (M17).
 
 Every choice here is the **current best guess**, not a rule. Each one says
 why it was made and what was considered, so it can be challenged and changed
@@ -56,13 +56,14 @@ the change log at the end. Sections marked **Open** are explicitly undecided.
 |---|---|---|
 | `r3d-geom` | `glam` (later `spade` for triangulation, M4) | anything r3d, GUI, GPU |
 | `r3d-core` | `r3d-geom`, `serde`, `serde_json`, `schemars` | sim, GUI, GPU |
-| `r3d-sim` | `r3d-geom`, `glam`, `rayon` | core, GUI, GPU (for the CPU backend) |
+| `r3d-sim` | `r3d-geom`, `glam`, `rayon`, `thiserror` | core, GUI, GPU |
+| `r3d-sim-gpu` | `r3d-sim`, `wgpu`, `bytemuck`, `pollster`, `thiserror` | core, commands, render, GUI |
 | `r3d-io` | `r3d-core`, `r3d-geom`, `pdf-writer`, `lopdf`, `roxmltree`, `svgtypes`, `serde_json`, `thiserror` | sim, GUI, GPU; no file I/O (takes and returns bytes) |
 | `r3d-commands` | core, geom, io (sim from M4) | GUI, GPU |
 | `r3d-render` | core, geom, `wgpu`, `image` | commands, GUI toolkit |
 | `r3d-mcp` | commands (render from M3), `rmcp`, `tokio` | GUI toolkit |
 | `r3d-cli` | commands, render, mcp, `clap` | GUI toolkit |
-| `r3d-ffi` | commands, render, avatar, io (exports), mcp (attached agents), `flutter_rust_bridge` (the Flutter app in `app/`, see 7.1) | |
+| `r3d-ffi` | commands, render, sim-gpu (the app drapes on the GPU), avatar, io (exports), mcp (attached agents), `flutter_rust_bridge` (the Flutter app in `app/`, see 7.1) | |
 
 Changes to the split suggested in the brief:
 
@@ -249,7 +250,7 @@ Validation lives at the start of `apply` rather than in a separate
 |---|---|---|
 | **UI / main** | `Session` (document, history, selection) | Executes commands synchronously, which is cheap. Reads sim frames without blocking. |
 | **Simulation** | `SimScene`, solver state | `crossbeam` channel in (`SimControl`: rebuild, start/pause, pin, grab target, params). Triple buffer out (latest positions plus stats). |
-| **Rayon pool** | n/a | Used by the solver inside a step (parallel per constraint color). |
+| **Rayon pool** | n/a | Used by the CPU solver inside a step (contacts, per particle). The GPU solver records a frame and waits for its readback on the simulation thread. |
 | **Remote/MCP** (app only, tokio) | MCP server on a local socket | Sends `(Command, reply_tx)` to the UI thread over a channel. The UI drains it each frame and calls `request_repaint`. |
 | **Background jobs** | SDF building, exports, triangulation of large panels | Job queue. Results come back as commands or events. |
 
@@ -337,11 +338,13 @@ with `glyphon`. Every tier renders offscreen too, for the CLI and MCP.
 Headless GPU: wgpu works without a window on macOS and Windows, and Linux CI
 uses lavapipe/llvmpipe (software Vulkan) for render golden tests.
 
-### 7.3 Simulation: XPBD on CPU with rayon — current choice
+### 7.3 Simulation: XPBD behind a `Solver` trait, on the GPU in the app — current choice
 
-See [`physics.md`](physics.md). It sits behind a `Solver` trait, so a GPU
-backend (wgpu compute) or Vertex Block Descent can come later without touching
-the callers.
+See [`physics.md`](physics.md). Two backends run the same compiled
+`Model`: `CpuSolver` (`r3d-sim`, rayon; the deterministic reference, used
+headless by `simulate`) and `GpuSolver` (`r3d-sim-gpu`, wgpu compute;
+used by the app on its shared device, with a fall-back to the CPU).
+Vertex Block Descent can come as a third without touching the callers.
 
 ### 7.4 Geometry
 
@@ -511,4 +514,7 @@ code stays **i18n-ready** for more:
 | 2026-11-17 | The app renders photos on a thread of its own on the views' GPU device; the 3D view draws the latest image (`ImageBlit`) | Cancelling and refining never block the UI; batches of about 40 ms of GPU time keep the views' frames smooth |
 | 2026-11-17 | Zero-copy views on Windows: a shared D3D11 texture (NT handle) opened by wgpu's D3D12 device on Flutter's adapter; `render_view` becomes asynchronous; `windows` crate (MIT/Apache-2.0, the version wgpu-hal uses) in `r3d-ffi` | Views were read back through the CPU every frame (36 fps on the T-shirt demo); shared, they reach 60 fps. Blocking the UI thread on the GPU made it miss one vsync in 14 |
 | 2026-11-17 | One GPU device for the whole app (`surface::ui_gpu`, made once on the UI's adapter), shared by every engine's views, the photo thread and the start screen's thumbnails | A device per thumbnail, made and dropped on worker threads (Vulkan, the default backend), hung the app on Windows: the GPU driver, detaching from an exiting thread, waited for another thread under the loader lock |
+| 2026-11-17 | M17: a `Solver` trait over a compiled `Model`; the GPU backend in a crate of its own, `r3d-sim-gpu` (the roadmap said "in `r3d-sim`") | `r3d-sim` stays free of GPU dependencies (CLAUDE.md §2) and testable without a GPU; both backends share the model and the reference scenes |
+| 2026-11-17 | M17: GPU XPBD over colour sets, no VBD spike | It meets the pass with room (T-shirt 5.4 ms, dress 5.3 ms per frame against 16.7 and 33; RTX 2080). The cost is per dispatch, not per particle, so VBD would only pay off by cutting substeps |
+| 2026-11-17 | M17: the app drapes on the GPU (its one device), falls back to the CPU on failure or with `R3D_SOLVER=cpu`; headless `simulate` stays on the CPU | The app needs the speed; agents and the CLI need reproducible, cached drapes, and a GPU result depends on the GPU |
 | 2026-11-17 | Flutter confirmed after a review of the GUI stack; Iced replaces Slint as plan B; Bevy and egui stay out | The 3D is ours (wgpu), Flutter only composites it: smooth on macOS (zero-copy), slower on Windows and WSL where views are read back, which zero-copy sharing fixes without a rewrite. Slint's licences are not permissive |

@@ -2068,6 +2068,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "r3d-sim-gpu"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "criterion",
+ "glam",
+ "pollster",
+ "r3d-commands",
+ "r3d-core",
+ "r3d-sim",
+ "serde_json",
+ "thiserror",
+ "wgpu",
+]
+
+[[package]]
 name = "r3d_ffi"
 version = "0.1.0"
 dependencies = [
@@ -2086,6 +2102,7 @@ dependencies = [
  "r3d-mcp",
  "r3d-render",
  "r3d-sim",
+ "r3d-sim-gpu",
  "serde_json",
  "tempfile",
  "wgpu",

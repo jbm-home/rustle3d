@@ -256,5 +256,8 @@ pub fn grabbed_cloth_follows_the_hand_and_falls_when_released(make: Make) {
     for _ in 0..60 {
         s.step(1.0 / 60.0).unwrap();
     }
-    assert!(s.positions()[corner].y < 0.05, "did not fall back");
+    // Down from the hand at 30 cm; it may land on folds of its own cloth,
+    // each layer two particle radii (17 mm here) thick.
+    let y = s.positions()[corner].y;
+    assert!(y < 0.1, "did not fall back: at {y} m");
 }

@@ -893,6 +893,7 @@ class _ShellState extends State<Shell> {
     if (s == null || !s.loaded) return '';
     return context.l.statsSim(
       s.particles,
+      s.backend.toUpperCase(),
       context.number(s.stepMs, 1),
       context.number(s.timeS, 1),
     );

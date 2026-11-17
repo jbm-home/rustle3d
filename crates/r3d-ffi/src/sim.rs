@@ -39,6 +39,8 @@ pub(crate) struct Published {
     pub step_ms: f64,
     /// Largest distance between sewn points (m).
     pub max_seam_gap: f32,
+    /// Where the solver runs (`"cpu"` or `"gpu"`).
+    pub backend: &'static str,
     /// Why the solver stopped stepping (its device failed); the positions
     /// are those of its last good step.
     pub failed: Option<String>,
@@ -79,10 +81,12 @@ impl SimThread {
     /// Load a new solver, paused, replacing the current one.
     pub fn load(&self, solver: Box<dyn Solver>) {
         let positions = solver.positions().to_vec();
+        let backend = solver.backend();
         self.publish_now(|p| {
             *p = Published {
                 positions,
                 loaded: true,
+                backend,
                 ..Published::default()
             }
         });
@@ -148,6 +152,7 @@ fn publish(
         Some(s) => {
             p.positions.clear();
             p.positions.extend_from_slice(s.positions());
+            p.backend = s.backend();
             p.time = s.time();
             p.max_seam_gap = s.stats().max_seam_gap;
         }
