@@ -265,7 +265,7 @@ Validation lives at the start of `apply` rather than in a separate
 
 ## 7. Key technical choices
 
-### 7.1 GUI stack — Flutter + native Rust renderer (to confirm by the M3 spike)
+### 7.1 GUI stack — Flutter + native Rust renderer
 
 Requirements: a beautiful, accessible UI with a very short learning curve
 (see [`ux.md`](ux.md)), fluid 2D ↔ 3D editing, and photorealistic rendering.
@@ -289,18 +289,20 @@ Why this beats the alternatives considered (survey of 2026-11-14):
 | Option | Verdict |
 |---|---|
 | **Tauri 2 + web UI**, our renderer compiled to WASM in the webview | Highest UI polish, but the webview limits rendering to WebGL2 (WebGPU is not guaranteed in Linux webviews), which rules out path tracing and modern GPU features. Ruled out by the photorealism goal. |
-| **Slint** + wgpu texture import | Rust-only and good-looking, and it can show wgpu textures. Lower polish ceiling, and the wgpu API is still marked unstable. **Plan B** if the Flutter spike fails. |
+| **Iced** | Rust-only (MIT), built on wgpu: our views would share its device with no texture bridge on any system. Active (0.14). Plain default look (fully themeable, as System76's COSMIC shows), fewer animations and less accessibility than Flutter, an API that changes between releases. **Plan B** if Flutter stops being viable. |
+| Slint | Rust-only, good-looking, can show wgpu textures. Ruled out by its licence: GPLv3, a royalty-free licence of its own (attribution required, not OSI) or a commercial one; none is permissive, as dependencies must be. |
 | GPUI (+ gpui-component) | Superb look, but no wgpu: embedding our renderer is a large project. Windows/Linux not mature. |
 | Makepad | Creative-tool oriented with built-in 3D, but sparse documentation and a small community. |
-| Iced, Dioxus native (Blitz), Xilem | Lower polish ceiling, or pre-alpha / experimental. |
+| egui, Dioxus native (Blitz), Xilem | Tool-like look (egui), or pre-alpha / experimental. |
+| Bevy | A game engine: it wants to own the renderer and the app's structure (ECS), its UI is far from a dense editor's needs, and its API breaks every few months. |
 
 Costs we accept: a second language (Dart) for the UI layer only, the Flutter
 toolchain (and full Xcode on macOS), and our own small texture bridge if the
 existing `flutter_wgpu_texture` crate (young, pinned to an old wgpu) does not
 fit.
 
-**Spike protocol (start of M3)**: the same screen in Flutter + Rust, and in
-Slint if needed. It shows the board with a few panels, the 3D view with a
+**Spike protocol (start of M3, passed on macOS)**: the same screen in
+Flutter + Rust. It shows the board with a few panels, the 3D view with a
 10k-vertex mesh updated every frame, an inspector, and light and dark
 themes. Pass criteria:
 - zero-copy texture on macOS first (Windows and Linux before v0.1);
@@ -496,3 +498,4 @@ code stays **i18n-ready** for more:
 | 2026-11-17 | `Fabric::look()` (colour, sheen and its roughness, specular, translucency) replaces `Fabric::appearance()` | The 3D view, the photo and the glTF export read one table, so they agree on a fabric |
 | 2026-11-17 | Whole-project operations (rename, delete, zip export/import) in `r3d_commands::projects`; `zip` crate (MIT) with deflate only (`flate2` on `miniz_oxide`, already in the tree) | Rename goes through `project.rename`, so the folder and the document agree; the start screen needs them on closed projects, outside any session; zip is the format users send each other, and the crate's other codecs (bzip2, zstd, lzma, AES) are not needed |
 | 2026-11-17 | The app renders photos on a thread of its own on the views' GPU device; the 3D view draws the latest image (`ImageBlit`) | Cancelling and refining never block the UI; batches of about 40 ms of GPU time keep the views' frames smooth |
+| 2026-11-17 | Flutter confirmed after a review of the GUI stack; Iced replaces Slint as plan B; Bevy and egui stay out | The 3D is ours (wgpu), Flutter only composites it: smooth on macOS (zero-copy), slower on Windows and WSL where views are read back, which zero-copy sharing fixes without a rewrite. Slint's licences are not permissive |
