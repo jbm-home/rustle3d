@@ -35,26 +35,38 @@ class ProjectStore {
   static Future<ProjectStore> open() async {
     final docs = await getApplicationDocumentsDirectory();
     final support = await getApplicationSupportDirectory();
-    final projects = Directory('${docs.path}/Rustle3D');
+    final projects = Directory(
+      normalize('${docs.path}${Platform.pathSeparator}Rustle3D'),
+    );
     await projects.create(recursive: true);
     return ProjectStore(projectsDir: projects.path, libraryDir: support.path);
   }
+
+  /// [path] spelled one way only, so that one folder is one entry: on
+  /// Windows, `/` and `\` both separate folders, and each path source
+  /// (the system, the file dialog, the engine) mixes them its own way.
+  static String normalize(String path) =>
+      Platform.isWindows ? path.replaceAll('/', r'\') : path;
 
   File get _recentFile => File('$libraryDir/recent-projects.json');
 
   /// The paths of the projects opened, most recent first.
   List<String> _openedPaths() {
     try {
-      return (jsonDecode(_recentFile.readAsStringSync()) as List)
-          .cast<String>();
+      final paths = (jsonDecode(_recentFile.readAsStringSync()) as List)
+          .cast<String>()
+          .map(normalize);
+      return {...paths}.toList();
     } on Object {
       return const [];
     }
   }
 
   /// Remember that the project at [path] was opened.
-  void remember(String path) =>
-      _writeOpened([path, ..._openedPaths().where((p) => p != path)]);
+  void remember(String path) {
+    final key = normalize(path);
+    _writeOpened([key, ..._openedPaths().where((p) => p != key)]);
+  }
 
   void _writeOpened(List<String> paths) {
     try {
@@ -69,15 +81,17 @@ class ProjectStore {
   /// Rename the project at [path] (closed) to [name]; returns its folder,
   /// renamed to match when that name is free.
   String rename(String path, String name) {
-    final renamed = renameProject(path: path, name: name);
-    _writeOpened([for (final p in _openedPaths()) p == path ? renamed : p]);
+    final key = normalize(path);
+    final renamed = normalize(renameProject(path: path, name: name));
+    _writeOpened([for (final p in _openedPaths()) p == key ? renamed : p]);
     return renamed;
   }
 
   /// Delete the project at [path] (closed) for good.
   void delete(String path) {
     deleteProject(path: path);
-    _writeOpened(_openedPaths().where((p) => p != path).toList());
+    final key = normalize(path);
+    _writeOpened(_openedPaths().where((p) => p != key).toList());
   }
 
   /// Pack the project at [path] into the zip archive [archive].
@@ -114,7 +128,7 @@ class ProjectStore {
     if (dir.existsSync()) {
       for (final entry in dir.listSync()) {
         if (entry is Directory && entry.path.endsWith('.r3d')) {
-          paths.add(entry.path);
+          paths.add(normalize(entry.path));
         }
       }
     }
