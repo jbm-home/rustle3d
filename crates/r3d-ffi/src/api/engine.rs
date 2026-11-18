@@ -483,7 +483,7 @@ impl Engine {
         project: &r3d_core::Project,
     ) -> Result<MutexGuard<'_, Option<(Body, Form)>>, ApiError> {
         let mut slot = self.form.lock().map_err(|_| poisoned())?;
-        let body = project.avatar().map(|a| a.body);
+        let body = project.shown_body();
         if slot.as_ref().map(|(b, _)| *b) != body {
             *slot = match (body, Form::of_project(project).map_err(err)?) {
                 (Some(b), Some(f)) => Some((b, f)),
@@ -745,8 +745,9 @@ impl Engine {
     }
 
     /// Write an export to `path`, a file the user chose (anywhere): the
-    /// pattern, or the garment as the 3D view shows it now (the running
-    /// drape, or its starting positions), with the avatar if `avatar`.
+    /// pattern (every size of a graded one, nested), or the garment as the
+    /// 3D view shows it now (the running drape, or its starting positions),
+    /// with the avatar if `avatar`.
     #[frb(sync)]
     pub fn export_file(
         &self,
@@ -758,13 +759,17 @@ impl Engine {
         let bytes = {
             let ws = self.workspace()?;
             let project = ws.session().project();
+            // A graded pattern exports as its nest: every size.
+            let every: Vec<usize> = project
+                .grading()
+                .map(|g| (0..g.sizes.len()).collect())
+                .unwrap_or_default();
+            let drawing = || r3d_io::graded_drawing(project, &every);
             match format {
-                ExportFormat::Svg => {
-                    r3d_io::svg::to_svg(&r3d_io::pattern_drawing(project)).into_bytes()
-                }
-                ExportFormat::PdfA4 => to_pdf(&r3d_io::pattern_drawing(project), Paper::A4),
-                ExportFormat::PdfSingle => to_pdf(&r3d_io::pattern_drawing(project), Paper::Single),
-                ExportFormat::Dxf => r3d_io::dxf::to_dxf(project).into_bytes(),
+                ExportFormat::Svg => r3d_io::svg::to_svg(&drawing()).into_bytes(),
+                ExportFormat::PdfA4 => to_pdf(&drawing(), Paper::A4),
+                ExportFormat::PdfSingle => to_pdf(&drawing(), Paper::Single),
+                ExportFormat::Dxf => r3d_io::dxf::to_dxf_sizes(project, &every).into_bytes(),
                 ExportFormat::Glb | ExportFormat::Obj => {
                     // Locks in the engine's usual order: the simulation
                     // before the cloth.
@@ -1026,7 +1031,7 @@ impl Engine {
         g: &mut Graphics,
         project: &r3d_core::Project,
     ) -> Result<(), ApiError> {
-        let body = project.avatar().map(|a| a.body);
+        let body = project.shown_body();
         if body != g.avatar.as_ref().map(|(b, _)| *b) {
             let form = self.form(project)?;
             g.avatar = form.as_ref().map(|(b, f)| {
@@ -1306,7 +1311,11 @@ impl Engine {
             (ViewKind::Garment, _) => match self.cloth_hit(v, &slot, x, y)? {
                 Some(hit) => (
                     Some(hit.panel),
-                    project.edge_near(hit.panel, hit.at, EDGE_PICK_MM),
+                    project.edge_near(
+                        hit.panel,
+                        project.from_shown(hit.panel, hit.at),
+                        EDGE_PICK_MM,
+                    ),
                 ),
                 None => (None, None),
             },
@@ -1540,12 +1549,15 @@ impl Engine {
         };
         // On a linked mirror copy, the line goes on its source (the copy
         // follows): copy = reflect(source) + offset.
-        let link = self
-            .workspace()?
-            .session()
-            .project()
-            .panel(panel)
-            .and_then(|p| p.mirror_of.clone());
+        let link = {
+            let ws = self.workspace()?;
+            let project = ws.session().project();
+            // Drawn on the shown size; the pattern is in the base size.
+            for p in &mut points {
+                *p = project.from_shown(panel, *p);
+            }
+            project.panel(panel).and_then(|p| p.mirror_of.clone())
+        };
         let panel = match link {
             Some(link) => {
                 if let Some(m) = r3d_geom::Mirror::new(link.origin, link.dir) {
@@ -2055,11 +2067,15 @@ impl Engine {
             .and_then(|d| d.scene.particles.get(hit.particle))
             .map(|p| p.rest)
             .unwrap_or_default();
+        let at = self.workspace()?.session().project().from_shown(
+            panel,
+            r3d_geom::DVec2::new(f64::from(at.x), f64::from(at.y)) * 1000.0,
+        );
         let p = hit.position;
         let step = serde_json::json!({
             "type": "pin.add",
             "panel": panel,
-            "at": [f64::from(at.x) * 1000.0, f64::from(at.y) * 1000.0],
+            "at": [at.x, at.y],
             "position": [p.x, p.y, p.z],
         });
         let out: serde_json::Value = serde_json::from_str(&self.run(step.to_string())?)

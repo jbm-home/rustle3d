@@ -12,8 +12,8 @@ use std::path::PathBuf;
 use glam::DVec2;
 use r3d_core::file::{self, SCHEMA_VERSION};
 use r3d_core::{
-    Around, Avatar, Body, Edge, EdgeCurve, Fabric, Garment, InternalLine, Notch, Panel,
-    PathSegment, Pin, Placement, Point, Project, Seam, SeamSide, Transaction,
+    Around, Avatar, Body, Edge, EdgeCurve, Fabric, Garment, Grading, InternalLine, Notch, Panel,
+    PathSegment, Pin, Placement, Point, Project, Seam, SeamSide, Size, Transaction,
 };
 
 fn golden_dir(version: u32) -> PathBuf {
@@ -31,11 +31,18 @@ fn sample() -> Project {
         .iter()
         .map(|&(x, y)| {
             let id = tx.new_point_id();
+            // The right side is graded: 10 mm outward per size.
+            let grade = if x > 200.0 {
+                vec![DVec2::new(-10.0, 0.0), DVec2::ZERO, DVec2::new(10.0, 0.0)]
+            } else {
+                Vec::new()
+            };
             tx.put_point(
                 id,
                 Point {
                     panel,
                     pos: DVec2::new(x, y),
+                    grade,
                 },
             );
             id
@@ -52,6 +59,16 @@ fn sample() -> Project {
         } else {
             EdgeCurve::Line
         };
+        // The curved top's handles are graded with its right end.
+        let grade = if i == 2 {
+            vec![
+                [DVec2::new(-5.0, 0.0), DVec2::ZERO],
+                [DVec2::ZERO; 2],
+                [DVec2::new(5.0, 0.0), DVec2::ZERO],
+            ]
+        } else {
+            Vec::new()
+        };
         tx.put_edge(
             id,
             Edge {
@@ -59,6 +76,7 @@ fn sample() -> Project {
                 start: pts[i],
                 end: pts[(i + 1) % pts.len()],
                 curve,
+                grade,
             },
         );
         contour.push(id);
@@ -150,6 +168,18 @@ fn sample() -> Project {
             hips_cm: 98.0,
         },
         preset: Some("Women M".into()),
+    }));
+    let size = |name: &str, bust_cm: f64| Size {
+        name: name.into(),
+        height_cm: 0.0,
+        bust_cm,
+        waist_cm: bust_cm,
+        hips_cm: bust_cm,
+    };
+    tx.set_grading(Some(Grading {
+        sizes: vec![size("38", -4.0), size("40", 0.0), size("42", 4.0)],
+        base: 1,
+        shown: 2,
     }));
     tx.commit();
     p

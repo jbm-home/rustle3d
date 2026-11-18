@@ -246,13 +246,29 @@ fn sync_panel(tx: &mut Transaction<'_>, copy_id: PanelId) -> Result<(), CommandE
         .collect::<Result<_, _>>()?;
     let n = src_edges.len();
     let mut positions = Vec::with_capacity(n);
+    let mut grades = Vec::with_capacity(n);
     let mut curves = Vec::with_capacity(n);
+    let mut curve_grades = Vec::with_capacity(n);
     for i in 0..n {
         let e = &src_edges[n - 1 - i];
         let end = p
             .point(e.end)
             .ok_or_else(|| CommandError::not_found(e.end))?;
         positions.push(f(end.pos));
+        grades.push(
+            end.grade
+                .iter()
+                .map(|g| m.apply_vector(*g))
+                .collect::<Vec<_>>(),
+        );
+        // The copy walks the edge backwards: its first handle is the
+        // source's second.
+        curve_grades.push(
+            e.grade
+                .iter()
+                .map(|[g1, g2]| [m.apply_vector(*g2), m.apply_vector(*g1)])
+                .collect::<Vec<_>>(),
+        );
         curves.push(match &e.curve {
             EdgeCurve::Line => EdgeCurve::Line,
             EdgeCurve::Cubic { c1, c2 } => EdgeCurve::Cubic {
@@ -317,7 +333,7 @@ fn sync_panel(tx: &mut Transaction<'_>, copy_id: PanelId) -> Result<(), CommandE
     };
 
     // 3. Write what changed.
-    for (id, pos) in point_ids.iter().zip(&positions) {
+    for ((id, pos), grade) in point_ids.iter().zip(&positions).zip(grades) {
         put_if_changed!(
             tx,
             point,
@@ -325,16 +341,18 @@ fn sync_panel(tx: &mut Transaction<'_>, copy_id: PanelId) -> Result<(), CommandE
             *id,
             Point {
                 panel: copy_id,
-                pos: *pos
+                pos: *pos,
+                grade
             }
         );
     }
-    for (i, (id, curve)) in edge_ids.iter().zip(curves).enumerate() {
+    for (i, ((id, curve), grade)) in edge_ids.iter().zip(curves).zip(curve_grades).enumerate() {
         let edge = Edge {
             panel: copy_id,
             start: point_ids[i],
             end: point_ids[(i + 1) % n],
             curve,
+            grade,
         };
         put_if_changed!(tx, edge, put_edge, *id, edge);
     }

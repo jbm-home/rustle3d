@@ -34,7 +34,7 @@ can be tested through MCP as soon as they exist.
 | M19 | Layers and multiple garments (tucked in: open) | 3–4 wk | A shirt tucked into trousers, each in its own fabric and colour |
 | M20 | Trims: buttons and zippers | 2–3 wk | A shirt that buttons and trousers with a fly zipper, draped closed |
 | M21 | Textures and prints | 2–3 wk | A striped shirt whose stripes follow the grainline on every piece |
-| M22 | Grading and sizes | 2–3 wk | A shirt graded from 36 to 46, each size draped on a matching avatar |
+| M22 | Grading and sizes ✅ | 2–3 wk | A shirt graded from 36 to 52, each size draped on a matching avatar |
 | M23 | Animated avatars | 3–4 wk | The avatar walks and the garment follows |
 | M24 | Fit maps | 1–2 wk | Tight spots on a garment show in colour on the avatar |
 | M15 | Game-ready export | 3–4 wk | LODs + baked wrinkle normal maps + skinning, imported in Godot/Unity/Unreal |
@@ -481,7 +481,35 @@ Plan as written:
   default set; they show in the 3D view, the photo renderer and the
   exports.
 
-## M22 — Grading and sizes
+## M22 — Grading and sizes ✅ (2026-11-18)
+Done ahead of M20–M21 (maintainer, 2026-11-17), with the range up to 52
+instead of 46.
+- Done: a size range on the project (`grading.set_sizes`, or the
+  built-in European charts with `grading.use_chart`: women 32–56, men
+  44–60), each size with a body built from the avatar; grade rules on
+  points (`point.set_grade`: a step per size, or offsets in some sizes),
+  curves, internal lines, pins and mirror copies following; every size
+  derived from the base (`Project::at_size`), the board, the drape and
+  the exports reading it; schema v10 (spec 18).
+- Templates added to a ranged project are drafted for every size's body:
+  a shirt graded 36–52 is, in every size, exactly the shirt drafted for
+  that body, its seams matching (`grading.check`), the sizes nested on
+  the board without touching the next piece.
+- `grading.show_size` drapes a size on its own body (app, CLI, MCP);
+  clicks on the draped garment come back to the base pattern.
+- The graded nest on the board, in SVG and PDF (a colour per size, a
+  legend) and DXF-AAMA (a block per piece and size, `Size:`); the app's
+  pattern exports of a graded project are the nest; `r3d export --sizes`.
+- The app: a Sizes section in the inspector (chart, range, base, size
+  shown in 3D), a grade step on a selected point.
+- Open: the shirt template drapes with folds at the sides from about
+  size 48 (the shirt drafted directly for that body does too: the
+  template, not the grading); notches graded on their own; an ASTM rule
+  table (`.rul`) and grading read from imported files. A graded
+  template takes about 6 s to add on 9 sizes (one body fit per size, in
+  parallel).
+
+Plan as written:
 - A size range on the pattern: grade rules move the key points from
   one size to the next (e.g. waist +10 mm, armhole lower by 5 mm), and
   every size is generated from the base size.

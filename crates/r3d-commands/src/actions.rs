@@ -5,7 +5,7 @@
 use r3d_io::gltf::to_glb;
 use r3d_io::obj::to_obj;
 use r3d_io::pdf::{Paper, layout, to_pdf};
-use r3d_io::{pattern_drawing, svg::to_svg};
+use r3d_io::{Drawing, graded_drawing, pattern_drawing, svg::to_svg};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -56,18 +56,45 @@ pub struct ExportSvg {
     /// `exports/<project name>.svg`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+    /// Sizes of the range to export, by name: one size alone, or several
+    /// nested (a graded nest). Default: the pattern as drawn (base size).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sizes: Option<Vec<String>>,
 }
 
 impl Described for ExportSvg {
-    const SUMMARY: &'static str = "Export all panels as an SVG at 1:1 scale (cutting and sewing lines, notches, internal lines, grainlines, labels, 100 mm test square). Returns the written path, relative to the project folder.";
+    const SUMMARY: &'static str = "Export all panels as an SVG at 1:1 scale (cutting and sewing lines, notches, internal lines, grainlines, labels, 100 mm test square). With `sizes`, the pattern in those sizes of the range: one alone, or a graded nest (the base size in full, the others' cutting lines in colour with a legend). Returns the written path, relative to the project folder.";
 }
 
 impl ActionSpec for ExportSvg {
     fn run(&self, ws: &mut Workspace) -> Result<Value, WorkspaceError> {
-        let svg = to_svg(&pattern_drawing(ws.session().project()));
+        let svg = to_svg(&drawing(ws, self.sizes.as_deref())?);
         let path = self.path.clone().unwrap_or_else(|| default_path(ws, "svg"));
         Ok(json!({ "path": ws.write(&path, svg.as_bytes())? }))
     }
+}
+
+/// The indices of the sizes called `names`, in the range's order.
+fn size_indices(project: &r3d_core::Project, names: &[String]) -> Result<Vec<usize>, CommandError> {
+    if names.is_empty() {
+        return Err(CommandError::invalid("sizes", Invalid::Empty));
+    }
+    let mut out = names
+        .iter()
+        .map(|n| crate::commands::size_index(project, n.trim()))
+        .collect::<Result<Vec<_>, _>>()?;
+    out.sort_unstable();
+    out.dedup();
+    Ok(out)
+}
+
+/// The pattern drawing of an export: in `sizes`, or as drawn.
+fn drawing(ws: &Workspace, sizes: Option<&[String]>) -> Result<Drawing, CommandError> {
+    let project = ws.session().project();
+    Ok(match sizes {
+        Some(names) => graded_drawing(project, &size_indices(project, names)?),
+        None => pattern_drawing(project),
+    })
 }
 
 /// Page layout of a PDF export.
@@ -105,15 +132,19 @@ pub struct ExportPdf {
     /// or `single` for one large page.
     #[serde(default)]
     pub paper: PaperSpec,
+    /// Sizes of the range to export, by name: one size alone, or several
+    /// nested (a graded nest). Default: the pattern as drawn (base size).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sizes: Option<Vec<String>>,
 }
 
 impl Described for ExportPdf {
-    const SUMMARY: &'static str = "Export all panels as a PDF at 1:1 scale, tiled on A4/Letter pages (labelled A1, A2…, with overlap guides) or on one large page. Print at 100 % and check the 100 mm test square. Returns the written path and page count.";
+    const SUMMARY: &'static str = "Export all panels as a PDF at 1:1 scale, tiled on A4/Letter pages (labelled A1, A2…, with overlap guides) or on one large page. Print at 100 % and check the 100 mm test square. With `sizes`, the pattern in those sizes of the range: one alone, or a graded nest. Returns the written path and page count.";
 }
 
 impl ActionSpec for ExportPdf {
     fn run(&self, ws: &mut Workspace) -> Result<Value, WorkspaceError> {
-        let drawing = pattern_drawing(ws.session().project());
+        let drawing = drawing(ws, self.sizes.as_deref())?;
         let paper = Paper::from(self.paper);
         let pages = layout(&drawing, paper).2.len();
         let path = self.path.clone().unwrap_or_else(|| default_path(ws, "pdf"));
@@ -248,15 +279,23 @@ pub struct ExportDxf {
     /// `exports/<project name>.dxf`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+    /// Sizes of the range to export, by name: one size alone, or several
+    /// nested (a graded nest). Default: the pattern as drawn (base size).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sizes: Option<Vec<String>>,
 }
 
 impl Described for ExportDxf {
-    const SUMMARY: &'static str = "Export all panels as DXF-AAMA (ASTM D6673, ASCII DXF in mm), for pattern and cutting software: one block per piece with its cutting line, sewing line, turn points, notches, grainline, internal lines and name. Returns the written path.";
+    const SUMMARY: &'static str = "Export all panels as DXF-AAMA (ASTM D6673, ASCII DXF in mm), for pattern and cutting software: one block per piece with its cutting line, sewing line, turn points, notches, grainline, internal lines and name. With `sizes`, a graded nest: every piece once per size, with a `Size:` text. Returns the written path.";
 }
 
 impl ActionSpec for ExportDxf {
     fn run(&self, ws: &mut Workspace) -> Result<Value, WorkspaceError> {
-        let dxf = r3d_io::dxf::to_dxf(ws.session().project());
+        let project = ws.session().project();
+        let dxf = match self.sizes.as_deref() {
+            Some(names) => r3d_io::dxf::to_dxf_sizes(project, &size_indices(project, names)?),
+            None => r3d_io::dxf::to_dxf(project),
+        };
         let path = self.path.clone().unwrap_or_else(|| default_path(ws, "dxf"));
         Ok(json!({ "path": ws.write(&path, dxf.as_bytes())? }))
     }

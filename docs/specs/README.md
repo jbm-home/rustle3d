@@ -27,3 +27,4 @@ descriptions, public papers, open standards, general garment-making knowledge.
 | 15 | [Game-engine export](15-game-export.md) | M9, M15 |
 | 16 | [Cutting a piece](16-cut.md) | M12 |
 | 17 | [Several garments and layers](17-garments-layers.md) | M19 |
+| 18 | [Grading and sizes](18-grading.md) | M22 |

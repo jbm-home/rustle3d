@@ -43,6 +43,34 @@ pub struct Project {
     pub(crate) avatar: Option<Avatar>,
     pub(crate) seams: IdMap<SeamId, Seam>,
     pub(crate) pins: IdMap<PinId, Pin>,
+    /// The size range the pattern is graded to, if any.
+    pub(crate) grading: Option<Grading>,
+}
+
+/// A size range: the pattern is drawn in the base size, and each point's
+/// grade moves it to the others (`docs/specs/18-grading.md`).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Grading {
+    /// From the smallest to the largest; at least two.
+    pub sizes: Vec<Size>,
+    /// The size the pattern is drawn in (index into `sizes`).
+    pub base: usize,
+    /// The size draped and shown in 3D (index into `sizes`).
+    pub shown: usize,
+}
+
+/// One size of a range: its name and how its body differs from the base
+/// size's, the project's avatar (cm).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Size {
+    /// As on the label: "38", "M".
+    pub name: String,
+    pub height_cm: f64,
+    pub bust_cm: f64,
+    pub waist_cm: f64,
+    pub hips_cm: f64,
 }
 
 /// Body measurements (cm), the input of the avatar fitting.
@@ -313,6 +341,22 @@ impl PathSegment {
 pub struct Point {
     pub panel: PanelId,
     pub pos: DVec2,
+    /// Grade rule: where the point is in each size of the project's range,
+    /// as an offset from `pos` (mm; zero in the base size). Empty: the
+    /// point is the same in every size.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub grade: Vec<DVec2>,
+}
+
+impl Point {
+    /// An ungraded point.
+    pub fn new(panel: PanelId, pos: DVec2) -> Self {
+        Self {
+            panel,
+            pos,
+            grade: Vec::new(),
+        }
+    }
 }
 
 /// An edge between two points of the same panel.
@@ -323,6 +367,24 @@ pub struct Edge {
     pub start: PointId,
     pub end: PointId,
     pub curve: EdgeCurve,
+    /// Grade of a curve's control points: their offsets in each size of
+    /// the project's range (mm; zero in the base size). Empty: they follow
+    /// the end points (see `grading`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub grade: Vec<[DVec2; 2]>,
+}
+
+impl Edge {
+    /// An edge whose curve follows its end points from size to size.
+    pub fn new(panel: PanelId, start: PointId, end: PointId, curve: EdgeCurve) -> Self {
+        Self {
+            panel,
+            start,
+            end,
+            curve,
+            grade: Vec::new(),
+        }
+    }
 }
 
 /// Shape of an edge.
@@ -366,6 +428,7 @@ impl Project {
             avatar: None,
             seams: IdMap::new(),
             pins: IdMap::new(),
+            grading: None,
         }
     }
 
@@ -415,6 +478,10 @@ impl Project {
 
     pub fn avatar(&self) -> Option<&Avatar> {
         self.avatar.as_ref()
+    }
+
+    pub fn grading(&self) -> Option<&Grading> {
+        self.grading.as_ref()
     }
 
     pub fn internal_lines(&self) -> &IdMap<InternalLineId, InternalLine> {

@@ -37,6 +37,12 @@ print and cut.
     polylines within 0.05 mm. Units: `$INSUNITS` = 4 and `Units: METRIC`.
   - The grainline is drawn through the middle of the piece and shortened
     until it lies inside the outline.
+  - **Sizes** (M22, spec 18): SVG, PDF and DXF take `sizes`, names from
+    the project's range: one size alone, or a graded nest (the base size
+    in full, the others' cutting lines each in a colour, a legend beside
+    the test square; in DXF every piece once per size, block `P<n>-<size>`
+    with a `Size: …` text). The app exports a graded project's nest of
+    every size.
 - **Import patterns** (`import.pattern`, one undo step through the
   `pattern.import` command): DXF-AAMA or plain DXF, SVG, PDF.
   - The file must be inside the project folder; the app and `r3d import`

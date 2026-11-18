@@ -1469,4 +1469,79 @@ class LFr extends L {
   @override
   String get learnPhotoStopText =>
       'Tournez la vue 3D sous l\'angle qui vous plaît, cliquez sur le bouton **appareil photo**, choisissez la qualité et l\'éclairage, puis **Lancer le rendu**. L\'image s\'affine dans la vue 3D ; **Enregistrer l\'image…** la garde en PNG.';
+
+  @override
+  String get sizes => 'Tailles';
+
+  @override
+  String get sizesHint =>
+      'Gradez le patron sur une gamme de tailles. Il reste tracé dans la taille de base ; les contours des autres tailles s\'emboîtent autour de chaque pièce.';
+
+  @override
+  String get addSizes => 'Ajouter une gamme de tailles';
+
+  @override
+  String get sizeChart => 'Barème';
+
+  @override
+  String get chartWomen => 'Femme';
+
+  @override
+  String get chartMen => 'Homme';
+
+  @override
+  String get sizeFrom => 'De';
+
+  @override
+  String get sizeTo => 'À';
+
+  @override
+  String get sizeBase => 'Taille de base';
+
+  @override
+  String get sizesDialogHint =>
+      'Les pièces ajoutées ensuite depuis un modèle sont gradées dans toutes les tailles. Chaque taille est drapée sur un corps à ses mesures.';
+
+  @override
+  String get sizeShown => 'Affichée en 3D';
+
+  @override
+  String get sizesChange => 'Modifier';
+
+  @override
+  String get sizesRemove => 'Retirer les tailles';
+
+  @override
+  String get sizeBaseTag => 'base';
+
+  @override
+  String get gradeStep => 'Gradation par taille';
+
+  @override
+  String get gradeStepHint =>
+      'De combien ce point bouge d\'une taille à la suivante.';
+
+  @override
+  String get gradeCustom =>
+      'Réglée taille par taille (par un modèle ou un agent). Un pas saisi ici la remplace.';
+
+  @override
+  String get errNoSizes => 'Ajoutez d\'abord une gamme de tailles.';
+
+  @override
+  String get errUnknownSize => 'Cette taille n\'est pas dans la gamme.';
+
+  @override
+  String get errTooFewSizes => 'Une gamme compte au moins deux tailles.';
+
+  @override
+  String get errDuplicateName => 'Deux tailles portent le même nom.';
+
+  @override
+  String get errBodyOutOfRange =>
+      'Une taille de cette gamme donnerait à l\'avatar des mesures hors des limites acceptées.';
+
+  @override
+  String get errBaseOffset =>
+      'La taille de base ne bouge pas : c\'est le patron tel qu\'il est tracé.';
 }

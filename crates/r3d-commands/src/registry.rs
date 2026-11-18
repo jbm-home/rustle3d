@@ -161,6 +161,11 @@ command_registry! {
     "garment.remove" => GarmentRemove,
     "garment.set_layer" => GarmentSetLayer,
     "panel.set_garment" => PanelSetGarment,
+    "grading.set_sizes" => GradingSetSizes,
+    "grading.use_chart" => GradingUseChart,
+    "grading.clear" => GradingClear,
+    "grading.show_size" => GradingShowSize,
+    "point.set_grade" => PointSetGrade,
     "template.apply" => TemplateApply,
     "pattern.import" => PatternImport,
 }
@@ -176,6 +181,9 @@ query_registry! {
     "seam.list" => SeamList,
     "pin.list" => PinList,
     "template.list" => TemplateList,
+    "grading.get" => GradingGet,
+    "grading.check" => GradingCheck,
+    "grading.charts" => GradingCharts,
 }
 
 action_registry! {

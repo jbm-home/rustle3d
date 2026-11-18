@@ -111,9 +111,16 @@ fn line_style(c: &mut Content, stroke: Stroke) {
         Stroke::Internal => (0.3, 0.25, &[6.0, 2.0, 1.0, 2.0]),
         Stroke::Grain => (0.3, 0.25, &[]),
         Stroke::Mark => (0.3, 0.0, &[]),
+        Stroke::Size(_) => (0.4, 0.0, &[]),
     };
     c.set_line_width(width);
-    c.set_stroke_gray(gray);
+    if let Stroke::Size(k) = stroke {
+        let rgb = Stroke::size_color(k);
+        let channel = |shift: u32| ((rgb >> shift) & 0xFF) as f32 / 255.0;
+        c.set_stroke_rgb(channel(16), channel(8), channel(0));
+    } else {
+        c.set_stroke_gray(gray);
+    }
     c.set_dash_pattern(dash.iter().copied(), 0.0);
 }
 

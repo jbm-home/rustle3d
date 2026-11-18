@@ -17,7 +17,7 @@ pub(crate) fn waist_height_cm(p: &Project) -> Result<f64, CommandError> {
     let Some(avatar) = p.avatar() else {
         return Ok(DEFAULT_TOP_CM);
     };
-    let fit = r3d_avatar::fit::fit(crate::queries::body_model()?, &avatar.body);
+    let fit = crate::queries::fitted(&avatar.body)?;
     Ok(f64::from(fit.achieved.waist_height_cm))
 }
 

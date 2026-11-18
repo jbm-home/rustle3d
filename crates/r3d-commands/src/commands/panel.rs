@@ -107,7 +107,7 @@ fn create_panel(
         .iter()
         .map(|&(pos, _)| {
             let id = tx.new_point_id();
-            tx.put_point(id, Point { panel, pos });
+            tx.put_point(id, Point::new(panel, pos));
             id
         })
         .collect();
@@ -117,12 +117,12 @@ fn create_panel(
             let id = tx.new_edge_id();
             tx.put_edge(
                 id,
-                Edge {
+                Edge::new(
                     panel,
-                    start: point_ids[i],
-                    end: point_ids[(i + 1) % n],
-                    curve: outline[i].1.clone(),
-                },
+                    point_ids[i],
+                    point_ids[(i + 1) % n],
+                    outline[i].1.clone(),
+                ),
             );
             id
         })

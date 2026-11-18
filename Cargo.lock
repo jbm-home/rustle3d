@@ -1977,6 +1977,7 @@ dependencies = [
  "r3d-geom",
  "r3d-io",
  "r3d-sim",
+ "rayon",
  "schemars",
  "serde",
  "serde_json",

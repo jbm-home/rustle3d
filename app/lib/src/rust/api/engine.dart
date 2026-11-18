@@ -85,8 +85,9 @@ abstract class Engine implements RustOpaqueInterface {
   void drag({required int view, required double dx, required double dy});
 
   /// Write an export to `path`, a file the user chose (anywhere): the
-  /// pattern, or the garment as the 3D view shows it now (the running
-  /// drape, or its starting positions), with the avatar if `avatar`.
+  /// pattern (every size of a graded one, nested), or the garment as the
+  /// 3D view shows it now (the running drape, or its starting positions),
+  /// with the avatar if `avatar`.
   void exportFile({
     required ExportFormat format,
     required String path,

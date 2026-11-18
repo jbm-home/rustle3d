@@ -17,4 +17,4 @@ pub mod pdf;
 pub mod scene3d;
 pub mod svg;
 
-pub use drawing::{Drawing, pattern_drawing};
+pub use drawing::{Drawing, graded_drawing, pattern_drawing};

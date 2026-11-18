@@ -1452,4 +1452,79 @@ class LEn extends L {
   @override
   String get learnPhotoStopText =>
       'Turn the 3D view to the angle you like, click the **camera** button, choose the quality and the lighting, then **Render**. The image gets cleaner in the 3D view; **Save image…** keeps it as a PNG file.';
+
+  @override
+  String get sizes => 'Sizes';
+
+  @override
+  String get sizesHint =>
+      'Grade the pattern to a range of sizes. It stays drawn in the base size; the other sizes\' outlines nest around each piece.';
+
+  @override
+  String get addSizes => 'Add a size range';
+
+  @override
+  String get sizeChart => 'Size chart';
+
+  @override
+  String get chartWomen => 'Women';
+
+  @override
+  String get chartMen => 'Men';
+
+  @override
+  String get sizeFrom => 'From';
+
+  @override
+  String get sizeTo => 'To';
+
+  @override
+  String get sizeBase => 'Base size';
+
+  @override
+  String get sizesDialogHint =>
+      'Pieces added from a template afterwards are graded to every size. Each size is draped on a body with its measurements.';
+
+  @override
+  String get sizeShown => 'Shown in 3D';
+
+  @override
+  String get sizesChange => 'Change';
+
+  @override
+  String get sizesRemove => 'Remove the sizes';
+
+  @override
+  String get sizeBaseTag => 'base';
+
+  @override
+  String get gradeStep => 'Grade per size';
+
+  @override
+  String get gradeStepHint =>
+      'How far this point moves from one size to the next.';
+
+  @override
+  String get gradeCustom =>
+      'Set per size (by a template or an agent). A step typed here replaces it.';
+
+  @override
+  String get errNoSizes => 'Add a size range first.';
+
+  @override
+  String get errUnknownSize => 'That size is not in the range.';
+
+  @override
+  String get errTooFewSizes => 'A size range needs at least two sizes.';
+
+  @override
+  String get errDuplicateName => 'Two sizes have the same name.';
+
+  @override
+  String get errBodyOutOfRange =>
+      'A size of this range would give the avatar measurements outside what it accepts.';
+
+  @override
+  String get errBaseOffset =>
+      'The base size cannot move: it is the pattern as drawn.';
 }

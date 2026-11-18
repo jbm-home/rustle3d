@@ -19,10 +19,13 @@ Future<void> main() async {
   await prepareSharedTextures();
   final store = await ProjectStore.open();
   // Review aids for screenshots (scripts/app-screenshot.sh):
-  // --dart-define=R3D_DEMO=t_shirt opens a fresh project from that template;
+  // --dart-define=R3D_DEMO=t_shirt opens a fresh project from that template,
+  // R3D_OPEN=<folder> an existing project (made with the CLI);
   // R3D_DARK=true, R3D_SELECT=panel:2, R3D_SIMULATE=true.
   const demo = String.fromEnvironment('R3D_DEMO');
+  const open = String.fromEnvironment('R3D_OPEN');
   Engine? engine;
+  if (open.isNotEmpty) engine = Engine.open(path: open);
   if (demo.isNotEmpty) {
     final scratch = ProjectStore(
       projectsDir: '${Directory.systemTemp.path}/rustle3d-demo',
@@ -36,6 +39,8 @@ Future<void> main() async {
         template: demo,
       ),
     );
+  }
+  if (engine != null) {
     const select = String.fromEnvironment('R3D_SELECT');
     if (select.isNotEmpty) engine.select(panels: [select]);
     if (const bool.fromEnvironment('R3D_SIMULATE')) {

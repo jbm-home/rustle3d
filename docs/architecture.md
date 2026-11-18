@@ -1,6 +1,6 @@
 # Rustle3D architecture
 
-Status: living document, last updated 2026-11-17 (M17).
+Status: living document, last updated 2026-11-18 (M22).
 
 Every choice here is the **current best guess**, not a rule. Each one says
 why it was made and what was considered, so it can be challenged and changed
@@ -59,7 +59,7 @@ the change log at the end. Sections marked **Open** are explicitly undecided.
 | `r3d-sim` | `r3d-geom`, `glam`, `rayon`, `thiserror` | core, GUI, GPU |
 | `r3d-sim-gpu` | `r3d-sim`, `wgpu`, `bytemuck`, `pollster`, `thiserror` | core, commands, render, GUI |
 | `r3d-io` | `r3d-core`, `r3d-geom`, `pdf-writer`, `lopdf`, `roxmltree`, `svgtypes`, `serde_json`, `thiserror` | sim, GUI, GPU; no file I/O (takes and returns bytes) |
-| `r3d-commands` | core, geom, io (sim from M4) | GUI, GPU |
+| `r3d-commands` | core, geom, io (sim from M4), avatar, `rayon` | GUI, GPU |
 | `r3d-render` | core, geom, `wgpu`, `image` | commands, GUI toolkit |
 | `r3d-mcp` | commands (render from M3), `rmcp`, `tokio` | GUI toolkit |
 | `r3d-cli` | commands, render, mcp, `clap` | GUI toolkit |
@@ -98,9 +98,19 @@ Project                                        (✓ = implemented in M1)
  ├─ seams:   IdMap<SeamId, Seam>               (two edge chains + direction flags)
  ├─ materials: IdMap<MaterialId, FabricMaterial>
  ├─ avatar:  Option<AvatarRef>                 (path inside the project folder + landmarks)
+ ├─ grading: Option<Grading>                   ✓ (M22: sizes with body differences, base, shown)
  ├─ arrangement_points: from the avatar, editable
  └─ drape:   Option<DrapeSnapshot>             (last saved simulated positions)
 ```
+
+- **Grading (M22)**: the document holds the pattern in its base size.
+  A point's `grade` is its offset in each size (a grade rule table), a
+  curved edge's `grade` its handles' (templates set it; otherwise the
+  handles follow their points). `Project::at_size(i)` is the whole
+  project redrawn in size `i` (based on `i`, the avatar in that size's
+  body); `Project::as_shown()` is the one the drape, the 3D view, photos
+  and 3D exports use. Derived, never stored: editing stays on one
+  geometry, and a size cannot drift from its rules (spec 18).
 
 - **IDs** are typed newtypes (`PanelId(u64)`, …) allocated from one monotonic
   counter per document, shared by every entity kind. They serialize as
@@ -518,3 +528,6 @@ code stays **i18n-ready** for more:
 | 2026-11-17 | M17: GPU XPBD over colour sets, no VBD spike | It meets the pass with room (T-shirt 5.4 ms, dress 5.3 ms per frame against 16.7 and 33; RTX 2080). The cost is per dispatch, not per particle, so VBD would only pay off by cutting substeps |
 | 2026-11-17 | M17: the app drapes on the GPU (its one device), falls back to the CPU on failure or with `R3D_SOLVER=cpu`; headless `simulate` stays on the CPU | The app needs the speed; agents and the CLI need reproducible, cached drapes, and a GPU result depends on the GPU |
 | 2026-11-17 | Flutter confirmed after a review of the GUI stack; Iced replaces Slint as plan B; Bevy and egui stay out | The 3D is ours (wgpu), Flutter only composites it: smooth on macOS (zero-copy), slower on Windows and WSL where views are read back, which zero-copy sharing fixes without a rewrite. Slint's licences are not permissive |
+| 2026-11-18 | M22: sizes as grade rules on the base pattern (an offset per size on each point, and on a curve's handles when known), every size derived on demand (`Project::at_size`), not stored pieces per size | One geometry to edit; the rules are what DXF-AAMA/ASTM grading exchanges; a size cannot drift from its rules. Offsets per size rather than one step per point: real charts change their step (+4 then +6 cm), and a template drafted per size gives exact offsets |
+| 2026-11-18 | M22: the drape uses the shown size through `Project::as_shown` inside `drape::build` and `Form::of_project`, so every caller (app, CLI, MCP, exports) drapes the same size | One choke point instead of each front-end grading the project |
+| 2026-11-18 | M22: `rayon` in `r3d-commands` (already in the tree through `r3d-sim`): a graded template drafts every size in parallel; body fits are kept (`queries::fitted`, last 32) | Each size's draft fits a body (≈ 2.5 s): a shirt on 9 sizes took 26 s, now 6.5 s |

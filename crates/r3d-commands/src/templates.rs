@@ -7,7 +7,14 @@
 //! blocks with ease instead of darts, proportions taken from the chest or
 //! the stature.
 
-use r3d_core::{AnyId, Around, Body, EdgeId, Fabric, PanelId, Transaction};
+use std::collections::BTreeMap;
+
+use rayon::prelude::*;
+
+use r3d_core::{
+    AnyId, Around, Avatar, Body, Edge, EdgeCurve, EdgeId, Fabric, PanelId, Point, PointId, Project,
+    Transaction,
+};
 use r3d_geom::{CubicBez, DVec2};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -230,6 +237,11 @@ struct Draft<'a, 'b> {
     /// Left edge of the next panel on the board (mm).
     x: f64,
     created: Vec<AnyId>,
+    /// Where each piece's draft x = 0 lies on the board (mm).
+    origins: BTreeMap<PanelId, f64>,
+    /// The least room each piece takes on the board, in drafting order:
+    /// its extent around its origin (mm).
+    room: &'a [(f64, f64)],
 }
 
 /// A drafted panel: its id, its contour edges in drawing order, and
@@ -264,6 +276,10 @@ impl Draft<'_, '_> {
     ) -> Result<Piece, CommandError> {
         let lo = outline.iter().fold(f64::MAX, |m, (p, _)| m.min(p.x));
         let hi = outline.iter().fold(f64::MIN, |m, (p, _)| m.max(p.x));
+        let (lo, hi) = match self.room.get(self.origins.len()) {
+            Some((rl, rh)) => (lo.min(*rl), hi.max(*rh)),
+            None => (lo, hi),
+        };
         let shift = DVec2::new(self.x - lo, 0.0);
         self.x += hi - lo + BOARD_GAP;
         let at = |p: DVec2| {
@@ -310,6 +326,7 @@ impl Draft<'_, '_> {
             mm: SEAM_ALLOWANCE_MM,
         }
         .apply(self.tx)?;
+        self.origins.insert(id, shift.x);
         Ok(Piece {
             id,
             edges,
@@ -325,9 +342,16 @@ impl Draft<'_, '_> {
             .project()
             .panel_bounding_box(source.id)
             .map_or((0.0, 0.0), |b| (b.min.x, b.max.x));
-        // Reflected across x = o, the copy spans [2o - max, 2o - min]: it
-        // starts at the cursor.
-        let axis = (self.x + max) / 2.0;
+        // Reflected across x = o, the copy's origin is at 2o - origin and
+        // it spans [2o - max, 2o - min] (or its room around its origin):
+        // it starts at the cursor.
+        let so = source.origin_x;
+        let (lo, hi) = (so - max, so - min);
+        let (lo, hi) = match self.room.get(self.origins.len()) {
+            Some((rl, rh)) => (lo.min(*rl), hi.max(*rh)),
+            None => (lo, hi),
+        };
+        let axis = (self.x - lo + so) / 2.0;
         let out = PanelMirror {
             panel: source.id,
             name: Some(name.to_owned()),
@@ -335,7 +359,7 @@ impl Draft<'_, '_> {
             axis_dir: None,
         }
         .apply(self.tx)?;
-        self.x += max - min + BOARD_GAP;
+        self.x += hi - lo + BOARD_GAP;
         let id = out
             .created
             .first()
@@ -358,10 +382,12 @@ impl Draft<'_, '_> {
                     .ok_or_else(|| internal(format!("no mirror of {src}")))
             })
             .collect::<Result<_, _>>()?;
+        let origin_x = 2.0 * axis - source.origin_x;
+        self.origins.insert(id, origin_x);
         Ok(Piece {
             id,
             edges,
-            origin_x: 2.0 * axis - source.origin_x,
+            origin_x,
         })
     }
 
@@ -433,12 +459,157 @@ fn p(x: f64, y: f64) -> DVec2 {
 }
 
 /// Draft `template` into the project. Returns the created panels and
-/// seams.
+/// seams. In a project with a size range, the pieces are drafted in every
+/// size and their points graded to match.
 pub fn draft(
     tx: &mut Transaction<'_>,
     template: Template,
     sizes: Sizes,
 ) -> Result<Vec<AnyId>, CommandError> {
+    let Some(g) = tx.project().grading().cloned() else {
+        return Ok(draft_in(tx, template, sizes, &[])?.0);
+    };
+    // Every size first, each on a copy of the project as it is: the same
+    // steps allocate the same ids.
+    let before = tx.project().clone();
+    let drafts = (0..g.sizes.len())
+        .into_par_iter()
+        .map(|i| draft_size(&before, i, template, sizes))
+        .collect::<Result<Vec<_>, _>>()?;
+    // Each piece takes the room of its widest size on the board, so the
+    // sizes nest without running into the next piece.
+    let mut room: Vec<(f64, f64)> = Vec::new();
+    for d in &drafts {
+        for (k, (id, origin)) in d.origins.iter().enumerate() {
+            let Some(b) = d.project.panel_bounding_box(*id) else {
+                continue;
+            };
+            let (lo, hi) = (b.min.x - origin, b.max.x - origin);
+            match room.get_mut(k) {
+                Some(r) => *r = (r.0.min(lo), r.1.max(hi)),
+                None => room.push((lo, hi)),
+            }
+        }
+    }
+    let (created, origins) = draft_in(tx, template, sizes, &room)?;
+    grade(tx, &origins, &drafts, g.base)?;
+    Ok(created)
+}
+
+/// A template drafted in one size.
+struct Drafted {
+    /// Where each piece's draft x = 0 lies on the board (mm).
+    origins: BTreeMap<PanelId, f64>,
+    /// The project with it.
+    project: Project,
+}
+
+/// Draft `template` on a copy of `before`, in the body of size `i`.
+fn draft_size(
+    before: &Project,
+    i: usize,
+    template: Template,
+    sizes: Sizes,
+) -> Result<Drafted, CommandError> {
+    let body = size_body(before, i).ok_or_else(|| internal(format!("no size {i}")))?;
+    let mut copy = before.clone();
+    let mut tx = Transaction::begin(&mut copy);
+    tx.set_avatar(Some(Avatar { body, preset: None }));
+    let (_, origins) = draft_in(&mut tx, template, sizes, &[])?;
+    Ok(Drafted {
+        origins,
+        project: tx.project().clone(),
+    })
+}
+
+/// The body a template is drafted for in size `i`: the avatar's (or a
+/// standard one) changed by the size's differences.
+fn size_body(p: &Project, i: usize) -> Option<Body> {
+    let body = p.avatar().map_or(STANDARD, |a| a.body);
+    let size = p.grading()?.sizes.get(i)?;
+    Some(Body {
+        height_cm: body.height_cm + size.height_cm,
+        bust_cm: body.bust_cm + size.bust_cm,
+        waist_cm: body.waist_cm + size.waist_cm,
+        hips_cm: body.hips_cm + size.hips_cm,
+        ..body
+    })
+}
+
+/// Grade the points and curves of the pieces just drafted (`origins`:
+/// each piece's draft origin on the board) from the drafts of every size:
+/// where each point lands from its piece's origin. The pieces of every
+/// size share their origin (on most a centre line), so they nest.
+fn grade(
+    tx: &mut Transaction<'_>,
+    origins: &BTreeMap<PanelId, f64>,
+    drafts: &[Drafted],
+    base: usize,
+) -> Result<(), CommandError> {
+    let n = drafts.len();
+    let from_origin = |d: &BTreeMap<PanelId, f64>, panel: PanelId| {
+        DVec2::new(d.get(&panel).copied().unwrap_or_default(), 0.0)
+    };
+    let points: Vec<(PointId, Point)> = tx
+        .project()
+        .points()
+        .iter()
+        .filter(|(_, p)| origins.contains_key(&p.panel))
+        .map(|(id, p)| (*id, p.clone()))
+        .collect();
+    for (id, point) in points {
+        let mut grade = vec![DVec2::ZERO; n];
+        for (i, d) in drafts.iter().enumerate().filter(|(i, _)| *i != base) {
+            let at = d
+                .project
+                .point(id)
+                .filter(|p| p.panel == point.panel)
+                .ok_or_else(|| internal(format!("{id} not drafted in size {i}")))?;
+            if let Some(slot) = grade.get_mut(i) {
+                *slot = (at.pos - from_origin(&d.origins, point.panel))
+                    - (point.pos - from_origin(origins, point.panel));
+            }
+        }
+        if grade.iter().any(|g| *g != DVec2::ZERO) {
+            tx.put_point(id, Point { grade, ..point });
+        }
+    }
+    let edges: Vec<(EdgeId, Edge)> = tx
+        .project()
+        .edges()
+        .iter()
+        .filter(|(_, e)| origins.contains_key(&e.panel))
+        .map(|(id, e)| (*id, e.clone()))
+        .collect();
+    for (id, edge) in edges {
+        let EdgeCurve::Cubic { c1, c2 } = edge.curve else {
+            continue;
+        };
+        let here = from_origin(origins, edge.panel);
+        let mut grade = vec![[DVec2::ZERO; 2]; n];
+        for (i, d) in drafts.iter().enumerate().filter(|(i, _)| *i != base) {
+            let there = from_origin(&d.origins, edge.panel);
+            if let Some(EdgeCurve::Cubic { c1: s1, c2: s2 }) = d.project.edge(id).map(|e| &e.curve)
+                && let Some(slot) = grade.get_mut(i)
+            {
+                *slot = [(*s1 - there) - (c1 - here), (*s2 - there) - (c2 - here)];
+            }
+        }
+        if grade.iter().flatten().any(|g| *g != DVec2::ZERO) {
+            tx.put_edge(id, Edge { grade, ..edge });
+        }
+    }
+    Ok(())
+}
+
+/// Draft `template` in the avatar's body, ungraded; piece `k` takes at
+/// least `room[k]` on the board (its extent around its origin, mm).
+fn draft_in(
+    tx: &mut Transaction<'_>,
+    template: Template,
+    sizes: Sizes,
+    room: &[(f64, f64)],
+) -> Result<(Vec<AnyId>, BTreeMap<PanelId, f64>), CommandError> {
     let body = tx.project().avatar().map_or(STANDARD, |a| a.body);
     let sizes = sizes.resolve(template, &body);
     let fresh = tx.project().panels().is_empty();
@@ -455,6 +626,8 @@ pub fn draft(
         tx,
         x,
         created: Vec::new(),
+        origins: BTreeMap::new(),
+        room,
     };
     match template {
         Template::StraightSkirt => skirt(&mut d, &sizes, &body, 0.0)?,
@@ -506,7 +679,7 @@ pub fn draft(
             d.created.insert(0, AnyId::Garment(garment));
         }
     }
-    Ok(d.created)
+    Ok((d.created, d.origins))
 }
 
 /// A skirt: a front and two back halves (the right one a mirror copy),

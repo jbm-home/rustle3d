@@ -4,9 +4,19 @@ use std::fmt::Write;
 
 use crate::drawing::{Drawing, Stroke};
 
-fn style(stroke: Stroke) -> &'static str {
+fn style(stroke: Stroke) -> String {
     match stroke {
-        Stroke::Cut => r##"stroke="#000" stroke-width="0.5""##,
+        Stroke::Size(k) => format!(
+            r##"stroke="#{:06X}" stroke-width="0.4""##,
+            Stroke::size_color(k)
+        ),
+        other => fixed_style(other).to_owned(),
+    }
+}
+
+fn fixed_style(stroke: Stroke) -> &'static str {
+    match stroke {
+        Stroke::Size(_) | Stroke::Cut => r##"stroke="#000" stroke-width="0.5""##,
         Stroke::Sew => r##"stroke="#000" stroke-width="0.3" stroke-dasharray="4 2""##,
         Stroke::Internal => r##"stroke="#444" stroke-width="0.3" stroke-dasharray="6 2 1 2""##,
         Stroke::Notch => r##"stroke="#000" stroke-width="0.5""##,

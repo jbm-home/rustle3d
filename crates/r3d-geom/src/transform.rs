@@ -20,6 +20,15 @@ impl Mirror {
         let v = p - self.origin;
         self.origin + 2.0 * v.dot(self.dir) * self.dir - v
     }
+
+    /// A displacement reflected (the axis' position does not matter); a
+    /// zero one stays exactly zero.
+    pub fn apply_vector(&self, v: DVec2) -> DVec2 {
+        if v == DVec2::ZERO {
+            return DVec2::ZERO;
+        }
+        2.0 * v.dot(self.dir) * self.dir - v
+    }
 }
 
 #[cfg(test)]
@@ -32,5 +41,6 @@ mod tests {
         assert_eq!(m.apply(DVec2::new(60.0, 5.0)), DVec2::new(140.0, 5.0));
         assert_eq!(m.apply(m.apply(DVec2::new(3.0, 4.0))), DVec2::new(3.0, 4.0));
         assert!(Mirror::new(DVec2::ZERO, DVec2::ZERO).is_none());
+        assert_eq!(m.apply_vector(DVec2::new(3.0, 4.0)), DVec2::new(-3.0, 4.0));
     }
 }

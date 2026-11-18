@@ -9,8 +9,8 @@ use std::mem;
 
 use crate::id::{EdgeId, GarmentId, InternalLineId, NotchId, PanelId, PinId, PointId, SeamId};
 use crate::model::{
-    Avatar, DisplayUnit, Edge, Garment, IdMap, InternalLine, Notch, Panel, Pin, Point, Project,
-    Seam,
+    Avatar, DisplayUnit, Edge, Garment, Grading, IdMap, InternalLine, Notch, Panel, Pin, Point,
+    Project, Seam,
 };
 
 /// Before/after values of one entity. `None` means "absent".
@@ -44,6 +44,10 @@ pub enum Change {
     DisplayUnit {
         before: DisplayUnit,
         after: DisplayUnit,
+    },
+    Grading {
+        before: Option<Grading>,
+        after: Option<Grading>,
     },
 }
 
@@ -83,6 +87,9 @@ impl Change {
             Change::Avatar { before, after } => {
                 p.avatar = if forward { after } else { before }.clone();
             }
+            Change::Grading { before, after } => {
+                p.grading = if forward { after } else { before }.clone();
+            }
         }
     }
 
@@ -105,6 +112,7 @@ impl Change {
             (Change::DisplayUnit { after, .. }, Change::DisplayUnit { after: b, .. }) => {
                 *after = *b
             }
+            (Change::Grading { after, .. }, Change::Grading { after: b, .. }) => *after = b.clone(),
             _ => return false,
         }
         true
@@ -308,6 +316,14 @@ impl<'a> Transaction<'a> {
         });
     }
 
+    pub fn set_grading(&mut self, grading: Option<Grading>) {
+        let before = mem::replace(&mut self.project.grading, grading.clone());
+        self.changes.push(Change::Grading {
+            before,
+            after: grading,
+        });
+    }
+
     pub fn set_display_unit(&mut self, unit: DisplayUnit) {
         let before = mem::replace(&mut self.project.display_unit, unit);
         self.changes.push(Change::DisplayUnit {
@@ -345,13 +361,7 @@ mod tests {
 
     fn add_point(tx: &mut Transaction<'_>, panel: PanelId, x: f64) -> PointId {
         let id = tx.new_point_id();
-        tx.put_point(
-            id,
-            Point {
-                panel,
-                pos: DVec2::new(x, 0.0),
-            },
-        );
+        tx.put_point(id, Point::new(panel, DVec2::new(x, 0.0)));
         id
     }
 
@@ -394,13 +404,7 @@ mod tests {
         let mut cs = tx.commit();
         for i in 1..=100 {
             let mut tx = Transaction::begin(&mut p);
-            tx.put_point(
-                pt,
-                Point {
-                    panel,
-                    pos: DVec2::new(i as f64, 0.0),
-                },
-            );
+            tx.put_point(pt, Point::new(panel, DVec2::new(i as f64, 0.0)));
             cs.append(tx.commit());
         }
         assert_eq!(cs.changes.len(), 1);

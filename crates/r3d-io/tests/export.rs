@@ -17,13 +17,7 @@ fn project(w: f64, h: f64, allowance: f64) -> Project {
         .iter()
         .map(|&(x, y)| {
             let id = tx.new_point_id();
-            tx.put_point(
-                id,
-                Point {
-                    panel,
-                    pos: DVec2::new(x, y),
-                },
-            );
+            tx.put_point(id, Point::new(panel, DVec2::new(x, y)));
             id
         })
         .collect();
@@ -32,12 +26,7 @@ fn project(w: f64, h: f64, allowance: f64) -> Project {
             let id = tx.new_edge_id();
             tx.put_edge(
                 id,
-                Edge {
-                    panel,
-                    start: pts[i],
-                    end: pts[(i + 1) % 4],
-                    curve: EdgeCurve::Line,
-                },
+                Edge::new(panel, pts[i], pts[(i + 1) % 4], EdgeCurve::Line),
             );
             id
         })

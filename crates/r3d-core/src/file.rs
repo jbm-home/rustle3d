@@ -20,7 +20,7 @@ use crate::model::Project;
 /// Identifies a Rustle3D project file.
 pub const FORMAT: &str = "rustle3d.project";
 /// Version written by this build.
-pub const SCHEMA_VERSION: u32 = 9;
+pub const SCHEMA_VERSION: u32 = 10;
 
 type Migration = fn(Value) -> Result<Value, FileError>;
 
@@ -34,6 +34,7 @@ const MIGRATIONS: &[Migration] = &[
     migrate_v6_to_v7,
     migrate_v7_to_v8,
     migrate_v8_to_v9,
+    migrate_v9_to_v10,
 ];
 
 fn object<'a>(
@@ -43,6 +44,13 @@ fn object<'a>(
     value.as_object_mut().ok_or_else(|| FileError::Json {
         detail: format!("{what} is not an object"),
     })
+}
+
+/// v10 adds a size range (until then, one size) and points' grades
+/// (absent: the same in every size).
+fn migrate_v9_to_v10(mut project: Value) -> Result<Value, FileError> {
+    object(&mut project, "project")?.insert("grading".into(), Value::Null);
+    Ok(project)
 }
 
 /// v9 orders the garments in layers (until then, by id: in practice one

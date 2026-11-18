@@ -31,6 +31,8 @@ knowing pattern making, and I learn along the way.
   T-shirt, shirt, trousers, simple dress, tote bag. Each one is a parametric recipe: given a
   few measurements (waist, hip, length, chest…) it generates panels, notches,
   seams, arrangement and a default material, through ordinary commands.
+  In a project with a size range (spec 18), the template is drafted for
+  every size's body and its points and curves graded to match.
 - **Guided flow** for new garments: a step bar *Measurements → Pattern → Sew →
   Fabric → Drape*. Each step highlights its tools and shows a one-line goal.
   Steps can be skipped, and the flow can be closed at any time.

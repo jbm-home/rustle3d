@@ -1118,10 +1118,16 @@ class _ShellState extends State<Shell> {
                           run: (step) {
                             _run(step);
                             _refresh();
-                            // A new placement starts the drape again from
-                            // around the body.
-                            if (step['type'] == 'panel.place') _restart();
+                            // A new placement, or another size on its own
+                            // body, starts the drape again from around the
+                            // body.
+                            if (step['type'] == 'panel.place' ||
+                                step['type'] == 'grading.show_size' ||
+                                step['type'] == 'grading.use_chart') {
+                              _restart();
+                            }
                           },
+                          query: _run,
                           onDelete: _deleteSelected,
                         ),
                       ),
@@ -1892,6 +1898,7 @@ class _Inspector extends StatelessWidget {
     required this.pins,
     required this.onUnpin,
     required this.run,
+    required this.query,
     required this.onDelete,
   });
 
@@ -1904,12 +1911,16 @@ class _Inspector extends StatelessWidget {
   final List<dynamic> pins;
   final ValueChanged<String> onUnpin;
   final ValueChanged<Map<String, Object?>> run;
+
+  /// Run a query and return its result (null on error).
+  final dynamic Function(Map<String, Object?>) query;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
     final garments = (summary['garments'] as List<dynamic>?) ?? const [];
+    final grading = summary['grading'] as Map<String, dynamic>?;
     return Container(
       decoration: BoxDecoration(
         color: p.surface,
@@ -1925,6 +1936,7 @@ class _Inspector extends StatelessWidget {
             0 => _EmptyInspector(
               summary: summary,
               run: run,
+              query: query,
               onArrange: () => run({'type': 'garment.arrange'}),
               pins: pins,
               onUnpin: onUnpin,
@@ -1932,6 +1944,7 @@ class _Inspector extends StatelessWidget {
             1 when panel != null => _PanelInspector(
               panel: panel!,
               garments: garments,
+              grading: grading,
               points: points,
               edge: edge,
               seams: seams,
@@ -1950,6 +1963,7 @@ class _EmptyInspector extends StatelessWidget {
   const _EmptyInspector({
     required this.summary,
     required this.run,
+    required this.query,
     required this.onArrange,
     required this.pins,
     required this.onUnpin,
@@ -1957,6 +1971,7 @@ class _EmptyInspector extends StatelessWidget {
 
   final Map<String, dynamic> summary;
   final ValueChanged<Map<String, Object?>> run;
+  final dynamic Function(Map<String, Object?>) query;
   final VoidCallback onArrange;
   final List<dynamic> pins;
   final ValueChanged<String> onUnpin;
@@ -2005,6 +2020,14 @@ class _EmptyInspector extends StatelessWidget {
         _GarmentList(
           garments: (summary['garments'] as List<dynamic>?) ?? const [],
           run: run,
+        ),
+        const SizedBox(height: Space.xl),
+        Divider(color: p.border, height: 1),
+        const SizedBox(height: Space.l),
+        _SizeRange(
+          grading: summary['grading'] as Map<String, dynamic>?,
+          run: run,
+          query: query,
         ),
         const SizedBox(height: Space.l),
         OutlinedButton.icon(
@@ -2104,6 +2127,7 @@ class _PanelInspector extends StatelessWidget {
   const _PanelInspector({
     required this.panel,
     required this.garments,
+    required this.grading,
     required this.points,
     required this.edge,
     required this.seams,
@@ -2115,6 +2139,9 @@ class _PanelInspector extends StatelessWidget {
 
   /// The project's garments, to move the piece to another.
   final List<dynamic> garments;
+
+  /// The project's size range (`project.summary`), if any.
+  final Map<String, dynamic>? grading;
   final List<PickedPoint> points;
   final String? edge;
   final List<dynamic> seams;
@@ -2158,7 +2185,12 @@ class _PanelInspector extends StatelessWidget {
         ],
         if (points.isNotEmpty) ...[
           const SizedBox(height: Space.m),
-          _PointsCard(points: points, run: run),
+          _PointsCard(
+            points: points,
+            run: run,
+            grading: linked ? null : grading,
+            panel: panel,
+          ),
         ],
         const SizedBox(height: Space.l),
         Row(
@@ -2535,6 +2567,7 @@ class _NumberField extends StatelessWidget {
     this.onSubmitted,
     this.focus,
     this.enabled = true,
+    this.signed = false,
   });
 
   final TextEditingController controller;
@@ -2542,6 +2575,9 @@ class _NumberField extends StatelessWidget {
   final String unit;
   final bool enabled;
   final VoidCallback? onSubmitted;
+
+  /// Negative numbers may be typed.
+  final bool signed;
 
   /// Typed characters go to the field, not to the window's one-key
   /// shortcuts (1–4 would turn the camera, R add a piece).
@@ -2567,9 +2603,14 @@ class _NumberField extends StatelessWidget {
         enabled: enabled,
         textAlign: TextAlign.right,
         style: ts(fontSize: 13, color: p.text, tabular: true),
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        keyboardType: TextInputType.numberWithOptions(
+          decimal: true,
+          signed: signed,
+        ),
         inputFormatters: [
-          FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+          FilteringTextInputFormatter.allow(
+            RegExp(signed ? r'[-0-9.,]' : r'[0-9.,]'),
+          ),
         ],
         onSubmitted: (_) => onSubmitted?.call(),
         decoration: InputDecoration(
@@ -3263,10 +3304,36 @@ class _AgentButton extends StatelessWidget {
 /// The corners picked on the board: with two, their distance, typed or
 /// with a slider (the second one moves along the line).
 class _PointsCard extends StatelessWidget {
-  const _PointsCard({required this.points, required this.run});
+  const _PointsCard({
+    required this.points,
+    required this.run,
+    required this.grading,
+    required this.panel,
+  });
 
   final List<PickedPoint> points;
   final ValueChanged<Map<String, Object?>> run;
+
+  /// The project's size range, to grade one point; null without one (or
+  /// on a linked mirror copy, which follows its source).
+  final Map<String, dynamic>? grading;
+
+  /// The piece, as `panel.get` gives it (with its points' grades).
+  final Map<String, dynamic> panel;
+
+  /// The grade of point [id] (an offset per size), empty if none.
+  List<Offset> _grade(String id) {
+    for (final e in panel['edges'] as List) {
+      final start = e['start'] as Map<String, dynamic>;
+      if (start['id'] == id) {
+        return [
+          for (final g in (start['grade'] as List?) ?? const [])
+            Offset((g[0] as num).toDouble(), (g[1] as num).toDouble()),
+        ];
+      }
+    }
+    return const [];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -3286,6 +3353,19 @@ class _PointsCard extends StatelessWidget {
             context.keys(pair == null ? l.pointPicked : l.pointsPicked),
             style: ts(fontSize: 12.5, height: 1.45, color: p.textMuted),
           ),
+          if ((points.length, grading) case (1, final g?)) ...[
+            const SizedBox(height: Space.m),
+            _GradeControl(
+              key: ValueKey('grade-${points.first.id}'),
+              grade: _grade(points.first.id),
+              base: (g['sizes'] as List).indexOf(g['base']),
+              onStep: (step) => run({
+                'type': 'point.set_grade',
+                'point': points.first.id,
+                'step': [step.dx, step.dy],
+              }),
+            ),
+          ],
           if (pair case (final a, final b)) ...[
             const SizedBox(height: Space.m),
             _LengthControl(
@@ -3303,6 +3383,367 @@ class _PointsCard extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// The project's size range: the sizes, the base one the pattern is drawn
+/// in, the one shown in 3D; a chart to set or change it.
+class _SizeRange extends StatelessWidget {
+  const _SizeRange({
+    required this.grading,
+    required this.run,
+    required this.query,
+  });
+
+  /// As `project.summary` gives it: `sizes`, `base`, `shown`; or null.
+  final Map<String, dynamic>? grading;
+  final ValueChanged<Map<String, Object?>> run;
+  final dynamic Function(Map<String, Object?>) query;
+
+  Future<void> _pick(BuildContext context) async {
+    final charts = query({'type': 'grading.charts'}) as List<dynamic>?;
+    if (charts == null) return;
+    final step = await showDialog<Map<String, Object?>>(
+      context: context,
+      builder: (_) => _SizeChartDialog(charts: charts, current: grading),
+    );
+    if (step != null) run(step);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final l = context.l;
+    final g = grading;
+    final title = Text(
+      l.sizes,
+      style: ts(fontSize: 14, fontWeight: FontWeight.w600, color: p.text),
+    );
+    if (g == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          title,
+          const SizedBox(height: Space.xs),
+          Text(
+            l.sizesHint,
+            style: ts(fontSize: 12.5, height: 1.45, color: p.textMuted),
+          ),
+          const SizedBox(height: Space.m),
+          OutlinedButton.icon(
+            onPressed: () => _pick(context),
+            icon: const Icon(Icons.straighten_rounded, size: 18),
+            label: Text(l.addSizes),
+          ),
+        ],
+      );
+    }
+    final sizes = [for (final s in g['sizes'] as List) s as String];
+    final base = g['base'] as String?;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        title,
+        const SizedBox(height: Space.s),
+        Wrap(
+          spacing: Space.xs,
+          runSpacing: Space.xs,
+          children: [
+            for (final s in sizes)
+              Chip(
+                label: Text(s == base ? '$s · ${l.sizeBaseTag}' : s),
+                visualDensity: VisualDensity.compact,
+                side: BorderSide(color: s == base ? p.accent : p.border),
+              ),
+          ],
+        ),
+        const SizedBox(height: Space.m),
+        DropdownButtonFormField<String>(
+          key: ValueKey('shown-${g['shown']}'),
+          initialValue: g['shown'] as String?,
+          decoration: InputDecoration(labelText: l.sizeShown),
+          items: [
+            for (final s in sizes) DropdownMenuItem(value: s, child: Text(s)),
+          ],
+          onChanged: (to) => run({'type': 'grading.show_size', 'size': to}),
+        ),
+        const SizedBox(height: Space.m),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => _pick(context),
+                child: Text(l.sizesChange),
+              ),
+            ),
+            const SizedBox(width: Space.s),
+            _IconAction(
+              icon: Icons.delete_outline_rounded,
+              tip: l.sizesRemove,
+              onTap: () => run({'type': 'grading.clear', 'confirm': true}),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// A size range from a built-in chart: the chart, the smallest and
+/// largest sizes and the base size. Pops a `grading.use_chart` step.
+class _SizeChartDialog extends StatefulWidget {
+  const _SizeChartDialog({required this.charts, required this.current});
+
+  /// As `grading.charts` gives them.
+  final List<dynamic> charts;
+
+  /// The range in use (`project.summary`), to start from.
+  final Map<String, dynamic>? current;
+
+  @override
+  State<_SizeChartDialog> createState() => _SizeChartDialogState();
+}
+
+class _SizeChartDialogState extends State<_SizeChartDialog> {
+  late String _chart;
+  late String _from;
+  late String _to;
+  late String _base;
+
+  List<String> _names(String chart) => [
+    for (final c in widget.charts)
+      if (c['chart'] == chart)
+        for (final s in c['sizes'] as List) s['name'] as String,
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    final current = widget.current;
+    final sizes = [
+      for (final s in (current?['sizes'] as List?) ?? const []) s as String,
+    ];
+    final chart = widget.charts
+        .map((c) => c['chart'] as String)
+        .firstWhere(
+          (c) => sizes.isNotEmpty && sizes.every(_names(c).contains),
+          orElse: () => widget.charts.first['chart'] as String,
+        );
+    _choose(chart);
+    if (sizes.isNotEmpty && _names(chart).contains(sizes.first)) {
+      _from = sizes.first;
+      _to = sizes.last;
+      _base = current?['base'] as String? ?? _base;
+    }
+  }
+
+  /// Switch to [chart], with a range around its middle.
+  void _choose(String chart) {
+    final names = _names(chart);
+    _chart = chart;
+    final mid = names.length ~/ 2;
+    _from = names[(mid - 2).clamp(0, names.length - 1)];
+    _to = names[(mid + 4).clamp(0, names.length - 1)];
+    _base = names[mid];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l;
+    final p = Tokens.of(context);
+    final names = _names(_chart);
+    final (lo, hi) = (names.indexOf(_from), names.indexOf(_to));
+    final at = names.indexOf(_base);
+    final valid = lo < hi && at >= lo && at <= hi;
+    Widget pick(
+      String label,
+      String value,
+      List<String> options,
+      ValueChanged<String> onPick,
+    ) => DropdownButtonFormField<String>(
+      key: ValueKey('$label-$_chart-${options.length}'),
+      initialValue: options.contains(value) ? value : null,
+      decoration: InputDecoration(labelText: label),
+      items: [
+        for (final s in options) DropdownMenuItem(value: s, child: Text(s)),
+      ],
+      onChanged: (v) {
+        if (v != null) setState(() => onPick(v));
+      },
+    );
+    final between = lo <= hi && lo >= 0
+        ? names.sublist(lo, hi + 1)
+        : const <String>[];
+    return AlertDialog(
+      title: Text(l.sizes),
+      content: SizedBox(
+        width: 320,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(l.sizeChart, style: ts(fontSize: 12.5, color: p.textMuted)),
+            const SizedBox(height: Space.xs),
+            SegmentedButton<String>(
+              segments: [
+                ButtonSegment(value: 'women', label: Text(l.chartWomen)),
+                ButtonSegment(value: 'men', label: Text(l.chartMen)),
+              ],
+              selected: {_chart},
+              onSelectionChanged: (s) => setState(() => _choose(s.first)),
+            ),
+            const SizedBox(height: Space.m),
+            Row(
+              children: [
+                Expanded(
+                  child: pick(l.sizeFrom, _from, names, (v) => _from = v),
+                ),
+                const SizedBox(width: Space.s),
+                Expanded(child: pick(l.sizeTo, _to, names, (v) => _to = v)),
+              ],
+            ),
+            const SizedBox(height: Space.m),
+            pick(l.sizeBase, _base, between, (v) => _base = v),
+            const SizedBox(height: Space.m),
+            Text(
+              l.sizesDialogHint,
+              style: ts(fontSize: 12.5, height: 1.45, color: p.textMuted),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l.cancel),
+        ),
+        FilledButton(
+          onPressed: valid
+              ? () => Navigator.pop(context, <String, Object?>{
+                  'type': 'grading.use_chart',
+                  'chart': _chart,
+                  'from': _from,
+                  'to': _to,
+                  'base': _base,
+                })
+              : null,
+          child: Text(l.apply),
+        ),
+      ],
+    );
+  }
+}
+
+/// How one point moves from size to size: the same step (mm) from each
+/// size to the next.
+class _GradeControl extends StatefulWidget {
+  const _GradeControl({
+    super.key,
+    required this.grade,
+    required this.base,
+    required this.onStep,
+  });
+
+  /// The point's offset in each size, empty if it is not graded.
+  final List<Offset> grade;
+
+  /// The base size's index.
+  final int base;
+  final ValueChanged<Offset> onStep;
+
+  @override
+  State<_GradeControl> createState() => _GradeControlState();
+}
+
+class _GradeControlState extends State<_GradeControl> {
+  late final TextEditingController _x;
+  late final TextEditingController _y;
+
+  /// The step to the next size up (or from the one below, at the top).
+  Offset get _step {
+    final g = widget.grade;
+    final b = widget.base;
+    if (g.length < 2 || b < 0 || b >= g.length) return Offset.zero;
+    return b + 1 < g.length ? g[b + 1] - g[b] : g[b] - g[b - 1];
+  }
+
+  /// Every size moves by the same step.
+  bool get _uniform {
+    final g = widget.grade;
+    for (var i = 1; i < g.length; i++) {
+      if ((g[i] - g[i - 1] - _step).distance > 0.05) return false;
+    }
+    return true;
+  }
+
+  static String _text(double v) {
+    final r = (v * 10).round() / 10;
+    return r == r.roundToDouble() ? r.toStringAsFixed(0) : r.toString();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _x = TextEditingController(text: _text(_step.dx));
+    _y = TextEditingController(text: _text(_step.dy));
+  }
+
+  @override
+  void dispose() {
+    _x.dispose();
+    _y.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final (x, y) = (_parseNumber(_x.text), _parseNumber(_y.text));
+    if (x == null || y == null) return;
+    widget.onStep(Offset(x, y));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final l = context.l;
+    Widget field(String axis, TextEditingController c) => Expanded(
+      child: Row(
+        children: [
+          Text(axis, style: ts(fontSize: 12.5, color: p.textMuted)),
+          const SizedBox(width: Space.xs),
+          Expanded(
+            child: _NumberField(
+              key: Key('grade-$axis'),
+              controller: c,
+              unit: 'mm',
+              signed: true,
+              onSubmitted: _submit,
+            ),
+          ),
+        ],
+      ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l.gradeStep,
+          style: ts(fontSize: 13, fontWeight: FontWeight.w600, color: p.text),
+        ),
+        const SizedBox(height: Space.xs),
+        Text(
+          _uniform ? l.gradeStepHint : l.gradeCustom,
+          style: ts(fontSize: 12, height: 1.4, color: p.textMuted),
+        ),
+        const SizedBox(height: Space.s),
+        Row(
+          children: [
+            field('x', _x),
+            const SizedBox(width: Space.s),
+            field('y', _y),
+          ],
+        ),
+      ],
     );
   }
 }

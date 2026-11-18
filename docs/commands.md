@@ -2277,6 +2277,253 @@ Move a piece to another garment; its linked mirror copies (and the piece it mirr
 
 </details>
 
+### `grading.set_sizes`
+
+Set the project's size range: the sizes from smallest to largest, each with how its body differs from the base size's (the avatar; cm), and the base size the pattern is drawn in. Points keep their grade in the sizes that stay (by name); new sizes are inter- or extrapolated. Changing the base redraws the pattern in that size. See grading.use_chart for standard sizes.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "SizeSpec": {
+      "additionalProperties": false,
+      "description": "One size of a range, as commands take it.",
+      "properties": {
+        "bust_cm": {
+          "default": 0.0,
+          "format": "double",
+          "type": "number"
+        },
+        "height_cm": {
+          "default": 0.0,
+          "description": "How the size's body differs from the base size's (cm; default 0).",
+          "format": "double",
+          "type": "number"
+        },
+        "hips_cm": {
+          "default": 0.0,
+          "format": "double",
+          "type": "number"
+        },
+        "name": {
+          "description": "As on the label: \"38\", \"M\".",
+          "type": "string"
+        },
+        "waist_cm": {
+          "default": 0.0,
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Set the project's size range.",
+  "properties": {
+    "base": {
+      "description": "The size the pattern is drawn in (a name from `sizes`).",
+      "type": "string"
+    },
+    "sizes": {
+      "description": "From the smallest to the largest; at least two, names unique.",
+      "items": {
+        "$ref": "#/$defs/SizeSpec"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "sizes",
+    "base"
+  ],
+  "title": "GradingSetSizes",
+  "type": "object"
+}
+```
+
+</details>
+
+### `grading.use_chart`
+
+Set the project's size range from a built-in European chart (`women` 32–56, `men` 44–60, every second size): the sizes from `from` to `to`, drawn in `base`. Each size's body differs from the avatar as the chart's sizes differ from its base size; without an avatar, the chart's base body becomes the avatar. Then grade the points (point.set_grade), or add a template, which is graded to every size.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "SizeChart": {
+      "description": "A built-in size chart.",
+      "oneOf": [
+        {
+          "const": "women",
+          "description": "European women's sizes 32 to 56 (bust 76–134 cm).",
+          "type": "string"
+        },
+        {
+          "const": "men",
+          "description": "European men's sizes 44 to 60 (chest 88–120 cm).",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Set the size range from a built-in chart.",
+  "properties": {
+    "base": {
+      "description": "The size the pattern is drawn in, e.g. \"40\".",
+      "type": "string"
+    },
+    "chart": {
+      "$ref": "#/$defs/SizeChart",
+      "description": "`women` (32–56) or `men` (44–60)."
+    },
+    "from": {
+      "description": "Smallest size of the range, e.g. \"36\".",
+      "type": "string"
+    },
+    "to": {
+      "description": "Largest size, e.g. \"52\".",
+      "type": "string"
+    }
+  },
+  "required": [
+    "chart",
+    "from",
+    "to",
+    "base"
+  ],
+  "title": "GradingUseChart",
+  "type": "object"
+}
+```
+
+</details>
+
+### `grading.clear`
+
+Remove the size range and every point's grade: the pattern stays in its base size. Destructive: requires "confirm": true.
+
+**Destructive**: requires `"confirm": true`.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Remove the size range and every grade.",
+  "properties": {
+    "confirm": {
+      "default": false,
+      "description": "Must be `true`: the grades are lost (still undoable).",
+      "type": "boolean"
+    }
+  },
+  "title": "GradingClear",
+  "type": "object"
+}
+```
+
+</details>
+
+### `grading.show_size`
+
+Choose the size of the range that is draped, shown in 3D and exported in 3D, on an avatar with that size's measurements. The pattern board keeps showing the base size, with the other sizes' outlines around it.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Choose the size draped and shown in 3D.",
+  "properties": {
+    "size": {
+      "description": "A size of the range.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "size"
+  ],
+  "title": "GradingShowSize",
+  "type": "object"
+}
+```
+
+</details>
+
+### `point.set_grade`
+
+Set how a contour point moves from size to size (its grade rule): either `step`, the same move from each size to the next (mm, [x, y]; e.g. [5, 0] moves the point 5 mm outward per size), or `offsets`, where it is in some sizes relative to the base size, the others inter- or extrapolated. A zero step removes the rule. Curve handles, internal lines and pins follow the points; linked mirror copies follow their source, mirrored.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "PointId": {
+      "description": "Identifier of a point, e.g. `point:1`.",
+      "pattern": "^point:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Set a point's grade rule.",
+  "properties": {
+    "offsets": {
+      "additionalProperties": {
+        "items": {
+          "format": "double",
+          "type": "number"
+        },
+        "maxItems": 2,
+        "minItems": 2,
+        "type": "array"
+      },
+      "description": "Or where the point is in some sizes, from its base position (mm,\nby size name); the other sizes are inter- or extrapolated.",
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "point": {
+      "$ref": "#/$defs/PointId"
+    },
+    "step": {
+      "description": "The same move from each size to the next (mm, [x, y]).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": [
+        "array",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "point"
+  ],
+  "title": "PointSetGrade",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `template.apply`
 
 Draft a starter garment (t_shirt, shirt, trousers, dress, straight_skirt, a_line_skirt, tote_bag) from sizes in cm, the avatar's measurements filling in any left out: its pieces are drawn, sewn, placed around the body and given a fabric, ready to simulate and edit. A project without panels takes the template's name, and so does its garment; in a project with pieces the template becomes a garment of its own, worn over the others (see garment.set_layer). Returns the garment if one was added, then the panels, seams and notches.
@@ -2619,7 +2866,7 @@ Read-only. Lengths in mm, areas in mm², rounded to 0.001.
 
 ### `project.summary`
 
-Project name, display unit, the garments (fabric, colour), entity counts and a summary of every panel.
+Project name, display unit, the garments (fabric, colour), the size range (names, base, shown; null without one), entity counts and a summary of every panel.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -2655,7 +2902,7 @@ List panels with area, perimeter, bounding box and validity.
 
 ### `panel.get`
 
-Full geometry of a panel: its edges in contour order with point IDs, positions, curve and length.
+Full geometry of a panel: its edges in contour order with point IDs, positions, curve and length; graded points have their `grade`, their offset in each size of the range (grading.get's order). With `size`, the geometry in that size.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -2674,6 +2921,13 @@ Full geometry of a panel: its edges in contour order with point IDs, positions, 
   "properties": {
     "panel": {
       "$ref": "#/$defs/PanelId"
+    },
+    "size": {
+      "description": "A size of the project's range: the geometry in that size. Default:\nas drawn (the base size).",
+      "type": [
+        "string",
+        "null"
+      ]
     }
   },
   "required": [
@@ -2852,13 +3106,77 @@ The starter garments template.apply can draft, each with the sizes it reads (cm)
 
 </details>
 
+### `grading.get`
+
+The project's size range: each size with how its body differs from the base size's (cm) and its body (the avatar's measurements changed by those differences; null without an avatar), the base size the pattern is drawn in, the size shown and draped in 3D, and how many points are graded. Null when the project has no range.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The project's size range.",
+  "title": "GradingGet",
+  "type": "object"
+}
+```
+
+</details>
+
+### `grading.check`
+
+Check the grading in every size of the range: the seams (not gathered) whose two sides differ by more than `tolerance_mm` (default 1), with both lengths, and the pieces whose outline crosses itself. `ok` is true when no size has either.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Seams that no longer match in a size, and pieces that cross themselves.",
+  "properties": {
+    "tolerance_mm": {
+      "description": "Report seams whose two sides differ by more than this (mm, default\n1).",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "title": "GradingCheck",
+  "type": "object"
+}
+```
+
+</details>
+
+### `grading.charts`
+
+The built-in size charts for grading.use_chart: each chart's sizes with their bodies (cm).
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The built-in size charts.",
+  "title": "GradingCharts",
+  "type": "object"
+}
+```
+
+</details>
+
 ## Actions
 
 Operations that write files (not undoable). Paths are relative to the project folder and cannot leave it.
 
 ### `export.svg`
 
-Export all panels as an SVG at 1:1 scale (cutting and sewing lines, notches, internal lines, grainlines, labels, 100 mm test square). Returns the written path, relative to the project folder.
+Export all panels as an SVG at 1:1 scale (cutting and sewing lines, notches, internal lines, grainlines, labels, 100 mm test square). With `sizes`, the pattern in those sizes of the range: one alone, or a graded nest (the base size in full, the others' cutting lines in colour with a legend). Returns the written path, relative to the project folder.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -2872,6 +3190,16 @@ Export all panels as an SVG at 1:1 scale (cutting and sewing lines, notches, int
       "description": "Output path relative to the project folder. Defaults to\n`exports/<project name>.svg`.",
       "type": [
         "string",
+        "null"
+      ]
+    },
+    "sizes": {
+      "description": "Sizes of the range to export, by name: one size alone, or several\nnested (a graded nest). Default: the pattern as drawn (base size).",
+      "items": {
+        "type": "string"
+      },
+      "type": [
+        "array",
         "null"
       ]
     }
@@ -2912,7 +3240,7 @@ Drape the placed and sewn panels on the avatar for a number of frames (1/60 s ea
 
 ### `export.pdf`
 
-Export all panels as a PDF at 1:1 scale, tiled on A4/Letter pages (labelled A1, A2…, with overlap guides) or on one large page. Print at 100 % and check the 100 mm test square. Returns the written path and page count.
+Export all panels as a PDF at 1:1 scale, tiled on A4/Letter pages (labelled A1, A2…, with overlap guides) or on one large page. Print at 100 % and check the 100 mm test square. With `sizes`, the pattern in those sizes of the range: one alone, or a graded nest. Returns the written path and page count.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -2953,6 +3281,16 @@ Export all panels as a PDF at 1:1 scale, tiled on A4/Letter pages (labelled A1, 
       "description": "Output path relative to the project folder. Defaults to\n`exports/<project name>.pdf`.",
       "type": [
         "string",
+        "null"
+      ]
+    },
+    "sizes": {
+      "description": "Sizes of the range to export, by name: one size alone, or several\nnested (a graded nest). Default: the pattern as drawn (base size).",
+      "items": {
+        "type": "string"
+      },
+      "type": [
+        "array",
         "null"
       ]
     }
@@ -3030,7 +3368,7 @@ Export the draped garment as Wavefront OBJ: one object per piece, metres, Y up, 
 
 ### `export.dxf`
 
-Export all panels as DXF-AAMA (ASTM D6673, ASCII DXF in mm), for pattern and cutting software: one block per piece with its cutting line, sewing line, turn points, notches, grainline, internal lines and name. Returns the written path.
+Export all panels as DXF-AAMA (ASTM D6673, ASCII DXF in mm), for pattern and cutting software: one block per piece with its cutting line, sewing line, turn points, notches, grainline, internal lines and name. With `sizes`, a graded nest: every piece once per size, with a `Size:` text. Returns the written path.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -3044,6 +3382,16 @@ Export all panels as DXF-AAMA (ASTM D6673, ASCII DXF in mm), for pattern and cut
       "description": "Output path relative to the project folder. Defaults to\n`exports/<project name>.dxf`.",
       "type": [
         "string",
+        "null"
+      ]
+    },
+    "sizes": {
+      "description": "Sizes of the range to export, by name: one size alone, or several\nnested (a graded nest). Default: the pattern as drawn (base size).",
+      "items": {
+        "type": "string"
+      },
+      "type": [
+        "array",
         "null"
       ]
     }

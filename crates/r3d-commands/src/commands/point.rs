@@ -175,6 +175,7 @@ impl CommandSpec for PointRemove {
             Edge {
                 end: b.end,
                 curve,
+                grade: Vec::new(),
                 ..a
             },
         );

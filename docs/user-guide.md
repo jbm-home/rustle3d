@@ -7,11 +7,12 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-17 (M14; long sleeves, mirrored seams, agent status;
+Last updated: 2026-11-18 (M14; long sleeves, mirrored seams, agent status;
 rename, delete, export and import projects; smooth views on Windows;
 cloth comes to rest; pieces arranged side by side by width; M17,
 draping on the graphics card; M18, shirt and trousers templates, pieces
-placed on a leg; M19, several garments in layers).
+placed on a leg; M19, several garments in layers; M22, sizes and
+grading).
 -->
 
 Rustle3D is a free, open-source desktop app for making clothes: draw the
@@ -121,6 +122,29 @@ the body out; the arrows wear a garment under or over its neighbour. To
 move a piece to another garment, pick it in the piece's **Garment**
 menu. Deleting a garment deletes its pieces too (undo brings them back).
 
+## Sizes
+A pattern can come in a range of sizes, for example 36 to 52. It is
+drawn in one size, the **base size**; each point says how it moves from
+size to size (its grade), and the other sizes follow.
+- With nothing selected, **Sizes** › **Add a size range** in the panel on
+  the right: pick a chart (women's 32 to 56 or men's 44 to 60, European
+  sizes), the smallest and largest size, and the base size. Each size has
+  a body with its measurements, built from your avatar.
+- Add a template **after** setting the sizes: it is drafted for every
+  size's body, so every size fits. A template added before stays in one
+  size until you grade its points.
+- On the board, each piece shows the other sizes' outlines around it.
+- **Shown in 3D** picks the size the garment is draped in, on a body
+  with that size's measurements; the drape starts again. The pattern
+  you edit stays in the base size.
+- To grade a point yourself, click it on the board: **Grade per size**
+  sets how far it moves, in mm, from each size to the next (x to the
+  right, y up). Curves, notches and lines inside the piece follow the
+  points; a mirror copy follows its source.
+- **Change** picks another range or base size (the grades are kept for
+  the sizes that stay); the delete button removes the sizes and every
+  grade.
+
 ## Draping (3D)
 - **Simulate** (Space) drapes the garment: the seams close and the cloth
   falls onto the body. Press again to pause; the arrow next to it starts
@@ -190,6 +214,12 @@ grainline and the piece name, plus a **100 mm test square**. Print at
 100 % ("actual size", never "fit to page") and measure the square before
 cutting.
 
+A pattern with sizes exports every size nested: the base size in full,
+the other sizes' cutting lines in colour, named in a legend next to the
+test square; in DXF-AAMA, every piece once per size, with its size. To
+export one size or a few, use the command line
+(`r3d export My.r3d --format pdf --sizes 44`) or an agent.
+
 ## Import
 **Import** in the top bar brings in a pattern drawn in another program:
 a **DXF-AAMA** or plain **DXF** file, an **SVG**, or a **PDF** (a pattern
@@ -250,6 +280,9 @@ DXF-AAMA; garments go out as glTF and OBJ: open formats only.
   cloth keep about 2 cm apart in the simulation.
 - A point's handles cannot be edited after it is drawn yet; use Bend on
   the edge.
+- Sizes: notches keep their distance along the edge in every size, and
+  a grade is set per point, not per edge, in the app. The shirt template
+  drapes with folds at the sides in the largest sizes (from about 48).
 - Photos: the fabric has no visible weave or print yet, and the cloth
   is a single thin layer (no thickness at the hem). Your own studio
   lighting (an HDRI image) cannot be loaded yet.

@@ -44,6 +44,20 @@ pub enum Invalid {
     Mirrored,
     #[error("is the project's only garment")]
     LastGarment,
+    #[error("needs a size range: set one first (grading.set_sizes or grading.use_chart)")]
+    NoSizes,
+    #[error("is not a size of the range")]
+    UnknownSize,
+    #[error("needs at least two sizes")]
+    TooFewSizes,
+    #[error("must not repeat a name")]
+    DuplicateName,
+    #[error("gives a size a body outside the accepted measurements")]
+    BodyOutOfRange,
+    #[error("must be zero in the base size")]
+    BaseOffset,
+    #[error("needs either `step` or `offsets`")]
+    StepOrOffsets,
 }
 
 impl Invalid {
@@ -68,6 +82,13 @@ impl Invalid {
             Invalid::NotAcross => "invalid.not_across",
             Invalid::Mirrored => "invalid.mirrored",
             Invalid::LastGarment => "invalid.last_garment",
+            Invalid::NoSizes => "invalid.no_sizes",
+            Invalid::UnknownSize => "invalid.unknown_size",
+            Invalid::TooFewSizes => "invalid.too_few_sizes",
+            Invalid::DuplicateName => "invalid.duplicate_name",
+            Invalid::BodyOutOfRange => "invalid.body_out_of_range",
+            Invalid::BaseOffset => "invalid.base_offset",
+            Invalid::StepOrOffsets => "invalid.step_or_offsets",
         }
     }
 }

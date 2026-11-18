@@ -18,6 +18,21 @@ pub enum Stroke {
     Grain,
     /// Calibration marks (test square).
     Mark,
+    /// Cutting line of another size of a graded nest: an index into
+    /// [`SIZE_COLORS`] (wrapping).
+    Size(usize),
+}
+
+/// Colours of the sizes of a graded nest (sRGB), told apart in print.
+pub const SIZE_COLORS: [u32; 8] = [
+    0xD62728, 0x1F77B4, 0x2CA02C, 0x9467BD, 0xFF7F0E, 0x8C564B, 0xE377C2, 0x17BECF,
+];
+
+impl Stroke {
+    /// The colour of a size's cutting line.
+    pub fn size_color(k: usize) -> u32 {
+        SIZE_COLORS.get(k % SIZE_COLORS.len()).copied().unwrap_or(0)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -56,10 +71,76 @@ const NOTCH_MM: f64 = 6.0;
 const ARROW_MM: f64 = 8.0;
 const LABEL_MM: f64 = 8.0;
 const GRAIN_SHRINK_STEPS: usize = 12;
+/// The graded nest's legend: row height, line sample and gaps (mm).
+const LEGEND_ROW_MM: f64 = 9.0;
+const LEGEND_LINE_MM: f64 = 20.0;
+const LEGEND_GAP_MM: f64 = 10.0;
 
 /// Build the drawing of every panel plus a 100 mm test square placed above
 /// the top-left corner, so it is on the first page of a tiled print.
 pub fn pattern_drawing(project: &Project) -> Drawing {
+    draw(project, project.name(), &[])
+}
+
+/// One size of a graded nest: its name, how its cutting lines are drawn,
+/// and the lines.
+struct Nested {
+    name: String,
+    stroke: Stroke,
+    outlines: Vec<Vec<DVec2>>,
+}
+
+/// The pattern in sizes `sizes` (indices into the project's range): one
+/// size alone, or several nested. The base size, or else the first listed,
+/// is drawn in full (sewing line, notches, internal lines, grainline,
+/// name); the others add their cutting lines in colour, named in a legend
+/// beside the test square. Without a range: the pattern as it is.
+pub fn graded_drawing(project: &Project, sizes: &[usize]) -> Drawing {
+    let Some(g) = project.grading() else {
+        return pattern_drawing(project);
+    };
+    let name = |k: usize| g.sizes.get(k).map(|s| s.name.clone()).unwrap_or_default();
+    let reference = if sizes.contains(&g.base) {
+        g.base
+    } else {
+        sizes.first().copied().unwrap_or(g.base)
+    };
+    let main = project.at_size(reference);
+    let mut nest = Vec::new();
+    if sizes.len() > 1 {
+        nest.push(Nested {
+            name: name(reference),
+            stroke: Stroke::Cut,
+            outlines: Vec::new(),
+        });
+    }
+    let others = sizes.iter().filter(|k| **k != reference);
+    for (rank, k) in others.enumerate() {
+        let sized = project.at_size(*k);
+        let outlines = sized
+            .panels()
+            .iter()
+            .filter_map(|(id, panel)| {
+                let outline = sized.panel_outline(*id)?;
+                Some(if panel.seam_allowance_mm > 0.0 {
+                    polygon::offset_outward(&outline, panel.seam_allowance_mm)
+                } else {
+                    outline
+                })
+            })
+            .collect();
+        nest.push(Nested {
+            name: name(*k),
+            stroke: Stroke::Size(rank),
+            outlines,
+        });
+    }
+    let names: Vec<String> = sizes.iter().map(|k| name(*k)).collect();
+    let title = format!("{} - {}", project.name(), names.join(" "));
+    draw(&main, &title, &nest)
+}
+
+fn draw(project: &Project, title: &str, nest: &[Nested]) -> Drawing {
     let mut d = Drawing {
         lines: Vec::new(),
         labels: Vec::new(),
@@ -134,6 +215,16 @@ pub fn pattern_drawing(project: &Project) -> Drawing {
         }
     }
 
+    for size in nest {
+        for outline in &size.outlines {
+            d.lines.push(Polyline {
+                points: outline.clone(),
+                closed: true,
+                stroke: size.stroke,
+            });
+        }
+    }
+
     let content = bounds_of(&d.lines);
     let corner = match content {
         Some(b) => DVec2::new(b.min.x, b.max.y + 2.0 * MARGIN_MM),
@@ -157,9 +248,31 @@ pub fn pattern_drawing(project: &Project) -> Drawing {
     });
     d.labels.push(Label {
         pos: corner + DVec2::new(s / 2.0, s / 2.0 - 1.5 * LABEL_MM),
-        text: project.name().to_owned(),
+        text: title.to_owned(),
         size_mm: LABEL_MM * 0.6,
     });
+    // The nest's legend, beside the square: a sample of each size's line.
+    for (row, size) in nest.iter().enumerate() {
+        let y = corner.y + s - (row as f64 + 0.5) * LEGEND_ROW_MM;
+        let start = corner + DVec2::new(s + LEGEND_GAP_MM, 0.0);
+        d.lines.push(Polyline {
+            points: vec![
+                DVec2::new(start.x, y),
+                DVec2::new(start.x + LEGEND_LINE_MM, y),
+            ],
+            closed: false,
+            stroke: size.stroke,
+        });
+        let text_x = start.x + LEGEND_LINE_MM + LEGEND_GAP_MM / 2.0;
+        d.labels.push(Label {
+            pos: DVec2::new(
+                text_x + approx_text_width(&size.name, LABEL_MM * 0.6) / 2.0,
+                y,
+            ),
+            text: size.name.clone(),
+            size_mm: LABEL_MM * 0.6,
+        });
+    }
 
     if let Some(b) = bounds_of(&d.lines) {
         d.bounds = Aabb {

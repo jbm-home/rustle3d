@@ -160,6 +160,18 @@ fn every_command_round_trips() {
     // Panel, 4 points, 4 edges, 2 notches, 1 line.
     assert_eq!(imported.created.len(), 1 + 4 + 4 + 2 + 1);
 
+    h.round_trip(json!({"type": "grading.use_chart", "chart": "women",
+        "from": "36", "to": "44", "base": "40"}));
+    let corner = imported.created[2].to_string();
+    h.round_trip(json!({"type": "point.set_grade", "point": corner, "step": [5, 0]}));
+    h.round_trip(json!({"type": "point.set_grade", "point": corner,
+        "offsets": {"44": [12, 3]}}));
+    h.round_trip(json!({"type": "grading.show_size", "size": "44"}));
+    // A new base redraws the pattern in that size.
+    h.round_trip(json!({"type": "grading.set_sizes", "base": "38", "sizes": [
+        {"name": "38", "bust_cm": -4}, {"name": "40"}, {"name": "42", "bust_cm": 4}]}));
+    h.round_trip(json!({"type": "grading.clear", "confirm": true}));
+
     let registered: BTreeSet<_> = Command::registry().iter().map(|i| i.name).collect();
     let missing: Vec<_> = registered.difference(&h.covered).collect();
     assert!(

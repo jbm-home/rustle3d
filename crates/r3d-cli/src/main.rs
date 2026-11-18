@@ -222,6 +222,10 @@ enum Cmd {
         /// Include the avatar in a 3D export.
         #[arg(long)]
         avatar: bool,
+        /// Pattern exports: these sizes of the range, comma-separated (one
+        /// alone, or several nested), or `all`.
+        #[arg(long)]
+        sizes: Option<String>,
         /// Output path relative to the project (default: exports/<name>.<ext>).
         #[arg(long)]
         out: Option<String>,
@@ -363,6 +367,7 @@ fn cmd_export(
     format: Format,
     paper: PaperArg,
     avatar: bool,
+    sizes: Option<String>,
     out: Option<String>,
 ) -> Result<(), Failure> {
     let mut step = match format {
@@ -383,6 +388,18 @@ fn cmd_export(
         step["path"] = Value::from(path);
     }
     let mut ws = Workspace::open(project)?;
+    if let Some(sizes) = sizes {
+        let names: Vec<String> = if sizes.trim() == "all" {
+            ws.session()
+                .project()
+                .grading()
+                .map(|g| g.sizes.iter().map(|s| s.name.clone()).collect())
+                .unwrap_or_default()
+        } else {
+            sizes.split(',').map(|s| s.trim().to_owned()).collect()
+        };
+        step["sizes"] = json!(names);
+    }
     let result = ws.run_step(&Step::from_value(step)?)?;
     print_json(&result)
 }
@@ -520,8 +537,9 @@ fn main() -> ExitCode {
             format,
             paper,
             avatar,
+            sizes,
             out,
-        } => cmd_export(&project, format, paper, avatar, out),
+        } => cmd_export(&project, format, paper, avatar, sizes, out),
         Cmd::Import {
             project,
             file,

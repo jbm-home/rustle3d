@@ -36,7 +36,9 @@ nothing is written. Scripts can refer to earlier results
 - `r3d mcp --project path`: MCP server over a folder; `r3d mcp --attach
   [--endpoint file]`: relay to the project open in the app (see 09).
 - `r3d export <project> --format svg|pdf|dxf|glb|obj [--paper a4|letter|single]
-  [--avatar] [--out path]`: the pattern, or the draped garment (see 07, 15).
+  [--avatar] [--sizes 36,44|all] [--out path]`: the pattern (in some sizes
+  of its range, nested, with `--sizes`; spec 18), or the draped garment
+  (see 07, 15).
 - `r3d schema [command]`: print JSON schemas.
 - Output is machine-readable JSON by default when piped. Exit codes: 0 ok,
   1 user error, 2 internal error.

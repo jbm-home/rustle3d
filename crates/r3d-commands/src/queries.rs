@@ -69,7 +69,7 @@ fn summarize(p: &Project, id: PanelId) -> Result<PanelSummary, CommandError> {
 pub struct ProjectSummary {}
 
 impl Described for ProjectSummary {
-    const SUMMARY: &'static str = "Project name, display unit, the garments (fabric, colour), entity counts and a summary of every panel.";
+    const SUMMARY: &'static str = "Project name, display unit, the garments (fabric, colour), the size range (names, base, shown; null without one), entity counts and a summary of every panel.";
 }
 
 #[derive(Serialize)]
@@ -85,6 +85,7 @@ struct SummaryOut {
     name: String,
     display_unit: DisplayUnit,
     garments: Vec<Value>,
+    grading: Value,
     counts: Counts,
     panels: Vec<PanelSummary>,
 }
@@ -111,6 +112,14 @@ impl QuerySpec for ProjectSummary {
                     })
                 })
                 .collect(),
+            grading: p.grading().map_or(Value::Null, |g| {
+                let name = |i: usize| g.sizes.get(i).map(|s| s.name.clone());
+                serde_json::json!({
+                    "sizes": g.sizes.iter().map(|s| &s.name).collect::<Vec<_>>(),
+                    "base": name(g.base),
+                    "shown": name(g.shown),
+                })
+            }),
             counts: Counts {
                 garments: p.garments().len(),
                 panels: p.panels().len(),
@@ -147,16 +156,22 @@ impl QuerySpec for PanelList {
 #[serde(deny_unknown_fields)]
 pub struct PanelGet {
     pub panel: PanelId,
+    /// A size of the project's range: the geometry in that size. Default:
+    /// as drawn (the base size).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<String>,
 }
 
 impl Described for PanelGet {
-    const SUMMARY: &'static str = "Full geometry of a panel: its edges in contour order with point IDs, positions, curve and length.";
+    const SUMMARY: &'static str = "Full geometry of a panel: its edges in contour order with point IDs, positions, curve and length; graded points have their `grade`, their offset in each size of the range (grading.get's order). With `size`, the geometry in that size.";
 }
 
 #[derive(Serialize)]
 struct PointOut {
     id: PointId,
     pos: Vec2,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    grade: Vec<Vec2>,
 }
 
 #[derive(Serialize)]
@@ -226,7 +241,20 @@ struct PanelOut {
 
 impl QuerySpec for PanelGet {
     fn run(&self, p: &Project) -> Result<Value, CommandError> {
+        if let Some(size) = &self.size {
+            let sized = p.at_size(crate::commands::size_index(p, size.trim())?);
+            return PanelGet {
+                panel: self.panel,
+                size: None,
+            }
+            .run(&sized);
+        }
         let panel = p.panel(self.panel).ok_or_else(|| missing(self.panel))?;
+        let grade = |id: PointId| -> Vec<Vec2> {
+            p.point(id)
+                .map(|pt| pt.grade.iter().map(|g| r3v(*g)).collect())
+                .unwrap_or_default()
+        };
         let mut edges = Vec::with_capacity(panel.contour.len());
         for eid in &panel.contour {
             let e = p.edge(*eid).ok_or_else(|| missing(*eid))?;
@@ -247,10 +275,12 @@ impl QuerySpec for PanelGet {
                 start: PointOut {
                     id: e.start,
                     pos: r3v(a),
+                    grade: grade(e.start),
                 },
                 end: PointOut {
                     id: e.end,
                     pos: r3v(b),
+                    grade: grade(e.end),
                 },
                 curve,
                 length_mm: r3(geom.length()),
@@ -389,6 +419,29 @@ pub fn body_model() -> Result<&'static r3d_avatar::model::BodyModel, CommandErro
         .map_err(|e| CommandError::Internal { detail: e.clone() })
 }
 
+/// The built-in body fitted to `body`. Fitting takes a few seconds, so
+/// the last bodies fitted are kept (a graded template drafts each size,
+/// the drape fits the shown size again).
+pub fn fitted(body: &r3d_core::Body) -> Result<r3d_avatar::fit::Fit, CommandError> {
+    const KEPT: usize = 32;
+    static FITS: std::sync::Mutex<Vec<(r3d_core::Body, r3d_avatar::fit::Fit)>> =
+        std::sync::Mutex::new(Vec::new());
+    let cached = |fits: &[(r3d_core::Body, r3d_avatar::fit::Fit)]| {
+        fits.iter().find(|(b, _)| b == body).map(|(_, f)| f.clone())
+    };
+    if let Some(fit) = FITS.lock().ok().and_then(|f| cached(&f)) {
+        return Ok(fit);
+    }
+    let fit = r3d_avatar::fit::fit(body_model()?, body);
+    if let Ok(mut fits) = FITS.lock() {
+        if fits.len() >= KEPT {
+            fits.remove(0);
+        }
+        fits.push((*body, fit.clone()));
+    }
+    Ok(fit)
+}
+
 /// The avatar and what the fitted body actually measures.
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -404,7 +457,7 @@ impl QuerySpec for AvatarGet {
             return Ok(Value::Null);
         };
         let model = body_model()?;
-        let fit = r3d_avatar::fit::fit(model, &avatar.body);
+        let fit = fitted(&avatar.body)?;
         let a = fit.achieved;
         let h = r3d_avatar::measure::heights(
             &r3d_avatar::fit::fitted_positions(model, &fit),
@@ -532,5 +585,128 @@ impl Described for TemplateList {
 impl QuerySpec for TemplateList {
     fn run(&self, p: &Project) -> Result<Value, CommandError> {
         to_value(&crate::templates::list(p.avatar().map(|a| &a.body)))
+    }
+}
+
+/// The project's size range.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GradingGet {}
+
+impl Described for GradingGet {
+    const SUMMARY: &'static str = "The project's size range: each size with how its body differs from the base size's (cm) and its body (the avatar's measurements changed by those differences; null without an avatar), the base size the pattern is drawn in, the size shown and draped in 3D, and how many points are graded. Null when the project has no range.";
+}
+
+impl QuerySpec for GradingGet {
+    fn run(&self, p: &Project) -> Result<Value, CommandError> {
+        let Some(g) = p.grading() else {
+            return Ok(Value::Null);
+        };
+        let sizes: Vec<Value> = g
+            .sizes
+            .iter()
+            .enumerate()
+            .map(|(i, s)| {
+                serde_json::json!({
+                    "name": s.name,
+                    "height_cm": s.height_cm,
+                    "bust_cm": s.bust_cm,
+                    "waist_cm": s.waist_cm,
+                    "hips_cm": s.hips_cm,
+                    "body": p.size_body(i),
+                })
+            })
+            .collect();
+        let name = |i: usize| g.sizes.get(i).map(|s| s.name.clone());
+        Ok(serde_json::json!({
+            "sizes": sizes,
+            "base": name(g.base),
+            "shown": name(g.shown),
+            "graded_points": p.points().values().filter(|pt| !pt.grade.is_empty()).count(),
+        }))
+    }
+}
+
+/// Seams that no longer match in a size, and pieces that cross themselves.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GradingCheck {
+    /// Report seams whose two sides differ by more than this (mm, default
+    /// 1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tolerance_mm: Option<f64>,
+}
+
+impl Described for GradingCheck {
+    const SUMMARY: &'static str = "Check the grading in every size of the range: the seams (not gathered) whose two sides differ by more than `tolerance_mm` (default 1), with both lengths, and the pieces whose outline crosses itself. `ok` is true when no size has either.";
+}
+
+impl QuerySpec for GradingCheck {
+    fn run(&self, p: &Project) -> Result<Value, CommandError> {
+        let tolerance = self.tolerance_mm.unwrap_or(1.0);
+        crate::error::finite("tolerance_mm", &[tolerance])?;
+        crate::error::non_negative("tolerance_mm", tolerance)?;
+        let g = crate::commands::grading(p)?;
+        let mut ok = true;
+        let sizes: Vec<Value> = g
+            .sizes
+            .iter()
+            .enumerate()
+            .map(|(i, size)| {
+                let q = p.at_size(i);
+                let seams: Vec<Value> = q
+                    .seams()
+                    .iter()
+                    .filter(|(_, s)| !s.gathered)
+                    .filter_map(|(id, s)| {
+                        let (a, b) = (q.edge_length(s.a.edge)?, q.edge_length(s.b.edge)?);
+                        ((a - b).abs() > tolerance).then(|| {
+                            serde_json::json!({
+                                "seam": id, "a_mm": r3(a), "b_mm": r3(b),
+                                "mismatch_mm": r3((a - b).abs()),
+                            })
+                        })
+                    })
+                    .collect();
+                let crossed: Vec<PanelId> = q
+                    .panels()
+                    .keys()
+                    .filter(|id| q.panel_is_simple(**id) == Some(false))
+                    .copied()
+                    .collect();
+                ok &= seams.is_empty() && crossed.is_empty();
+                serde_json::json!({
+                    "name": size.name, "seams": seams, "crossed_panels": crossed,
+                })
+            })
+            .collect();
+        Ok(serde_json::json!({ "ok": ok, "sizes": sizes }))
+    }
+}
+
+/// The built-in size charts.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GradingCharts {}
+
+impl Described for GradingCharts {
+    const SUMMARY: &'static str = "The built-in size charts for grading.use_chart: each chart's sizes with their bodies (cm).";
+}
+
+impl QuerySpec for GradingCharts {
+    fn run(&self, _: &Project) -> Result<Value, CommandError> {
+        use crate::commands::SizeChart;
+        let charts: Vec<Value> = [SizeChart::Women, SizeChart::Men]
+            .into_iter()
+            .map(|c| {
+                let sizes: Vec<Value> = c
+                    .sizes()
+                    .into_iter()
+                    .map(|(name, body)| serde_json::json!({"name": name, "body": body}))
+                    .collect();
+                serde_json::json!({ "chart": c, "sizes": sizes })
+            })
+            .collect();
+        Ok(Value::Array(charts))
     }
 }

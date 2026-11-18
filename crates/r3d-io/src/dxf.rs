@@ -119,6 +119,24 @@ impl Writer {
 /// sewing line offset by the seam allowance), with the sewing line on its
 /// own layer when they differ.
 pub fn to_dxf(project: &Project) -> String {
+    write_dxf(project, &[(project.clone(), None)])
+}
+
+/// The pattern in sizes `sizes` of its range (indices), as a graded nest:
+/// every piece once per size, each a block with a `Size:` text, the sizes
+/// drawn over each other where they are on the board.
+pub fn to_dxf_sizes(project: &Project, sizes: &[usize]) -> String {
+    let Some(g) = project.grading() else {
+        return to_dxf(project);
+    };
+    let sized: Vec<(Project, Option<String>)> = sizes
+        .iter()
+        .filter_map(|k| Some((project.at_size(*k), Some(g.sizes.get(*k)?.name.clone()))))
+        .collect();
+    write_dxf(project, &sized)
+}
+
+fn write_dxf(project: &Project, sized: &[(Project, Option<String>)]) -> String {
     let mut w = Writer(String::new());
     w.pair(0, "SECTION");
     w.pair(2, "HEADER");
@@ -149,61 +167,74 @@ pub fn to_dxf(project: &Project) -> String {
     let mut names = Vec::new();
     w.pair(0, "SECTION");
     w.pair(2, "BLOCKS");
-    for (k, (id, panel)) in project.panels().iter().enumerate() {
-        let Some(sew) = sewing_line(project, *id) else {
-            continue;
-        };
-        let block = format!("P{}", k + 1);
-        w.pair(0, "BLOCK");
-        w.pair(8, "0");
-        w.pair(2, &block);
-        w.pair(70, 0);
-        w.num(10, 0.0);
-        w.num(20, 0.0);
-        w.num(30, 0.0);
-        w.pair(3, &block);
-        let sa = panel.seam_allowance_mm;
-        let flat: Vec<DVec2> = sew.iter().map(|(p, _)| *p).collect();
-        if sa > 0.0 {
-            w.polyline(BOUNDARY, &polygon::offset_outward(&flat, sa), true);
-            w.polyline(SEW, &flat, true);
-        } else {
-            w.polyline(BOUNDARY, &flat, true);
-            for (p, kind) in &sew {
-                match kind {
-                    Vertex::Turn => w.point(TURN, *p),
-                    Vertex::Curve => w.point(CURVE, *p),
-                    Vertex::Between => {}
+    for (project, size) in sized {
+        for (k, (id, panel)) in project.panels().iter().enumerate() {
+            let Some(sew) = sewing_line(project, *id) else {
+                continue;
+            };
+            let block = match size {
+                Some(size) => format!("P{}-{size}", k + 1),
+                None => format!("P{}", k + 1),
+            };
+            w.pair(0, "BLOCK");
+            w.pair(8, "0");
+            w.pair(2, &block);
+            w.pair(70, 0);
+            w.num(10, 0.0);
+            w.num(20, 0.0);
+            w.num(30, 0.0);
+            w.pair(3, &block);
+            let sa = panel.seam_allowance_mm;
+            let flat: Vec<DVec2> = sew.iter().map(|(p, _)| *p).collect();
+            if sa > 0.0 {
+                w.polyline(BOUNDARY, &polygon::offset_outward(&flat, sa), true);
+                w.polyline(SEW, &flat, true);
+            } else {
+                w.polyline(BOUNDARY, &flat, true);
+                for (p, kind) in &sew {
+                    match kind {
+                        Vertex::Turn => w.point(TURN, *p),
+                        Vertex::Curve => w.point(CURVE, *p),
+                        Vertex::Between => {}
+                    }
                 }
             }
-        }
-        for (nid, notch) in project.notches() {
-            if !panel.contour.contains(&notch.edge) {
-                continue;
+            for (nid, notch) in project.notches() {
+                if !panel.contour.contains(&notch.edge) {
+                    continue;
+                }
+                if let Some(at) = project.notch_placement(*nid) {
+                    let outward = DVec2::new(at.tangent.y, -at.tangent.x);
+                    w.point(NOTCH, at.pos + outward * sa);
+                }
             }
-            if let Some(at) = project.notch_placement(*nid) {
-                let outward = DVec2::new(at.tangent.y, -at.tangent.x);
-                w.point(NOTCH, at.pos + outward * sa);
+            if let Some((a, b)) = crate::drawing::grainline(&flat, panel.grain_angle_deg) {
+                w.line(GRAIN, a, b);
+                let side = (a + b) * 0.5 + (b - a).normalize_or_zero().perp() * 15.0;
+                w.text(BOUNDARY, side, 5.0, &format!("Piece Name: {}", panel.name));
+                w.text(BOUNDARY, side - DVec2::new(0.0, 8.0), 5.0, "Quantity: 1");
+                if let Some(size) = size {
+                    w.text(
+                        BOUNDARY,
+                        side - DVec2::new(0.0, 16.0),
+                        5.0,
+                        &format!("Size: {size}"),
+                    );
+                }
             }
-        }
-        if let Some((a, b)) = crate::drawing::grainline(&flat, panel.grain_angle_deg) {
-            w.line(GRAIN, a, b);
-            let side = (a + b) * 0.5 + (b - a).normalize_or_zero().perp() * 15.0;
-            w.text(BOUNDARY, side, 5.0, &format!("Piece Name: {}", panel.name));
-            w.text(BOUNDARY, side - DVec2::new(0.0, 8.0), 5.0, "Quantity: 1");
-        }
-        for (lid, _) in project
-            .internal_lines()
-            .iter()
-            .filter(|(_, l)| l.panel == *id)
-        {
-            if let Some(pts) = project.internal_line_polyline(*lid) {
-                w.polyline(INTERNAL, &thin(&pts), false);
+            for (lid, _) in project
+                .internal_lines()
+                .iter()
+                .filter(|(_, l)| l.panel == *id)
+            {
+                if let Some(pts) = project.internal_line_polyline(*lid) {
+                    w.polyline(INTERNAL, &thin(&pts), false);
+                }
             }
+            w.pair(0, "ENDBLK");
+            w.pair(8, "0");
+            names.push(block);
         }
-        w.pair(0, "ENDBLK");
-        w.pair(8, "0");
-        names.push(block);
     }
     w.pair(0, "ENDSEC");
 

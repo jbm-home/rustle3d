@@ -45,7 +45,14 @@ impl CommandSpec for EdgeSetCurve {
                 }
             }
         };
-        tx.put_edge(self.edge, Edge { curve, ..edge });
+        tx.put_edge(
+            self.edge,
+            Edge {
+                curve,
+                grade: Vec::new(),
+                ..edge
+            },
+        );
         Ok(CommandOutput::default())
     }
 
@@ -97,29 +104,24 @@ impl CommandSpec for EdgeSplit {
                 )
             }
         };
+        let grade = tx.project().grade_along(self.edge, self.at_mm / len);
         let point = tx.new_point_id();
         tx.put_point(
             point,
             Point {
                 panel: edge.panel,
                 pos,
+                grade,
             },
         );
         let new_edge = tx.new_edge_id();
-        tx.put_edge(
-            new_edge,
-            Edge {
-                panel: edge.panel,
-                start: point,
-                end: edge.end,
-                curve: second,
-            },
-        );
+        tx.put_edge(new_edge, Edge::new(edge.panel, point, edge.end, second));
         tx.put_edge(
             self.edge,
             Edge {
                 end: point,
                 curve: first,
+                grade: Vec::new(),
                 ..edge.clone()
             },
         );

@@ -16,7 +16,7 @@ use std::path::Path;
 use std::time::Instant;
 
 use glam::{Vec2, Vec3};
-use r3d_avatar::fit::{fit, fitted_positions};
+use r3d_avatar::fit::fitted_positions;
 use r3d_core::{Around, EdgeId, Fabric, GarmentId, PanelId, PinId, Project};
 use r3d_geom::DVec2;
 use r3d_geom::mesh::mesh_polygon;
@@ -25,7 +25,7 @@ use r3d_sim::scene::{Particle, Triangle};
 use r3d_sim::{CpuSolver, FabricPreset, SUBSTEPS, SimScene, Solver, StepStats};
 
 use crate::error::CommandError;
-use crate::queries::body_model;
+use crate::queries::{body_model, fitted};
 
 /// Default distance between cloth vertices (mm): interactive on a laptop.
 pub const DEFAULT_SPACING_MM: f64 = 25.0;
@@ -467,13 +467,14 @@ impl Form {
         }
     }
 
-    /// The project's avatar fitted to its measurements, if it has one.
+    /// The project's avatar fitted to its measurements, if it has one
+    /// (in the shown size's).
     pub fn of_project(project: &Project) -> Result<Option<Self>, CommandError> {
-        let Some(avatar) = project.avatar() else {
+        let Some(body) = project.shown_body() else {
             return Ok(None);
         };
         let model = body_model()?;
-        let positions = fitted_positions(model, &fit(model, &avatar.body));
+        let positions = fitted_positions(model, &fitted(&body)?);
         Ok(Some(Self::new(positions, model.triangles().to_vec())))
     }
 }
@@ -486,7 +487,7 @@ pub(crate) fn arm_drop(project: &Project) -> Result<f64, CommandError> {
     let arm = match project.avatar() {
         Some(avatar) => {
             let model = body_model()?;
-            let positions = fitted_positions(model, &fit(model, &avatar.body));
+            let positions = fitted_positions(model, &fitted(&avatar.body)?);
             let height = positions.iter().map(|p| p.y).fold(0.0, f32::max);
             Arm::find(&positions, height, 1.0)
         }
@@ -832,12 +833,14 @@ fn segment_counts(project: &Project, spacing: f64) -> BTreeMap<EdgeId, usize> {
     counts
 }
 
-/// Build the scene. Panels without a placement are left out.
+/// Build the scene, in the project's shown size. Panels without a
+/// placement are left out.
 pub fn build(
     project: &Project,
     form: Option<&Form>,
     spacing_mm: f64,
 ) -> Result<Drape, CommandError> {
+    let project = &*project.as_shown();
     let spacing = spacing_mm.max(2.0);
     let counts = segment_counts(project, spacing);
     // One fabric per garment, and the garments simulated (those with a
@@ -1217,6 +1220,7 @@ impl<'a> LinesOnCloth<'a> {
 
     /// Every internal line of the simulated panels.
     pub fn internal_lines(&self, project: &Project) -> Vec<ClothLine> {
+        let project = project.as_shown();
         project
             .internal_lines()
             .iter()

@@ -36,6 +36,12 @@ pub enum IntegrityError {
     BadSeam { seam: AnyId },
     #[error("{entity} has an invalid value")]
     BadValue { entity: AnyId },
+    #[error(
+        "the size range is invalid (fewer than two sizes, empty or repeated names, base or shown size out of range, or a base size that differs from the avatar)"
+    )]
+    BadGrading,
+    #[error("{entity} has a grade that does not match the size range")]
+    BadGrade { entity: AnyId },
 }
 
 impl Localizable for IntegrityError {
@@ -73,6 +79,10 @@ impl Localizable for IntegrityError {
             Self::BadSeam { seam } => Message::new("integrity.bad_seam", text).arg("seam", seam),
             Self::BadValue { entity } => {
                 Message::new("integrity.bad_value", text).arg("entity", entity)
+            }
+            Self::BadGrading => Message::new("integrity.bad_grading", text),
+            Self::BadGrade { entity } => {
+                Message::new("integrity.bad_grade", text).arg("entity", entity)
             }
             Self::BadMirror { panel } => {
                 Message::new("integrity.bad_mirror", text).arg("panel", panel)
@@ -158,7 +168,42 @@ impl Project {
             }
         }
 
+        let sizes = match &self.grading {
+            Some(g) => {
+                let mut names = std::collections::BTreeSet::new();
+                let named = g
+                    .sizes
+                    .iter()
+                    .all(|s| !s.name.trim().is_empty() && names.insert(s.name.as_str()));
+                let finite = g.sizes.iter().all(|s| {
+                    [s.height_cm, s.bust_cm, s.waist_cm, s.hips_cm]
+                        .iter()
+                        .all(|v| v.is_finite())
+                });
+                let base_ok = g.sizes.get(g.base).is_some_and(|s| {
+                    [s.height_cm, s.bust_cm, s.waist_cm, s.hips_cm]
+                        .iter()
+                        .all(|v| *v == 0.0)
+                });
+                if g.sizes.len() < 2 || !named || !finite || !base_ok || g.shown >= g.sizes.len() {
+                    return Err(E::BadGrading);
+                }
+                Some((g.sizes.len(), g.base))
+            }
+            None => None,
+        };
         for (id, point) in &self.points {
+            let grade_ok = point.grade.is_empty()
+                || sizes.is_some_and(|(n, base)| {
+                    point.grade.len() == n
+                        && point.grade.iter().all(|g| g.is_finite())
+                        && point.grade.get(base) == Some(&glam::DVec2::ZERO)
+                });
+            if !grade_ok {
+                return Err(E::BadGrade {
+                    entity: (*id).into(),
+                });
+            }
             if !self.panels.contains_key(&point.panel) {
                 return Err(E::DanglingReference {
                     entity: (*id).into(),
@@ -195,6 +240,16 @@ impl Project {
                 && (!c1.is_finite() || !c2.is_finite())
             {
                 return Err(E::NonFinite { entity });
+            }
+            let grade_ok = edge.grade.is_empty()
+                || (matches!(edge.curve, EdgeCurve::Cubic { .. })
+                    && sizes.is_some_and(|(n, base)| {
+                        edge.grade.len() == n
+                            && edge.grade.iter().flatten().all(|g| g.is_finite())
+                            && edge.grade.get(base) == Some(&[glam::DVec2::ZERO; 2])
+                    }));
+            if !grade_ok {
+                return Err(E::BadGrade { entity });
             }
         }
 

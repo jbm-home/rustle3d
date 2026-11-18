@@ -419,8 +419,13 @@ fn copy_point(
     panel: PanelId,
 ) -> Result<PointId, CommandError> {
     let pos = point_pos(tx, id)?;
+    let grade = tx
+        .project()
+        .point(id)
+        .map(|p| p.grade.clone())
+        .unwrap_or_default();
     let new = tx.new_point_id();
-    tx.put_point(new, Point { panel, pos });
+    tx.put_point(new, Point { panel, pos, grade });
     Ok(new)
 }
 
@@ -568,29 +573,26 @@ fn split_at(
             )
         }
     };
+    let total = tx.project().edge_length(id).unwrap_or_default();
+    let fraction = if total > 0.0 { first_len / total } else { 0.0 };
+    let grade = tx.project().grade_along(id, fraction);
     let point = tx.new_point_id();
     tx.put_point(
         point,
         Point {
             panel: edge.panel,
             pos,
+            grade,
         },
     );
     let new_edge = tx.new_edge_id();
-    tx.put_edge(
-        new_edge,
-        Edge {
-            panel: edge.panel,
-            start: point,
-            end: edge.end,
-            curve: second,
-        },
-    );
+    tx.put_edge(new_edge, Edge::new(edge.panel, point, edge.end, second));
     tx.put_edge(
         id,
         Edge {
             end: point,
             curve: first,
+            grade: Vec::new(),
             ..edge
         },
     );
@@ -664,8 +666,16 @@ fn cut_edges(
             let end = if k + 1 == n {
                 to
             } else {
+                let grade = tx.project().grade_at(panel, c.p3);
                 let id = tx.new_point_id();
-                tx.put_point(id, Point { panel, pos: c.p3 });
+                tx.put_point(
+                    id,
+                    Point {
+                        panel,
+                        pos: c.p3,
+                        grade,
+                    },
+                );
                 id
             };
             let id = tx.new_edge_id();
@@ -674,15 +684,7 @@ fn cut_edges(
             } else {
                 EdgeCurve::Cubic { c1: c.p1, c2: c.p2 }
             };
-            tx.put_edge(
-                id,
-                Edge {
-                    panel,
-                    start,
-                    end,
-                    curve,
-                },
-            );
+            tx.put_edge(id, Edge::new(panel, start, end, curve));
             start = end;
             id
         })

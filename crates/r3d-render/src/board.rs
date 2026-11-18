@@ -28,6 +28,9 @@ pub struct BoardPanel {
     pub internal_lines: Vec<Vec<DVec2>>,
     /// Notch position and outward normal.
     pub notches: Vec<(DVec2, DVec2)>,
+    /// The panel's outline in the other sizes of the project's range (the
+    /// graded nest), and whether each is the size shown in 3D.
+    pub sizes: Vec<(Vec<DVec2>, bool)>,
 }
 
 /// Everything the board draws.
@@ -68,6 +71,16 @@ pub const SEAM_TOLERANCE_MM: f64 = 2.0;
 impl BoardScene {
     pub fn from_project(project: &Project, selected: &[PanelId]) -> Self {
         let order: Vec<PanelId> = project.panels().keys().copied().collect();
+        // The other sizes of the range, for the graded nest.
+        let sized: Vec<(Project, bool)> = project
+            .grading()
+            .map(|g| {
+                (0..g.sizes.len())
+                    .filter(|k| *k != g.base)
+                    .map(|k| (project.at_size(k), k == g.shown))
+                    .collect()
+            })
+            .unwrap_or_default();
         let color_of = |id: PanelId, panel: &r3d_core::Panel| {
             let owner = panel.mirror_of.as_ref().map_or(id, |l| l.source);
             order.iter().position(|p| *p == owner).unwrap_or_default() % PIECE_COLORS
@@ -90,6 +103,10 @@ impl BoardScene {
                     .filter(|(_, l)| l.panel == *id)
                     .filter_map(|(lid, _)| project.internal_line_polyline(*lid))
                     .collect();
+                let sizes = sized
+                    .iter()
+                    .filter_map(|(p, shown)| Some((p.panel_outline(*id)?, *shown)))
+                    .collect();
                 Some(BoardPanel {
                     id: *id,
                     color: color_of(*id, panel),
@@ -97,6 +114,7 @@ impl BoardScene {
                     outline,
                     internal_lines,
                     notches,
+                    sizes,
                 })
             })
             .collect();
@@ -168,7 +186,12 @@ impl BoardScene {
         let all: Vec<DVec2> = self
             .panels
             .iter()
-            .flat_map(|p| p.outline.iter().copied())
+            .flat_map(|p| {
+                p.outline
+                    .iter()
+                    .chain(p.sizes.iter().flat_map(|(o, _)| o.iter()))
+                    .copied()
+            })
             .collect();
         polygon::bounding_box(&all)
     }
@@ -459,6 +482,16 @@ impl BoardRenderer {
             faint[3] *= 0.45;
             for line in &panel.internal_lines {
                 batch.polyline(line, false, px, faint);
+            }
+            // The graded nest: the other sizes' outlines, the one shown in
+            // 3D stronger.
+            for (outline, shown) in &panel.sizes {
+                let (color, width) = if *shown {
+                    (theme.panel_line, 1.5 * px)
+                } else {
+                    (faint, px)
+                };
+                batch.polyline(outline, true, width, color);
             }
             let (line_color, width) = if selected {
                 (theme.selection, 2.5 * px)

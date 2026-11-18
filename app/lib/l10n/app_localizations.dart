@@ -2604,6 +2604,144 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Turn the 3D view to the angle you like, click the **camera** button, choose the quality and the lighting, then **Render**. The image gets cleaner in the 3D view; **Save image…** keeps it as a PNG file.'**
   String get learnPhotoStopText;
+
+  /// No description provided for @sizes.
+  ///
+  /// In en, this message translates to:
+  /// **'Sizes'**
+  String get sizes;
+
+  /// No description provided for @sizesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Grade the pattern to a range of sizes. It stays drawn in the base size; the other sizes\' outlines nest around each piece.'**
+  String get sizesHint;
+
+  /// No description provided for @addSizes.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a size range'**
+  String get addSizes;
+
+  /// No description provided for @sizeChart.
+  ///
+  /// In en, this message translates to:
+  /// **'Size chart'**
+  String get sizeChart;
+
+  /// No description provided for @chartWomen.
+  ///
+  /// In en, this message translates to:
+  /// **'Women'**
+  String get chartWomen;
+
+  /// No description provided for @chartMen.
+  ///
+  /// In en, this message translates to:
+  /// **'Men'**
+  String get chartMen;
+
+  /// No description provided for @sizeFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'From'**
+  String get sizeFrom;
+
+  /// No description provided for @sizeTo.
+  ///
+  /// In en, this message translates to:
+  /// **'To'**
+  String get sizeTo;
+
+  /// No description provided for @sizeBase.
+  ///
+  /// In en, this message translates to:
+  /// **'Base size'**
+  String get sizeBase;
+
+  /// No description provided for @sizesDialogHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pieces added from a template afterwards are graded to every size. Each size is draped on a body with its measurements.'**
+  String get sizesDialogHint;
+
+  /// No description provided for @sizeShown.
+  ///
+  /// In en, this message translates to:
+  /// **'Shown in 3D'**
+  String get sizeShown;
+
+  /// No description provided for @sizesChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get sizesChange;
+
+  /// No description provided for @sizesRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the sizes'**
+  String get sizesRemove;
+
+  /// No description provided for @sizeBaseTag.
+  ///
+  /// In en, this message translates to:
+  /// **'base'**
+  String get sizeBaseTag;
+
+  /// No description provided for @gradeStep.
+  ///
+  /// In en, this message translates to:
+  /// **'Grade per size'**
+  String get gradeStep;
+
+  /// No description provided for @gradeStepHint.
+  ///
+  /// In en, this message translates to:
+  /// **'How far this point moves from one size to the next.'**
+  String get gradeStepHint;
+
+  /// No description provided for @gradeCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Set per size (by a template or an agent). A step typed here replaces it.'**
+  String get gradeCustom;
+
+  /// No description provided for @errNoSizes.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a size range first.'**
+  String get errNoSizes;
+
+  /// No description provided for @errUnknownSize.
+  ///
+  /// In en, this message translates to:
+  /// **'That size is not in the range.'**
+  String get errUnknownSize;
+
+  /// No description provided for @errTooFewSizes.
+  ///
+  /// In en, this message translates to:
+  /// **'A size range needs at least two sizes.'**
+  String get errTooFewSizes;
+
+  /// No description provided for @errDuplicateName.
+  ///
+  /// In en, this message translates to:
+  /// **'Two sizes have the same name.'**
+  String get errDuplicateName;
+
+  /// No description provided for @errBodyOutOfRange.
+  ///
+  /// In en, this message translates to:
+  /// **'A size of this range would give the avatar measurements outside what it accepts.'**
+  String get errBodyOutOfRange;
+
+  /// No description provided for @errBaseOffset.
+  ///
+  /// In en, this message translates to:
+  /// **'The base size cannot move: it is the pattern as drawn.'**
+  String get errBaseOffset;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {
