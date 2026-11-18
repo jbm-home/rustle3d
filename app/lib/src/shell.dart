@@ -542,8 +542,9 @@ class _ShellState extends State<Shell> {
   /// Corners picked on the board (one, or two to measure between).
   List<PickedPoint> _points = const [];
 
-  /// The Bend tool's handle being dragged: 1 or 2.
-  int? _handle;
+  /// The curve handle being dragged (Bend, Select): its edge, and `c1` or
+  /// `c2`.
+  (String, String)? _handle;
 
   /// The points placed so far with Curve (a closed piece) or Cut (an open
   /// line), in mm.
@@ -1016,23 +1017,47 @@ class _ShellState extends State<Shell> {
     _refresh();
   }
 
-  bool _bendPress(Offset mm, double mmPerPx) {
-    final e = _pickedEdge;
-    if (e == null || e['curve']['kind'] != 'cubic') return false;
-    for (final (k, key) in [(1, 'c1'), (2, 'c2')]) {
+  /// The curve handles shown on the board: both of the curved edge picked
+  /// (Bend, Select), or, with Select, a picked corner's: one on each
+  /// curve meeting there.
+  List<(Map<String, dynamic>, String)> get _handles {
+    if (_tool != 'bend' && _tool != 'select') return const [];
+    bool cubic(Map<String, dynamic> e) => e['curve']['kind'] == 'cubic';
+    if (_pickedEdge case final e? when cubic(e)) return [(e, 'c1'), (e, 'c2')];
+    if (_tool != 'select' || _points.length != 1) return const [];
+    final corner = _points.first.id;
+    return [
+      for (final e
+          in (_panel?['edges'] as List? ?? const [])
+              .cast<Map<String, dynamic>>())
+        if (cubic(e)) ...[
+          if (e['start']['id'] == corner) (e, 'c1'),
+          if (e['end']['id'] == corner) (e, 'c2'),
+        ],
+    ];
+  }
+
+  /// A press on a curve handle holds it; elsewhere it does what the tool
+  /// does.
+  bool _handlePress(Offset mm, double mmPerPx) {
+    for (final (e, key) in _handles) {
       if ((_at(e['curve'][key]) - mm).distance < _pickPx * mmPerPx) {
-        _handle = k;
+        _handle = (e['id'] as String, key);
         return true;
       }
     }
     return false;
   }
 
-  void _bendDrag(Offset mm) {
-    final (e, h) = (_pickedEdge, _handle);
-    if (e == null || h == null) return;
-    final c1 = h == 1 ? mm : _at(e['curve']['c1']);
-    final c2 = h == 2 ? mm : _at(e['curve']['c2']);
+  void _handleDrag(Offset mm) {
+    final (id, key) = _handle ?? ('', '');
+    final e = (_panel?['edges'] as List? ?? const [])
+        .cast<Map<String, dynamic>>()
+        .where((e) => e['id'] == id)
+        .firstOrNull;
+    if (e == null) return;
+    final c1 = key == 'c1' ? mm : _at(e['curve']['c1']);
+    final c2 = key == 'c2' ? mm : _at(e['curve']['c2']);
     _run({
       'type': 'edge.set_curve',
       'edge': e['id'],
@@ -1043,6 +1068,13 @@ class _ShellState extends State<Shell> {
       },
     });
     _refresh();
+  }
+
+  void _handleRelease() {
+    if (_handle == null) return;
+    _handle = null;
+    // The whole drag is one undo step.
+    _guard(widget.engine.release);
   }
 
   /// What the board tools draw over the pattern.
@@ -1109,18 +1141,11 @@ class _ShellState extends State<Shell> {
         point(toScreen(a.at), i == 0 && !cut ? 6 : 4);
       }
     }
-    final e = _tool == 'bend' ? _pickedEdge : null;
-    if (e != null) {
-      if (e['curve']['kind'] == 'cubic') {
-        for (final (end, handle) in [
-          (e['start']['pos'], e['curve']['c1']),
-          (e['end']['pos'], e['curve']['c2']),
-        ]) {
-          final h = toScreen(_at(handle));
-          canvas.drawLine(toScreen(_at(end)), h, line);
-          point(h, 5);
-        }
-      }
+    for (final (e, key) in _handles) {
+      final end = e[key == 'c1' ? 'start' : 'end']['pos'];
+      final h = toScreen(_at(e['curve'][key]));
+      canvas.drawLine(toScreen(_at(end)), h, line);
+      point(h, 5);
     }
     // The line or edge being drawn follows the pointer.
     if (_hover case final h?) {
@@ -1915,13 +1940,14 @@ class _ShellState extends State<Shell> {
                                             ),
                                             'bend' => PatternPointer(
                                               onTap: _bendTap,
-                                              onPress: _bendPress,
-                                              onDrag: _bendDrag,
-                                              onRelease: () {
-                                                _handle = null;
-                                                // The bend is one undo step.
-                                                _guard(widget.engine.release);
-                                              },
+                                              onPress: _handlePress,
+                                              onDrag: _handleDrag,
+                                              onRelease: _handleRelease,
+                                            ),
+                                            'select' => PatternPointer(
+                                              onPress: _handlePress,
+                                              onDrag: _handleDrag,
+                                              onRelease: _handleRelease,
                                             ),
                                             'straighten' => PatternPointer(
                                               onTap: _straightenTap,

@@ -7,7 +7,7 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-18 (Dimension tool, formulas typed in a value;
+Last updated: 2026-11-18 (handles dragged with Select; Dimension tool, formulas typed in a value;
 Sew: part of an edge, several edges, internal lines; ⌘-click to pick a second corner or edge,
 rail tips beside the rail; M14; long sleeves, mirrored seams, agent status;
 rename, delete, export and import projects; smooth views on Windows;
@@ -86,7 +86,7 @@ of related tools (the last one used stays on the button).
 
 | Tool | Key | What it does |
 |---|---|---|
-| Select | V | Click a piece, a corner or an edge (⌘-click or ⇧-click a second corner or edge); drag a corner or an edge to reshape the piece |
+| Select | V | Click a piece, a corner or an edge (⌘-click or ⇧-click a second corner or edge); drag a corner or an edge to reshape the piece; a picked curved edge, or a corner between curves, shows its handles: drag them to bend the curve (a smooth point keeps its two handles lined up) |
 | Shapes → Rectangle | R | Adds a rectangular piece |
 | Shapes → Ellipse | E | Adds a circle or an ellipse of the width and height you type |
 | Shapes → Circle skirt | | Adds the pieces of a full, half or quarter circle skirt from the waist and the skirt's length |
@@ -448,8 +448,6 @@ DXF-AAMA; garments go out as glTF and OBJ: open formats only.
 - Garments worn close together can show through each other where they
   touch, and a shirt cannot be tucked into fitted trousers yet: layers of
   cloth keep about 2 cm apart in the simulation.
-- A point's handles cannot be dragged with Select yet; use Bend on the
-  edge (a smooth point keeps its two handles lined up).
 - Not yet in the simulation: elastic and shirring, visible topstitching,
   interfacing, quilting and padding. Holes are cut on their line (no seam
   allowance inside them), and a mirrored or symmetric piece cannot have

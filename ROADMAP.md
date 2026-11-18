@@ -38,7 +38,7 @@ can be tested through MCP as soon as they exist.
 | M27 | Sketching 2: constraints and symmetry ✅ | 4–5 wk | Draw a half bodice against a symmetry axis with fixed dimensions; change one, the shape follows |
 | M28 | Parametric patterns ✅ | 2–3 wk | A skirt whose waist is `waist / 4 + 10 mm` redrafts itself on another body |
 | M29 | Construction details ✅ | 3–4 wk | A skirt with darts, a pleat and a patch pocket sewn on an internal line |
-| M32 | Editor finishing | 1–2 wk | A patch pocket sewn on its line and a dimension drawn on the board, all with the mouse |
+| M32 | Editor finishing ✅ | 1–2 wk | A patch pocket sewn on its line and a dimension drawn on the board, all with the mouse |
 | M20 | Trims: buttons and zippers | 2–3 wk | A shirt that buttons and trousers with a fly zipper, draped closed |
 | M21 | Textures and prints | 2–3 wk | A striped shirt whose stripes follow the grainline on every piece |
 | M30 | Production: marker, yardage, tech pack, projector | 3–4 wk | A graded shirt nested on a 150 cm fabric, its yardage and cost, its tech pack PDF |
@@ -720,7 +720,7 @@ Built (2026-11-18), demo `./demos/m29/demo.sh`, spec 21:
   tool; holes in mirror copies and symmetric pieces; seam allowance
   inside holes.
 
-## M32 — Editor finishing
+## M32 — Editor finishing ✅ (2026-11-18)
 From the maintainer (2026-11-18): what M27–M29 built must be drawable
 in the app, not only through commands. Mostly UI work on existing
 commands; in this order:
@@ -737,7 +737,8 @@ commands; in this order:
   and whose waist dimension is drawn on the board, all with the mouse;
   an integration test drives the same steps.
 
-Built so far (2026-11-18):
+Built (2026-11-18), demo `./demos/m32/demo.sh` (the three integration
+tests below, in the real app):
 - Step 1: the Sew tool picks a whole edge or internal line (click), a
   stretch of one (drag along it, the ends caught on corners, notches and
   other seams' ends) or a run of edges (⌘-clicks in any order, put in
@@ -747,8 +748,13 @@ Built so far (2026-11-18):
   distance (direct, width or height from where it is pulled out) or two
   edges' angle, measured, then its value typed where it was placed
   (`app/integration_test/dimension_test.dart`).
-- Step 3, formulas: any dimension field takes a formula in place of a
-  number (on the board and in the inspector).
+- Step 3: any dimension field takes a formula in place of a number (on
+  the board and in the inspector); with Select, a picked curved edge or
+  a corner between curves shows its handles, dragged in one undo step
+  (`app/integration_test/handles_test.dart`).
+- Open (step 4, core work): constraints on internal lines, notches and
+  construction lines; holes in mirror copies and symmetric pieces; seam
+  allowance inside holes; moving a dimension's label by hand.
 
 ## M30 — Production: marker, yardage, tech pack, projector
 - **Indicators per piece**: area, fabric mass; totals per garment.

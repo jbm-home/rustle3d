@@ -29,7 +29,10 @@ board: an edge's length, the distance between two corners (direct,
 width or height, from where it is pulled out: above or below both
 corners, a width; beside both, a height) or the angle between two
 edges, measured as they are (`measure`), then its value (or a formula,
-spec 20) typed in a field where it was placed.
+spec 20) typed in a field where it was placed. With Select, a picked
+curved edge shows its two handles and a picked corner the handle of each
+curve meeting there; dragging one is one undo step (the solver keeps a
+smooth point's handles aligned).
 
 ## User story
 As a designer, I draft a half bodice against its centre front with the

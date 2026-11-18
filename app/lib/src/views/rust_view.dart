@@ -381,8 +381,8 @@ class _RustViewState extends State<RustView>
             }
             _holding =
                 view != null &&
+                // (A tool's own press, above, came first.)
                 widget.holding &&
-                widget.pattern == null &&
                 widget.engine.press(
                   view: view,
                   x: e.localPosition.dx * _ratio,

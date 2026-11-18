@@ -106,7 +106,7 @@ cargo fmt --all                              # format
 cargo run -p r3d-cli -- --help               # headless CLI (binary: r3d)
 cargo xtask gen-docs                         # regenerate docs/commands.md (a test checks it)
 UPDATE_GOLDEN=1 cargo test -p r3d-core       # regenerate current-version golden files
-./demos/m17/demo.sh                          # latest milestone demo (one folder per milestone)
+./demos/m32/demo.sh                          # latest milestone demo (one folder per milestone)
 cargo bench -p r3d-sim                       # CPU solver benchmarks (docs/physics.md §7)
 cargo bench -p r3d-sim-gpu                   # GPU vs CPU on the T-shirt and the dress
 cargo run -p r3d-cli -- simulate X.r3d       # headless drape (cached), then: render X.r3d --view 3d|photo --out a.png
