@@ -34,7 +34,7 @@ can be tested through MCP as soon as they exist.
 | M19 | Layers and multiple garments (tucked in: open) | 3–4 wk | A shirt tucked into trousers, each in its own fabric and colour |
 | M22 | Grading and sizes ✅ | 2–3 wk | A shirt graded from 36 to 52, each size draped on a matching avatar |
 | M25 | Maximized views ✅ | < 1 wk | The board fills the window, the drape pauses; one click brings both views back |
-| M26 | History and editing comfort | 1–2 wk | Jump back ten steps from the history panel; paste two sewn pieces with their seam |
+| M26 | History, editing comfort, feedback on long steps | 2–3 wk | Jump back ten steps from the history panel; paste two sewn pieces with their seam; a graded template shows its progress |
 | M27 | Sketching 2: constraints and symmetry | 4–5 wk | Draw a half bodice against a symmetry axis with fixed dimensions; change one, the shape follows |
 | M28 | Parametric patterns | 2–3 wk | A skirt whose waist is `waist / 4 + 10 mm` redrafts itself on another body |
 | M29 | Construction details | 3–4 wk | A skirt with darts, a pleat and a patch pocket sewn on an internal line |
@@ -551,7 +551,7 @@ Built (2026-11-18), UI only (no command; the layout is not saved):
   paused and resumes on restore; Space or the guide's Drape brings the
   3D view back. Tested by `app/integration_test/views_test.dart`.
 
-## M26 — History and editing comfort
+## M26 — History, editing comfort, feedback on long steps
 Spec 08 already plans most of it.
 - Undo/Redo labels naming the action ("Undo Move point") in the Edit
   menu and their tooltips; steps grouped the way the user sees them (a
@@ -563,8 +563,18 @@ Spec 08 already plans most of it.
 - Semantic copy and paste: pieces pasted with the seams between them,
   their internal lines, notches, pins, grade rules and mirror links (in
   the same project or another one). Needs a `panel.paste` command.
+- **Feedback on long steps** (maintainer, 2026-11-18): the app never
+  looks frozen. Long steps run off the UI thread and show their
+  progress: opening a project, adding a template (about 6 s graded on 9
+  sizes, one body fit per size: a bar per size), setting a size chart,
+  importing a pattern, exporting (graded nests, glTF), fitting a new
+  body, starting the drape. A spinner when the length is unknown, a
+  progress bar with what is being done when it is known, a cancel
+  button where stopping is safe. The core reports progress through the
+  command layer, so the CLI and MCP see it too.
 - **Demo**: draw, sew and move pieces, jump back ten steps from the
-  panel, redo; copy two sewn pieces into a new project.
+  panel, redo; copy two sewn pieces into a new project; add the shirt
+  template to a project graded 36–52 and watch its sizes being drafted.
 
 ## M27 — Sketching 2: constraints and symmetry
 From the maintainer (2026-11-18): drafting lacks ease. General CAD ideas
@@ -672,6 +682,4 @@ commercial use) · turntable video of the photo render (a runway walk
 after M23) · step-by-step sewing instructions generated from the seams
 (needs a sewing order) · OpenUSD
 export · finer cloth mesh with a strain limit (smaller folds;
-physics.md §7) · picking points and notches in 3D · signed packages ·
-a loading indicator while a project opens (opening runs on the UI
-thread and blocks it for a moment; move it off and show progress).
+physics.md §7) · picking points and notches in 3D · signed packages.
