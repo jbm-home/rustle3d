@@ -104,6 +104,11 @@ impl Workspace {
         &self.session
     }
 
+    /// End the current merge run of the history (a gesture is over).
+    pub fn seal_history(&mut self) {
+        self.session.seal_history();
+    }
+
     pub(crate) fn session_mut(&mut self) -> &mut Session {
         &mut self.session
     }

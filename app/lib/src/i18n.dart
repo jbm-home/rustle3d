@@ -53,6 +53,9 @@ bool get isMac => defaultTargetPlatform == TargetPlatform.macOS;
 extension Messages on BuildContext {
   L get l => L.of(this);
 
+  /// A step of the undo history, by its command (or batch) name.
+  String stepName(String step) => l.stepName(step.replaceAll('.', '_'));
+
   /// [text] with the macOS key symbols it is written with (⌘ ⌥ ⇧ ⌫) as
   /// this platform's keys: unchanged on macOS, "Ctrl+Shift+Z" for "⇧⌘Z",
   /// "Alt-click" for "⌥-click" elsewhere (key names in the UI language).

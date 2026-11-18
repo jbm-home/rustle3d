@@ -1,6 +1,6 @@
 //! Undo/redo history of change sets.
 
-use r3d_core::{ChangeSet, Project};
+use r3d_core::{ChangeSet, PanelId, Project};
 
 /// Default number of undo steps kept.
 pub const DEFAULT_LIMIT: usize = 500;
@@ -24,6 +24,25 @@ pub struct History {
 impl Default for History {
     fn default() -> Self {
         Self::with_limit(DEFAULT_LIMIT)
+    }
+}
+
+/// What undoing or redoing steps changed: the last step's label and the
+/// panels touched that still exist (to select them).
+#[derive(Debug, Default, PartialEq)]
+pub struct Moved {
+    pub label: String,
+    pub panels: Vec<PanelId>,
+}
+
+impl Moved {
+    fn add(&mut self, entry: &Entry, project: &Project) {
+        self.label.clone_from(&entry.label);
+        for id in entry.changes.panels(project) {
+            if !self.panels.contains(&id) {
+                self.panels.push(id);
+            }
+        }
     }
 }
 
@@ -67,31 +86,68 @@ impl History {
         self.sealed = true;
     }
 
-    /// Undo the last step; returns its label.
-    pub fn undo(&mut self, project: &mut Project) -> Option<String> {
-        let entry = self.undo.pop()?;
-        entry.changes.undo(project);
-        let label = entry.label.clone();
-        self.redo.push(entry);
-        self.sealed = true;
-        Some(label)
+    /// Undo the last step.
+    pub fn undo(&mut self, project: &mut Project) -> Option<Moved> {
+        let at = self.undo.len().checked_sub(1)?;
+        self.go_to(project, at)
     }
 
-    /// Redo the last undone step; returns its label.
-    pub fn redo(&mut self, project: &mut Project) -> Option<String> {
-        let entry = self.redo.pop()?;
-        entry.changes.redo(project);
-        let label = entry.label.clone();
-        self.undo.push(entry);
-        self.sealed = true;
-        Some(label)
+    /// Redo the last undone step.
+    pub fn redo(&mut self, project: &mut Project) -> Option<Moved> {
+        if self.redo.is_empty() {
+            return None;
+        }
+        self.go_to(project, self.undo.len() + 1)
     }
 
+    /// Undo or redo steps until `at` steps are done (0: none, all undone;
+    /// [`History::len`]: all redone). `None` past the end or where it is
+    /// already.
+    pub fn go_to(&mut self, project: &mut Project, at: usize) -> Option<Moved> {
+        if at > self.len() || at == self.undo.len() {
+            return None;
+        }
+        let mut moved = Moved::default();
+        while self.undo.len() > at {
+            let entry = self.undo.pop()?;
+            entry.changes.undo(project);
+            moved.add(&entry, project);
+            self.redo.push(entry);
+        }
+        while self.undo.len() < at {
+            let entry = self.redo.pop()?;
+            entry.changes.redo(project);
+            moved.add(&entry, project);
+            self.undo.push(entry);
+        }
+        self.sealed = true;
+        Some(moved)
+    }
+
+    /// Every step's label, oldest first: the done ones, then the undone.
+    pub fn labels(&self) -> Vec<&str> {
+        self.undo
+            .iter()
+            .chain(self.redo.iter().rev())
+            .map(|e| e.label.as_str())
+            .collect()
+    }
+
+    /// Steps done: what undo would take back, from the latest.
     pub fn undo_len(&self) -> usize {
         self.undo.len()
     }
 
     pub fn redo_len(&self) -> usize {
         self.redo.len()
+    }
+
+    /// Steps done and undone.
+    pub fn len(&self) -> usize {
+        self.undo.len() + self.redo.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }

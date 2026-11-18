@@ -1536,4 +1536,122 @@ class LEn extends L {
 
   @override
   String get sizesOnBoard => 'Show the sizes on the board';
+
+  @override
+  String stepName(String step) {
+    String _temp0 = intl.Intl.selectLogic(step, {
+      'project_rename': 'Rename project',
+      'project_set_display_unit': 'Change units',
+      'avatar_set': 'Change body',
+      'avatar_remove': 'Remove body',
+      'panel_create_rect': 'Add rectangle',
+      'panel_create_polygon': 'Add polygon',
+      'panel_create_path': 'Add curved piece',
+      'panel_rename': 'Rename piece',
+      'panel_translate': 'Move piece',
+      'panel_set_grain': 'Set grainline',
+      'panel_set_seam_allowance': 'Set seam allowance',
+      'panel_mirror': 'Mirror piece',
+      'panel_unlink': 'Unlink copy',
+      'panel_place': 'Place piece',
+      'panel_delete': 'Delete piece',
+      'panel_cut': 'Cut piece',
+      'panel_paste': 'Paste',
+      'point_move': 'Move point',
+      'point_set_distance': 'Set distance',
+      'point_remove': 'Remove point',
+      'edge_set_curve': 'Bend edge',
+      'edge_split': 'Add point',
+      'edge_move': 'Move edge',
+      'notch_add': 'Add notch',
+      'notch_move': 'Move notch',
+      'notch_remove': 'Remove notch',
+      'internal_line_add': 'Draw line',
+      'internal_line_remove': 'Remove line',
+      'seam_add': 'Sew',
+      'seam_remove': 'Unsew',
+      'seam_flip': 'Flip seam',
+      'seam_set_gathered': 'Gather seam',
+      'edge_lengthen': 'Lengthen',
+      'edge_set_length': 'Set length',
+      'seam_take_in': 'Take in',
+      'seam_match_length': 'Match lengths',
+      'pin_add': 'Pin',
+      'pin_remove': 'Unpin',
+      'garment_set_fabric': 'Change fabric',
+      'garment_arrange': 'Arrange pieces',
+      'garment_set_color': 'Change colour',
+      'garment_add': 'Add garment',
+      'garment_rename': 'Rename garment',
+      'garment_remove': 'Remove garment',
+      'garment_set_layer': 'Change layer',
+      'panel_set_garment': 'Move to garment',
+      'grading_set_sizes': 'Set sizes',
+      'grading_use_chart': 'Use size chart',
+      'grading_clear': 'Remove sizes',
+      'grading_show_size': 'Show size',
+      'point_set_grade': 'Grade point',
+      'template_apply': 'Add template',
+      'pattern_import': 'Import pattern',
+      'batch': 'Several changes',
+      'other': '$step',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String undoStep(String name) {
+    return 'Undo $name  ⌘Z';
+  }
+
+  @override
+  String redoStep(String name) {
+    return 'Redo $name  ⇧⌘Z';
+  }
+
+  @override
+  String get nothingToUndo => 'Nothing to undo';
+
+  @override
+  String get nothingToRedo => 'Nothing to redo';
+
+  @override
+  String get historyTip => 'History: go back or forward to any step';
+
+  @override
+  String get historyTitle => 'History';
+
+  @override
+  String get historyStart => 'Opened';
+
+  @override
+  String get historyEmpty => 'No changes yet.';
+
+  @override
+  String copied(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count pieces copied',
+      one: '1 piece copied',
+    );
+    return '$_temp0, with the seams between them. ⌘V pastes them, here or in another project.';
+  }
+
+  @override
+  String pasted(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count pieces pasted',
+      one: '1 piece pasted',
+    );
+    return '$_temp0.';
+  }
+
+  @override
+  String get nothingToPaste => 'Nothing to paste: copy pieces first (⌘C).';
+
+  @override
+  String get selectToCopy => 'Select pieces to copy.';
 }

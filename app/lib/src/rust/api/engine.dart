@@ -167,7 +167,8 @@ abstract class Engine implements RustOpaqueInterface {
   /// pixels, row after row (platforms without shared textures).
   Future<Uint8List> readView({required int view});
 
-  /// Pointer up: let go of the cloth.
+  /// Pointer up: let go of the cloth, and end the gesture's undo step
+  /// (a drag is one step, the next one another).
   void release();
 
   /// Render a view and wait until the GPU is done, so the UI never shows

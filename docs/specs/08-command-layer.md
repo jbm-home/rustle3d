@@ -24,9 +24,15 @@ do anything the UI can do, through the same typed commands.
 - `docs/commands.md` is generated from the registry.
 
 ## UX
-- An Edit menu with Undo/Redo labels naming the action ("Undo Move point"),
-  a history panel to jump back several steps, and a command palette over the
-  same registry.
+- Undo/Redo name the action ("Undo Move point") in their tooltips; the
+  app has no menu bar, so the history button next to them lists every
+  step (`history.list`), the latest first, and a click goes back or
+  forward to it (`history.go_to`). A command palette uses the same
+  registry.
+- A step is what the user sees as one action: a drag (merged by merge
+  key, sealed when the pointer is released), a tool's whole gesture, a
+  template added (one command), a batch (named by its `label`).
+- Undo, redo and go-to select the panels the steps changed.
 
 ## Acceptance criteria
 - Every command has an apply → undo → redo round-trip test that checks the

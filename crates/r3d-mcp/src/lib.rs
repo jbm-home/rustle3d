@@ -65,6 +65,8 @@ enum Target {
     Op(&'static str),
     Undo,
     Redo,
+    List,
+    GoTo,
     Batch,
     Render(render::View),
 }
@@ -152,6 +154,25 @@ fn catalog() -> (Vec<Tool>, BTreeMap<String, Target>) {
         Target::Redo,
     );
     add(
+        tool_name(step::LIST),
+        "The steps of the undo history, oldest first (`steps`, each with its `label`), and how          many are done (`at`)."
+            .into(),
+        no_params(),
+        Target::List,
+    );
+    add(
+        tool_name(step::GO_TO),
+        "Undo or redo until `at` steps of the history are done (see history_list; 0 undoes          them all). Returns the panels changed."
+            .into(),
+        object(json!({
+            "type": "object",
+            "properties": { "at": { "type": "integer", "minimum": 0 } },
+            "required": ["at"],
+            "additionalProperties": false
+        })),
+        Target::GoTo,
+    );
+    add(
         step::BATCH.into(),
         "Run several commands atomically as one undo step: if one fails, none is applied and the \
          error gives its index. Each item is a command object with its dotted `type`, e.g. \
@@ -159,7 +180,10 @@ fn catalog() -> (Vec<Tool>, BTreeMap<String, Target>) {
             .into(),
         object(json!({
             "type": "object",
-            "properties": { "commands": { "type": "array", "items": { "type": "object" } } },
+            "properties": {
+                "label": { "type": "string", "description": "The step's name in the history (default `batch`)" },
+                "commands": { "type": "array", "items": { "type": "object" } }
+            },
             "required": ["commands"],
             "additionalProperties": false
         })),
@@ -284,6 +308,8 @@ impl Server {
             Some(Target::Op(op)) => *op,
             Some(Target::Undo) => step::UNDO,
             Some(Target::Redo) => step::REDO,
+            Some(Target::List) => step::LIST,
+            Some(Target::GoTo) => step::GO_TO,
             Some(Target::Batch) => step::BATCH,
         };
         match self.run_step(type_name, args) {

@@ -645,11 +645,26 @@ impl Engine {
         let step = Step::from_value(value).map_err(err)?;
         let mut ws = self.workspace()?;
         let result = ws.run_step(&step).map_err(err)?;
-        if !matches!(step, Step::Query(_)) {
+        if !matches!(step, Step::Query(_) | Step::List) {
             self.edited()?;
         }
         if ws.session().is_dirty() {
             ws.save().map_err(err)?;
+        }
+        // Moving through the history selects what changed, so the user
+        // sees what was undone or redone.
+        if matches!(step, Step::Undo | Step::Redo | Step::GoTo(_)) {
+            let changed: Vec<PanelId> = result["panels"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|v| v.as_str()?.parse().ok())
+                .collect();
+            if !changed.is_empty() {
+                *self.selected()? = changed;
+                *self.selected_edge.lock().map_err(|_| poisoned())? = None;
+                self.selected_points.lock().map_err(|_| poisoned())?.clear();
+            }
         }
         self.forget_missing(ws.session().project())?;
         Ok(result.to_string())
@@ -2133,9 +2148,11 @@ impl Engine {
         Ok(())
     }
 
-    /// Pointer up: let go of the cloth.
+    /// Pointer up: let go of the cloth, and end the gesture's undo step
+    /// (a drag is one step, the next one another).
     #[frb(sync)]
     pub fn release(&self) -> Result<(), ApiError> {
+        self.workspace()?.seal_history();
         let held = self.held.lock().map_err(|_| poisoned())?.take();
         let was_pulling = held.is_some_and(|h| matches!(h.tool, Tool::Pull { pulling: true }));
         // A moved piece drapes again if the drape was running.

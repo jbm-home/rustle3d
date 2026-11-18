@@ -61,6 +61,11 @@ class _ShellState extends State<Shell> {
   String? _edge;
   String _tool = 'select';
 
+  /// The undo history: every step's command name, oldest first, and how
+  /// many are done.
+  List<String> _history = const [];
+  int _historyAt = 0;
+
   // Performance readouts, smoothed and refreshed twice a second.
   double _boardMs = 0;
   double _garmentMs = 0;
@@ -303,6 +308,12 @@ class _ShellState extends State<Shell> {
       _seams = (_run({'type': 'seam.list'}) as List<dynamic>?) ?? const [];
       _edge = _guard<String?>(widget.engine.selectedEdge);
       _points = _guard(widget.engine.selectedPoints) ?? const [];
+      final history = _run({'type': 'history.list'}) as Map<String, dynamic>?;
+      _history = [
+        for (final step in (history?['steps'] as List<dynamic>? ?? const []))
+          step['label'] as String,
+      ];
+      _historyAt = (history?['at'] as int?) ?? 0;
     });
   }
 
@@ -902,13 +913,58 @@ class _ShellState extends State<Shell> {
     );
   }
 
+  // Undo, redo and going back in the history select what changed.
   void _undo() {
+    if (_historyAt == 0) return;
     _run({'type': 'history.undo'});
     _refresh();
   }
 
   void _redo() {
+    if (_historyAt == _history.length) return;
     _run({'type': 'history.redo'});
+    _refresh();
+  }
+
+  /// Copy the selected pieces, with what belongs to them (seams between
+  /// them, notches, lines, pins, grade rules), as a clip on the system
+  /// clipboard: it pastes here or in another project.
+  Future<void> _copy() async {
+    final l = context.l;
+    if (_selection.isEmpty) return _toast(l.selectToCopy);
+    final clip = _run({'type': 'panel.copy', 'panels': _selection});
+    if (clip == null) return;
+    await Clipboard.setData(ClipboardData(text: jsonEncode(clip)));
+    if (mounted) _toast(context.keys(l.copied(_selection.length)));
+  }
+
+  /// Paste the pieces of a clip, and select them.
+  Future<void> _paste() async {
+    final l = context.l;
+    final text = (await Clipboard.getData(Clipboard.kTextPlain))?.text;
+    if (!mounted) return;
+    Object? clip;
+    try {
+      clip = text == null ? null : jsonDecode(text);
+    } on FormatException {
+      clip = null;
+    }
+    if (clip is! Map || clip['format'] != 'rustle3d.clip') {
+      return _toast(context.keys(l.nothingToPaste));
+    }
+    final out = _run({'type': 'panel.paste', 'clip': clip});
+    if (out == null) return;
+    final panels = [
+      for (final id in (out['created'] as List<dynamic>))
+        if ((id as String).startsWith('panel:')) id,
+    ];
+    _guard(() => widget.engine.select(panels: panels));
+    _refresh();
+    _toast(l.pasted(panels.length));
+  }
+
+  void _goToStep(int at) {
+    _run({'type': 'history.go_to', 'at': at});
     _refresh();
   }
 
@@ -965,6 +1021,10 @@ class _ShellState extends State<Shell> {
         ): _redo,
         if (!isMac)
           const SingleActivator(LogicalKeyboardKey.keyY, control: true): _redo,
+        SingleActivator(LogicalKeyboardKey.keyC, meta: isMac, control: !isMac):
+            _copy,
+        SingleActivator(LogicalKeyboardKey.keyV, meta: isMac, control: !isMac):
+            _paste,
         const SingleActivator(LogicalKeyboardKey.keyR): _addRectangle,
         const SingleActivator(LogicalKeyboardKey.keyV): () =>
             _setTool('select'),
@@ -1014,8 +1074,11 @@ class _ShellState extends State<Shell> {
                 onToggleTheme: widget.onToggleTheme,
                 language: widget.language,
                 onLanguage: widget.onLanguage,
+                history: _history,
+                historyAt: _historyAt,
                 onUndo: _undo,
                 onRedo: _redo,
+                onGoTo: _goToStep,
                 onBody: _showBody,
                 onExport: _export,
                 onImport: _importPattern,
@@ -1086,7 +1149,11 @@ class _ShellState extends State<Shell> {
                                     onTap: _bendTap,
                                     onPress: _bendPress,
                                     onDrag: _bendDrag,
-                                    onRelease: () => _handle = null,
+                                    onRelease: () {
+                                      _handle = null;
+                                      // The bend is one undo step.
+                                      _guard(widget.engine.release);
+                                    },
                                   ),
                                   'straighten' => PatternPointer(
                                     onTap: _straightenTap,
@@ -1255,7 +1322,10 @@ class _TopBar extends StatelessWidget {
     required this.onToggleTheme,
     required this.language,
     required this.onLanguage,
+    required this.history,
+    required this.historyAt,
     required this.onUndo,
+    required this.onGoTo,
     required this.onRedo,
     required this.onBody,
     required this.onExport,
@@ -1276,8 +1346,15 @@ class _TopBar extends StatelessWidget {
   final VoidCallback onToggleTheme;
   final String language;
   final ValueChanged<String> onLanguage;
+
+  /// The undo history (command names, oldest first) and the steps done.
+  final List<String> history;
+  final int historyAt;
   final VoidCallback onUndo;
   final VoidCallback onRedo;
+
+  /// Go back or forward until this many steps are done.
+  final ValueChanged<int> onGoTo;
   final VoidCallback onBody;
 
   /// Export in a format (with the avatar, for 3D formats).
@@ -1439,14 +1516,23 @@ class _TopBar extends StatelessWidget {
             const SizedBox(width: Space.s),
             _IconAction(
               icon: Icons.undo_rounded,
-              tip: context.keys(l.undoTip),
-              onTap: onUndo,
+              tip: historyAt > 0
+                  ? context.keys(
+                      l.undoStep(context.stepName(history[historyAt - 1])),
+                    )
+                  : l.nothingToUndo,
+              onTap: historyAt > 0 ? onUndo : null,
             ),
             _IconAction(
               icon: Icons.redo_rounded,
-              tip: context.keys(l.redoTip),
-              onTap: onRedo,
+              tip: historyAt < history.length
+                  ? context.keys(
+                      l.redoStep(context.stepName(history[historyAt])),
+                    )
+                  : l.nothingToRedo,
+              onTap: historyAt < history.length ? onRedo : null,
             ),
+            _HistoryButton(steps: history, at: historyAt, onGoTo: onGoTo),
             const SizedBox(width: Space.s),
             LanguageButton(current: language, onChanged: onLanguage),
             _IconAction(
@@ -1527,6 +1613,85 @@ class _StepChip extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The undo history as a list: the steps done, then the undone ones
+/// (muted); a click goes back or forward to just after that step.
+class _HistoryButton extends StatelessWidget {
+  const _HistoryButton({
+    required this.steps,
+    required this.at,
+    required this.onGoTo,
+  });
+
+  final List<String> steps;
+  final int at;
+  final ValueChanged<int> onGoTo;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final l = context.l;
+    Widget row(int target, String label, IconData icon) {
+      final current = target == at;
+      final undone = target > at;
+      return MenuItemButton(
+        onPressed: current ? null : () => onGoTo(target),
+        leadingIcon: Icon(
+          current ? Icons.arrow_right_rounded : icon,
+          size: 18,
+          color: current ? p.accent : p.textMuted,
+        ),
+        child: Text(
+          label,
+          style: ts(
+            fontSize: 13,
+            fontWeight: current ? FontWeight.w600 : FontWeight.w400,
+            color: current
+                ? p.text
+                : undone
+                ? p.textMuted.withValues(alpha: 0.6)
+                : p.text,
+          ),
+        ),
+      );
+    }
+
+    return MenuAnchor(
+      menuChildren: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(Space.m, Space.s, Space.m, 4),
+          child: Text(
+            l.historyTitle,
+            style: ts(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: p.textMuted,
+            ),
+          ),
+        ),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 420, minWidth: 220),
+          child: SingleChildScrollView(
+            // The latest steps first: the ones a user goes back to.
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = steps.length; i >= 1; i--)
+                  row(i, context.stepName(steps[i - 1]), Icons.circle_outlined),
+                row(0, l.historyStart, Icons.folder_open_outlined),
+              ],
+            ),
+          ),
+        ),
+      ],
+      builder: (context, menu, _) => _IconAction(
+        icon: Icons.history_rounded,
+        tip: l.historyTip,
+        onTap: () => menu.isOpen ? menu.close() : menu.open(),
       ),
     );
   }

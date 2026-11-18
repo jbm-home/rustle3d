@@ -1,8 +1,10 @@
 //! Script steps: what the CLI `run` subcommand and MCP batch accept.
 //!
 //! A step is a JSON object with a `type`: a command name, a query name,
-//! `history.undo`, `history.redo`, or `batch` (`{"type": "batch",
-//! "commands": [...]}`, executed atomically as one undo step).
+//! `history.undo`, `history.redo`, `history.list`, `history.go_to`
+//! (`{"type": "history.go_to", "at": 3}`), or `batch` (`{"type": "batch",
+//! "commands": [...]}`, executed atomically as one undo step, named by an
+//! optional `label`).
 
 use serde_json::Value;
 
@@ -11,6 +13,8 @@ use crate::registry::{Action, Command, Query};
 
 pub const UNDO: &str = "history.undo";
 pub const REDO: &str = "history.redo";
+pub const LIST: &str = "history.list";
+pub const GO_TO: &str = "history.go_to";
 pub const BATCH: &str = "batch";
 
 /// One step of a script.
@@ -22,7 +26,15 @@ pub enum Step {
     Action(Action),
     Undo,
     Redo,
-    Batch(Vec<Command>),
+    /// The steps of the history, and how many are done.
+    List,
+    /// Undo or redo until `at` steps are done.
+    GoTo(usize),
+    /// Commands run atomically as one undo step called `label`.
+    Batch {
+        label: String,
+        commands: Vec<Command>,
+    },
 }
 
 fn type_of(value: &Value) -> Result<String, CommandError> {
@@ -79,6 +91,16 @@ impl Step {
         match name.as_str() {
             UNDO => Ok(Step::Undo),
             REDO => Ok(Step::Redo),
+            GO_TO => value
+                .get("at")
+                .and_then(Value::as_u64)
+                .and_then(|n| usize::try_from(n).ok())
+                .map(Step::GoTo)
+                .ok_or_else(|| CommandError::Malformed {
+                    name,
+                    detail: "expected `at`, a whole number of steps".into(),
+                }),
+            LIST => Ok(Step::List),
             BATCH => {
                 let Value::Object(mut obj) = value else {
                     return Err(CommandError::Malformed {
@@ -86,18 +108,28 @@ impl Step {
                         detail: "expected an object".into(),
                     });
                 };
+                let label = match obj.remove("label") {
+                    None => BATCH.to_owned(),
+                    Some(Value::String(label)) if !label.trim().is_empty() => label,
+                    Some(_) => {
+                        return Err(CommandError::Malformed {
+                            name,
+                            detail: "`label` must be a non-empty string".into(),
+                        });
+                    }
+                };
                 let Some(Value::Array(items)) = obj.remove("commands") else {
                     return Err(CommandError::Malformed {
                         name,
                         detail: "expected a `commands` array".into(),
                     });
                 };
-                items
+                let commands = items
                     .into_iter()
                     .enumerate()
                     .map(|(i, v)| parse_command(v).map_err(|e| e.at(i)))
-                    .collect::<Result<_, _>>()
-                    .map(Step::Batch)
+                    .collect::<Result<_, _>>()?;
+                Ok(Step::Batch { label, commands })
             }
             n if is_command(n) => parse_command(value).map(Step::Command),
             n if is_query(n) => parse_query(value).map(Step::Query),

@@ -171,6 +171,12 @@ fn every_command_round_trips() {
     h.round_trip(json!({"type": "grading.set_sizes", "base": "38", "sizes": [
         {"name": "38", "bust_cm": -4}, {"name": "40"}, {"name": "42", "bust_cm": 4}]}));
     h.round_trip(json!({"type": "grading.clear", "confirm": true}));
+    let copy = r3d_commands::step::parse_query(
+        json!({"type": "panel.copy", "panels": [imported.created[0]]}),
+    )
+    .unwrap();
+    let clip = h.session.query(&copy).unwrap();
+    h.round_trip(json!({"type": "panel.paste", "clip": clip}));
 
     let registered: BTreeSet<_> = Command::registry().iter().map(|i| i.name).collect();
     let missing: Vec<_> = registered.difference(&h.covered).collect();

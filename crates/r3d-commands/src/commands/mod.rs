@@ -2,6 +2,7 @@
 
 mod arrange;
 mod avatar;
+mod clip;
 mod cut;
 mod edge;
 mod garment;
@@ -22,6 +23,7 @@ mod template;
 
 pub use arrange::*;
 pub use avatar::*;
+pub use clip::*;
 pub use cut::*;
 pub use edge::*;
 pub use garment::*;

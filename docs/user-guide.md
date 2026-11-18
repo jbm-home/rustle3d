@@ -12,7 +12,7 @@ rename, delete, export and import projects; smooth views on Windows;
 cloth comes to rest; pieces arranged side by side by width; M17,
 draping on the graphics card; M18, shirt and trousers templates, pieces
 placed on a leg; M19, several garments in layers; M22, sizes and
-grading; M25, maximized views).
+grading; M25, maximized views; M26, history, copy and paste).
 -->
 
 Rustle3D is a free, open-source desktop app for making clothes: draw the
@@ -87,6 +87,25 @@ comes back (a drape you paused yourself stays paused); starting the drape
 
 Other keys: **⌘Z** undo, **⇧⌘Z** redo (also Ctrl+Y on Windows and Linux),
 **Backspace/Delete** deletes the selection, **Esc** cancels a drawing.
+
+**Copy and paste**: **⌘C** copies the selected pieces, **⌘V** pastes
+them, in the same project or in another one (open it from the start
+screen and paste). Pieces come with what belongs to them: the seams
+between them, their notches, internal lines, pins, size grading (when
+the project has the same sizes) and mirror links among them. Pasted
+pieces land to the right of the others and are selected. Pasted into
+another project they keep their place around the body, ready to drape;
+pasted beside their originals, they are left off the body until you
+place them in the inspector, so they do not start inside them.
+
+**Undo and the history**: hover the undo or redo arrow to see what it
+will undo or redo ("Undo Move point"). A whole gesture is one step: a
+drag of a corner, an edge or a curve handle, a piece moved around the
+body, a template added. Undoing selects the pieces that changed, so you
+see what came back. The clock button next to the arrows lists every step
+since the project was opened, the latest first: click one to go back to
+just after it (the steps after it stay listed, muted, until you change
+something else); click **Opened** to go back to the start.
 
 ### Measuring and setting sizes
 - Click an edge: the inspector shows its **length**. Type a new one (or

@@ -148,6 +148,51 @@ impl ChangeSet {
         project.next_id = self.next_id_after;
     }
 
+    /// The panels these changes touch that exist in `project`, in the
+    /// order first touched: what to select after undoing or redoing them,
+    /// so the user sees what changed. A notch or a seam counts for the
+    /// panels of its edges.
+    pub fn panels(&self, project: &Project) -> Vec<PanelId> {
+        let edge_panel = |e: EdgeId| project.edge(e).map(|e| e.panel);
+        let mut out: Vec<PanelId> = Vec::new();
+        let mut add = |id: Option<PanelId>| {
+            if let Some(id) = id
+                && project.panel(id).is_some()
+                && !out.contains(&id)
+            {
+                out.push(id);
+            }
+        };
+        for c in &self.changes {
+            macro_rules! each {
+                ($c:expr, $f:expr) => {
+                    for v in [&$c.before, &$c.after].into_iter().flatten() {
+                        for id in $f(v) {
+                            add(id);
+                        }
+                    }
+                };
+            }
+            match c {
+                Change::Panel(c) => add(Some(c.id)),
+                Change::Point(c) => each!(c, |v: &Point| [Some(v.panel)]),
+                Change::Edge(c) => each!(c, |v: &Edge| [Some(v.panel)]),
+                Change::InternalLine(c) => each!(c, |v: &InternalLine| [Some(v.panel)]),
+                Change::Pin(c) => each!(c, |v: &Pin| [Some(v.panel)]),
+                Change::Notch(c) => each!(c, |v: &Notch| [edge_panel(v.edge)]),
+                Change::Seam(c) => {
+                    each!(c, |v: &Seam| [edge_panel(v.a.edge), edge_panel(v.b.edge)])
+                }
+                Change::Garment(_)
+                | Change::Avatar { .. }
+                | Change::Name { .. }
+                | Change::DisplayUnit { .. }
+                | Change::Grading { .. } => {}
+            }
+        }
+        out
+    }
+
     /// Merge a later change set into this one, compacting per entity so that
     /// e.g. dragging a point for 300 frames stays one small undo step.
     ///
@@ -392,6 +437,17 @@ mod tests {
             add_point(&mut tx, panel, 1.0);
         }
         assert_eq!(p, start);
+    }
+
+    #[test]
+    fn panels_lists_what_exists_once() {
+        let mut p = Project::new("t");
+        let mut tx = Transaction::begin(&mut p);
+        let gone = tx.new_panel_id();
+        add_point(&mut tx, gone, 0.0);
+        let cs = tx.commit();
+        // The panel itself was never put: only existing panels count.
+        assert!(cs.panels(&p).is_empty());
     }
 
     #[test]

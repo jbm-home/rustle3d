@@ -5,7 +5,7 @@ use std::fmt::Write;
 
 use crate::registry::{Action, Command, Query};
 use crate::spec::Info;
-use crate::step::{BATCH, REDO, UNDO};
+use crate::step::{BATCH, GO_TO, LIST, REDO, UNDO};
 
 fn section(out: &mut String, infos: &[Info]) {
     for info in infos {
@@ -42,8 +42,16 @@ pub fn commands_markdown() -> String {
          or one of:\n\n\
          - `{{\"type\": \"{UNDO}\"}}`: undo the last step.\n\
          - `{{\"type\": \"{REDO}\"}}`: redo the last undone step.\n\
-         - `{{\"type\": \"{BATCH}\", \"commands\": [...]}}`: run commands atomically \
-         as one undo step; if one fails, none is applied.\n\n\
+         - `{{\"type\": \"{LIST}\"}}`: the steps of the history, oldest first \
+         (`steps`, each with its `label`: the command's name, or the batch's), and how \
+         many are done (`at`).\n\
+         - `{{\"type\": \"{GO_TO}\", \"at\": 3}}`: undo or redo until `at` steps are \
+         done (0 undoes them all).\n\
+         - `{{\"type\": \"{BATCH}\", \"label\": \"...\", \"commands\": [...]}}`: run \
+         commands atomically as one undo step, named `label` in the history (optional, \
+         default `batch`); if one fails, none is applied.\n\n\
+         Undo, redo and go-to return the panels they changed (`panels`); the app \
+         selects them.\n\n\
          A string such as `\"$3.created[0]\"` refers to the result of an earlier step \
          (step 3, 0-based, then the path `.created[0]`; `[n]` indexes arrays, `.name` \
          reads fields). It must be the whole string; `$$` writes a literal `$`. \

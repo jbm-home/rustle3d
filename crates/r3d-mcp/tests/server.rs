@@ -29,7 +29,7 @@ fn tools_mirror_the_registries() {
     let (_tmp, s) = server();
     let names = s.tool_names();
     let expected =
-        Command::registry().len() + Query::registry().len() + Action::registry().len() + 6;
+        Command::registry().len() + Query::registry().len() + Action::registry().len() + 8;
     assert_eq!(names.len(), expected);
     for n in &names {
         assert!(
@@ -41,6 +41,7 @@ fn tools_mirror_the_registries() {
     assert!(names.contains(&"panel_create_rect".to_owned()));
     assert!(names.contains(&"export_pdf".to_owned()));
     assert!(names.contains(&"render_photo".to_owned()));
+    assert!(names.contains(&"history_go_to".to_owned()));
 }
 
 #[test]

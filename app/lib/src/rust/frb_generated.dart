@@ -3769,7 +3769,8 @@ class EngineImpl extends RustOpaque implements Engine {
   Future<Uint8List> readView({required int view}) =>
       RustLib.instance.api.crateApiEngineEngineReadView(that: this, view: view);
 
-  /// Pointer up: let go of the cloth.
+  /// Pointer up: let go of the cloth, and end the gesture's undo step
+  /// (a drag is one step, the next one another).
   void release() =>
       RustLib.instance.api.crateApiEngineEngineRelease(that: this);
 

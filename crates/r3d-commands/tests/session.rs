@@ -192,6 +192,8 @@ fn command_and_query_names_are_distinct_and_well_formed() {
     names.extend([
         r3d_commands::step::UNDO,
         r3d_commands::step::REDO,
+        r3d_commands::step::LIST,
+        r3d_commands::step::GO_TO,
         r3d_commands::step::BATCH,
     ]);
     let unique: std::collections::BTreeSet<_> = names.iter().collect();
@@ -234,4 +236,67 @@ fn scripts_report_the_failing_step_and_resolve_references() {
     assert!(r3d_commands::Script::parse("{}").is_err());
     let script = r3d_commands::Script::parse("[1]").unwrap();
     assert!(script.run(|step| s.run_step(step)).is_err());
+}
+
+#[test]
+fn history_lists_its_steps_and_jumps_to_any() {
+    let (mut s, panel, point) = session_with_rect();
+    let start = s.project().clone();
+    run(
+        &mut s,
+        json!({"type": "panel.rename", "panel": panel, "name": "Front"}),
+    )
+    .unwrap();
+    run(
+        &mut s,
+        json!({"type": "batch", "label": "panel.paste", "commands": [
+            {"type": "point.move", "point": point, "to": [5, 5]},
+        ]}),
+    )
+    .unwrap();
+    let end = s.project().clone();
+    let list = run(&mut s, json!({"type": "history.list"})).unwrap();
+    let labels: Vec<_> = list["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s["label"].as_str().unwrap())
+        .collect();
+    assert_eq!(labels, ["panel.create_rect", "panel.rename", "panel.paste"]);
+    assert_eq!(list["at"], 3);
+
+    // Back to the start, then to the end: the steps stay listed.
+    let back = run(&mut s, json!({"type": "history.go_to", "at": 0})).unwrap();
+    assert_eq!(back["at"], 0);
+    assert_eq!(s.project(), &Project::new("t"));
+    assert_eq!(s.history().len(), 3);
+    run(&mut s, json!({"type": "history.go_to", "at": 1})).unwrap();
+    assert_eq!(s.project().panels().len(), start.panels().len());
+    let forward = run(&mut s, json!({"type": "history.go_to", "at": 3})).unwrap();
+    assert_eq!(s.project(), &end);
+    // The panel the redone steps changed, to select.
+    assert_eq!(forward["panels"], json!([panel]));
+    // Where it already is: nothing to do, no error.
+    run(&mut s, json!({"type": "history.go_to", "at": 3})).unwrap();
+    let err = run(&mut s, json!({"type": "history.go_to", "at": 4})).unwrap_err();
+    assert_eq!(err.message().code, "invalid.range");
+    let err = run(&mut s, json!({"type": "history.go_to"})).unwrap_err();
+    assert_eq!(err.message().code, "malformed");
+}
+
+#[test]
+fn undo_names_the_step_and_its_panels() {
+    let (mut s, panel, _) = session_with_rect();
+    run(
+        &mut s,
+        json!({"type": "panel.rename", "panel": panel, "name": "Front"}),
+    )
+    .unwrap();
+    let undone = run(&mut s, json!({"type": "history.undo"})).unwrap();
+    assert_eq!(undone, json!({"undone": "panel.rename", "panels": [panel]}));
+    // Undoing the creation: the panel is gone, nothing to select.
+    let undone = run(&mut s, json!({"type": "history.undo"})).unwrap();
+    assert_eq!(undone, json!({"undone": "panel.create_rect", "panels": []}));
+    let redone = run(&mut s, json!({"type": "history.redo"})).unwrap();
+    assert_eq!(redone["panels"], json!([panel]));
 }

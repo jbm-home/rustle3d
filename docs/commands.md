@@ -17,7 +17,11 @@ A script (CLI `r3d run`) is a JSON array of steps. A step is a command, a query,
 
 - `{"type": "history.undo"}`: undo the last step.
 - `{"type": "history.redo"}`: redo the last undone step.
-- `{"type": "batch", "commands": [...]}`: run commands atomically as one undo step; if one fails, none is applied.
+- `{"type": "history.list"}`: the steps of the history, oldest first (`steps`, each with its `label`: the command's name, or the batch's), and how many are done (`at`).
+- `{"type": "history.go_to", "at": 3}`: undo or redo until `at` steps are done (0 undoes them all).
+- `{"type": "batch", "label": "...", "commands": [...]}`: run commands atomically as one undo step, named `label` in the history (optional, default `batch`); if one fails, none is applied.
+
+Undo, redo and go-to return the panels they changed (`panels`); the app selects them.
 
 A string such as `"$3.created[0]"` refers to the result of an earlier step (step 3, 0-based, then the path `.created[0]`; `[n]` indexes arrays, `.name` reads fields). It must be the whole string; `$$` writes a literal `$`. References keep scripts independent of ID allocation.
 
@@ -945,6 +949,63 @@ Cut a panel in two along an open path of straight and cubic segments (mm) that c
     "segments"
   ],
   "title": "PanelCut",
+  "type": "object"
+}
+```
+
+</details>
+
+### `panel.paste`
+
+Paste pieces copied with panel.copy, under new IDs, with the seams between them, their notches, internal lines, grade rules (when the project has the same number of sizes and base size), pins and mirror links. A piece keeps its place around the body unless a piece of the project already starts there (pasted beside its original): then it is left unplaced, with no pins. Returns the new panels, then the new seams.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "GarmentId": {
+      "description": "Identifier of a garment, e.g. `garment:1`.",
+      "pattern": "^garment:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Paste pieces copied with panel.copy.",
+  "properties": {
+    "clip": {
+      "description": "The clip, as panel.copy returns it."
+    },
+    "garment": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/GarmentId"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The garment the pieces join. Omitted: the one they were copied\nfrom if this project has it, otherwise the project's first."
+    },
+    "offset": {
+      "description": "How far to move the pieces on the board (mm). Omitted: to the right\nof the project's pieces.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": [
+        "array",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "clip"
+  ],
+  "title": "PanelPaste",
   "type": "object"
 }
 ```
@@ -2934,6 +2995,43 @@ Full geometry of a panel: its edges in contour order with point IDs, positions, 
     "panel"
   ],
   "title": "PanelGet",
+  "type": "object"
+}
+```
+
+</details>
+
+### `panel.copy`
+
+Copy pieces into a clip (JSON) for panel.paste, in this project or another one: the pieces with their points, curves, notches, internal lines, pins and grade rules, the seams between them and the mirror links among them. Seams and links to pieces left out are not copied.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "PanelId": {
+      "description": "Identifier of a panel, e.g. `panel:1`.",
+      "pattern": "^panel:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Copy pieces: a clip to give to panel.paste.",
+  "properties": {
+    "panels": {
+      "description": "The pieces to copy (at least one).",
+      "items": {
+        "$ref": "#/$defs/PanelId"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "panels"
+  ],
+  "title": "PanelCopy",
   "type": "object"
 }
 ```

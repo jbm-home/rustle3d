@@ -1553,4 +1553,123 @@ class LFr extends L {
 
   @override
   String get sizesOnBoard => 'Afficher les tailles sur le plateau';
+
+  @override
+  String stepName(String step) {
+    String _temp0 = intl.Intl.selectLogic(step, {
+      'project_rename': 'Renommer le projet',
+      'project_set_display_unit': 'Changer d’unité',
+      'avatar_set': 'Modifier le corps',
+      'avatar_remove': 'Retirer le corps',
+      'panel_create_rect': 'Ajouter un rectangle',
+      'panel_create_polygon': 'Ajouter un polygone',
+      'panel_create_path': 'Ajouter une pièce courbe',
+      'panel_rename': 'Renommer la pièce',
+      'panel_translate': 'Déplacer la pièce',
+      'panel_set_grain': 'Régler le droit-fil',
+      'panel_set_seam_allowance': 'Régler la valeur de couture',
+      'panel_mirror': 'Symétrie de la pièce',
+      'panel_unlink': 'Délier la copie',
+      'panel_place': 'Placer la pièce',
+      'panel_delete': 'Supprimer la pièce',
+      'panel_cut': 'Couper la pièce',
+      'panel_paste': 'Coller',
+      'point_move': 'Déplacer le point',
+      'point_set_distance': 'Fixer la distance',
+      'point_remove': 'Retirer le point',
+      'edge_set_curve': 'Courber le bord',
+      'edge_split': 'Ajouter un point',
+      'edge_move': 'Déplacer le bord',
+      'notch_add': 'Ajouter un cran',
+      'notch_move': 'Déplacer le cran',
+      'notch_remove': 'Retirer le cran',
+      'internal_line_add': 'Tracer une ligne',
+      'internal_line_remove': 'Retirer la ligne',
+      'seam_add': 'Coudre',
+      'seam_remove': 'Découdre',
+      'seam_flip': 'Inverser la couture',
+      'seam_set_gathered': 'Froncer la couture',
+      'edge_lengthen': 'Rallonger',
+      'edge_set_length': 'Fixer la longueur',
+      'seam_take_in': 'Reprendre la couture',
+      'seam_match_length': 'Égaliser les longueurs',
+      'pin_add': 'Épingler',
+      'pin_remove': 'Retirer l’épingle',
+      'garment_set_fabric': 'Changer de tissu',
+      'garment_arrange': 'Disposer les pièces',
+      'garment_set_color': 'Changer la couleur',
+      'garment_add': 'Ajouter un vêtement',
+      'garment_rename': 'Renommer le vêtement',
+      'garment_remove': 'Retirer le vêtement',
+      'garment_set_layer': 'Changer de couche',
+      'panel_set_garment': 'Changer de vêtement',
+      'grading_set_sizes': 'Définir les tailles',
+      'grading_use_chart': 'Utiliser un barème',
+      'grading_clear': 'Retirer les tailles',
+      'grading_show_size': 'Afficher la taille',
+      'point_set_grade': 'Graduer le point',
+      'template_apply': 'Ajouter un modèle',
+      'pattern_import': 'Importer un patron',
+      'batch': 'Plusieurs modifications',
+      'other': '$step',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String undoStep(String name) {
+    return 'Annuler $name  ⌘Z';
+  }
+
+  @override
+  String redoStep(String name) {
+    return 'Rétablir $name  ⇧⌘Z';
+  }
+
+  @override
+  String get nothingToUndo => 'Rien à annuler';
+
+  @override
+  String get nothingToRedo => 'Rien à rétablir';
+
+  @override
+  String get historyTip => 'Historique : revenir à n’importe quelle étape';
+
+  @override
+  String get historyTitle => 'Historique';
+
+  @override
+  String get historyStart => 'Ouverture';
+
+  @override
+  String get historyEmpty => 'Aucune modification pour l’instant.';
+
+  @override
+  String copied(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count pièces copiées',
+      one: '1 pièce copiée',
+    );
+    return '$_temp0, avec les coutures entre elles. ⌘V les colle, ici ou dans un autre projet.';
+  }
+
+  @override
+  String pasted(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count pièces collées',
+      one: '1 pièce collée',
+    );
+    return '$_temp0.';
+  }
+
+  @override
+  String get nothingToPaste =>
+      'Rien à coller : copiez d’abord des pièces (⌘C).';
+
+  @override
+  String get selectToCopy => 'Sélectionnez les pièces à copier.';
 }

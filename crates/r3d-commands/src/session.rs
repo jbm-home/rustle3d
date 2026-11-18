@@ -3,14 +3,11 @@
 use r3d_core::{Project, Transaction};
 use serde_json::{Value, json};
 
-use crate::error::CommandError;
-use crate::history::History;
+use crate::error::{CommandError, Invalid};
+use crate::history::{History, Moved};
 use crate::registry::{Command, Query};
 use crate::spec::{CommandOutput, to_value};
 use crate::step::Step;
-
-/// Label of a batch in the history.
-pub const BATCH_LABEL: &str = "batch";
 
 /// A project plus its undo history. All front-ends edit through this.
 #[derive(Debug)]
@@ -62,10 +59,14 @@ impl Session {
         .map(|mut outs| outs.pop().unwrap_or_default())
     }
 
-    /// Execute commands atomically as a single undo step. If any command
-    /// fails, nothing is changed and the error says which one.
-    pub fn execute_batch(&mut self, cmds: &[Command]) -> Result<Vec<CommandOutput>, CommandError> {
-        self.execute_all(cmds, BATCH_LABEL, None, true)
+    /// Execute commands atomically as a single undo step named `label`. If
+    /// any command fails, nothing is changed and the error says which one.
+    pub fn execute_batch(
+        &mut self,
+        label: &str,
+        cmds: &[Command],
+    ) -> Result<Vec<CommandOutput>, CommandError> {
+        self.execute_all(cmds, label, None, true)
     }
 
     fn execute_all(
@@ -108,24 +109,51 @@ impl Session {
         Ok(outputs)
     }
 
-    /// Undo the last step; returns its label.
-    pub fn undo(&mut self) -> Result<String, CommandError> {
-        let label = self
+    /// Undo the last step.
+    pub fn undo(&mut self) -> Result<Moved, CommandError> {
+        let moved = self
             .history
             .undo(&mut self.project)
             .ok_or(CommandError::NothingToUndo)?;
         self.dirty = true;
-        Ok(label)
+        Ok(moved)
     }
 
-    /// Redo the last undone step; returns its label.
-    pub fn redo(&mut self) -> Result<String, CommandError> {
-        let label = self
+    /// Redo the last undone step.
+    pub fn redo(&mut self) -> Result<Moved, CommandError> {
+        let moved = self
             .history
             .redo(&mut self.project)
             .ok_or(CommandError::NothingToRedo)?;
         self.dirty = true;
-        Ok(label)
+        Ok(moved)
+    }
+
+    /// Undo or redo until `at` steps of the history are done.
+    pub fn go_to(&mut self, at: usize) -> Result<Moved, CommandError> {
+        let len = self.history.len();
+        if at > len {
+            return Err(CommandError::invalid("at", Invalid::Range(0.0, len as f64)));
+        }
+        let moved = self
+            .history
+            .go_to(&mut self.project, at)
+            .unwrap_or_default();
+        if !moved.label.is_empty() {
+            self.dirty = true;
+        }
+        Ok(moved)
+    }
+
+    /// The steps of the history, oldest first, and how many are done.
+    pub fn history_list(&self) -> Value {
+        let steps: Vec<Value> = self
+            .history
+            .labels()
+            .into_iter()
+            .map(|label| json!({ "label": label }))
+            .collect();
+        json!({ "steps": steps, "at": self.history.undo_len() })
     }
 
     pub fn query(&self, q: &Query) -> Result<Value, CommandError> {
@@ -136,10 +164,21 @@ impl Session {
     pub fn run_step(&mut self, step: &Step) -> Result<Value, CommandError> {
         match step {
             Step::Command(c) => to_value(&self.execute(c)?),
-            Step::Batch(cmds) => to_value(&self.execute_batch(cmds)?),
+            Step::Batch { label, commands } => to_value(&self.execute_batch(label, commands)?),
             Step::Query(q) => self.query(q),
-            Step::Undo => Ok(json!({ "undone": self.undo()? })),
-            Step::Redo => Ok(json!({ "redone": self.redo()? })),
+            Step::Undo => {
+                let m = self.undo()?;
+                Ok(json!({ "undone": m.label, "panels": m.panels }))
+            }
+            Step::Redo => {
+                let m = self.redo()?;
+                Ok(json!({ "redone": m.label, "panels": m.panels }))
+            }
+            Step::GoTo(at) => {
+                let m = self.go_to(*at)?;
+                Ok(json!({ "at": self.history.undo_len(), "panels": m.panels }))
+            }
+            Step::List => Ok(self.history_list()),
             Step::Action(a) => Err(CommandError::NeedsProject { name: a.name() }),
         }
     }
