@@ -76,6 +76,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PhotoStatus dco_decode_box_autoadd_photo_status(dynamic raw);
 
   @protected
+  Snap dco_decode_box_autoadd_snap(dynamic raw);
+
+  @protected
   StepProgress dco_decode_box_autoadd_step_progress(dynamic raw);
 
   @protected
@@ -118,6 +121,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<PickedPoint> dco_decode_list_picked_point(dynamic raw);
 
   @protected
+  List<double> dco_decode_list_prim_f_64_loose(dynamic raw);
+
+  @protected
   Float64List dco_decode_list_prim_f_64_strict(dynamic raw);
 
   @protected
@@ -137,6 +143,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PhotoStatus? dco_decode_opt_box_autoadd_photo_status(dynamic raw);
+
+  @protected
+  Snap? dco_decode_opt_box_autoadd_snap(dynamic raw);
 
   @protected
   StepProgress? dco_decode_opt_box_autoadd_step_progress(dynamic raw);
@@ -167,6 +176,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SimStatus dco_decode_sim_status(dynamic raw);
+
+  @protected
+  Snap dco_decode_snap(dynamic raw);
 
   @protected
   StepProgress dco_decode_step_progress(dynamic raw);
@@ -243,6 +255,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PhotoStatus sse_decode_box_autoadd_photo_status(SseDeserializer deserializer);
 
   @protected
+  Snap sse_decode_box_autoadd_snap(SseDeserializer deserializer);
+
+  @protected
   StepProgress sse_decode_box_autoadd_step_progress(
     SseDeserializer deserializer,
   );
@@ -289,6 +304,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<PickedPoint> sse_decode_list_picked_point(SseDeserializer deserializer);
 
   @protected
+  List<double> sse_decode_list_prim_f_64_loose(SseDeserializer deserializer);
+
+  @protected
   Float64List sse_decode_list_prim_f_64_strict(SseDeserializer deserializer);
 
   @protected
@@ -314,6 +332,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PhotoStatus? sse_decode_opt_box_autoadd_photo_status(
     SseDeserializer deserializer,
   );
+
+  @protected
+  Snap? sse_decode_opt_box_autoadd_snap(SseDeserializer deserializer);
 
   @protected
   StepProgress? sse_decode_opt_box_autoadd_step_progress(
@@ -350,6 +371,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SimStatus sse_decode_sim_status(SseDeserializer deserializer);
+
+  @protected
+  Snap sse_decode_snap(SseDeserializer deserializer);
 
   @protected
   StepProgress sse_decode_step_progress(SseDeserializer deserializer);
@@ -436,6 +460,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_snap(Snap self, SseSerializer serializer);
+
+  @protected
   void sse_encode_box_autoadd_step_progress(
     StepProgress self,
     SseSerializer serializer,
@@ -487,6 +514,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_prim_f_64_loose(
+    List<double> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_prim_f_64_strict(
     Float64List self,
     SseSerializer serializer,
@@ -526,6 +559,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_snap(Snap? self, SseSerializer serializer);
+
+  @protected
   void sse_encode_opt_box_autoadd_step_progress(
     StepProgress? self,
     SseSerializer serializer,
@@ -563,6 +599,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_sim_status(SimStatus self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_snap(Snap self, SseSerializer serializer);
 
   @protected
   void sse_encode_step_progress(StepProgress self, SseSerializer serializer);

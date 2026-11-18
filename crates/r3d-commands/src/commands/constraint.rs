@@ -1,0 +1,561 @@
+//! Constraints and dimensions (spec 19), construction lines, smooth
+//! points; and the step that keeps every constraint satisfied.
+
+use r3d_core::constraints::{Touched, Update, measure, solve_project};
+use r3d_core::edit::Change;
+use r3d_core::{
+    AnyId, Constraint, ConstraintId, Edge, EdgeCurve, Guide, GuideId, Point, PointId, Transaction,
+};
+use r3d_geom::DVec2;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
+use super::{Vec2, editable_point, v};
+use crate::error::{CommandError, Invalid, finite, positive};
+use crate::spec::{CommandOutput, CommandSpec, Described};
+
+/// Add a constraint or a dimension.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ConstraintAdd {
+    pub constraint: Constraint,
+    /// For a dimension: keep the value the drawing has now (the one given
+    /// is ignored).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub measure: bool,
+}
+
+impl Described for ConstraintAdd {
+    const SUMMARY: &'static str = "Add a constraint (fixed, coincident, horizontal, vertical, parallel, perpendicular, tangent, equal_length, on_edge) or a dimension (distance, length, angle) on contour points and edges. The drawing is solved at once: the geometry moves as little as possible so that every constraint holds; constraints that cannot all hold are refused (`constraints_unsolvable`). With `measure`, a dimension keeps the value it has now. Returns the constraint; `constraint.list` shows them with the freedom left.";
+}
+
+/// Refuse a point or edge that is missing or derived.
+fn check_ref(tx: &Transaction<'_>, id: AnyId) -> Result<(), CommandError> {
+    let p = tx.project();
+    let derived = match id {
+        AnyId::Point(pt) => {
+            p.point(pt).ok_or_else(|| CommandError::not_found(pt))?;
+            p.is_derived_point(pt)
+        }
+        AnyId::Edge(e) => {
+            p.edge(e).ok_or_else(|| CommandError::not_found(e))?;
+            p.is_derived_edge(e)
+        }
+        _ => false,
+    };
+    if derived {
+        return Err(CommandError::Derived { id });
+    }
+    Ok(())
+}
+
+/// The kind of constraint with its points and edges, ignoring a
+/// dimension's value: two constraints with the same key say the same.
+fn key(c: &Constraint) -> Option<Constraint> {
+    let mut k = c.with_value(0.0).unwrap_or_else(|| c.clone());
+    // Symmetric relations say the same either way round.
+    match &mut k {
+        Constraint::Coincident { a, b } => {
+            let (x, y) = ((*a).min(*b), (*a).max(*b));
+            (*a, *b) = (x, y);
+        }
+        Constraint::Parallel { a, b }
+        | Constraint::Perpendicular { a, b }
+        | Constraint::EqualLength { a, b }
+        | Constraint::Angle { a, b, .. } => {
+            let (x, y) = ((*a).min(*b), (*a).max(*b));
+            (*a, *b) = (x, y);
+        }
+        _ => {}
+    }
+    Some(k)
+}
+
+fn check_value(c: &Constraint) -> Result<(), CommandError> {
+    match c {
+        Constraint::Distance { mm, .. } | Constraint::Length { mm, .. } => positive("value", *mm),
+        Constraint::Angle { deg, .. } => {
+            finite("value", &[*deg])?;
+            if (0.0..=180.0).contains(deg) {
+                Ok(())
+            } else {
+                Err(CommandError::invalid("value", Invalid::Range(0.0, 180.0)))
+            }
+        }
+        _ => Ok(()),
+    }
+}
+
+impl CommandSpec for ConstraintAdd {
+    fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        let c = &self.constraint;
+        for p in c.points() {
+            check_ref(tx, p.into())?;
+        }
+        for e in c.edges() {
+            check_ref(tx, e.into())?;
+        }
+        let same = match c {
+            Constraint::Coincident { a, b } | Constraint::Distance { a, b, .. } => a == b,
+            Constraint::Parallel { a, b }
+            | Constraint::Perpendicular { a, b }
+            | Constraint::EqualLength { a, b }
+            | Constraint::Angle { a, b, .. } => a == b,
+            _ => false,
+        };
+        if same {
+            return Err(CommandError::invalid("constraint", Invalid::SamePoint));
+        }
+        if let Constraint::OnEdge { point, edge } = c
+            && tx
+                .project()
+                .edge(*edge)
+                .is_some_and(|e| e.start == *point || e.end == *point)
+        {
+            // An edge's own end is on it already.
+            return Err(CommandError::invalid("constraint", Invalid::Duplicate));
+        }
+        let c = if self.measure && c.value().is_some() {
+            let now = measure(tx.project(), c).unwrap_or_default();
+            c.with_value(now).unwrap_or_else(|| c.clone())
+        } else {
+            c.clone()
+        };
+        check_value(&c)?;
+        let k = key(&c);
+        if tx.project().constraints().values().any(|o| key(o) == k) {
+            return Err(CommandError::invalid("constraint", Invalid::Duplicate));
+        }
+        let id = tx.new_constraint_id();
+        tx.put_constraint(id, c);
+        Ok(CommandOutput {
+            created: vec![id.into()],
+        })
+    }
+}
+
+/// Remove a constraint.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ConstraintRemove {
+    pub constraint: ConstraintId,
+}
+
+impl Described for ConstraintRemove {
+    const SUMMARY: &'static str =
+        "Remove a constraint or a dimension: the geometry stays as it is, free to move again.";
+}
+
+impl CommandSpec for ConstraintRemove {
+    fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        tx.remove_constraint(self.constraint)
+            .ok_or_else(|| CommandError::not_found(self.constraint))?;
+        Ok(CommandOutput::default())
+    }
+}
+
+/// Change a dimension's value.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ConstraintSetValue {
+    pub constraint: ConstraintId,
+    /// mm for a distance or a length, degrees (0–180) for an angle.
+    pub value: f64,
+}
+
+impl Described for ConstraintSetValue {
+    const SUMMARY: &'static str = "Change a dimension's value (mm, or degrees for an angle): the drawing is redrawn so that it and every other constraint hold, moving as little as possible.";
+}
+
+impl CommandSpec for ConstraintSetValue {
+    fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        let c = tx
+            .project()
+            .constraint(self.constraint)
+            .ok_or_else(|| CommandError::not_found(self.constraint))?;
+        let c = c
+            .with_value(self.value)
+            .ok_or_else(|| CommandError::invalid("constraint", Invalid::NotDimension))?;
+        check_value(&c)?;
+        tx.put_constraint(self.constraint, c);
+        Ok(CommandOutput::default())
+    }
+
+    fn merge_key(&self) -> Option<String> {
+        Some(format!("constraint.set_value:{}", self.constraint))
+    }
+}
+
+/// Make a point smooth or a corner.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PointSetSmooth {
+    pub point: PointId,
+    /// `true`: the outline passes through the point without a corner (its
+    /// two edges become curves with aligned handles, kept aligned by a
+    /// `tangent` constraint); `false`: a corner again (the constraint goes,
+    /// the shape stays).
+    pub smooth: bool,
+}
+
+impl Described for PointSetSmooth {
+    const SUMMARY: &'static str = "Make a contour point smooth (no corner: its two edges become curves whose handles line up, and stay so through a `tangent` constraint) or a corner again (the constraint is removed, the shape stays).";
+}
+
+impl CommandSpec for PointSetSmooth {
+    fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        let point = editable_point(tx, self.point)?;
+        let tangents: Vec<ConstraintId> = tx
+            .project()
+            .constraints()
+            .iter()
+            .filter(|(_, c)| matches!(c, Constraint::Tangent { point } if *point == self.point))
+            .map(|(id, _)| *id)
+            .collect();
+        if !self.smooth {
+            for id in tangents {
+                tx.remove_constraint(id);
+            }
+            return Ok(CommandOutput::default());
+        }
+        if !tangents.is_empty() {
+            return Ok(CommandOutput::default());
+        }
+        let p = tx.project();
+        let panel = p
+            .panel(point.panel)
+            .ok_or_else(|| CommandError::not_found(point.panel))?;
+        let find = |end: bool| {
+            panel.contour.iter().find_map(|id| {
+                let e = p.edge(*id)?;
+                let hit = if end { e.end } else { e.start } == self.point;
+                hit.then(|| (*id, e.clone()))
+            })
+        };
+        let (Some((arriving, ein)), Some((leaving, eout))) = (find(true), find(false)) else {
+            return Err(CommandError::invalid("point", Invalid::NotJoined));
+        };
+        let pos = |id: PointId| p.point(id).map(|p| p.pos).unwrap_or_default();
+        let at = point.pos;
+        // Handles: the edges' own, or a third of the way along a line.
+        let (c1_in, c2_in) = match ein.curve {
+            EdgeCurve::Cubic { c1, c2 } => (c1, c2),
+            EdgeCurve::Line => {
+                let a = pos(ein.start);
+                (a + (at - a) / 3.0, a + (at - a) * 2.0 / 3.0)
+            }
+        };
+        let (c1_out, c2_out) = match eout.curve {
+            EdgeCurve::Cubic { c1, c2 } => (c1, c2),
+            EdgeCurve::Line => {
+                let b = pos(eout.end);
+                (at + (b - at) / 3.0, at + (b - at) * 2.0 / 3.0)
+            }
+        };
+        // One direction through the point: between the arriving and the
+        // leaving directions.
+        let u_in = (at - c2_in).try_normalize().unwrap_or(DVec2::X);
+        let u_out = (c1_out - at).try_normalize().unwrap_or(DVec2::X);
+        let u = (u_in + u_out).try_normalize().unwrap_or(u_out);
+        let c2_in = at - u * (at - c2_in).length();
+        let c1_out = at + u * (c1_out - at).length();
+        tx.put_edge(
+            arriving,
+            Edge {
+                curve: EdgeCurve::Cubic {
+                    c1: c1_in,
+                    c2: c2_in,
+                },
+                ..ein
+            },
+        );
+        tx.put_edge(
+            leaving,
+            Edge {
+                curve: EdgeCurve::Cubic {
+                    c1: c1_out,
+                    c2: c2_out,
+                },
+                ..eout
+            },
+        );
+        let id = tx.new_constraint_id();
+        tx.put_constraint(id, Constraint::Tangent { point: self.point });
+        Ok(CommandOutput {
+            created: vec![id.into()],
+        })
+    }
+}
+
+/// Add a construction line.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GuideAdd {
+    /// One end on the board (mm).
+    pub a: Vec2,
+    /// The other end (mm).
+    pub b: Vec2,
+}
+
+impl Described for GuideAdd {
+    const SUMMARY: &'static str = "Add a construction line on the board, from `a` to `b` (mm): drawn to draft against and snapped to, never cut, sewn or exported. Returns the line.";
+}
+
+fn guide(a: Vec2, b: Vec2) -> Result<Guide, CommandError> {
+    finite("a", &a)?;
+    finite("b", &b)?;
+    if a == b {
+        return Err(CommandError::invalid("b", Invalid::SamePoint));
+    }
+    Ok(Guide { a: v(a), b: v(b) })
+}
+
+impl CommandSpec for GuideAdd {
+    fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        let g = guide(self.a, self.b)?;
+        let id = tx.new_guide_id();
+        tx.put_guide(id, g);
+        Ok(CommandOutput {
+            created: vec![id.into()],
+        })
+    }
+}
+
+/// Move a construction line's ends.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GuideMove {
+    pub guide: GuideId,
+    pub a: Vec2,
+    pub b: Vec2,
+}
+
+impl Described for GuideMove {
+    const SUMMARY: &'static str = "Move a construction line: its new ends `a` and `b` (mm).";
+}
+
+impl CommandSpec for GuideMove {
+    fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        tx.project()
+            .guides()
+            .get(&self.guide)
+            .ok_or_else(|| CommandError::not_found(self.guide))?;
+        let g = guide(self.a, self.b)?;
+        tx.put_guide(self.guide, g);
+        Ok(CommandOutput::default())
+    }
+
+    fn merge_key(&self) -> Option<String> {
+        Some(format!("guide.move:{}", self.guide))
+    }
+}
+
+/// Remove a construction line.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GuideRemove {
+    pub guide: GuideId,
+}
+
+impl Described for GuideRemove {
+    const SUMMARY: &'static str = "Remove a construction line.";
+}
+
+impl CommandSpec for GuideRemove {
+    fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        tx.remove_guide(self.guide)
+            .ok_or_else(|| CommandError::not_found(self.guide))?;
+        Ok(CommandOutput::default())
+    }
+}
+
+/// What the step's changes moved: the points and curves to hold.
+fn touched(changes: &[Change]) -> Touched {
+    let mut t = Touched::default();
+    for c in changes {
+        match c {
+            Change::Point(c) => {
+                if let (Some(b), Some(a)) = (&c.before, &c.after)
+                    && b.pos != a.pos
+                {
+                    t.points.insert(c.id);
+                }
+            }
+            Change::Edge(c) => {
+                if let (Some(b), Some(a)) = (&c.before, &c.after)
+                    && b.curve != a.curve
+                {
+                    t.edges.insert(c.id);
+                }
+            }
+            _ => {}
+        }
+    }
+    t
+}
+
+/// After a step: drop the constraints whose points or edges are gone (or
+/// now derived), then solve, so that every constraint holds again. The
+/// changes join the step's undo step.
+pub(crate) fn settle_constraints(tx: &mut Transaction<'_>) -> Result<(), CommandError> {
+    let p = tx.project();
+    let orphans: Vec<ConstraintId> = p
+        .constraints()
+        .iter()
+        .filter(|(_, c)| {
+            c.points()
+                .iter()
+                .any(|pt| p.point(*pt).is_none() || p.is_derived_point(*pt))
+                || c.edges()
+                    .iter()
+                    .any(|e| p.edge(*e).is_none() || p.is_derived_edge(*e))
+        })
+        .map(|(id, _)| *id)
+        .collect();
+    for id in orphans {
+        tx.remove_constraint(id);
+    }
+    if tx.project().constraints().is_empty() {
+        return Ok(());
+    }
+    let touched = touched(tx.changes());
+    let updates = solve_project(tx.project(), &touched).map_err(|e| CommandError::Unsolvable {
+        constraints: e.constraints.into_iter().map(AnyId::from).collect(),
+    })?;
+    for u in updates {
+        match u {
+            Update::Point(id, to) => {
+                if let Some(pt) = tx.project().point(id).cloned() {
+                    tx.put_point(id, Point { pos: to, ..pt });
+                }
+            }
+            Update::Curve(id, curve) => {
+                if let Some(e) = tx.project().edge(id).cloned() {
+                    tx.put_edge(id, Edge { curve, ..e });
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Remove the constraints naming any of `edges` (for edits that replace an
+/// edge by others, so that what was said of it no longer applies).
+pub(crate) fn drop_constraints_on(tx: &mut Transaction<'_>, edges: &[r3d_core::EdgeId]) {
+    let gone: Vec<ConstraintId> = tx
+        .project()
+        .constraints()
+        .iter()
+        .filter(|(_, c)| c.edges().iter().any(|e| edges.contains(e)))
+        .map(|(id, _)| *id)
+        .collect();
+    for id in gone {
+        tx.remove_constraint(id);
+    }
+}
+
+/// The constraints and dimensions, with how constrained the drawing is.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ConstraintList {
+    /// Only those on this piece. Omitted: all of them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub panel: Option<r3d_core::PanelId>,
+}
+
+impl Described for ConstraintList {
+    const SUMMARY: &'static str = "List the constraints and dimensions (on one piece, or all): each with its piece, its kind and what it names, a dimension's value and what the drawing measures now, whether it holds, and `marks` (where its points and the middles of its edges are, mm). `groups` are constraints sharing points, each with `freedom` (ways the constrained geometry can still move, moving or turning a piece as a whole included) and `redundant` constraints (over-constrained: they repeat what others say).";
+}
+
+impl crate::spec::QuerySpec for ConstraintList {
+    fn run(&self, p: &r3d_core::Project) -> Result<serde_json::Value, CommandError> {
+        if let Some(panel) = self.panel {
+            p.panel(panel)
+                .ok_or_else(|| CommandError::not_found(panel))?;
+        }
+        let on_panel = |c: &Constraint| {
+            self.panel.is_none_or(|panel| {
+                c.points()
+                    .iter()
+                    .any(|pt| p.point(*pt).is_some_and(|pt| pt.panel == panel))
+                    || c.edges()
+                        .iter()
+                        .any(|e| p.edge(*e).is_some_and(|e| e.panel == panel))
+            })
+        };
+        let round = |x: f64| (x * 1000.0).round() / 1000.0;
+        let constraints: Vec<serde_json::Value> = p
+            .constraints()
+            .iter()
+            .filter(|(_, c)| on_panel(c))
+            .map(|(id, c)| {
+                let mut out = serde_json::to_value(c).unwrap_or_default();
+                if let Some(obj) = out.as_object_mut() {
+                    obj.insert("id".into(), serde_json::json!(id));
+                    obj.insert("panel".into(), serde_json::json!(p.constraint_panel(c)));
+                    obj.insert(
+                        "holds".into(),
+                        serde_json::json!(r3d_core::constraints::holds(p, *id)),
+                    );
+                    if let Some(now) = measure(p, c) {
+                        obj.insert("measured".into(), serde_json::json!(round(now)));
+                    }
+                    // Where to draw it: the points it names, the middles
+                    // of its edges.
+                    let mut marks: Vec<[f64; 2]> = c
+                        .points()
+                        .iter()
+                        .filter_map(|pt| p.point(*pt))
+                        .map(|pt| [round(pt.pos.x), round(pt.pos.y)])
+                        .collect();
+                    for e in c.edges() {
+                        if let Some(g) = p.edge_geometry(e) {
+                            let (at, _) = g.point_at_length(g.length() / 2.0);
+                            marks.push([round(at.x), round(at.y)]);
+                        }
+                    }
+                    obj.insert("marks".into(), serde_json::json!(marks));
+                }
+                out
+            })
+            .collect();
+        let groups: Vec<serde_json::Value> = r3d_core::constraints::status(p)
+            .into_iter()
+            .filter(|g| {
+                g.constraints
+                    .iter()
+                    .any(|id| p.constraint(*id).is_some_and(on_panel))
+            })
+            .map(|g| {
+                serde_json::json!({
+                    "constraints": g.constraints,
+                    "freedom": g.freedom,
+                    "redundant": g.redundant,
+                    "satisfied": g.satisfied,
+                })
+            })
+            .collect();
+        Ok(serde_json::json!({ "constraints": constraints, "groups": groups }))
+    }
+}
+
+/// The construction lines.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GuideList {}
+
+impl Described for GuideList {
+    const SUMMARY: &'static str =
+        "List the construction lines: each with its ends `a` and `b` (mm).";
+}
+
+impl crate::spec::QuerySpec for GuideList {
+    fn run(&self, p: &r3d_core::Project) -> Result<serde_json::Value, CommandError> {
+        Ok(serde_json::Value::Array(
+            p.guides()
+                .iter()
+                .map(|(id, g)| serde_json::json!({ "id": id, "a": [g.a.x, g.a.y], "b": [g.b.x, g.b.y] }))
+                .collect(),
+        ))
+    }
+}

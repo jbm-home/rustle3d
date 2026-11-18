@@ -125,6 +125,8 @@ impl CommandSpec for EdgeSplit {
                 ..edge.clone()
             },
         );
+        // The edge constrained is now two: its constraints go.
+        super::drop_constraints_on(tx, &[self.edge]);
         let mut contour = panel.contour.clone();
         let at = contour
             .iter()

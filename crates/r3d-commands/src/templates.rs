@@ -292,6 +292,7 @@ impl Draft<'_, '_> {
             name: Some(name.to_owned()),
             points: outline.iter().map(|(p, _)| at(*p)).collect(),
             grain_angle_deg: 90.0,
+            symmetric: false,
         }
         .apply(self.tx)?;
         let id = out

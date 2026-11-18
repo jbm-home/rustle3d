@@ -106,6 +106,7 @@ impl CommandSpec for PatternImport {
                 start: moved(piece.start),
                 segments: moved_segments(&piece.segments),
                 grain_angle_deg: piece.grain_angle_deg,
+                symmetric: false,
             }
             .apply(tx)?;
             let Some(AnyId::Panel(panel)) = out.created.first().copied() else {

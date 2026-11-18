@@ -170,6 +170,17 @@ command_registry! {
     "point.set_grade" => PointSetGrade,
     "template.apply" => TemplateApply,
     "pattern.import" => PatternImport,
+    "constraint.add" => ConstraintAdd,
+    "constraint.remove" => ConstraintRemove,
+    "constraint.set_value" => ConstraintSetValue,
+    "point.set_smooth" => PointSetSmooth,
+    "panel.unfold" => PanelUnfold,
+    "guide.add" => GuideAdd,
+    "guide.move" => GuideMove,
+    "guide.remove" => GuideRemove,
+    "panel.create_ellipse" => PanelCreateEllipse,
+    "panel.create_sector" => PanelCreateSector,
+    "edge.set_arc" => EdgeSetArc,
 }
 
 query_registry! {
@@ -187,6 +198,8 @@ query_registry! {
     "grading.get" => GradingGet,
     "grading.check" => GradingCheck,
     "grading.charts" => GradingCharts,
+    "constraint.list" => ConstraintList,
+    "guide.list" => GuideList,
 }
 
 action_registry! {

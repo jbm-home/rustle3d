@@ -813,7 +813,7 @@
   "errBodyOutOfRange": "A size of this range would give the avatar measurements outside what it accepts.",
   "errBaseOffset": "The base size cannot move: it is the pattern as drawn.",
   "sizesOnBoard": "Show the sizes on the board",
-  "stepName": "{step, select, project_rename{Rename project} project_set_display_unit{Change units} avatar_set{Change body} avatar_remove{Remove body} panel_create_rect{Add rectangle} panel_create_polygon{Add polygon} panel_create_path{Add curved piece} panel_rename{Rename piece} panel_translate{Move piece} panel_set_grain{Set grainline} panel_set_seam_allowance{Set seam allowance} panel_mirror{Mirror piece} panel_unlink{Unlink copy} panel_place{Place piece} panel_delete{Delete piece} panel_cut{Cut piece} panel_paste{Paste} point_move{Move point} point_set_distance{Set distance} point_remove{Remove point} edge_set_curve{Bend edge} edge_split{Add point} edge_move{Move edge} notch_add{Add notch} notch_move{Move notch} notch_remove{Remove notch} internal_line_add{Draw line} internal_line_remove{Remove line} seam_add{Sew} seam_remove{Unsew} seam_flip{Flip seam} seam_set_gathered{Gather seam} edge_lengthen{Lengthen} edge_set_length{Set length} seam_take_in{Take in} seam_match_length{Match lengths} pin_add{Pin} pin_remove{Unpin} garment_set_fabric{Change fabric} garment_arrange{Arrange pieces} garment_set_color{Change colour} garment_add{Add garment} garment_rename{Rename garment} garment_remove{Remove garment} garment_set_layer{Change layer} panel_set_garment{Move to garment} grading_set_sizes{Set sizes} grading_use_chart{Use size chart} grading_clear{Remove sizes} grading_show_size{Show size} point_set_grade{Grade point} template_apply{Add template} pattern_import{Import pattern} batch{Several changes} other{{step}}}",
+  "stepName": "{step, select, project_rename{Rename project} project_set_display_unit{Change units} avatar_set{Change body} avatar_remove{Remove body} panel_create_rect{Add rectangle} panel_create_polygon{Add polygon} panel_create_path{Add curved piece} panel_rename{Rename piece} panel_translate{Move piece} panel_set_grain{Set grainline} panel_set_seam_allowance{Set seam allowance} panel_mirror{Mirror piece} panel_unlink{Unlink copy} panel_place{Place piece} panel_delete{Delete piece} panel_cut{Cut piece} panel_paste{Paste} point_move{Move point} point_set_distance{Set distance} point_remove{Remove point} edge_set_curve{Bend edge} edge_split{Add point} edge_move{Move edge} notch_add{Add notch} notch_move{Move notch} notch_remove{Remove notch} internal_line_add{Draw line} internal_line_remove{Remove line} seam_add{Sew} seam_remove{Unsew} seam_flip{Flip seam} seam_set_gathered{Gather seam} edge_lengthen{Lengthen} edge_set_length{Set length} seam_take_in{Take in} seam_match_length{Match lengths} pin_add{Pin} pin_remove{Unpin} garment_set_fabric{Change fabric} garment_arrange{Arrange pieces} garment_set_color{Change colour} garment_add{Add garment} garment_rename{Rename garment} garment_remove{Remove garment} garment_set_layer{Change layer} panel_set_garment{Move to garment} grading_set_sizes{Set sizes} grading_use_chart{Use size chart} grading_clear{Remove sizes} grading_show_size{Show size} point_set_grade{Grade point} template_apply{Add template} pattern_import{Import pattern} batch{Several changes} constraint_add{Add constraint} constraint_remove{Remove constraint} constraint_set_value{Change dimension} point_set_smooth{Smooth point} panel_unfold{Unfold piece} guide_add{Add construction line} guide_move{Move construction line} guide_remove{Remove construction line} panel_create_ellipse{Add ellipse} panel_create_sector{Add circle skirt} edge_set_arc{Make arc} other{{step}}}",
   "@stepName": {
     "description": "A step of the undo history, by its command name with dots as underscores.",
     "placeholders": {
@@ -896,5 +896,74 @@
   "busySizesTitle": "Setting the sizes",
   "busyBodyTitle": "Changing the body",
   "busyDrapeTitle": "Starting the drape",
-  "bodyFitting": "Fitting the body…"
+  "bodyFitting": "Fitting the body…",
+  "toolShapes": "Shapes",
+  "toolEllipse": "Ellipse",
+  "toolEllipseHint": "A circle or an ellipse of the size you type",
+  "toolSector": "Circle skirt",
+  "toolSectorHint": "Ring pieces from the waist and the skirt's length",
+  "toolArc": "Arc",
+  "toolArcHint": "Click an edge to make it a circular arc",
+  "toolGuide": "Construction line",
+  "toolGuideHint": "Click two points: a line to draft against, never cut or sewn",
+  "hintGuide": "Construction line: click two points · Esc cancels · V to stop",
+  "hintArc": "Arc: click an edge · V to stop",
+  "toastGuideAdded": "Construction line added.",
+  "symmetricHalf": "Half piece",
+  "symmetricHalfTip": "Draw half of a symmetric piece: the closing edge is the axis, the other half follows",
+  "width": "Width",
+  "height": "Height",
+  "sectorWaist": "Waist",
+  "sectorLength": "Skirt length",
+  "sectorFull": "Full",
+  "sectorHalf": "Half",
+  "sectorQuarter": "Quarter",
+  "sectorHint": "A full circle skirt is two half pieces, to sew at the sides.",
+  "arcTitle": "Arc",
+  "arcBulge": "Bulge",
+  "arcHint": "How far the middle of the arc is from the straight line; negative curves inward.",
+  "constraints": "Constraints",
+  "constraintsEmpty": "Pick a corner or an edge on the board (⇧-click a second one) to constrain it.",
+  "constraintsFreedom": "{count, plural, =0{Fully constrained} =1{1 degree of freedom left} other{{count} degrees of freedom left}}",
+  "@constraintsFreedom": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "constraintsRedundant": "Some constraints repeat others.",
+  "constraintBroken": "Does not hold",
+  "constraintKind": "{kind, select, fixed{Fixed} coincident{Joined} horizontal{Horizontal} vertical{Vertical} parallel{Parallel} perpendicular{Square} tangent{Smooth} equal_length{Same length} on_edge{On the edge} distance{Distance} width{Width} height{Height} length{Length} angle{Angle} other{{kind}}}",
+  "@constraintKind": {
+    "description": "A constraint or a dimension on the board, by its kind.",
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      }
+    }
+  },
+  "constrain": "Constrain",
+  "removeConstraint": "Remove",
+  "pointSmooth": "Smooth",
+  "pointCorner": "Corner",
+  "pointRemove": "Remove point",
+  "symmetricPiece": "Symmetric piece",
+  "unlinkHalves": "Separate halves",
+  "unfold": "Unfold here",
+  "makeArc": "Arc",
+  "snapKind": "{kind, select, point{Point} midpoint{Middle} edge{On edge} guide{On line} axis{On axis} horizontal{Level} vertical{Aligned} other{{kind}}}",
+  "@snapKind": {
+    "description": "What a point snapped to on the board.",
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      }
+    }
+  },
+  "errDerived": "This part follows the drawn half or the original piece: edit that one.",
+  "errUnsolvable": "These constraints cannot all hold: nothing was changed.",
+  "errSymmetric": "A symmetric piece: separate its halves first.",
+  "errNotStraight": "This needs a straight edge.",
+  "errDuplicate": "Already constrained this way."
 }

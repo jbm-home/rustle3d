@@ -2800,7 +2800,7 @@ abstract class L {
   /// A step of the undo history, by its command name with dots as underscores.
   ///
   /// In en, this message translates to:
-  /// **'{step, select, project_rename{Rename project} project_set_display_unit{Change units} avatar_set{Change body} avatar_remove{Remove body} panel_create_rect{Add rectangle} panel_create_polygon{Add polygon} panel_create_path{Add curved piece} panel_rename{Rename piece} panel_translate{Move piece} panel_set_grain{Set grainline} panel_set_seam_allowance{Set seam allowance} panel_mirror{Mirror piece} panel_unlink{Unlink copy} panel_place{Place piece} panel_delete{Delete piece} panel_cut{Cut piece} panel_paste{Paste} point_move{Move point} point_set_distance{Set distance} point_remove{Remove point} edge_set_curve{Bend edge} edge_split{Add point} edge_move{Move edge} notch_add{Add notch} notch_move{Move notch} notch_remove{Remove notch} internal_line_add{Draw line} internal_line_remove{Remove line} seam_add{Sew} seam_remove{Unsew} seam_flip{Flip seam} seam_set_gathered{Gather seam} edge_lengthen{Lengthen} edge_set_length{Set length} seam_take_in{Take in} seam_match_length{Match lengths} pin_add{Pin} pin_remove{Unpin} garment_set_fabric{Change fabric} garment_arrange{Arrange pieces} garment_set_color{Change colour} garment_add{Add garment} garment_rename{Rename garment} garment_remove{Remove garment} garment_set_layer{Change layer} panel_set_garment{Move to garment} grading_set_sizes{Set sizes} grading_use_chart{Use size chart} grading_clear{Remove sizes} grading_show_size{Show size} point_set_grade{Grade point} template_apply{Add template} pattern_import{Import pattern} batch{Several changes} other{{step}}}'**
+  /// **'{step, select, project_rename{Rename project} project_set_display_unit{Change units} avatar_set{Change body} avatar_remove{Remove body} panel_create_rect{Add rectangle} panel_create_polygon{Add polygon} panel_create_path{Add curved piece} panel_rename{Rename piece} panel_translate{Move piece} panel_set_grain{Set grainline} panel_set_seam_allowance{Set seam allowance} panel_mirror{Mirror piece} panel_unlink{Unlink copy} panel_place{Place piece} panel_delete{Delete piece} panel_cut{Cut piece} panel_paste{Paste} point_move{Move point} point_set_distance{Set distance} point_remove{Remove point} edge_set_curve{Bend edge} edge_split{Add point} edge_move{Move edge} notch_add{Add notch} notch_move{Move notch} notch_remove{Remove notch} internal_line_add{Draw line} internal_line_remove{Remove line} seam_add{Sew} seam_remove{Unsew} seam_flip{Flip seam} seam_set_gathered{Gather seam} edge_lengthen{Lengthen} edge_set_length{Set length} seam_take_in{Take in} seam_match_length{Match lengths} pin_add{Pin} pin_remove{Unpin} garment_set_fabric{Change fabric} garment_arrange{Arrange pieces} garment_set_color{Change colour} garment_add{Add garment} garment_rename{Rename garment} garment_remove{Remove garment} garment_set_layer{Change layer} panel_set_garment{Move to garment} grading_set_sizes{Set sizes} grading_use_chart{Use size chart} grading_clear{Remove sizes} grading_show_size{Show size} point_set_grade{Grade point} template_apply{Add template} pattern_import{Import pattern} batch{Several changes} constraint_add{Add constraint} constraint_remove{Remove constraint} constraint_set_value{Change dimension} point_set_smooth{Smooth point} panel_unfold{Unfold piece} guide_add{Add construction line} guide_move{Move construction line} guide_remove{Remove construction line} panel_create_ellipse{Add ellipse} panel_create_sector{Add circle skirt} edge_set_arc{Make arc} other{{step}}}'**
   String stepName(String step);
 
   /// No description provided for @undoStep.
@@ -2964,6 +2964,282 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Fitting the body…'**
   String get bodyFitting;
+
+  /// No description provided for @toolShapes.
+  ///
+  /// In en, this message translates to:
+  /// **'Shapes'**
+  String get toolShapes;
+
+  /// No description provided for @toolEllipse.
+  ///
+  /// In en, this message translates to:
+  /// **'Ellipse'**
+  String get toolEllipse;
+
+  /// No description provided for @toolEllipseHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A circle or an ellipse of the size you type'**
+  String get toolEllipseHint;
+
+  /// No description provided for @toolSector.
+  ///
+  /// In en, this message translates to:
+  /// **'Circle skirt'**
+  String get toolSector;
+
+  /// No description provided for @toolSectorHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Ring pieces from the waist and the skirt\'s length'**
+  String get toolSectorHint;
+
+  /// No description provided for @toolArc.
+  ///
+  /// In en, this message translates to:
+  /// **'Arc'**
+  String get toolArc;
+
+  /// No description provided for @toolArcHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Click an edge to make it a circular arc'**
+  String get toolArcHint;
+
+  /// No description provided for @toolGuide.
+  ///
+  /// In en, this message translates to:
+  /// **'Construction line'**
+  String get toolGuide;
+
+  /// No description provided for @toolGuideHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Click two points: a line to draft against, never cut or sewn'**
+  String get toolGuideHint;
+
+  /// No description provided for @hintGuide.
+  ///
+  /// In en, this message translates to:
+  /// **'Construction line: click two points · Esc cancels · V to stop'**
+  String get hintGuide;
+
+  /// No description provided for @hintArc.
+  ///
+  /// In en, this message translates to:
+  /// **'Arc: click an edge · V to stop'**
+  String get hintArc;
+
+  /// No description provided for @toastGuideAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Construction line added.'**
+  String get toastGuideAdded;
+
+  /// No description provided for @symmetricHalf.
+  ///
+  /// In en, this message translates to:
+  /// **'Half piece'**
+  String get symmetricHalf;
+
+  /// No description provided for @symmetricHalfTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Draw half of a symmetric piece: the closing edge is the axis, the other half follows'**
+  String get symmetricHalfTip;
+
+  /// No description provided for @width.
+  ///
+  /// In en, this message translates to:
+  /// **'Width'**
+  String get width;
+
+  /// No description provided for @height.
+  ///
+  /// In en, this message translates to:
+  /// **'Height'**
+  String get height;
+
+  /// No description provided for @sectorWaist.
+  ///
+  /// In en, this message translates to:
+  /// **'Waist'**
+  String get sectorWaist;
+
+  /// No description provided for @sectorLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Skirt length'**
+  String get sectorLength;
+
+  /// No description provided for @sectorFull.
+  ///
+  /// In en, this message translates to:
+  /// **'Full'**
+  String get sectorFull;
+
+  /// No description provided for @sectorHalf.
+  ///
+  /// In en, this message translates to:
+  /// **'Half'**
+  String get sectorHalf;
+
+  /// No description provided for @sectorQuarter.
+  ///
+  /// In en, this message translates to:
+  /// **'Quarter'**
+  String get sectorQuarter;
+
+  /// No description provided for @sectorHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A full circle skirt is two half pieces, to sew at the sides.'**
+  String get sectorHint;
+
+  /// No description provided for @arcTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Arc'**
+  String get arcTitle;
+
+  /// No description provided for @arcBulge.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulge'**
+  String get arcBulge;
+
+  /// No description provided for @arcHint.
+  ///
+  /// In en, this message translates to:
+  /// **'How far the middle of the arc is from the straight line; negative curves inward.'**
+  String get arcHint;
+
+  /// No description provided for @constraints.
+  ///
+  /// In en, this message translates to:
+  /// **'Constraints'**
+  String get constraints;
+
+  /// No description provided for @constraintsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a corner or an edge on the board (⇧-click a second one) to constrain it.'**
+  String get constraintsEmpty;
+
+  /// No description provided for @constraintsFreedom.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Fully constrained} =1{1 degree of freedom left} other{{count} degrees of freedom left}}'**
+  String constraintsFreedom(int count);
+
+  /// No description provided for @constraintsRedundant.
+  ///
+  /// In en, this message translates to:
+  /// **'Some constraints repeat others.'**
+  String get constraintsRedundant;
+
+  /// No description provided for @constraintBroken.
+  ///
+  /// In en, this message translates to:
+  /// **'Does not hold'**
+  String get constraintBroken;
+
+  /// A constraint or a dimension on the board, by its kind.
+  ///
+  /// In en, this message translates to:
+  /// **'{kind, select, fixed{Fixed} coincident{Joined} horizontal{Horizontal} vertical{Vertical} parallel{Parallel} perpendicular{Square} tangent{Smooth} equal_length{Same length} on_edge{On the edge} distance{Distance} width{Width} height{Height} length{Length} angle{Angle} other{{kind}}}'**
+  String constraintKind(String kind);
+
+  /// No description provided for @constrain.
+  ///
+  /// In en, this message translates to:
+  /// **'Constrain'**
+  String get constrain;
+
+  /// No description provided for @removeConstraint.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get removeConstraint;
+
+  /// No description provided for @pointSmooth.
+  ///
+  /// In en, this message translates to:
+  /// **'Smooth'**
+  String get pointSmooth;
+
+  /// No description provided for @pointCorner.
+  ///
+  /// In en, this message translates to:
+  /// **'Corner'**
+  String get pointCorner;
+
+  /// No description provided for @pointRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove point'**
+  String get pointRemove;
+
+  /// No description provided for @symmetricPiece.
+  ///
+  /// In en, this message translates to:
+  /// **'Symmetric piece'**
+  String get symmetricPiece;
+
+  /// No description provided for @unlinkHalves.
+  ///
+  /// In en, this message translates to:
+  /// **'Separate halves'**
+  String get unlinkHalves;
+
+  /// No description provided for @unfold.
+  ///
+  /// In en, this message translates to:
+  /// **'Unfold here'**
+  String get unfold;
+
+  /// No description provided for @makeArc.
+  ///
+  /// In en, this message translates to:
+  /// **'Arc'**
+  String get makeArc;
+
+  /// What a point snapped to on the board.
+  ///
+  /// In en, this message translates to:
+  /// **'{kind, select, point{Point} midpoint{Middle} edge{On edge} guide{On line} axis{On axis} horizontal{Level} vertical{Aligned} other{{kind}}}'**
+  String snapKind(String kind);
+
+  /// No description provided for @errDerived.
+  ///
+  /// In en, this message translates to:
+  /// **'This part follows the drawn half or the original piece: edit that one.'**
+  String get errDerived;
+
+  /// No description provided for @errUnsolvable.
+  ///
+  /// In en, this message translates to:
+  /// **'These constraints cannot all hold: nothing was changed.'**
+  String get errUnsolvable;
+
+  /// No description provided for @errSymmetric.
+  ///
+  /// In en, this message translates to:
+  /// **'A symmetric piece: separate its halves first.'**
+  String get errSymmetric;
+
+  /// No description provided for @errNotStraight.
+  ///
+  /// In en, this message translates to:
+  /// **'This needs a straight edge.'**
+  String get errNotStraight;
+
+  /// No description provided for @errDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'Already constrained this way.'**
+  String get errDuplicate;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

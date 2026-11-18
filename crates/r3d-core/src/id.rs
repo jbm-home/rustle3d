@@ -150,6 +150,19 @@ define_id!(
     Pin,
     "pin"
 );
+define_id!(
+    /// A constraint or a dimension on points and edges.
+    ConstraintId,
+    Constraint,
+    "constraint"
+);
+define_id!(
+    /// A construction line on the board: drawn to draft against, never cut
+    /// or sewn.
+    GuideId,
+    Guide,
+    "guide"
+);
 
 /// Any entity ID, for messages and command outputs.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -162,6 +175,8 @@ pub enum AnyId {
     InternalLine(InternalLineId),
     Seam(SeamId),
     Pin(PinId),
+    Constraint(ConstraintId),
+    Guide(GuideId),
 }
 
 impl fmt::Display for AnyId {
@@ -175,6 +190,8 @@ impl fmt::Display for AnyId {
             AnyId::InternalLine(id) => id.fmt(f),
             AnyId::Seam(id) => id.fmt(f),
             AnyId::Pin(id) => id.fmt(f),
+            AnyId::Constraint(id) => id.fmt(f),
+            AnyId::Guide(id) => id.fmt(f),
         }
     }
 }
@@ -198,9 +215,11 @@ impl FromStr for AnyId {
             InternalLineId::PREFIX => s.parse().map(AnyId::InternalLine),
             SeamId::PREFIX => s.parse().map(AnyId::Seam),
             PinId::PREFIX => s.parse().map(AnyId::Pin),
+            ConstraintId::PREFIX => s.parse().map(AnyId::Constraint),
+            GuideId::PREFIX => s.parse().map(AnyId::Guide),
             _ => Err(ParseIdError {
                 text: s.to_owned(),
-                expected: "garment|panel|point|edge|notch|line|seam|pin",
+                expected: "garment|panel|point|edge|notch|line|seam|pin|constraint|guide",
             }),
         }
     }
@@ -226,7 +245,7 @@ impl JsonSchema for AnyId {
     fn json_schema(_: &mut SchemaGenerator) -> Schema {
         json_schema!({
             "type": "string",
-            "pattern": "^(garment|panel|point|edge|notch|line|seam|pin):[1-9][0-9]*$",
+            "pattern": "^(garment|panel|point|edge|notch|line|seam|pin|constraint|guide):[1-9][0-9]*$",
         })
     }
 }

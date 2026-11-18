@@ -35,7 +35,7 @@ can be tested through MCP as soon as they exist.
 | M22 | Grading and sizes ✅ | 2–3 wk | A shirt graded from 36 to 52, each size draped on a matching avatar |
 | M25 | Maximized views ✅ | < 1 wk | The board fills the window, the drape pauses; one click brings both views back |
 | M26 | History, editing comfort, feedback on long steps ✅ | 2–3 wk | Jump back ten steps from the history panel; paste two sewn pieces with their seam; a graded template shows its progress |
-| M27 | Sketching 2: constraints and symmetry | 4–5 wk | Draw a half bodice against a symmetry axis with fixed dimensions; change one, the shape follows |
+| M27 | Sketching 2: constraints and symmetry ✅ | 4–5 wk | Draw a half bodice against a symmetry axis with fixed dimensions; change one, the shape follows |
 | M28 | Parametric patterns | 2–3 wk | A skirt whose waist is `waist / 4 + 10 mm` redrafts itself on another body |
 | M29 | Construction details | 3–4 wk | A skirt with darts, a pleat and a patch pocket sewn on an internal line |
 | M20 | Trims: buttons and zippers | 2–3 wk | A shirt that buttons and trousers with a fly zipper, draped closed |
@@ -600,7 +600,7 @@ Built (2026-11-18), demo `./demos/m26/demo.sh`:
   the history list, ⌘C/⌘V and the progress card were checked by hand on
   Windows.
 
-## M27 — Sketching 2: constraints and symmetry
+## M27 — Sketching 2: constraints and symmetry ✅ (2026-11-18)
 From the maintainer (2026-11-18): drafting lacks ease. General CAD ideas
 (constraints, dimensions, symmetry), in our own UI and terms.
 - **Constraints** on points and edges: coincident, horizontal, vertical,
@@ -625,6 +625,32 @@ From the maintainer (2026-11-18): drafting lacks ease. General CAD ideas
 - **Demo**: draw a half bodice against an axis with fixed dimensions;
   change the bust dimension, the piece and its other half follow; draw
   a circle skirt from an arc sector.
+
+Built (2026-11-18), demo `./demos/m27/demo.sh`, spec 19:
+- Constraints and dimensions (`constraint.add` / `remove` /
+  `set_value` / `list`; schema v11) solved after every step in the same
+  undo step by our own damped minimum-norm Gauss–Newton solver
+  (`r3d_geom::solve`), the edited points held first; conflicts refused
+  with the constraints concerned; degrees of freedom and redundant
+  constraints reported.
+- Symmetric pieces: `panel.unfold`, or `symmetric` when drawing a polygon
+  or a path (the closing edge is the axis); the reflected half follows,
+  keeps its IDs (seams on it stay) and its notches; `panel.unlink`
+  separates the halves. Linked mirror copies as before.
+- Construction lines (`guide.*`), drawn dashed across the board; snapping
+  in the app to corners, middles, edges, lines, axes and level with the
+  previous point, with a hint; a dragged corner snaps too.
+- `panel.create_ellipse`, `panel.create_sector` (circle skirts from the
+  waist and the length), `edge.set_arc`; `point.set_smooth` (smooth and
+  corner points); Delete removes a picked corner.
+- The app: ⇧-click picks a second corner or edge; constraint chips and a
+  Constraints section in the inspector (values typed), signs and
+  dimensions over the board; the Half piece option, the Construction
+  line tool (G), the Shapes group (rectangle, ellipse E, circle skirt),
+  the Arc tool.
+- Open: constraints on internal lines, notches and construction lines;
+  dragging a dimension on the board; dragging a point's handles with
+  Select (Bend does it, and a smooth point keeps them aligned).
 
 ## M28 — Parametric patterns
 - A dimension (M27) can be a **formula** of the body's measurements and

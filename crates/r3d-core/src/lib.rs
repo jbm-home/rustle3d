@@ -8,6 +8,7 @@
 //! records every entity change so that undo/redo is generic and cannot drift
 //! from what a command actually did. See `docs/architecture.md` §3–4.
 
+pub mod constraints;
 pub mod edit;
 pub mod file;
 pub mod grading;
@@ -19,10 +20,13 @@ pub mod model;
 pub mod project_dir;
 
 pub use edit::{ChangeSet, Transaction};
-pub use id::{AnyId, EdgeId, GarmentId, InternalLineId, NotchId, PanelId, PinId, PointId, SeamId};
+pub use id::{
+    AnyId, ConstraintId, EdgeId, GarmentId, GuideId, InternalLineId, NotchId, PanelId, PinId,
+    PointId, SeamId,
+};
 pub use message::{Localizable, Message};
 pub use model::{
-    Around, Avatar, Body, DisplayUnit, Edge, EdgeCurve, Fabric, FabricLook, Garment, Grading,
-    InternalLine, MirrorLink, Notch, Panel, PathSegment, Pin, Placement, Point, Project, Seam,
-    SeamSide, Size, TemplateRef,
+    Along, Around, Avatar, Body, Constraint, DisplayUnit, Edge, EdgeCurve, Fabric, FabricLook,
+    Garment, Grading, Guide, InternalLine, MirrorLink, Notch, Panel, PathSegment, Pin, Placement,
+    Point, Project, Seam, SeamSide, Size, Symmetry, TemplateRef,
 };

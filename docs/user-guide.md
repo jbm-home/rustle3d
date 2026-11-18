@@ -13,7 +13,8 @@ cloth comes to rest; pieces arranged side by side by width; M17,
 draping on the graphics card; M18, shirt and trousers templates, pieces
 placed on a leg; M19, several garments in layers; M22, sizes and
 grading; M25, maximized views; M26, history, copy and paste, progress of long steps;
-GPL licence, donations).
+GPL licence, donations; M27, constraints, dimensions, half pieces,
+construction lines, snapping, ellipses, circle skirts and arcs).
 -->
 
 Rustle3D is a free, open-source desktop app for making clothes: draw the
@@ -81,13 +82,17 @@ of related tools (the last one used stays on the button).
 
 | Tool | Key | What it does |
 |---|---|---|
-| Select | V | Click a piece or an edge; drag a corner or an edge to reshape the piece |
-| Rectangle | R | Adds a rectangular piece |
+| Select | V | Click a piece, a corner or an edge (⇧-click a second corner or edge); drag a corner or an edge to reshape the piece |
+| Shapes → Rectangle | R | Adds a rectangular piece |
+| Shapes → Ellipse | E | Adds a circle or an ellipse of the width and height you type |
+| Shapes → Circle skirt | | Adds the pieces of a full, half or quarter circle skirt from the waist and the skirt's length |
 | Polygon | P | Click the corners of a new piece; click the first corner or press Enter to close; Esc cancels |
 | Curve | C | Draws a piece with curves: click for a corner, drag for a smooth point; click the first point or press Enter to close |
 | Edit curves → Bend | B | Click an edge, then drag its two handles to bend it |
 | Edit curves → Straighten | L | Click a curved edge to make it straight |
 | Edit curves → Add point | A | Click an edge to add a point there (the curve keeps its shape) |
+| Edit curves → Arc | | Click an edge, type how far it bulges: it becomes a circular arc |
+| Construction line | G | Click two points: a line across the board to draw against (never cut or sewn); click it and press Delete to remove it |
 | Cut | K | Click (or drag, for curves) a line across a piece, from outside to outside, then Enter: the piece becomes two pieces sewn together along the line |
 | Draw on garment | D | Drag across the 3D garment: the line lands on the pattern |
 | Notch | N | Click an edge where the notch goes |
@@ -101,7 +106,24 @@ comes back (a drape you paused yourself stays paused); starting the drape
 (Space) brings the 3D view back. The board keeps its zoom.
 
 Other keys: **⌘Z** undo, **⇧⌘Z** redo (also Ctrl+Y on Windows and Linux),
-**Backspace/Delete** deletes the selection, **Esc** cancels a drawing.
+**Backspace/Delete** deletes the selection (a single corner picked: that
+point; a construction line picked: that line), **Esc** cancels a drawing.
+
+**Snapping**: while you draw (Polygon, Curve, Cut, Construction line) or
+drag a corner, the point lands on what is near the pointer: a corner,
+the middle of an edge, an edge, a construction line, a symmetry axis, or
+level with the previous point (or the first one, or a dragged corner's
+neighbours). A small label says what it snapped to.
+
+**Half pieces**: with Polygon or Curve, turn on **Half piece** (top left
+of the board) and draw half of a symmetric piece, ending where you
+started on the centre line: the edge that closes it is the axis, and the
+other half appears, mirrored. Edit the half you drew; the other one
+follows (points, curves, notches) and the axis is drawn dash-dotted.
+Seams and notches can go on either half. An existing piece can be
+unfolded the same way on one of its straight edges (**Unfold here** in
+the edge's card), and **Separate halves** in the inspector makes both
+halves ordinary again.
 
 **Long steps**: opening a project, adding a template, choosing sizes,
 changing the body's measurements, importing, exporting and starting the
@@ -140,7 +162,33 @@ something else); click **Opened** to go back to the start.
   distance between them. Type a new distance: the second corner moves
   along the line.
 - A curved edge can be made straight again with **Straighten** in its
-  card.
+  card, or made a circular arc with **Arc**.
+
+### Constraints and dimensions
+Constraints keep a piece the way you want it while you change the rest.
+Pick what to constrain on the board: a corner or an edge, and ⇧-click a
+second one. The inspector offers what fits:
+- one edge: **Horizontal**, **Vertical**, **Length** (keeps the length it
+  has now);
+- two edges: **Parallel**, **Square**, **Same length**, **Angle**;
+- one corner: **Fixed** (it stays put while the rest adjusts),
+  **Smooth** (no corner there: the curves pass through it smoothly) or
+  **Corner**, **Remove point**;
+- two corners: **Distance**, **Width** (across), **Height** (up and
+  down), **Joined** (at the same place, for corners of two pieces);
+- a corner and an edge: **On the edge**.
+
+The piece's constraints are listed under **Constraints** in the
+inspector and drawn on the board when it is selected. Type a new value
+for a distance, a length or an angle: the piece is redrawn so that this
+value and every other constraint hold, moving as little as possible;
+the other half of a half piece follows. Drag a corner: it stays where
+you drop it and what is constrained to it follows. If constraints
+cannot all hold, the change is refused and nothing moves; a constraint
+that does not hold shows in red. The inspector also says how many ways
+the piece can still move (moving or turning it as a whole counts,
+unless a corner is fixed), and warns when some constraints repeat
+others.
 
 ### Cutting a piece
 With **Cut** (K), draw a line across one piece, starting and ending
@@ -333,8 +381,12 @@ DXF-AAMA; garments go out as glTF and OBJ: open formats only.
 - Garments worn close together can show through each other where they
   touch, and a shirt cannot be tucked into fitted trousers yet: layers of
   cloth keep about 2 cm apart in the simulation.
-- A point's handles cannot be edited after it is drawn yet; use Bend on
-  the edge.
+- A point's handles cannot be dragged with Select yet; use Bend on the
+  edge (a smooth point keeps its two handles lined up).
+- Constraints apply to corners and edges of the outline, not to internal
+  lines, notches or construction lines; dimensions are typed in the
+  inspector, not dragged on the board. A symmetric piece's axis is
+  straight.
 - Sizes: notches keep their distance along the edge in every size, and
   a grade is set per point, not per edge, in the app. The shirt template
   drapes with folds at the sides in the largest sizes (from about 48).

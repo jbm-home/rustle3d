@@ -1613,6 +1613,17 @@ class LEn extends L {
       'template_apply': 'Add template',
       'pattern_import': 'Import pattern',
       'batch': 'Several changes',
+      'constraint_add': 'Add constraint',
+      'constraint_remove': 'Remove constraint',
+      'constraint_set_value': 'Change dimension',
+      'point_set_smooth': 'Smooth point',
+      'panel_unfold': 'Unfold piece',
+      'guide_add': 'Add construction line',
+      'guide_move': 'Move construction line',
+      'guide_remove': 'Remove construction line',
+      'panel_create_ellipse': 'Add ellipse',
+      'panel_create_sector': 'Add circle skirt',
+      'edge_set_arc': 'Make arc',
       'other': '$step',
     });
     return '$_temp0';
@@ -1722,4 +1733,191 @@ class LEn extends L {
 
   @override
   String get bodyFitting => 'Fitting the body…';
+
+  @override
+  String get toolShapes => 'Shapes';
+
+  @override
+  String get toolEllipse => 'Ellipse';
+
+  @override
+  String get toolEllipseHint => 'A circle or an ellipse of the size you type';
+
+  @override
+  String get toolSector => 'Circle skirt';
+
+  @override
+  String get toolSectorHint =>
+      'Ring pieces from the waist and the skirt\'s length';
+
+  @override
+  String get toolArc => 'Arc';
+
+  @override
+  String get toolArcHint => 'Click an edge to make it a circular arc';
+
+  @override
+  String get toolGuide => 'Construction line';
+
+  @override
+  String get toolGuideHint =>
+      'Click two points: a line to draft against, never cut or sewn';
+
+  @override
+  String get hintGuide =>
+      'Construction line: click two points · Esc cancels · V to stop';
+
+  @override
+  String get hintArc => 'Arc: click an edge · V to stop';
+
+  @override
+  String get toastGuideAdded => 'Construction line added.';
+
+  @override
+  String get symmetricHalf => 'Half piece';
+
+  @override
+  String get symmetricHalfTip =>
+      'Draw half of a symmetric piece: the closing edge is the axis, the other half follows';
+
+  @override
+  String get width => 'Width';
+
+  @override
+  String get height => 'Height';
+
+  @override
+  String get sectorWaist => 'Waist';
+
+  @override
+  String get sectorLength => 'Skirt length';
+
+  @override
+  String get sectorFull => 'Full';
+
+  @override
+  String get sectorHalf => 'Half';
+
+  @override
+  String get sectorQuarter => 'Quarter';
+
+  @override
+  String get sectorHint =>
+      'A full circle skirt is two half pieces, to sew at the sides.';
+
+  @override
+  String get arcTitle => 'Arc';
+
+  @override
+  String get arcBulge => 'Bulge';
+
+  @override
+  String get arcHint =>
+      'How far the middle of the arc is from the straight line; negative curves inward.';
+
+  @override
+  String get constraints => 'Constraints';
+
+  @override
+  String get constraintsEmpty =>
+      'Pick a corner or an edge on the board (⇧-click a second one) to constrain it.';
+
+  @override
+  String constraintsFreedom(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count degrees of freedom left',
+      one: '1 degree of freedom left',
+      zero: 'Fully constrained',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get constraintsRedundant => 'Some constraints repeat others.';
+
+  @override
+  String get constraintBroken => 'Does not hold';
+
+  @override
+  String constraintKind(String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'fixed': 'Fixed',
+      'coincident': 'Joined',
+      'horizontal': 'Horizontal',
+      'vertical': 'Vertical',
+      'parallel': 'Parallel',
+      'perpendicular': 'Square',
+      'tangent': 'Smooth',
+      'equal_length': 'Same length',
+      'on_edge': 'On the edge',
+      'distance': 'Distance',
+      'width': 'Width',
+      'height': 'Height',
+      'length': 'Length',
+      'angle': 'Angle',
+      'other': '$kind',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get constrain => 'Constrain';
+
+  @override
+  String get removeConstraint => 'Remove';
+
+  @override
+  String get pointSmooth => 'Smooth';
+
+  @override
+  String get pointCorner => 'Corner';
+
+  @override
+  String get pointRemove => 'Remove point';
+
+  @override
+  String get symmetricPiece => 'Symmetric piece';
+
+  @override
+  String get unlinkHalves => 'Separate halves';
+
+  @override
+  String get unfold => 'Unfold here';
+
+  @override
+  String get makeArc => 'Arc';
+
+  @override
+  String snapKind(String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'point': 'Point',
+      'midpoint': 'Middle',
+      'edge': 'On edge',
+      'guide': 'On line',
+      'axis': 'On axis',
+      'horizontal': 'Level',
+      'vertical': 'Aligned',
+      'other': '$kind',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get errDerived =>
+      'This part follows the drawn half or the original piece: edit that one.';
+
+  @override
+  String get errUnsolvable =>
+      'These constraints cannot all hold: nothing was changed.';
+
+  @override
+  String get errSymmetric => 'A symmetric piece: separate its halves first.';
+
+  @override
+  String get errNotStraight => 'This needs a straight edge.';
+
+  @override
+  String get errDuplicate => 'Already constrained this way.';
 }

@@ -11,7 +11,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::avatar::validate_body;
-use super::{Vec2, editable_panel, v};
+use super::{Vec2, v};
 use crate::error::{CommandError, Invalid, finite, non_blank};
 use crate::progress::Progress;
 use crate::spec::{CommandOutput, CommandSpec, Described};
@@ -513,12 +513,7 @@ impl Described for PointSetGrade {
 
 impl CommandSpec for PointSetGrade {
     fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
-        let point = tx
-            .project()
-            .point(self.point)
-            .cloned()
-            .ok_or_else(|| CommandError::not_found(self.point))?;
-        editable_panel(tx, point.panel)?;
+        let point = super::editable_point(tx, self.point)?;
         let g = grading(tx.project())?;
         let grade = match (&self.step, &self.offsets) {
             (Some(step), None) => {

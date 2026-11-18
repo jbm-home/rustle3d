@@ -10,6 +10,7 @@ mod cloth;
 mod forms;
 mod photo;
 mod sim;
+mod snap;
 mod surface;
 
 // Generated glue: raw FFI entry points (`unsafe`) and wire-format decoding

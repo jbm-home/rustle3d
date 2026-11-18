@@ -58,6 +58,16 @@ pub enum Invalid {
     BaseOffset,
     #[error("needs either `step` or `offsets`")]
     StepOrOffsets,
+    #[error("is symmetric: make its halves independent first (panel.unlink)")]
+    Symmetric,
+    #[error("must be a straight edge")]
+    NotStraight,
+    #[error("is not a dimension (distance, length or angle)")]
+    NotDimension,
+    #[error("is already constrained this way")]
+    Duplicate,
+    #[error("must name points and edges of the same piece's outline")]
+    NotJoined,
 }
 
 impl Invalid {
@@ -89,6 +99,11 @@ impl Invalid {
             Invalid::BodyOutOfRange => "invalid.body_out_of_range",
             Invalid::BaseOffset => "invalid.base_offset",
             Invalid::StepOrOffsets => "invalid.step_or_offsets",
+            Invalid::Symmetric => "invalid.symmetric",
+            Invalid::NotStraight => "invalid.not_straight",
+            Invalid::NotDimension => "invalid.not_dimension",
+            Invalid::Duplicate => "invalid.duplicate",
+            Invalid::NotJoined => "invalid.not_joined",
         }
     }
 }
@@ -107,6 +122,12 @@ pub enum CommandError {
     ConfirmationRequired { command: &'static str },
     #[error("{panel} is a linked mirror copy: edit its source, or unlink it first")]
     LinkedMirror { panel: AnyId },
+    #[error(
+        "{id} follows other geometry (a linked mirror copy or the reflected half of a symmetric piece): edit what it follows"
+    )]
+    Derived { id: AnyId },
+    #[error("the constraints cannot all hold ({}): nothing was changed", list(.constraints))]
+    Unsolvable { constraints: Vec<AnyId> },
     #[error("{edge} is sewn ({seam}): remove the seam first")]
     Sewn { edge: AnyId, seam: AnyId },
     #[error("nothing to undo")]
@@ -172,6 +193,10 @@ impl Localizable for CommandError {
                 Message::new("confirmation_required", text).arg("command", command)
             }
             Self::LinkedMirror { panel } => Message::new("linked_mirror", text).arg("panel", panel),
+            Self::Derived { id } => Message::new("derived", text).arg("id", id),
+            Self::Unsolvable { constraints } => {
+                Message::new("constraints_unsolvable", text).arg("constraints", list(constraints))
+            }
             Self::Sewn { edge, seam } => Message::new("sewn", text)
                 .arg("edge", edge)
                 .arg("seam", seam),
@@ -196,6 +221,14 @@ impl Localizable for CommandError {
             Self::Internal { detail } => Message::new("internal", text).arg("detail", detail),
         }
     }
+}
+
+/// IDs as a comma-separated list.
+fn list(ids: &[AnyId]) -> String {
+    ids.iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// Check that every number is finite.

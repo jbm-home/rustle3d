@@ -17,12 +17,12 @@ use r3d_sim_gpu::{GpuContext, GpuSolver};
 
 use crate::cloth::{
     Adjust, CORNER_PICK_PX, ClothHit, EDGE_PICK_MM, EDGE_PICK_PX, Held, Hit, PICK_PX, RESYNC_EVERY,
-    SEAM_END, STROKE_STEP_MM, Sync, Tool, ray_triangle,
+    SEAM_END, SNAP_PX, STROKE_STEP_MM, Sync, Tool, ray_triangle,
 };
 use crate::forms::Forms;
 use crate::photo::{PhotoJob, Subject};
 use crate::sim::SimThread;
-use r3d_core::{Body, EdgeId, Fabric, Localizable, Message, PanelId, PointId};
+use r3d_core::{Body, EdgeId, Fabric, GuideId, Localizable, Message, PanelId, PointId};
 use r3d_render::board::BoardView;
 use r3d_render::photo::{Lighting, Quality, Settings, Surface};
 use r3d_render::theme::PIECE_COLORS;
@@ -179,6 +179,29 @@ pub enum Gesture {
     Adjust,
     /// Move the piece around the body (its placement).
     Move,
+}
+
+/// Where a pointer lands on the board, and why: `kind` is `point`,
+/// `midpoint`, `edge`, `guide`, `axis`, `horizontal`, `vertical` or
+/// `free`; for `horizontal` and `vertical`, `from` is the point it is
+/// level with (`[x, y]` mm).
+#[derive(Debug, Clone)]
+pub struct Snap {
+    pub x_mm: f64,
+    pub y_mm: f64,
+    pub kind: String,
+    pub from: Option<Vec<f64>>,
+}
+
+impl From<crate::snap::Landing> for Snap {
+    fn from(l: crate::snap::Landing) -> Self {
+        Snap {
+            x_mm: l.at.x,
+            y_mm: l.at.y,
+            kind: l.kind.to_owned(),
+            from: l.from.map(|f| vec![f.x, f.y]),
+        }
+    }
 }
 
 /// A corner picked on the board, and where it is (mm).
@@ -382,8 +405,13 @@ pub struct Engine {
     graphics: Mutex<Option<Graphics>>,
     /// Selection shared by every view (not saved, not undoable).
     selection: Mutex<Vec<PanelId>>,
-    /// The edge picked within the selection, if any.
-    selected_edge: Mutex<Option<EdgeId>>,
+    /// The edges picked within the selection (one, or two to constrain
+    /// together).
+    selected_edges: Mutex<Vec<EdgeId>>,
+    /// The construction line picked, if any.
+    selected_guide: Mutex<Option<GuideId>>,
+    /// Where the corner being dragged landed, and why (a snap hint).
+    drag_snap: Mutex<Option<Snap>>,
     /// Corners picked on the board (one, or two to measure between).
     selected_points: Mutex<Vec<PointId>>,
     /// The simulation thread, started on first use.
@@ -460,7 +488,9 @@ impl Engine {
             ws: Arc::new(Mutex::new(ws)),
             graphics: Mutex::new(None),
             selection: Mutex::new(Vec::new()),
-            selected_edge: Mutex::new(None),
+            selected_edges: Mutex::new(Vec::new()),
+            selected_guide: Mutex::new(None),
+            drag_snap: Mutex::new(None),
             selected_points: Mutex::new(Vec::new()),
             sim: Mutex::new(None),
             cloth: Mutex::new(None),
@@ -796,7 +826,7 @@ impl Engine {
                 .collect();
             if !changed.is_empty() {
                 *self.selected()? = changed;
-                *self.selected_edge.lock().map_err(|_| poisoned())? = None;
+                self.selected_edges.lock().map_err(|_| poisoned())?.clear();
                 self.selected_points.lock().map_err(|_| poisoned())?.clear();
             }
         }
@@ -823,9 +853,13 @@ impl Engine {
     /// undo, or an agent's change).
     fn forget_missing(&self, project: &r3d_core::Project) -> Result<(), ApiError> {
         self.selected()?.retain(|id| project.panel(*id).is_some());
-        let mut edge = self.selected_edge.lock().map_err(|_| poisoned())?;
-        if edge.is_some_and(|e| project.edge(e).is_none()) {
-            *edge = None;
+        self.selected_edges
+            .lock()
+            .map_err(|_| poisoned())?
+            .retain(|e| project.edge(*e).is_some());
+        let mut guide = self.selected_guide.lock().map_err(|_| poisoned())?;
+        if guide.is_some_and(|g| !project.guides().contains_key(&g)) {
+            *guide = None;
         }
         Ok(())
     }
@@ -1173,10 +1207,10 @@ impl Engine {
         };
         match v.kind {
             ViewKind::Board => {
-                let edge = *self.selected_edge.lock().map_err(|_| poisoned())?;
+                let edges = self.selected_edges.lock().map_err(|_| poisoned())?.clone();
                 let scene = self
                     .board_scene(project, &selected)
-                    .with_selected_edge(edge);
+                    .with_selected_edges(&edges);
                 let board_view = v
                     .board_view
                     .unwrap_or_else(|| BoardView::fit(scene.bounds(), v.width, v.height));
@@ -1280,7 +1314,12 @@ impl Engine {
             .map(SimThread::latest)
             .unwrap_or_default();
         let cloth = self.cloth.lock().map_err(|_| poisoned())?;
-        let edge = *self.selected_edge.lock().map_err(|_| poisoned())?;
+        let edge = self
+            .selected_edges
+            .lock()
+            .map_err(|_| poisoned())?
+            .first()
+            .copied();
         let (lines, edge_line) = cloth
             .as_ref()
             .map(|d| {
@@ -1519,18 +1558,61 @@ impl Engine {
                 None => (None, None),
             },
         };
-        let mut points = self.selected_points.lock().map_err(|_| poisoned())?;
-        match corner {
-            // ⇧-click adds a second corner, to measure between them.
-            Some((_, point, _)) if extend && points.len() == 1 && points[..] != [point] => {
-                points.push(point)
+        // A construction line, where nothing else is.
+        let guide = match (v.kind, frozen, panel) {
+            (ViewKind::Board, Some((bv, w, h)), None) => {
+                let p = bv.to_board(x, y, w, h);
+                project
+                    .guides()
+                    .iter()
+                    .map(|(id, g)| (*id, crate::snap::distance_to_line(p, g.a, g.b)))
+                    .filter(|(_, d)| *d <= EDGE_PICK_PX * bv.mm_per_px)
+                    .min_by(|a, b| a.1.total_cmp(&b.1))
+                    .map(|(id, _)| id)
             }
-            Some((_, point, _)) => *points = vec![point],
-            None => points.clear(),
+            _ => None,
+        };
+        *self.selected_guide.lock().map_err(|_| poisoned())? = guide;
+        let mut points = self.selected_points.lock().map_err(|_| poisoned())?;
+        let mut edges = self.selected_edges.lock().map_err(|_| poisoned())?;
+        // ⇧-click adds a second corner or edge (to measure or constrain
+        // them together): two picks at most, the oldest dropped.
+        match (corner, edge) {
+            (Some((_, point, _)), _) if extend => {
+                if !points.contains(&point) {
+                    points.push(point);
+                }
+            }
+            (Some((_, point, _)), _) => {
+                *points = vec![point];
+                edges.clear();
+            }
+            (None, Some(e)) if extend => {
+                if !edges.contains(&e) {
+                    edges.push(e);
+                }
+            }
+            (None, Some(e)) => {
+                *edges = vec![e];
+                points.clear();
+            }
+            (None, None) => {
+                points.clear();
+                edges.clear();
+            }
+        }
+        while points.len() + edges.len() > 2 {
+            if edges.len() > points.len() || points.is_empty() {
+                edges.remove(0);
+            } else {
+                points.remove(0);
+            }
         }
         let mut selected = self.selected()?;
-        *selected = panel.into_iter().collect();
-        *self.selected_edge.lock().map_err(|_| poisoned())? = edge;
+        // Extending keeps the piece picked first.
+        if !(extend && !selected.is_empty() && (corner.is_some() || edge.is_some())) {
+            *selected = panel.into_iter().collect();
+        }
         Ok(selected.iter().map(ToString::to_string).collect())
     }
 
@@ -1570,7 +1652,8 @@ impl Engine {
             scene.edge_at(at, max_mm).map(|e| (e.panel, e.id))
         };
         *self.selected()? = found.map(|(panel, _)| panel).into_iter().collect();
-        *self.selected_edge.lock().map_err(|_| poisoned())? = found.map(|(_, e)| e);
+        *self.selected_edges.lock().map_err(|_| poisoned())? =
+            found.map(|(_, e)| e).into_iter().collect();
         self.selected_points.lock().map_err(|_| poisoned())?.clear();
         Ok(found.map(|(_, e)| e.to_string()))
     }
@@ -1791,10 +1874,67 @@ impl Engine {
     #[frb(sync)]
     pub fn selected_edge(&self) -> Result<Option<String>, ApiError> {
         Ok(self
-            .selected_edge
+            .selected_edges
             .lock()
             .map_err(|_| poisoned())?
+            .first()
             .map(|e| e.to_string()))
+    }
+
+    /// Every edge picked (one, or two picked with ⇧).
+    #[frb(sync)]
+    pub fn selected_edges(&self) -> Result<Vec<String>, ApiError> {
+        Ok(self
+            .selected_edges
+            .lock()
+            .map_err(|_| poisoned())?
+            .iter()
+            .map(ToString::to_string)
+            .collect())
+    }
+
+    /// The construction line picked on the board, if any.
+    #[frb(sync)]
+    pub fn selected_guide(&self) -> Result<Option<String>, ApiError> {
+        Ok(self
+            .selected_guide
+            .lock()
+            .map_err(|_| poisoned())?
+            .map(|g| g.to_string()))
+    }
+
+    /// Where a pointer at pattern point (`x_mm`, `y_mm`) lands within
+    /// `max_mm`: on a corner, an edge's middle, an edge, a construction
+    /// line or a symmetry axis, or level with one of `align` (points
+    /// given as `[x0, y0, x1, y1, …]`, e.g. the points drawn so far).
+    #[frb(sync)]
+    pub fn snap(
+        &self,
+        x_mm: f64,
+        y_mm: f64,
+        max_mm: f64,
+        align: Vec<f64>,
+    ) -> Result<Snap, ApiError> {
+        let ws = self.workspace()?;
+        let align: Vec<r3d_geom::DVec2> = align
+            .chunks_exact(2)
+            .map(|c| r3d_geom::DVec2::new(c[0], c[1]))
+            .collect();
+        let at = r3d_geom::DVec2::new(x_mm, y_mm);
+        Ok(Snap::from(crate::snap::land(
+            ws.session().project(),
+            at,
+            max_mm,
+            &align,
+            None,
+        )))
+    }
+
+    /// Where the corner being dragged on the board last landed, if it
+    /// snapped to something.
+    #[frb(sync)]
+    pub fn drag_snap(&self) -> Result<Option<Snap>, ApiError> {
+        Ok(self.drag_snap.lock().map_err(|_| poisoned())?.clone())
     }
 
     /// Where the ray through pixel (`x`, `y`) of a 3D view first meets the
@@ -1950,6 +2090,10 @@ impl Engine {
             return Ok(false);
         };
         if v.kind == ViewKind::Board {
+            // ⇧ adds to the selection on the board: nothing is held.
+            if adjust {
+                return Ok(false);
+            }
             let (board_view, width, height) = (v.board_view, v.width, v.height);
             drop(slot);
             return self.press_board(view, board_view, width, height, x, y);
@@ -2123,7 +2267,7 @@ impl Engine {
         let at = bv.to_board(x, y, width, height);
         let editable = |panel: PanelId| project.panel(panel).is_some_and(|p| p.mirror_of.is_none());
         let corner = corner_at(project, at, CORNER_PICK_PX * bv.mm_per_px)
-            .filter(|(panel, ..)| editable(*panel));
+            .filter(|(panel, point, _)| editable(*panel) && !project.is_derived_point(*point));
         let (panel, edge, tool) = match corner {
             Some((panel, point, from)) => (
                 panel,
@@ -2136,7 +2280,7 @@ impl Engine {
             ),
             None => match scene
                 .edge_at(at, EDGE_PICK_PX * bv.mm_per_px)
-                .filter(|e| editable(e.panel))
+                .filter(|e| editable(e.panel) && !project.is_derived_edge(e.id))
             {
                 Some(e) => (
                     e.panel,
@@ -2159,7 +2303,7 @@ impl Engine {
             v.board_view = Some(bv);
         }
         *self.selected()? = vec![panel];
-        *self.selected_edge.lock().map_err(|_| poisoned())? = edge;
+        *self.selected_edges.lock().map_err(|_| poisoned())? = edge.into_iter().collect();
         *self.held.lock().map_err(|_| poisoned())? = Some(Held {
             particle: 0,
             anchor: glam::Vec3::ZERO,
@@ -2188,8 +2332,14 @@ impl Engine {
         };
         let (step, next, moved) = match tool {
             Tool::Corner { point, from, grab } => {
-                let d = (at - grab).round();
-                let to = from + d;
+                let landing = self.corner_landing(view, point, from + (at - grab))?;
+                // Whole millimetres, unless it landed on something.
+                let to = match landing {
+                    Some(l) => l.at,
+                    None => from + (at - grab).round(),
+                };
+                *self.drag_snap.lock().map_err(|_| poisoned())? = landing.map(Snap::from);
+                let d = to - from;
                 let step = serde_json::json!({
                     "type": "point.move", "point": point, "to": [to.x, to.y],
                 });
@@ -2226,6 +2376,41 @@ impl Engine {
             kind: "move".into(),
             mm: moved.length(),
         }))
+    }
+
+    /// Where a corner dragged to `to` lands, if it snaps: on another
+    /// corner, an edge, a construction line, an axis, or level with its
+    /// two neighbours along the outline.
+    fn corner_landing(
+        &self,
+        view: u32,
+        point: PointId,
+        to: r3d_geom::DVec2,
+    ) -> Result<Option<crate::snap::Landing>, ApiError> {
+        let max_mm = self
+            .graphics()?
+            .as_ref()
+            .and_then(|g| g.views.get(&view))
+            .and_then(|v| v.board_view)
+            .map_or(0.0, |bv| SNAP_PX * bv.mm_per_px);
+        let ws = self.workspace()?;
+        let project = ws.session().project();
+        let neighbours: Vec<r3d_geom::DVec2> = project
+            .edges()
+            .values()
+            .filter_map(|e| {
+                let other = if e.start == point {
+                    e.end
+                } else if e.end == point {
+                    e.start
+                } else {
+                    return None;
+                };
+                project.point(other).map(|p| p.pos)
+            })
+            .collect();
+        let l = crate::snap::land(project, to, max_mm, &neighbours, Some(point));
+        Ok((l.kind != "free").then_some(l))
     }
 
     /// Run `step` with `"mm"` = `total - applied` and return the new total
@@ -2297,6 +2482,7 @@ impl Engine {
     #[frb(sync)]
     pub fn release(&self) -> Result<(), ApiError> {
         self.workspace()?.seal_history();
+        *self.drag_snap.lock().map_err(|_| poisoned())? = None;
         let held = self.held.lock().map_err(|_| poisoned())?.take();
         let was_pulling = held.is_some_and(|h| matches!(h.tool, Tool::Pull { pulling: true }));
         // A moved piece drapes again if the drape was running.
@@ -2402,7 +2588,8 @@ impl Engine {
     pub fn select(&self, panels: Vec<String>) -> Result<Vec<String>, ApiError> {
         let ws = self.workspace()?;
         let project = ws.session().project();
-        *self.selected_edge.lock().map_err(|_| poisoned())? = None;
+        self.selected_edges.lock().map_err(|_| poisoned())?.clear();
+        *self.selected_guide.lock().map_err(|_| poisoned())? = None;
         let mut selected = self.selected()?;
         *selected = panels
             .iter()

@@ -3,9 +3,9 @@
 //! Checked after loading a file (a corrupted or hand-edited file is refused
 //! instead of half-loaded) and after every command in tests.
 
-use crate::id::AnyId;
+use crate::id::{AnyId, EdgeId, PointId};
 use crate::message::{Localizable, Message};
-use crate::model::{EdgeCurve, PathSegment, Project};
+use crate::model::{Constraint, EdgeCurve, PathSegment, Project};
 
 /// A broken invariant.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
@@ -161,7 +161,9 @@ impl Project {
                     .map(|k| (AnyId::from(*k), k.raw())),
             )
             .chain(self.seams.keys().map(|k| (AnyId::from(*k), k.raw())))
-            .chain(self.pins.keys().map(|k| (AnyId::from(*k), k.raw())));
+            .chain(self.pins.keys().map(|k| (AnyId::from(*k), k.raw())))
+            .chain(self.constraints.keys().map(|k| (AnyId::from(*k), k.raw())))
+            .chain(self.guides.keys().map(|k| (AnyId::from(*k), k.raw())));
         for (entity, raw) in ids {
             if raw >= self.next_id {
                 return Err(E::IdCounter { entity });
@@ -285,6 +287,21 @@ impl Project {
             if panel.contour.len() < 2 {
                 return Err(E::ContourTooShort { panel: pid });
             }
+            if let Some(sym) = &panel.symmetry {
+                let own_point = |p: &PointId| self.points.get(p).is_some_and(|p| p.panel == *id);
+                let own_edge = |e: &EdgeId| panel.contour.contains(e);
+                let ok = panel.mirror_of.is_none()
+                    && sym.origin.is_finite()
+                    && sym.dir.is_finite()
+                    && sym.dir.length_squared() > 0.0
+                    && own_point(&sym.start)
+                    && own_point(&sym.end)
+                    && sym.points.iter().flatten().all(own_point)
+                    && sym.edges.iter().flatten().all(own_edge);
+                if !ok {
+                    return Err(E::BadMirror { panel: pid });
+                }
+            }
             let mut edges = Vec::with_capacity(panel.contour.len());
             for eid in &panel.contour {
                 let Some(edge) = self.edges.get(eid) else {
@@ -350,6 +367,44 @@ impl Project {
                 });
             if !finite {
                 return Err(E::NonFinite { entity });
+            }
+        }
+
+        for (id, c) in &self.constraints {
+            let entity = AnyId::from(*id);
+            let missing = c
+                .points()
+                .into_iter()
+                .find(|p| !self.points.contains_key(p))
+                .map(AnyId::from)
+                .or_else(|| {
+                    c.edges()
+                        .into_iter()
+                        .find(|e| !self.edges.contains_key(e))
+                        .map(AnyId::from)
+                });
+            if let Some(missing) = missing {
+                return Err(E::DanglingReference { entity, missing });
+            }
+            let derived = c.points().into_iter().any(|p| self.is_derived_point(p))
+                || c.edges().into_iter().any(|e| self.is_derived_edge(e));
+            let value_ok = match c {
+                Constraint::Distance { mm, .. } | Constraint::Length { mm, .. } => {
+                    mm.is_finite() && *mm > 0.0
+                }
+                Constraint::Angle { deg, .. } => (0.0..=180.0).contains(deg),
+                _ => true,
+            };
+            if derived || !value_ok {
+                return Err(E::BadValue { entity });
+            }
+        }
+
+        for (id, g) in &self.guides {
+            if !(g.a.is_finite() && g.b.is_finite()) || g.a == g.b {
+                return Err(E::BadValue {
+                    entity: (*id).into(),
+                });
             }
         }
         Ok(())

@@ -8,8 +8,8 @@ use std::collections::BTreeMap;
 
 use r3d_core::file::SCHEMA_VERSION;
 use r3d_core::{
-    Edge, EdgeCurve, EdgeId, GarmentId, InternalLine, Notch, Panel, PanelId, PathSegment, Pin,
-    Point, PointId, Project, Seam, SeamSide, Transaction,
+    Constraint, Edge, EdgeCurve, EdgeId, GarmentId, InternalLine, Notch, Panel, PanelId,
+    PathSegment, Pin, Point, PointId, Project, Seam, SeamSide, Symmetry, Transaction,
 };
 use r3d_geom::DVec2;
 use schemars::JsonSchema;
@@ -44,6 +44,8 @@ struct Clip {
     internal_lines: Vec<InternalLine>,
     seams: Vec<Seam>,
     pins: Vec<Pin>,
+    /// Constraints whose points and edges are all in the clip.
+    constraints: Vec<Constraint>,
 }
 
 /// Copy pieces: a clip to give to panel.paste.
@@ -107,6 +109,15 @@ impl QuerySpec for PanelCopy {
                 .values()
                 .filter(|pin| panels.contains_key(&pin.panel))
                 .copied()
+                .collect(),
+            constraints: p
+                .constraints()
+                .values()
+                .filter(|c| {
+                    c.points().iter().all(|pt| points.contains_key(pt))
+                        && c.edges().iter().all(|e| edges.contains_key(e))
+                })
+                .cloned()
                 .collect(),
             panels,
             points,
@@ -277,6 +288,25 @@ impl CommandSpec for PanelPaste {
                 .iter()
                 .map(|e| edges.get(*e))
                 .collect::<Result<_, _>>()?;
+            let symmetry = match &panel.symmetry {
+                Some(sym) => Some(Symmetry {
+                    origin: sym.origin + d,
+                    dir: sym.dir,
+                    start: points.get(sym.start)?,
+                    end: points.get(sym.end)?,
+                    points: sym
+                        .points
+                        .iter()
+                        .map(|[a, b]| Ok([points.get(*a)?, points.get(*b)?]))
+                        .collect::<Result<_, CommandError>>()?,
+                    edges: sym
+                        .edges
+                        .iter()
+                        .map(|[a, b]| Ok([edges.get(*a)?, edges.get(*b)?]))
+                        .collect::<Result<_, CommandError>>()?,
+                }),
+                None => None,
+            };
             tx.put_panel(
                 panels.get(*id)?,
                 Panel {
@@ -285,6 +315,7 @@ impl CommandSpec for PanelPaste {
                     contour,
                     mirror_of,
                     placement,
+                    symmetry,
                     ..panel.clone()
                 },
             );
@@ -373,6 +404,13 @@ impl CommandSpec for PanelPaste {
                 },
             );
             created.push(id.into());
+        }
+        for c in &clip.constraints {
+            let c = c
+                .remapped(|pt| points.get(pt).ok(), |e| edges.get(e).ok())
+                .ok_or_else(|| malformed("a constraint names what is not in the clip".into()))?;
+            let id = tx.new_constraint_id();
+            tx.put_constraint(id, c);
         }
         // A clip edited by hand may not hold together: say so, rather
         // than an internal error from the session's own check.

@@ -1,6 +1,6 @@
 # Rustle3D architecture
 
-Status: living document, last updated 2026-11-18 (M22).
+Status: living document, last updated 2026-11-18 (M27).
 
 Every choice here is the **current best guess**, not a rule. Each one says
 why it was made and what was considered, so it can be challenged and changed
@@ -99,6 +99,8 @@ Project                                        (✓ = implemented in M1)
  ├─ materials: IdMap<MaterialId, FabricMaterial>
  ├─ avatar:  Option<AvatarRef>                 (path inside the project folder + landmarks)
  ├─ grading: Option<Grading>                   ✓ (M22: sizes with body differences, base, shown)
+ ├─ constraints: IdMap<ConstraintId, Constraint> ✓ (M27: geometric constraints and dimensions)
+ ├─ guides: IdMap<GuideId, Guide>              ✓ (M27: construction lines)
  ├─ arrangement_points: from the avatar, editable
  └─ drape:   Option<DrapeSnapshot>             (last saved simulated positions)
 ```
@@ -111,6 +113,16 @@ Project                                        (✓ = implemented in M1)
   body); `Project::as_shown()` is the one the drape, the 3D view, photos
   and 3D exports use. Derived, never stored: editing stays on one
   geometry, and a size cannot drift from its rules (spec 18).
+
+- **Constraints (M27)** relate contour points and edges (horizontal,
+  parallel, tangent, a distance, a length, an angle…). They are document
+  entities, edited by commands; the geometry they move stays ordinary
+  points and curves, so everything downstream (drape, exports, grading)
+  is unchanged. `r3d_core::constraints` turns them into equations and
+  solves them with `r3d_geom::solve` (spec 19). A symmetric piece
+  (`Panel::symmetry`) is drawn as a half: the reflected half's points
+  and edges are derived, paired with the drawn ones so their IDs (and
+  the seams on them) survive edits.
 
 - **IDs** are typed newtypes (`PanelId(u64)`, …) allocated from one monotonic
   counter per document, shared by every entity kind. They serialize as
@@ -231,6 +243,13 @@ Validation lives at the start of `apply` rather than in a separate
   file write, confined to the project folder: relative paths only, no `..`,
   and symlinks are resolved so they cannot point outside. The CLI and the MCP
   server work on a `Workspace`.
+- **Constraints are settled after every step** (M27), in the step's
+  own transaction: constraints whose points or edges are gone are
+  dropped, then the solver moves the geometry so that every constraint
+  holds again, holding first what the step itself moved (read from the
+  transaction's changes). A step whose constraints cannot all hold is
+  refused (`constraints_unsolvable`) and rolled back. Symmetric pieces'
+  reflected halves are then recomputed, then linked mirror copies.
 - **Linked mirror copies** are derived data. After every step, the session
   recomputes each copy from its source (reflection across an axis, then an
   offset). It reuses the copy's entity IDs while the source topology is
@@ -552,4 +571,8 @@ code stays **i18n-ready** for more:
 | 2026-11-18 | M26: history steps `history.list` and `history.go_to`, batch labels; the history names steps by command name (stable codes the UI translates) and undo/redo return the panels changed | One history for every front-end; labels stay translatable; the user sees what was undone |
 | 2026-11-18 | M26: semantic copy as a query (`panel.copy` returns a clip, the pieces with their points, edges, notches, lines, pins and the seams between them, under the document's schema) and `panel.paste` (fresh IDs); the app passes clips through the system clipboard | Copy changes nothing, so it is not a command; a clip is plain JSON, so pasting into another project, or by an agent, needs no app state. A clip pastes only into the same schema version |
 | 2026-11-18 | M26: progress and cancel through the command layer (`Progress`, `apply_with`, `run_with`); long engine calls asynchronous over the bridge, polled by the UI; the drape prepared on a copy of the document; body fits on a thread of their own, shared while in progress | Opening a project, new measurements and a graded template froze the app for seconds (a body fit is ≈ 2.5 s). Polling keeps the bridge simple (no streams) and every front-end reads the same reports |
+| 2026-11-18 | M27: a geometric constraint solver of our own (`r3d_geom::solve`: damped minimum-norm Gauss–Newton, rank by Gram–Schmidt, Jacobian by central differences per equation) rather than a library | Sketches are small (tens of variables); the minimum-norm step is what makes a sketch move as little as possible, which general least-squares crates do not give; no new dependency |
+| 2026-11-18 | M27: constraints as document entities (schema v11), solved after every step inside the step's transaction, the edited points held first | One undo step per edit, whatever the solver moves; agents and the app share the behaviour; a drawing can never be saved with a constraint broken |
+| 2026-11-18 | M27: symmetric pieces as a half plus a derived reflection paired point for point and edge for edge (`Symmetry`), not a "cut on fold" flag read by the drape and the exports | The pattern stays a whole piece for every consumer (meshing, seams, exports, grading); pairing keeps the reflection's IDs, so seams on it survive edits of the drawn half |
+| 2026-11-18 | M27: board snapping in the bridge (`r3d-ffi/src/snap.rs`), not a query | It depends on the zoom and on what is being drawn; agents send exact coordinates |
 | 2026-11-18 | Licence changed from MIT to GPL-3.0-or-later before the repository goes public; dependencies must be GPL-3.0-compatible, permissive preferred (MPL-2.0, LGPL-3.0, GPL-3.0 with a justification) | Keeps Rustle3D and its derivatives free software, as Blender, Krita and Inkscape do: a fork or a closed product built on it must publish its changes. All dependencies so far (MIT, Apache-2.0, BSD, Zlib, OFL font, CC0 body) are compatible with GPLv3. Possible while every commit has a single author |

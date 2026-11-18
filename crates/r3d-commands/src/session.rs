@@ -132,7 +132,11 @@ impl Session {
         for (i, cmd) in cmds.iter().enumerate() {
             outputs.push(cmd.apply(&mut tx, progress).map_err(|e| wrap(i, e))?);
         }
-        // Linked mirror copies are derived data: refresh them once per step.
+        // Constraints hold after every step; then the derived geometry
+        // follows (symmetric halves, then linked mirror copies, which may
+        // copy a symmetric piece).
+        crate::commands::settle_constraints(&mut tx)?;
+        crate::commands::sync_symmetry(&mut tx)?;
         crate::commands::sync_mirrors(&mut tx)?;
         // Never commit a document that breaks an invariant: that would be a
         // bug in a command, and the transaction is rolled back on return.

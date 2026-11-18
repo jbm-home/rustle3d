@@ -246,7 +246,7 @@ Create a rectangular panel. Returns the panel, then its 4 points (counter-clockw
 
 ### `panel.create_polygon`
 
-Create a panel from a closed polygon. Returns the panel, then its points, then its edges.
+Create a panel from a closed polygon. With `symmetric`, the points draw half a piece against an axis, the closing edge: the other half follows (panel.unfold). Returns the panel, then its points, then its edges (then, symmetric, the reflected half's points and edges).
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -281,6 +281,10 @@ Create a panel from a closed polygon. Returns the panel, then its points, then i
         "type": "array"
       },
       "type": "array"
+    },
+    "symmetric": {
+      "description": "The points draw half a piece: the closing edge, from the last point\nback to the first, is its axis, and the piece is unfolded across it\n(as panel.unfold does).",
+      "type": "boolean"
     }
   },
   "required": [
@@ -295,7 +299,7 @@ Create a panel from a closed polygon. Returns the panel, then its points, then i
 
 ### `panel.create_path`
 
-Create a panel from a closed path of straight and cubic Bézier edges (mm), like internal_line.add but closed. Must form a simple outline; stored counter-clockwise. Returns the panel, then its points, then its edges.
+Create a panel from a closed path of straight and cubic Bézier edges (mm), like internal_line.add but closed. Must form a simple outline; stored counter-clockwise. With `symmetric`, the path draws half a piece against an axis, the straight edge back to `start`: the other half follows (panel.unfold). Returns the panel, then its points, then its edges (then, symmetric, the reflected half's points and edges).
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -407,6 +411,10 @@ Create a panel from a closed path of straight and cubic Bézier edges (mm), like
       "maxItems": 2,
       "minItems": 2,
       "type": "array"
+    },
+    "symmetric": {
+      "description": "The path draws half a piece: the straight edge back to `start` is\nits axis, and the piece is unfolded across it (as panel.unfold\ndoes).",
+      "type": "boolean"
     }
   },
   "required": [
@@ -648,7 +656,7 @@ Create a linked mirror copy of a panel (e.g. left/right pieces). The copy follow
 
 ### `panel.unlink`
 
-Make a linked mirror copy independent: it keeps its current shape and can then be edited directly.
+Make a linked mirror copy independent, or a symmetric piece's halves (panel.unfold): it keeps its current shape and can then be edited directly.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -2921,6 +2929,788 @@ Add pattern pieces in one step: for each, its sewing line (as in panel.create_pa
 
 </details>
 
+### `constraint.add`
+
+Add a constraint (fixed, coincident, horizontal, vertical, parallel, perpendicular, tangent, equal_length, on_edge) or a dimension (distance, length, angle) on contour points and edges. The drawing is solved at once: the geometry moves as little as possible so that every constraint holds; constraints that cannot all hold are refused (`constraints_unsolvable`). With `measure`, a dimension keeps the value it has now. Returns the constraint; `constraint.list` shows them with the freedom left.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "Along": {
+      "description": "How a distance is measured.",
+      "oneOf": [
+        {
+          "const": "direct",
+          "description": "In a straight line.",
+          "type": "string"
+        },
+        {
+          "const": "horizontal",
+          "description": "Across: the difference of the two points' x.",
+          "type": "string"
+        },
+        {
+          "const": "vertical",
+          "description": "Up or down: the difference of their y.",
+          "type": "string"
+        }
+      ]
+    },
+    "Constraint": {
+      "description": "A relation the drawing keeps between points and edges: after every\nchange, the constraint solver moves the geometry so that all of them\nhold again (`docs/specs/19-constraints.md`). Dimensions (`distance`,\n`length`, `angle`) carry a value; the others are geometric.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "The point never moves when the solver adjusts the drawing (it moves\nonly when it is moved itself).",
+          "properties": {
+            "kind": {
+              "const": "fixed",
+              "type": "string"
+            },
+            "point": {
+              "$ref": "#/$defs/PointId"
+            }
+          },
+          "required": [
+            "kind",
+            "point"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Two points at the same place (on two pieces, usually).",
+          "properties": {
+            "a": {
+              "$ref": "#/$defs/PointId"
+            },
+            "b": {
+              "$ref": "#/$defs/PointId"
+            },
+            "kind": {
+              "const": "coincident",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "a",
+            "b"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The edge's ends at the same height.",
+          "properties": {
+            "edge": {
+              "$ref": "#/$defs/EdgeId"
+            },
+            "kind": {
+              "const": "horizontal",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "edge"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The edge's ends one above the other.",
+          "properties": {
+            "edge": {
+              "$ref": "#/$defs/EdgeId"
+            },
+            "kind": {
+              "const": "vertical",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "edge"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The two edges' chords parallel.",
+          "properties": {
+            "a": {
+              "$ref": "#/$defs/EdgeId"
+            },
+            "b": {
+              "$ref": "#/$defs/EdgeId"
+            },
+            "kind": {
+              "const": "parallel",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "a",
+            "b"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The two edges' chords at right angles.",
+          "properties": {
+            "a": {
+              "$ref": "#/$defs/EdgeId"
+            },
+            "b": {
+              "$ref": "#/$defs/EdgeId"
+            },
+            "kind": {
+              "const": "perpendicular",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "a",
+            "b"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A smooth joint: the two contour edges meeting at the point leave it\nin opposite directions (no corner).",
+          "properties": {
+            "kind": {
+              "const": "tangent",
+              "type": "string"
+            },
+            "point": {
+              "$ref": "#/$defs/PointId"
+            }
+          },
+          "required": [
+            "kind",
+            "point"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The two edges have the same length (along their curves).",
+          "properties": {
+            "a": {
+              "$ref": "#/$defs/EdgeId"
+            },
+            "b": {
+              "$ref": "#/$defs/EdgeId"
+            },
+            "kind": {
+              "const": "equal_length",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "a",
+            "b"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The point lies on the edge (on its line, extended, for a straight\nedge).",
+          "properties": {
+            "edge": {
+              "$ref": "#/$defs/EdgeId"
+            },
+            "kind": {
+              "const": "on_edge",
+              "type": "string"
+            },
+            "point": {
+              "$ref": "#/$defs/PointId"
+            }
+          },
+          "required": [
+            "kind",
+            "point",
+            "edge"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A dimension: the distance between two points.",
+          "properties": {
+            "a": {
+              "$ref": "#/$defs/PointId"
+            },
+            "along": {
+              "$ref": "#/$defs/Along",
+              "default": "direct"
+            },
+            "b": {
+              "$ref": "#/$defs/PointId"
+            },
+            "kind": {
+              "const": "distance",
+              "type": "string"
+            },
+            "mm": {
+              "description": "mm, > 0.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "a",
+            "b",
+            "mm"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A dimension: the edge's length along its curve.",
+          "properties": {
+            "edge": {
+              "$ref": "#/$defs/EdgeId"
+            },
+            "kind": {
+              "const": "length",
+              "type": "string"
+            },
+            "mm": {
+              "description": "mm, > 0.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "edge",
+            "mm"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A dimension: the angle between two edges (at their common point\nwhen they share one, between their chords otherwise).",
+          "properties": {
+            "a": {
+              "$ref": "#/$defs/EdgeId"
+            },
+            "b": {
+              "$ref": "#/$defs/EdgeId"
+            },
+            "deg": {
+              "description": "Degrees, 0–180.",
+              "format": "double",
+              "type": "number"
+            },
+            "kind": {
+              "const": "angle",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "a",
+            "b",
+            "deg"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "EdgeId": {
+      "description": "Identifier of a edge, e.g. `edge:1`.",
+      "pattern": "^edge:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "PointId": {
+      "description": "Identifier of a point, e.g. `point:1`.",
+      "pattern": "^point:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Add a constraint or a dimension.",
+  "properties": {
+    "constraint": {
+      "$ref": "#/$defs/Constraint"
+    },
+    "measure": {
+      "description": "For a dimension: keep the value the drawing has now (the one given\nis ignored).",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "constraint"
+  ],
+  "title": "ConstraintAdd",
+  "type": "object"
+}
+```
+
+</details>
+
+### `constraint.remove`
+
+Remove a constraint or a dimension: the geometry stays as it is, free to move again.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "ConstraintId": {
+      "description": "Identifier of a constraint, e.g. `constraint:1`.",
+      "pattern": "^constraint:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Remove a constraint.",
+  "properties": {
+    "constraint": {
+      "$ref": "#/$defs/ConstraintId"
+    }
+  },
+  "required": [
+    "constraint"
+  ],
+  "title": "ConstraintRemove",
+  "type": "object"
+}
+```
+
+</details>
+
+### `constraint.set_value`
+
+Change a dimension's value (mm, or degrees for an angle): the drawing is redrawn so that it and every other constraint hold, moving as little as possible.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "ConstraintId": {
+      "description": "Identifier of a constraint, e.g. `constraint:1`.",
+      "pattern": "^constraint:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Change a dimension's value.",
+  "properties": {
+    "constraint": {
+      "$ref": "#/$defs/ConstraintId"
+    },
+    "value": {
+      "description": "mm for a distance or a length, degrees (0–180) for an angle.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "constraint",
+    "value"
+  ],
+  "title": "ConstraintSetValue",
+  "type": "object"
+}
+```
+
+</details>
+
+### `point.set_smooth`
+
+Make a contour point smooth (no corner: its two edges become curves whose handles line up, and stay so through a `tangent` constraint) or a corner again (the constraint is removed, the shape stays).
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "PointId": {
+      "description": "Identifier of a point, e.g. `point:1`.",
+      "pattern": "^point:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Make a point smooth or a corner.",
+  "properties": {
+    "point": {
+      "$ref": "#/$defs/PointId"
+    },
+    "smooth": {
+      "description": "`true`: the outline passes through the point without a corner (its\ntwo edges become curves with aligned handles, kept aligned by a\n`tangent` constraint); `false`: a corner again (the constraint goes,\nthe shape stays).",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "point",
+    "smooth"
+  ],
+  "title": "PointSetSmooth",
+  "type": "object"
+}
+```
+
+</details>
+
+### `panel.unfold`
+
+Make a half piece whole and symmetric: it is unfolded across one of its straight edges (the axis, e.g. a centre front), which disappears. The other half follows every later change of the drawn half (points, curves, notches) and cannot be edited itself; seams and notches can go on it. panel.unlink makes the halves independent. Returns the new points and edges of the reflected half.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "EdgeId": {
+      "description": "Identifier of a edge, e.g. `edge:1`.",
+      "pattern": "^edge:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "PanelId": {
+      "description": "Identifier of a panel, e.g. `panel:1`.",
+      "pattern": "^panel:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Unfold a half piece on one of its edges.",
+  "properties": {
+    "edge": {
+      "$ref": "#/$defs/EdgeId",
+      "description": "A straight edge of the piece: the axis (a centre front on the fold)."
+    },
+    "panel": {
+      "$ref": "#/$defs/PanelId"
+    }
+  },
+  "required": [
+    "panel",
+    "edge"
+  ],
+  "title": "PanelUnfold",
+  "type": "object"
+}
+```
+
+</details>
+
+### `guide.add`
+
+Add a construction line on the board, from `a` to `b` (mm): drawn to draft against and snapped to, never cut, sewn or exported. Returns the line.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Add a construction line.",
+  "properties": {
+    "a": {
+      "description": "One end on the board (mm).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+    },
+    "b": {
+      "description": "The other end (mm).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+    }
+  },
+  "required": [
+    "a",
+    "b"
+  ],
+  "title": "GuideAdd",
+  "type": "object"
+}
+```
+
+</details>
+
+### `guide.move`
+
+Move a construction line: its new ends `a` and `b` (mm).
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "GuideId": {
+      "description": "Identifier of a guide, e.g. `guide:1`.",
+      "pattern": "^guide:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Move a construction line's ends.",
+  "properties": {
+    "a": {
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+    },
+    "b": {
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+    },
+    "guide": {
+      "$ref": "#/$defs/GuideId"
+    }
+  },
+  "required": [
+    "guide",
+    "a",
+    "b"
+  ],
+  "title": "GuideMove",
+  "type": "object"
+}
+```
+
+</details>
+
+### `guide.remove`
+
+Remove a construction line.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "GuideId": {
+      "description": "Identifier of a guide, e.g. `guide:1`.",
+      "pattern": "^guide:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Remove a construction line.",
+  "properties": {
+    "guide": {
+      "$ref": "#/$defs/GuideId"
+    }
+  },
+  "required": [
+    "guide"
+  ],
+  "title": "GuideRemove",
+  "type": "object"
+}
+```
+
+</details>
+
+### `panel.create_ellipse`
+
+Create an elliptical (or, with equal radii, circular) panel: four curved edges between the points at the right, top, left and bottom. Returns the panel, then its 4 points, then its 4 edges.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Create an elliptical panel.",
+  "properties": {
+    "centre": {
+      "default": [
+        0.0,
+        0.0
+      ],
+      "description": "Centre on the board, in mm. Defaults to `[0, 0]`.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+    },
+    "grain_angle_deg": {
+      "default": 90.0,
+      "description": "Grainline angle in degrees from +X. Defaults to 90 (vertical).",
+      "format": "double",
+      "type": "number"
+    },
+    "name": {
+      "description": "Panel name. Defaults to \"Panel N\".",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "radii": {
+      "description": "Half width and half height (mm, > 0); equal for a circle.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+    }
+  },
+  "required": [
+    "radii"
+  ],
+  "title": "PanelCreateEllipse",
+  "type": "object"
+}
+```
+
+</details>
+
+### `panel.create_sector`
+
+Create an arc sector, the piece of a circle skirt: the inner arc is `inner_length_mm` long (the waist it covers), the outer arc `length_mm` further out (the hem), over `sweep_deg` (e.g. 180 for half a circle skirt). The radius comes from the waist: inner_length / sweep. The piece hangs below `centre`, its waist on top. Returns the panel, then its points (the hem from left to right, then the waist from right to left), then its edges.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Create an arc sector: a ring cut between two radii.",
+  "properties": {
+    "centre": {
+      "default": [
+        0.0,
+        0.0
+      ],
+      "description": "Centre of the circles on the board (mm). Defaults to `[0, 0]`; the\npiece hangs below it.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+    },
+    "grain_angle_deg": {
+      "default": 90.0,
+      "description": "Grainline angle in degrees from +X. Defaults to 90 (vertical).",
+      "format": "double",
+      "type": "number"
+    },
+    "inner_length_mm": {
+      "description": "Length of the inner arc (mm, > 0): the waist this piece covers.",
+      "format": "double",
+      "type": "number"
+    },
+    "length_mm": {
+      "description": "Distance from the inner to the outer arc (mm, > 0): the skirt's\nlength.",
+      "format": "double",
+      "type": "number"
+    },
+    "name": {
+      "description": "Panel name. Defaults to \"Panel N\".",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sweep_deg": {
+      "description": "The angle the piece covers (degrees, more than 0 and less than\n360): 180 for a half circle, 90 for a quarter. A full circle skirt\nis two half circles, or four quarters, sewn together.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "inner_length_mm",
+    "length_mm",
+    "sweep_deg"
+  ],
+  "title": "PanelCreateSector",
+  "type": "object"
+}
+```
+
+</details>
+
+### `edge.set_arc`
+
+Make an edge a circular arc through its two ends, bulging `bulge_mm` from the straight line (positive outward). An arc over 90° is split into edges of at most 90° (new points between them); then the constraints on the edge are removed and its notches spread along the arc. Returns the new points and edges, if any.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "EdgeId": {
+      "description": "Identifier of a edge, e.g. `edge:1`.",
+      "pattern": "^edge:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Turn an edge into a circular arc.",
+  "properties": {
+    "bulge_mm": {
+      "description": "How far the arc's middle is from the straight line between the\nedge's ends (mm, not 0): positive bulges outward (to the right of\nthe edge, as outlines turn counter-clockwise), negative inward.",
+      "format": "double",
+      "type": "number"
+    },
+    "edge": {
+      "$ref": "#/$defs/EdgeId"
+    }
+  },
+  "required": [
+    "edge",
+    "bulge_mm"
+  ],
+  "title": "EdgeSetArc",
+  "type": "object"
+}
+```
+
+</details>
+
 ## Queries
 
 Read-only. Lengths in mm, areas in mm², rounded to 0.001.
@@ -3262,6 +4052,62 @@ The built-in size charts for grading.use_chart: each chart's sizes with their bo
   "additionalProperties": false,
   "description": "The built-in size charts.",
   "title": "GradingCharts",
+  "type": "object"
+}
+```
+
+</details>
+
+### `constraint.list`
+
+List the constraints and dimensions (on one piece, or all): each with its piece, its kind and what it names, a dimension's value and what the drawing measures now, whether it holds, and `marks` (where its points and the middles of its edges are, mm). `groups` are constraints sharing points, each with `freedom` (ways the constrained geometry can still move, moving or turning a piece as a whole included) and `redundant` constraints (over-constrained: they repeat what others say).
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "PanelId": {
+      "description": "Identifier of a panel, e.g. `panel:1`.",
+      "pattern": "^panel:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The constraints and dimensions, with how constrained the drawing is.",
+  "properties": {
+    "panel": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PanelId"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Only those on this piece. Omitted: all of them."
+    }
+  },
+  "title": "ConstraintList",
+  "type": "object"
+}
+```
+
+</details>
+
+### `guide.list`
+
+List the construction lines: each with its ends `a` and `b` (mm).
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The construction lines.",
+  "title": "GuideList",
   "type": "object"
 }
 ```

@@ -3,6 +3,7 @@
 mod arrange;
 mod avatar;
 mod clip;
+mod constraint;
 mod cut;
 mod edge;
 mod garment;
@@ -18,12 +19,15 @@ mod point;
 mod project;
 mod seam;
 mod set_length;
+mod shape;
+mod symmetry;
 mod take_in;
 mod template;
 
 pub use arrange::*;
 pub use avatar::*;
 pub use clip::*;
+pub use constraint::*;
 pub use cut::*;
 pub use edge::*;
 pub use garment::*;
@@ -39,6 +43,8 @@ pub use point::*;
 pub use project::*;
 pub use seam::*;
 pub use set_length::*;
+pub use shape::*;
+pub use symmetry::*;
 pub use take_in::*;
 pub use template::*;
 
@@ -93,7 +99,25 @@ pub(crate) fn editable_edge_panel(
         .cloned()
         .ok_or_else(|| CommandError::not_found(edge))?;
     let panel = editable_panel(tx, e.panel)?;
+    if tx.project().is_derived_edge(edge) {
+        return Err(CommandError::Derived { id: edge.into() });
+    }
     Ok((e, panel))
+}
+
+/// A point whose position may be edited directly: not derived from other
+/// geometry.
+pub(crate) fn editable_point(tx: &Transaction<'_>, id: PointId) -> Result<Point, CommandError> {
+    let point = tx
+        .project()
+        .point(id)
+        .cloned()
+        .ok_or_else(|| CommandError::not_found(id))?;
+    editable_panel(tx, point.panel)?;
+    if tx.project().is_derived_point(id) {
+        return Err(CommandError::Derived { id: id.into() });
+    }
+    Ok(point)
 }
 
 /// Move contour points by the given offsets (mm); curve handles stay

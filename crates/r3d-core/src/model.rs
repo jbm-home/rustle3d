@@ -10,7 +10,10 @@ use glam::{DVec2, DVec3};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::id::{EdgeId, GarmentId, InternalLineId, NotchId, PanelId, PinId, PointId, SeamId};
+use crate::id::{
+    ConstraintId, EdgeId, GarmentId, GuideId, InternalLineId, NotchId, PanelId, PinId, PointId,
+    SeamId,
+};
 
 /// Ordered entity map.
 pub type IdMap<K, V> = BTreeMap<K, V>;
@@ -45,6 +48,166 @@ pub struct Project {
     pub(crate) pins: IdMap<PinId, Pin>,
     /// The size range the pattern is graded to, if any.
     pub(crate) grading: Option<Grading>,
+    /// Constraints and dimensions the drawing keeps.
+    pub(crate) constraints: IdMap<ConstraintId, Constraint>,
+    /// Construction lines on the board.
+    pub(crate) guides: IdMap<GuideId, Guide>,
+}
+
+/// A relation the drawing keeps between points and edges: after every
+/// change, the constraint solver moves the geometry so that all of them
+/// hold again (`docs/specs/19-constraints.md`). Dimensions (`distance`,
+/// `length`, `angle`) carry a value; the others are geometric.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum Constraint {
+    /// The point never moves when the solver adjusts the drawing (it moves
+    /// only when it is moved itself).
+    Fixed { point: PointId },
+    /// Two points at the same place (on two pieces, usually).
+    Coincident { a: PointId, b: PointId },
+    /// The edge's ends at the same height.
+    Horizontal { edge: EdgeId },
+    /// The edge's ends one above the other.
+    Vertical { edge: EdgeId },
+    /// The two edges' chords parallel.
+    Parallel { a: EdgeId, b: EdgeId },
+    /// The two edges' chords at right angles.
+    Perpendicular { a: EdgeId, b: EdgeId },
+    /// A smooth joint: the two contour edges meeting at the point leave it
+    /// in opposite directions (no corner).
+    Tangent { point: PointId },
+    /// The two edges have the same length (along their curves).
+    EqualLength { a: EdgeId, b: EdgeId },
+    /// The point lies on the edge (on its line, extended, for a straight
+    /// edge).
+    OnEdge { point: PointId, edge: EdgeId },
+    /// A dimension: the distance between two points.
+    Distance {
+        a: PointId,
+        b: PointId,
+        /// mm, > 0.
+        mm: f64,
+        #[serde(default)]
+        along: Along,
+    },
+    /// A dimension: the edge's length along its curve.
+    Length {
+        edge: EdgeId,
+        /// mm, > 0.
+        mm: f64,
+    },
+    /// A dimension: the angle between two edges (at their common point
+    /// when they share one, between their chords otherwise).
+    Angle {
+        a: EdgeId,
+        b: EdgeId,
+        /// Degrees, 0–180.
+        deg: f64,
+    },
+}
+
+/// How a distance is measured.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Along {
+    /// In a straight line.
+    #[default]
+    Direct,
+    /// Across: the difference of the two points' x.
+    Horizontal,
+    /// Up or down: the difference of their y.
+    Vertical,
+}
+
+impl Constraint {
+    /// The points it names.
+    pub fn points(&self) -> Vec<PointId> {
+        match self {
+            Constraint::Fixed { point }
+            | Constraint::Tangent { point }
+            | Constraint::OnEdge { point, .. } => vec![*point],
+            Constraint::Coincident { a, b } | Constraint::Distance { a, b, .. } => vec![*a, *b],
+            _ => Vec::new(),
+        }
+    }
+
+    /// The edges it names.
+    pub fn edges(&self) -> Vec<EdgeId> {
+        match self {
+            Constraint::Horizontal { edge }
+            | Constraint::Vertical { edge }
+            | Constraint::Length { edge, .. }
+            | Constraint::OnEdge { edge, .. } => vec![*edge],
+            Constraint::Parallel { a, b }
+            | Constraint::Perpendicular { a, b }
+            | Constraint::EqualLength { a, b }
+            | Constraint::Angle { a, b, .. } => vec![*a, *b],
+            _ => Vec::new(),
+        }
+    }
+
+    /// A dimension's value (mm or degrees); `None` for the others.
+    pub fn value(&self) -> Option<f64> {
+        match self {
+            Constraint::Distance { mm, .. } | Constraint::Length { mm, .. } => Some(*mm),
+            Constraint::Angle { deg, .. } => Some(*deg),
+            _ => None,
+        }
+    }
+
+    /// The same dimension with another value; `None` for the others.
+    pub fn with_value(&self, value: f64) -> Option<Constraint> {
+        let mut c = self.clone();
+        match &mut c {
+            Constraint::Distance { mm, .. } | Constraint::Length { mm, .. } => *mm = value,
+            Constraint::Angle { deg, .. } => *deg = value,
+            _ => return None,
+        }
+        Some(c)
+    }
+
+    /// The same constraint on other points and edges (`map_point` and
+    /// `map_edge` give each one's replacement); `None` when one has none.
+    pub fn remapped(
+        &self,
+        map_point: impl Fn(PointId) -> Option<PointId>,
+        map_edge: impl Fn(EdgeId) -> Option<EdgeId>,
+    ) -> Option<Constraint> {
+        let mut c = self.clone();
+        match &mut c {
+            Constraint::Fixed { point } | Constraint::Tangent { point } => {
+                *point = map_point(*point)?
+            }
+            Constraint::Coincident { a, b } | Constraint::Distance { a, b, .. } => {
+                *a = map_point(*a)?;
+                *b = map_point(*b)?;
+            }
+            Constraint::Horizontal { edge }
+            | Constraint::Vertical { edge }
+            | Constraint::Length { edge, .. } => *edge = map_edge(*edge)?,
+            Constraint::OnEdge { point, edge } => {
+                *point = map_point(*point)?;
+                *edge = map_edge(*edge)?;
+            }
+            Constraint::Parallel { a, b }
+            | Constraint::Perpendicular { a, b }
+            | Constraint::EqualLength { a, b }
+            | Constraint::Angle { a, b, .. } => {
+                *a = map_edge(*a)?;
+                *b = map_edge(*b)?;
+            }
+        }
+        Some(c)
+    }
+}
+
+/// A construction line between two board points (mm).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Guide {
+    pub a: DVec2,
+    pub b: DVec2,
 }
 
 /// A size range: the pattern is drawn in the base size, and each point's
@@ -296,6 +459,32 @@ pub struct Panel {
     /// Where the panel starts around the body; unplaced panels are not
     /// simulated.
     pub placement: Option<Placement>,
+    /// Set when the panel is symmetric about an axis: half of it is drawn,
+    /// the other half follows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub symmetry: Option<Symmetry>,
+}
+
+/// A piece drawn as a half against an axis (a centre front on the fold).
+/// The contour runs along the drawn half from `start` to `end`, two points
+/// on the axis, then back along the half reflected across the axis. The
+/// reflected points and edges are derived: the command layer recomputes
+/// them after every change (keeping their IDs, so seams and notches on
+/// them stay), and keeps `start` and `end` on the axis.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Symmetry {
+    /// A point on the axis (mm).
+    pub origin: DVec2,
+    /// Direction of the axis (non-zero).
+    pub dir: DVec2,
+    /// Where the drawn half starts and ends, on the axis.
+    pub start: PointId,
+    pub end: PointId,
+    /// Each point of the drawn half (but its ends) and its reflection.
+    pub points: Vec<[PointId; 2]>,
+    /// Each edge of the drawn half and its reflection.
+    pub edges: Vec<[EdgeId; 2]>,
 }
 
 /// Link from a mirror copy to its source panel: the copy is the source
@@ -443,6 +632,8 @@ impl Project {
             seams: IdMap::new(),
             pins: IdMap::new(),
             grading: None,
+            constraints: IdMap::new(),
+            guides: IdMap::new(),
         }
     }
 
@@ -496,6 +687,58 @@ impl Project {
 
     pub fn grading(&self) -> Option<&Grading> {
         self.grading.as_ref()
+    }
+
+    pub fn constraints(&self) -> &IdMap<ConstraintId, Constraint> {
+        &self.constraints
+    }
+
+    pub fn constraint(&self, id: ConstraintId) -> Option<&Constraint> {
+        self.constraints.get(&id)
+    }
+
+    pub fn guides(&self) -> &IdMap<GuideId, Guide> {
+        &self.guides
+    }
+
+    /// The panel a constraint is drawn on: that of its first point, or
+    /// else of its first edge.
+    pub fn constraint_panel(&self, c: &Constraint) -> Option<PanelId> {
+        c.points()
+            .first()
+            .and_then(|p| self.point(*p).map(|p| p.panel))
+            .or_else(|| {
+                c.edges()
+                    .first()
+                    .and_then(|e| self.edge(*e).map(|e| e.panel))
+            })
+    }
+
+    /// Whether an edge is derived (on a linked mirror copy, or on the
+    /// reflected half of a symmetric piece): it follows other geometry, so
+    /// it cannot be edited or constrained itself.
+    pub fn is_derived_edge(&self, id: EdgeId) -> bool {
+        self.edge(id).is_some_and(|e| {
+            self.panel(e.panel).is_some_and(|p| {
+                p.mirror_of.is_some()
+                    || p.symmetry
+                        .as_ref()
+                        .is_some_and(|s| s.edges.iter().any(|[_, r]| *r == id))
+            })
+        })
+    }
+
+    /// Whether a point is derived: on a linked mirror copy, or on the
+    /// reflected half of a symmetric piece (see [`Project::is_derived_edge`]).
+    pub fn is_derived_point(&self, id: PointId) -> bool {
+        self.point(id)
+            .and_then(|p| self.panel(p.panel))
+            .is_some_and(|p| {
+                p.mirror_of.is_some()
+                    || p.symmetry
+                        .as_ref()
+                        .is_some_and(|s| s.points.iter().any(|[_, r]| *r == id))
+            })
     }
 
     pub fn internal_lines(&self) -> &IdMap<InternalLineId, InternalLine> {

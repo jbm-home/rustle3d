@@ -33,10 +33,19 @@ Future<void> prepareSharedTextures() async {
 /// What a board tool (Polygon, Notch, Curve) does with the pointer, in
 /// pattern coordinates (mm) with the board's millimetres per pixel.
 class PatternPointer {
-  const PatternPointer({this.onTap, this.onPress, this.onDrag, this.onRelease});
+  const PatternPointer({
+    this.onTap,
+    this.onPress,
+    this.onDrag,
+    this.onRelease,
+    this.onHover,
+  });
 
   /// A click (no drag).
   final void Function(Offset mm, double mmPerPx)? onTap;
+
+  /// The pointer moved over the board, no button down.
+  final void Function(Offset mm, double mmPerPx)? onHover;
 
   /// A press: true holds it (the next moves go to [onDrag], not to
   /// panning).
@@ -475,6 +484,12 @@ class _RustViewState extends State<RustView>
               extend: HardwareKeyboard.instance.isShiftPressed,
             );
             widget.onSelection?.call(selection);
+          },
+          onPointerHover: (e) {
+            final hover = widget.pattern?.onHover;
+            if (hover == null) return;
+            final mm = _toPattern(e.localPosition);
+            if (mm != null) hover(mm, _mmPerPx(e.localPosition));
           },
           onPointerSignal: (e) {
             if (e is PointerScrollEvent) {

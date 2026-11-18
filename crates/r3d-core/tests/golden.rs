@@ -12,8 +12,9 @@ use std::path::PathBuf;
 use glam::DVec2;
 use r3d_core::file::{self, SCHEMA_VERSION};
 use r3d_core::{
-    Around, Avatar, Body, Edge, EdgeCurve, Fabric, Garment, Grading, InternalLine, Notch, Panel,
-    PathSegment, Pin, Placement, Point, Project, Seam, SeamSide, Size, TemplateRef, Transaction,
+    Along, Around, Avatar, Body, Constraint, Edge, EdgeCurve, Fabric, Garment, Grading, Guide,
+    InternalLine, Notch, Panel, PathSegment, Pin, Placement, Point, Project, Seam, SeamSide, Size,
+    Symmetry, TemplateRef, Transaction,
 };
 
 fn golden_dir(version: u32) -> PathBuf {
@@ -96,6 +97,14 @@ fn sample() -> Project {
                 top_cm: 104.0,
                 offset_mm: 30.0,
                 centre_x_mm: Some(200.0),
+            }),
+            symmetry: Some(Symmetry {
+                origin: DVec2::new(200.0, 0.0),
+                dir: DVec2::new(0.0, 1.0),
+                start: pts[0],
+                end: pts[2],
+                points: vec![[pts[1], pts[3]]],
+                edges: vec![[contour[0], contour[3]], [contour[1], contour[2]]],
             }),
         },
     );
@@ -185,6 +194,32 @@ fn sample() -> Project {
         base: 1,
         shown: 2,
     }));
+    for c in [
+        Constraint::Horizontal { edge: contour[0] },
+        Constraint::Fixed { point: pts[0] },
+        Constraint::Distance {
+            a: pts[0],
+            b: pts[1],
+            mm: 400.0,
+            along: Along::Horizontal,
+        },
+        Constraint::Angle {
+            a: contour[0],
+            b: contour[1],
+            deg: 92.0,
+        },
+    ] {
+        let id = tx.new_constraint_id();
+        tx.put_constraint(id, c);
+    }
+    let guide = tx.new_guide_id();
+    tx.put_guide(
+        guide,
+        Guide {
+            a: DVec2::new(-50.0, 300.0),
+            b: DVec2::new(450.0, 300.0),
+        },
+    );
     tx.commit();
     p
 }

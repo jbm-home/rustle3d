@@ -188,6 +188,16 @@ struct EdgeOut {
     end: PointOut,
     curve: CurveOut,
     length_mm: f64,
+    /// On the reflected half of a symmetric piece: it follows the drawn
+    /// half and cannot be edited.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    derived: bool,
+}
+
+#[derive(Serialize)]
+struct SymmetryOut {
+    axis_origin: Vec2,
+    axis_dir: Vec2,
 }
 
 #[derive(Serialize)]
@@ -234,6 +244,9 @@ struct PanelOut {
     /// Present on linked mirror copies, which cannot be edited directly.
     #[serde(skip_serializing_if = "Option::is_none")]
     mirror_of: Option<MirrorOut>,
+    /// Present on symmetric pieces (panel.unfold).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    symmetry: Option<SymmetryOut>,
     edges: Vec<EdgeOut>,
     notches: Vec<NotchOut>,
     internal_lines: Vec<InternalLineOut>,
@@ -284,6 +297,7 @@ impl QuerySpec for PanelGet {
                 },
                 curve,
                 length_mm: r3(geom.length()),
+                derived: panel.mirror_of.is_none() && p.is_derived_edge(*eid),
             });
         }
         let notches = p
@@ -332,6 +346,10 @@ impl QuerySpec for PanelGet {
                 axis_origin: r3v(l.origin),
                 axis_dir: r3v(l.dir),
                 offset: r3v(l.offset),
+            }),
+            symmetry: panel.symmetry.as_ref().map(|s| SymmetryOut {
+                axis_origin: r3v(s.origin),
+                axis_dir: r3v(s.dir),
             }),
             edges,
             notches,

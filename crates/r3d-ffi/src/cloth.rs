@@ -77,6 +77,8 @@ pub(crate) enum Tool {
 /// On the board, corners within this distance of the pointer are picked
 /// before edges (px).
 pub(crate) const CORNER_PICK_PX: f64 = 10.0;
+/// How close (pixels) a dragged corner must come to something to snap.
+pub(crate) const SNAP_PX: f64 = 8.0;
 
 /// What ⇧-dragging a particle on a contour edge adjusts.
 #[derive(Clone, Copy)]

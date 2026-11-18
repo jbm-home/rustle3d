@@ -110,19 +110,20 @@ pub struct PanelUnlink {
 }
 
 impl Described for PanelUnlink {
-    const SUMMARY: &'static str = "Make a linked mirror copy independent: it keeps its current shape and can then be edited directly.";
+    const SUMMARY: &'static str = "Make a linked mirror copy independent, or a symmetric piece's halves (panel.unfold): it keeps its current shape and can then be edited directly.";
 }
 
 impl CommandSpec for PanelUnlink {
     fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
         let panel = get_panel(tx.project(), self.panel)?;
-        if panel.mirror_of.is_none() {
+        if panel.mirror_of.is_none() && panel.symmetry.is_none() {
             return Err(CommandError::invalid("panel", Invalid::NotLinked));
         }
         tx.put_panel(
             self.panel,
             Panel {
                 mirror_of: None,
+                symmetry: None,
                 ..panel
             },
         );

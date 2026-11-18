@@ -2,7 +2,7 @@ use r3d_core::{Edge, EdgeCurve, Notch, Panel, Point, PointId, Transaction};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{Vec2, editable_panel, not_sewn, v};
+use super::{Vec2, editable_panel, editable_point, not_sewn, v};
 use crate::error::{CommandError, Invalid, finite};
 use crate::spec::{CommandOutput, CommandSpec, Described};
 
@@ -69,8 +69,7 @@ impl Described for PointMove {
 impl CommandSpec for PointMove {
     fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
         finite("to", &self.to)?;
-        let point = get_point(tx, self.point)?;
-        editable_panel(tx, point.panel)?;
+        let point = editable_point(tx, self.point)?;
         let to = v(self.to);
         let d = to - point.pos;
         // Keep the handles attached to this point rigidly attached.
@@ -120,8 +119,15 @@ impl Described for PointRemove {
 
 impl CommandSpec for PointRemove {
     fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
-        let point = get_point(tx, self.point)?;
+        let point = editable_point(tx, self.point)?;
         let panel = editable_panel(tx, point.panel)?;
+        if panel
+            .symmetry
+            .as_ref()
+            .is_some_and(|s| s.start == self.point || s.end == self.point)
+        {
+            return Err(CommandError::invalid("point", Invalid::Symmetric));
+        }
         if panel.contour.len() <= 3 {
             return Err(CommandError::invalid("point", Invalid::TooFewPoints(3)));
         }
@@ -181,6 +187,8 @@ impl CommandSpec for PointRemove {
         );
         tx.remove_edge(b_id);
         tx.remove_point(self.point);
+        // The joined edge is a new one: what constrained its parts goes.
+        super::drop_constraints_on(tx, &[a_id, b_id]);
         let contour = panel
             .contour
             .iter()

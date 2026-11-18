@@ -92,6 +92,9 @@ impl CommandSpec for PanelCut {
                 if has_mirror_copy(tx, id) {
                     return Err(CommandError::invalid("panel", Invalid::Mirrored));
                 }
+                if panel.symmetry.is_some() {
+                    return Err(CommandError::invalid("panel", Invalid::Symmetric));
+                }
                 (id, crossings(tx, &panel, &path)?)
             }
             None => {
@@ -104,9 +107,12 @@ impl CommandSpec for PanelCut {
                 match crossed.as_slice() {
                     [(id, found)] => {
                         // Say why the one piece crossed cannot be cut.
-                        editable_panel(tx, *id)?;
+                        let panel = editable_panel(tx, *id)?;
                         if has_mirror_copy(tx, *id) {
                             return Err(CommandError::invalid("panel", Invalid::Mirrored));
+                        }
+                        if panel.symmetry.is_some() {
+                            return Err(CommandError::invalid("panel", Invalid::Symmetric));
                         }
                         (*id, *found)
                     }

@@ -178,6 +178,34 @@ fn every_command_round_trips() {
     let clip = h.session.query(&copy).unwrap();
     h.round_trip(json!({"type": "panel.paste", "clip": clip}));
 
+    // Constraints and dimensions (spec 19).
+    let quad = h.round_trip(json!({"type": "panel.create_polygon",
+        "points": [[5000, 0], [5300, 10], [5300, 400], [5000, 400]]}));
+    let (q_pts, q_edges): (Vec<String>, Vec<String>) = (
+        quad.created[1..5].iter().map(ToString::to_string).collect(),
+        quad.created[5..9].iter().map(ToString::to_string).collect(),
+    );
+    h.round_trip(json!({"type": "constraint.add",
+        "constraint": {"kind": "horizontal", "edge": q_edges[0]}}));
+    let len = h.round_trip(json!({"type": "constraint.add", "measure": true,
+        "constraint": {"kind": "length", "edge": q_edges[0], "mm": 1}}));
+    let len = len.created[0].to_string();
+    h.round_trip(json!({"type": "constraint.set_value", "constraint": len, "value": 320}));
+    h.round_trip(json!({"type": "constraint.remove", "constraint": len}));
+    h.round_trip(json!({"type": "point.set_smooth", "point": q_pts[2], "smooth": true}));
+    h.round_trip(json!({"type": "panel.unfold", "panel": quad.created[0], "edge": q_edges[3]}));
+    h.round_trip(json!({"type": "panel.unlink", "panel": quad.created[0]}));
+    let guide = h.round_trip(json!({"type": "guide.add", "a": [0, -100], "b": [600, -100]}));
+    let guide = guide.created[0].to_string();
+    h.round_trip(json!({"type": "guide.move", "guide": guide, "a": [0, -120], "b": [600, -120]}));
+    h.round_trip(json!({"type": "guide.remove", "guide": guide}));
+    h.round_trip(json!({"type": "panel.create_ellipse", "centre": [7000, 0], "radii": [80, 50]}));
+    let sector = h.round_trip(json!({"type": "panel.create_sector", "centre": [8000, 0],
+        "inner_length_mm": 350, "length_mm": 600, "sweep_deg": 180}));
+    h.round_trip(
+        json!({"type": "edge.set_arc", "edge": sector.created.last().unwrap(), "bulge_mm": 40}),
+    );
+
     let registered: BTreeSet<_> = Command::registry().iter().map(|i| i.name).collect();
     let missing: Vec<_> = registered.difference(&h.covered).collect();
     assert!(

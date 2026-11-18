@@ -7,10 +7,13 @@
 
 use std::mem;
 
-use crate::id::{EdgeId, GarmentId, InternalLineId, NotchId, PanelId, PinId, PointId, SeamId};
+use crate::id::{
+    ConstraintId, EdgeId, GarmentId, GuideId, InternalLineId, NotchId, PanelId, PinId, PointId,
+    SeamId,
+};
 use crate::model::{
-    Avatar, DisplayUnit, Edge, Garment, Grading, IdMap, InternalLine, Notch, Panel, Pin, Point,
-    Project, Seam,
+    Avatar, Constraint, DisplayUnit, Edge, Garment, Grading, Guide, IdMap, InternalLine, Notch,
+    Panel, Pin, Point, Project, Seam,
 };
 
 /// Before/after values of one entity. `None` means "absent".
@@ -33,6 +36,8 @@ pub enum Change {
     InternalLine(Box<EntityChange<InternalLineId, InternalLine>>),
     Seam(Box<EntityChange<SeamId, Seam>>),
     Pin(Box<EntityChange<PinId, Pin>>),
+    Constraint(Box<EntityChange<ConstraintId, Constraint>>),
+    Guide(Box<EntityChange<GuideId, Guide>>),
     Avatar {
         before: Option<Avatar>,
         after: Option<Avatar>,
@@ -78,6 +83,8 @@ impl Change {
             Change::InternalLine(c) => set(&mut p.internal_lines, c.id, pick!(c)),
             Change::Seam(c) => set(&mut p.seams, c.id, pick!(c)),
             Change::Pin(c) => set(&mut p.pins, c.id, pick!(c)),
+            Change::Constraint(c) => set(&mut p.constraints, c.id, pick!(c)),
+            Change::Guide(c) => set(&mut p.guides, c.id, pick!(c)),
             Change::Name { before, after } => {
                 p.name = if forward { after } else { before }.clone();
             }
@@ -104,6 +111,10 @@ impl Change {
             (Change::Notch(a), Change::Notch(b)) if a.id == b.id => a.after = b.after.clone(),
             (Change::Seam(a), Change::Seam(b)) if a.id == b.id => a.after = b.after,
             (Change::Pin(a), Change::Pin(b)) if a.id == b.id => a.after = b.after,
+            (Change::Constraint(a), Change::Constraint(b)) if a.id == b.id => {
+                a.after = b.after.clone()
+            }
+            (Change::Guide(a), Change::Guide(b)) if a.id == b.id => a.after = b.after.clone(),
             (Change::InternalLine(a), Change::InternalLine(b)) if a.id == b.id => {
                 a.after = b.after.clone()
             }
@@ -183,7 +194,11 @@ impl ChangeSet {
                 Change::Seam(c) => {
                     each!(c, |v: &Seam| [edge_panel(v.a.edge), edge_panel(v.b.edge)])
                 }
+                Change::Constraint(c) => {
+                    each!(c, |v: &Constraint| [project.constraint_panel(v)])
+                }
                 Change::Garment(_)
+                | Change::Guide(_)
                 | Change::Avatar { .. }
                 | Change::Name { .. }
                 | Change::DisplayUnit { .. }
@@ -352,6 +367,33 @@ impl<'a> Transaction<'a> {
     entity_ops!(
         "pin", PinId, Pin, pins, Pin, new_pin_id, put_pin, remove_pin
     );
+
+    entity_ops!(
+        "constraint",
+        ConstraintId,
+        Constraint,
+        constraints,
+        Constraint,
+        new_constraint_id,
+        put_constraint,
+        remove_constraint
+    );
+
+    entity_ops!(
+        "guide",
+        GuideId,
+        Guide,
+        guides,
+        Guide,
+        new_guide_id,
+        put_guide,
+        remove_guide
+    );
+
+    /// What changed so far, in order.
+    pub fn changes(&self) -> &[Change] {
+        &self.changes
+    }
 
     pub fn set_avatar(&mut self, avatar: Option<Avatar>) {
         let before = mem::replace(&mut self.project.avatar, avatar.clone());

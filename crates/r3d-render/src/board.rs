@@ -40,7 +40,13 @@ pub struct BoardScene {
     pub selected: Vec<PanelId>,
     /// Every contour edge, for picking and drawing seams.
     pub edges: Vec<BoardEdge>,
-    pub selected_edge: Option<EdgeId>,
+    /// Edges picked (one, or two to constrain together).
+    pub selected_edges: Vec<EdgeId>,
+    /// Construction lines: each the line through two points, drawn across
+    /// the board.
+    pub guides: Vec<[DVec2; 2]>,
+    /// Symmetric pieces' axes, between the drawn half's two ends.
+    pub axes: Vec<[DVec2; 2]>,
 }
 
 /// A contour edge on the board.
@@ -130,11 +136,22 @@ impl BoardScene {
                 })
             })
             .collect();
+        let pos = |p| project.point(p).map(|p| p.pos);
+        let axes = project
+            .panels()
+            .values()
+            .filter_map(|panel| {
+                let sym = panel.symmetry.as_ref()?;
+                Some([pos(sym.start)?, pos(sym.end)?])
+            })
+            .collect();
         Self {
             panels,
             selected: selected.to_vec(),
             edges,
-            selected_edge: None,
+            selected_edges: Vec::new(),
+            guides: project.guides().values().map(|g| [g.a, g.b]).collect(),
+            axes,
         }
     }
 
@@ -155,9 +172,9 @@ impl BoardScene {
         self
     }
 
-    /// The same scene with `edge` highlighted.
-    pub fn with_selected_edge(mut self, edge: Option<EdgeId>) -> Self {
-        self.selected_edge = edge;
+    /// The same scene with `edges` highlighted.
+    pub fn with_selected_edges(mut self, edges: &[EdgeId]) -> Self {
+        self.selected_edges = edges.to_vec();
         self
     }
 
@@ -297,6 +314,22 @@ impl Batch {
         let (p0, p1, p2, p3) = (a - e + n, a - e - n, b + e - n, b + e + n);
         self.tri(p0, p1, p2, color);
         self.tri(p0, p2, p3, color);
+    }
+
+    /// Dashes of `dash` with gaps of `gap` from `a` to `b`.
+    fn dashed(&mut self, a: DVec2, b: DVec2, dash: f64, gap: f64, width: f64, color: Rgba) {
+        let length = a.distance(b);
+        let period = dash + gap;
+        if length <= 0.0 || period <= 0.0 {
+            return;
+        }
+        let dir = (b - a) / length;
+        // At most a few thousand dashes, whatever the zoom.
+        let count = (length / period).ceil().min(4000.0) as usize;
+        for k in 0..count {
+            let s = k as f64 * period;
+            self.segment(a + dir * s, a + dir * (s + dash).min(length), width, color);
+        }
     }
 
     fn polyline(&mut self, pts: &[DVec2], closed: bool, width: f64, color: Rgba) {
@@ -465,6 +498,25 @@ impl BoardRenderer {
             }
         }
 
+        // Construction lines, dashed across the whole board, in a soft
+        // tint of the selection colour.
+        let guide = mix(theme.board_background, theme.selection, 0.55);
+        for [a, b] in &scene.guides {
+            let Some(dir) = (*b - *a).try_normalize() else {
+                continue;
+            };
+            let reach = (hi - lo).length();
+            let from = *a + dir * dir.dot(view.center - *a) - dir * reach;
+            batch.dashed(
+                from,
+                from + dir * 2.0 * reach,
+                8.0 * px,
+                5.0 * px,
+                px,
+                guide,
+            );
+        }
+
         for panel in &scene.panels {
             let selected = scene.selected.contains(&panel.id);
             let base = theme.pieces[panel.color % PIECE_COLORS];
@@ -531,10 +583,14 @@ impl BoardRenderer {
                 }
             }
         }
-        if let Some(edge) = scene
+        // Symmetry axes: long dash, dot.
+        for [a, b] in &scene.axes {
+            batch.dashed(*a, *b, 12.0 * px, 3.0 * px, 1.5 * px, theme.panel_line);
+        }
+        for edge in scene
             .edges
             .iter()
-            .find(|e| Some(e.id) == scene.selected_edge)
+            .filter(|e| scene.selected_edges.contains(&e.id))
         {
             batch.polyline(&edge.points, false, 4.5 * px, theme.selection);
         }

@@ -20,6 +20,8 @@ import 'rust/api/engine.dart';
 import 'start_screen.dart' show Logo;
 import 'views/rust_view.dart';
 
+part 'sketch.dart';
+
 class Shell extends StatefulWidget {
   const Shell({
     super.key,
@@ -60,6 +62,16 @@ class _ShellState extends State<Shell> {
   List<dynamic> _pins = const [];
   List<dynamic> _seams = const [];
   String? _edge;
+
+  /// Every edge picked (one, or two picked with ⇧), and the construction
+  /// line picked.
+  List<String> _edges = const [];
+  String? _pickedGuide;
+
+  /// The selected piece's constraints and how constrained it is
+  /// (`constraint.list`).
+  List<dynamic> _constraints = const [];
+  List<dynamic> _constraintGroups = const [];
   String _tool = 'select';
 
   /// The undo history: every step's command name, oldest first, and how
@@ -101,6 +113,17 @@ class _ShellState extends State<Shell> {
   /// The view under the pointer, which the shortcut maximizes.
   ViewKind _hovered = ViewKind.board;
 
+  /// Where the window's one-key shortcuts listen: a press on a view gives
+  /// the keys back to them (after typing in a field, say).
+  final _keys = FocusNode(debugLabel: 'shortcuts');
+
+  /// When nothing in the window has the keys any more (a field let them
+  /// go, or was removed while typing in it), they go back to the tools.
+  void _keepKeys() {
+    final focus = FocusManager.instance.primaryFocus;
+    if (focus != null && focus == _keys.enclosingScope) _keys.requestFocus();
+  }
+
   /// The body is being fitted to new measurements (the 3D view shows the
   /// old one meanwhile).
   bool _fitting = false;
@@ -112,6 +135,7 @@ class _ShellState extends State<Shell> {
   @override
   void initState() {
     super.initState();
+    FocusManager.instance.addListener(_keepKeys);
     _refresh();
     _agentPoll = Timer.periodic(
       const Duration(milliseconds: 200),
@@ -134,6 +158,8 @@ class _ShellState extends State<Shell> {
 
   @override
   void dispose() {
+    FocusManager.instance.removeListener(_keepKeys);
+    _keys.dispose();
     _agentPoll?.cancel();
     widget.engine.dispose();
     super.dispose();
@@ -352,7 +378,15 @@ class _ShellState extends State<Shell> {
       _pins = (_run({'type': 'pin.list'}) as List<dynamic>?) ?? const [];
       _seams = (_run({'type': 'seam.list'}) as List<dynamic>?) ?? const [];
       _edge = _guard<String?>(widget.engine.selectedEdge);
+      _edges = _guard(widget.engine.selectedEdges) ?? const [];
+      _pickedGuide = _guard<String?>(widget.engine.selectedGuide);
       _points = _guard(widget.engine.selectedPoints) ?? const [];
+      final constraints = _selection.length == 1
+          ? _run({'type': 'constraint.list', 'panel': _selection.first})
+                as Map<String, dynamic>?
+          : null;
+      _constraints = (constraints?['constraints'] as List?) ?? const [];
+      _constraintGroups = (constraints?['groups'] as List?) ?? const [];
       final history = _run({'type': 'history.list'}) as Map<String, dynamic>?;
       _history = [
         for (final step in (history?['steps'] as List<dynamic>? ?? const []))
@@ -490,16 +524,194 @@ class _ShellState extends State<Shell> {
   /// line), in mm.
   final List<_Anchor> _path = [];
 
-  /// The Edit curves tool last used, shown on its rail button.
-  String _curveEdit = 'bend';
+  /// The tool of each rail group last used, shown on its button.
+  final Map<String, String> _groupShown = {};
+
+  /// Polygon and Curve draw half a piece, mirrored on the closing edge.
+  bool _symmetric = false;
+
+  /// Where the pointer is over the board while drawing, snapped.
+  Snap? _hover;
+
+  /// The construction line's first point, once clicked.
+  Offset? _guideStart;
 
   void _setTool(String tool) => setState(() {
     _tool = tool;
-    if (_ToolRail.curveEdits.contains(tool)) _curveEdit = tool;
+    for (final (group, tools) in _ToolRail.groups) {
+      if (tools.contains(tool)) _groupShown[group] = tool;
+    }
     _sewFrom = null;
     _polygon.clear();
     _path.clear();
+    _guideStart = null;
+    _hover = null;
   });
+
+  /// The points a new point may line up with: the first and the last
+  /// placed so far.
+  List<double> get _alignWith {
+    final placed = [..._polygon, for (final a in _path) a.at, ?_guideStart];
+    return [
+      if (placed.isNotEmpty) ...[placed.last.dx, placed.last.dy],
+      if (placed.length > 2) ...[placed.first.dx, placed.first.dy],
+    ];
+  }
+
+  /// Where a point placed at `mm` lands: on a corner, an edge's middle,
+  /// an edge, a construction line or an axis, or level with the points
+  /// placed so far.
+  Offset _snapped(Offset mm, double mmPerPx) {
+    final s = _guard(
+      () => widget.engine.snap(
+        xMm: mm.dx,
+        yMm: mm.dy,
+        maxMm: _pickPx * mmPerPx,
+        align: _alignWith,
+      ),
+    );
+    return s == null ? mm : Offset(s.xMm, s.yMm);
+  }
+
+  /// The pointer moved over the board while drawing: show where a click
+  /// would land.
+  void _hoverAt(Offset mm, double mmPerPx) {
+    final s = _guard(
+      () => widget.engine.snap(
+        xMm: mm.dx,
+        yMm: mm.dy,
+        maxMm: _pickPx * mmPerPx,
+        align: _alignWith,
+      ),
+    );
+    setState(() => _hover = s);
+  }
+
+  /// Construction line: the first click starts it, the second ends it.
+  void _guideTap(Offset mm, double mmPerPx) {
+    final at = _snapped(mm, mmPerPx);
+    final start = _guideStart;
+    if (start == null) {
+      setState(() => _guideStart = at);
+      return;
+    }
+    if ((at - start).distance < 1e-6) return;
+    final out = _run({
+      'type': 'guide.add',
+      'a': [start.dx, start.dy],
+      'b': [at.dx, at.dy],
+    });
+    setState(() => _guideStart = null);
+    _refresh();
+    if (out != null) _toast(context.l.toastGuideAdded);
+  }
+
+  /// Arc: an edge clicked becomes a circular arc, bulging as typed.
+  Future<void> _arcTap(Offset mm, double mmPerPx) async {
+    _guard(
+      () => widget.engine.pickEdgeNear(
+        xMm: mm.dx,
+        yMm: mm.dy,
+        maxMm: _pickPx * mmPerPx,
+      ),
+    );
+    _refresh();
+    final e = _pickedEdge;
+    if (e == null) return;
+    await _askArc(e['id'] as String, (e['length_mm'] as num).toDouble());
+  }
+
+  Future<void> _askArc(String edge, double lengthMm) async {
+    final l = context.l;
+    final picked = await _askNumbers(
+      context,
+      title: l.arcTitle,
+      fields: [(l.arcBulge, l.cm, (lengthMm / 80).clamp(0.5, 20))],
+      hint: l.arcHint,
+    );
+    if (picked == null || !mounted) return;
+    final bulge = picked.$1.first;
+    if (bulge == 0) return;
+    _run({'type': 'edge.set_arc', 'edge': edge, 'bulge_mm': bulge * 10});
+    _refresh();
+  }
+
+  /// Right of the pieces on the board, at the height of the first one.
+  List<double> _freeSpot(double margin) {
+    final panels = (_summary['panels'] as List<dynamic>? ?? const []);
+    var right = 0.0;
+    for (final p in panels) {
+      final max = (p['bbox']?['max'] as List<dynamic>?)?.first as num?;
+      if (max != null && max > right) right = max.toDouble();
+    }
+    return [right + 60 + margin, 0];
+  }
+
+  Future<void> _addEllipse() async {
+    final l = context.l;
+    final picked = await _askNumbers(
+      context,
+      title: l.toolEllipse,
+      fields: [(l.width, l.cm, 30), (l.height, l.cm, 20)],
+    );
+    if (picked == null || !mounted) return;
+    final [w, h] = picked.$1;
+    if (w <= 0 || h <= 0) return;
+    final spot = _freeSpot(w * 5);
+    final panels = (_summary['panels'] as List<dynamic>? ?? const []);
+    _run({
+      'type': 'panel.create_ellipse',
+      'name': l.pieceNew(panels.length + 1),
+      'centre': [spot[0], h * 5],
+      'radii': [w * 5, h * 5],
+    });
+    _refresh();
+  }
+
+  /// A circle skirt: the pieces of a full, half or quarter circle for the
+  /// waist and length typed (a full circle is two half pieces).
+  Future<void> _addSector() async {
+    final l = context.l;
+    final waist =
+        ((_summary['avatar'] as Map?)?['body']?['waist_cm'] as num?)
+            ?.toDouble() ??
+        70;
+    final picked = await _askNumbers(
+      context,
+      title: l.toolSector,
+      fields: [(l.sectorWaist, l.cm, waist + 2), (l.sectorLength, l.cm, 60)],
+      choices: [l.sectorFull, l.sectorHalf, l.sectorQuarter],
+      hint: l.sectorHint,
+    );
+    if (picked == null || !mounted) return;
+    final ([w, len], choice) = picked;
+    if (w <= 0 || len <= 0) return;
+    final (pieces, sweep) = switch (choice) {
+      0 => (2, 180.0),
+      1 => (1, 180.0),
+      _ => (1, 90.0),
+    };
+    final panels = (_summary['panels'] as List<dynamic>? ?? const []);
+    final inner = w * 10 / pieces;
+    final radius = inner / (sweep * 3.141592653589793 / 180) + len * 10;
+    final spot = _freeSpot(radius);
+    _run({
+      'type': 'batch',
+      'label': 'panel.create_sector',
+      'commands': [
+        for (var k = 0; k < pieces; k++)
+          {
+            'type': 'panel.create_sector',
+            'name': l.pieceNew(panels.length + 1 + k),
+            'centre': [spot[0] + k * (2 * radius + 60), 0],
+            'inner_length_mm': inner,
+            'length_mm': len * 10,
+            'sweep_deg': sweep,
+          },
+      ],
+    });
+    _refresh();
+  }
 
   /// Board pick tolerance (logical pixels).
   static const _pickPx = 12.0;
@@ -510,7 +722,8 @@ class _ShellState extends State<Shell> {
       _finishPolygon();
       return;
     }
-    setState(() => _polygon.add(mm));
+    final at = _snapped(mm, mmPerPx);
+    setState(() => _polygon.add(at));
   }
 
   void _finishPolygon() {
@@ -522,6 +735,7 @@ class _ShellState extends State<Shell> {
       'points': [
         for (final p in _polygon) [p.dx, p.dy],
       ],
+      if (_symmetric) 'symmetric': true,
     });
     setState(_polygon.clear);
     _refresh();
@@ -561,7 +775,8 @@ class _ShellState extends State<Shell> {
       _finishPath();
       return true;
     }
-    setState(() => _path.add(_Anchor(mm)));
+    final at = _snapped(mm, mmPerPx);
+    setState(() => _path.add(_Anchor(at)));
     return true;
   }
 
@@ -611,6 +826,7 @@ class _ShellState extends State<Shell> {
         'name': l.pieceNew(panels.length + 1),
         'start': start,
         'segments': _segments(_path, closed: true),
+        if (_symmetric) 'symmetric': true,
       };
     } else {
       step = {
@@ -790,6 +1006,28 @@ class _ShellState extends State<Shell> {
           point(h, 5);
         }
       }
+    }
+    // The line or edge being drawn follows the pointer.
+    if (_hover case final h?) {
+      final placed = [..._polygon, for (final a in _path) a.at, ?_guideStart];
+      if (placed.isNotEmpty) {
+        canvas.drawLine(
+          toScreen(placed.last),
+          toScreen(Offset(h.xMm, h.yMm)),
+          line..color = p.accent.withValues(alpha: 0.5),
+        );
+        line.color = p.accent;
+      }
+      _paintSnap(context, canvas, toScreen, h, p);
+    }
+    if (_guideStart case final g?) point(toScreen(g), 4);
+    if (_tool == 'select') {
+      if (_guard(widget.engine.dragSnap) case final s?) {
+        _paintSnap(context, canvas, toScreen, s, p);
+      }
+    }
+    if (_constraints.isNotEmpty) {
+      _paintConstraints(context, canvas, toScreen, _constraints, p);
     }
     if (_tool == 'select' && _points.isNotEmpty) {
       final pts = [for (final q in _points) toScreen(Offset(q.xMm, q.yMm))];
@@ -1041,6 +1279,15 @@ class _ShellState extends State<Shell> {
   }
 
   Future<void> _deleteSelected() async {
+    // A construction line, or a single corner, goes without asking.
+    if (_pickedGuide case final guide?) {
+      _run({'type': 'guide.remove', 'guide': guide});
+      return _refresh();
+    }
+    if (_tool == 'select' && _points.length == 1 && _edges.isEmpty) {
+      _run({'type': 'point.remove', 'point': _points.first.id});
+      return _refresh();
+    }
     final panel = _panel;
     if (panel == null) return;
     final ok = await showDialog<bool>(
@@ -1112,10 +1359,13 @@ class _ShellState extends State<Shell> {
         const SingleActivator(LogicalKeyboardKey.keyA): () =>
             _setTool('addPoint'),
         const SingleActivator(LogicalKeyboardKey.keyK): () => _setTool('cut'),
+        const SingleActivator(LogicalKeyboardKey.keyG): () => _setTool('guide'),
+        const SingleActivator(LogicalKeyboardKey.keyE): _addEllipse,
         const SingleActivator(LogicalKeyboardKey.enter): _finish,
         const SingleActivator(LogicalKeyboardKey.escape): () => setState(() {
           _polygon.clear();
           _path.clear();
+          _guideStart = null;
         }),
         const SingleActivator(LogicalKeyboardKey.backspace): _deleteSelected,
         const SingleActivator(LogicalKeyboardKey.delete): _deleteSelected,
@@ -1133,6 +1383,7 @@ class _ShellState extends State<Shell> {
             _toggleMaximized(_hovered),
       },
       child: Focus(
+        focusNode: _keys,
         autofocus: true,
         child: Scaffold(
           key: _scaffold,
@@ -1181,14 +1432,24 @@ class _ShellState extends State<Shell> {
                     children: [
                       _ToolRail(
                         active: _tool,
-                        curveEdit: _curveEdit,
+                        shown: _groupShown,
                         highlight: _guide ? _step.tool : null,
                         keys: _spotTools,
                         onSelect: (tool) {
-                          if (tool == 'rectangle') {
-                            _addRectangle();
-                          } else {
-                            _setTool(tool);
+                          for (final (group, tools) in _ToolRail.groups) {
+                            if (tools.contains(tool)) {
+                              setState(() => _groupShown[group] = tool);
+                            }
+                          }
+                          switch (tool) {
+                            case 'rectangle':
+                              _addRectangle();
+                            case 'ellipse':
+                              _addEllipse();
+                            case 'sector':
+                              _addSector();
+                            default:
+                              _setTool(tool);
                           }
                         },
                       ),
@@ -1196,53 +1457,98 @@ class _ShellState extends State<Shell> {
                         Expanded(
                           child: MouseRegion(
                             onEnter: (_) => _hovered = ViewKind.board,
-                            child: _ViewCard(
-                              key: _tourPattern,
-                              title: l.viewPattern,
-                              icon: Icons.architecture_outlined,
-                              maximized: _maximized == ViewKind.board,
-                              onToggleSize: () =>
-                                  _toggleMaximized(ViewKind.board),
-                              child: RustView(
-                                engine: widget.engine,
-                                kind: ViewKind.board,
-                                // Corners and edges are dragged with Select.
-                                holding: _tool == 'select',
-                                pattern: switch (_tool) {
-                                  'polygon' => PatternPointer(
-                                    onTap: _polygonTap,
-                                  ),
-                                  'notch' => PatternPointer(onTap: _notchTap),
-                                  'curve' || 'cut' => PatternPointer(
-                                    onPress: _pathPress,
-                                    onDrag: _pathDrag,
-                                  ),
-                                  'bend' => PatternPointer(
-                                    onTap: _bendTap,
-                                    onPress: _bendPress,
-                                    onDrag: _bendDrag,
-                                    onRelease: () {
-                                      _handle = null;
-                                      // The bend is one undo step.
-                                      _guard(widget.engine.release);
-                                    },
-                                  ),
-                                  'straighten' => PatternPointer(
-                                    onTap: _straightenTap,
-                                  ),
-                                  'addPoint' => PatternPointer(
-                                    onTap: _addPointTap,
-                                  ),
-                                  _ => null,
-                                },
-                                overlay: (canvas, toScreen) => _boardOverlay(
-                                  canvas,
-                                  toScreen,
-                                  Tokens.of(context),
+                            child: Listener(
+                              onPointerDown: (_) => _keys.requestFocus(),
+                              child: _ViewCard(
+                                key: _tourPattern,
+                                title: l.viewPattern,
+                                icon: Icons.architecture_outlined,
+                                maximized: _maximized == ViewKind.board,
+                                onToggleSize: () =>
+                                    _toggleMaximized(ViewKind.board),
+                                child: Stack(
+                                  children: [
+                                    Positioned.fill(
+                                      child: RustView(
+                                        engine: widget.engine,
+                                        kind: ViewKind.board,
+                                        // Corners and edges are dragged with Select.
+                                        holding: _tool == 'select',
+                                        pattern: switch (_tool) {
+                                          'polygon' => PatternPointer(
+                                            onTap: _polygonTap,
+                                            onHover: _hoverAt,
+                                          ),
+                                          'guide' => PatternPointer(
+                                            onTap: _guideTap,
+                                            onHover: _hoverAt,
+                                          ),
+                                          'arc' => PatternPointer(
+                                            onTap: _arcTap,
+                                          ),
+                                          'notch' => PatternPointer(
+                                            onTap: _notchTap,
+                                          ),
+                                          'curve' || 'cut' => PatternPointer(
+                                            onPress: _pathPress,
+                                            onDrag: _pathDrag,
+                                            onHover: _hoverAt,
+                                          ),
+                                          'bend' => PatternPointer(
+                                            onTap: _bendTap,
+                                            onPress: _bendPress,
+                                            onDrag: _bendDrag,
+                                            onRelease: () {
+                                              _handle = null;
+                                              // The bend is one undo step.
+                                              _guard(widget.engine.release);
+                                            },
+                                          ),
+                                          'straighten' => PatternPointer(
+                                            onTap: _straightenTap,
+                                          ),
+                                          'addPoint' => PatternPointer(
+                                            onTap: _addPointTap,
+                                          ),
+                                          _ => null,
+                                        },
+                                        overlay: (canvas, toScreen) =>
+                                            _boardOverlay(
+                                              canvas,
+                                              toScreen,
+                                              Tokens.of(context),
+                                            ),
+                                        onSelection: (_) => _tool == 'sew'
+                                            ? _sewClick()
+                                            : _refresh(),
+                                        onFrameTime: (ms) => _onFrame(true, ms),
+                                      ),
+                                    ),
+                                    // Top right: the view's title is top left.
+                                    if (_tool == 'polygon' || _tool == 'curve')
+                                      Positioned(
+                                        right: Space.m,
+                                        top: Space.m,
+                                        child: Tooltip(
+                                          message: l.symmetricHalfTip,
+                                          // Enter still closes the piece.
+                                          child: ExcludeFocus(
+                                            child: FilterChip(
+                                              avatar: const Icon(
+                                                Icons.flip_rounded,
+                                                size: 16,
+                                              ),
+                                              label: Text(l.symmetricHalf),
+                                              selected: _symmetric,
+                                              onSelected: (on) => setState(
+                                                () => _symmetric = on,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
-                                onSelection: (_) =>
-                                    _tool == 'sew' ? _sewClick() : _refresh(),
-                                onFrameTime: (ms) => _onFrame(true, ms),
                               ),
                             ),
                           ),
@@ -1252,77 +1558,83 @@ class _ShellState extends State<Shell> {
                         Expanded(
                           child: MouseRegion(
                             onEnter: (_) => _hovered = ViewKind.garment,
-                            child: _ViewCard(
-                              key: _tourGarment,
-                              title: _photo == null ? '3D' : l.photo,
-                              maximized: _maximized == ViewKind.garment,
-                              onToggleSize: () =>
-                                  _toggleMaximized(ViewKind.garment),
-                              icon: _photo == null
-                                  ? Icons.view_in_ar_outlined
-                                  : Icons.photo_camera_outlined,
-                              trailing: _photo != null
-                                  ? null
-                                  : Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        _CameraBar(
-                                          key: _spotCameras,
-                                          onLook: _look,
-                                        ),
-                                        const SizedBox(width: Space.s),
-                                        _SimControls(
-                                          key: _spotSimulate,
-                                          status: _sim,
-                                          onRun: _setRunning,
-                                          onRestart: _restart,
-                                        ),
-                                        const SizedBox(width: Space.s),
-                                        _Pill(
-                                          key: _spotPhoto,
-                                          child: _IconAction(
-                                            key: const ValueKey('photoButton'),
-                                            icon: Icons.photo_camera_outlined,
-                                            tip: l.photoTip,
-                                            onTap: _askPhoto,
+                            child: Listener(
+                              onPointerDown: (_) => _keys.requestFocus(),
+                              child: _ViewCard(
+                                key: _tourGarment,
+                                title: _photo == null ? '3D' : l.photo,
+                                maximized: _maximized == ViewKind.garment,
+                                onToggleSize: () =>
+                                    _toggleMaximized(ViewKind.garment),
+                                icon: _photo == null
+                                    ? Icons.view_in_ar_outlined
+                                    : Icons.photo_camera_outlined,
+                                trailing: _photo != null
+                                    ? null
+                                    : Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          _CameraBar(
+                                            key: _spotCameras,
+                                            onLook: _look,
                                           ),
-                                        ),
-                                      ],
+                                          const SizedBox(width: Space.s),
+                                          _SimControls(
+                                            key: _spotSimulate,
+                                            status: _sim,
+                                            onRun: _setRunning,
+                                            onRestart: _restart,
+                                          ),
+                                          const SizedBox(width: Space.s),
+                                          _Pill(
+                                            key: _spotPhoto,
+                                            child: _IconAction(
+                                              key: const ValueKey(
+                                                'photoButton',
+                                              ),
+                                              icon: Icons.photo_camera_outlined,
+                                              tip: l.photoTip,
+                                              onTap: _askPhoto,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                overlay: _photo == null
+                                    ? null
+                                    : PhotoBar(
+                                        status: _photo!,
+                                        onStop: _stopPhoto,
+                                        onSave: _savePhoto,
+                                        onClose: _closePhoto,
+                                      ),
+                                child: Stack(
+                                  children: [
+                                    Positioned.fill(
+                                      child: RustView(
+                                        engine: widget.engine,
+                                        kind: ViewKind.garment,
+                                        onSelection: (_) => _refresh(),
+                                        onFrameTime: (ms) =>
+                                            _onFrame(false, ms),
+                                        onPinned: (_) {
+                                          _refresh();
+                                          _toast(l.toastPinned);
+                                        },
+                                        drawing: _tool == 'draw',
+                                        onDrawn: (_) {
+                                          _refresh();
+                                          _toast(l.toastLineAdded);
+                                        },
+                                      ),
                                     ),
-                              overlay: _photo == null
-                                  ? null
-                                  : PhotoBar(
-                                      status: _photo!,
-                                      onStop: _stopPhoto,
-                                      onSave: _savePhoto,
-                                      onClose: _closePhoto,
-                                    ),
-                              child: Stack(
-                                children: [
-                                  Positioned.fill(
-                                    child: RustView(
-                                      engine: widget.engine,
-                                      kind: ViewKind.garment,
-                                      onSelection: (_) => _refresh(),
-                                      onFrameTime: (ms) => _onFrame(false, ms),
-                                      onPinned: (_) {
-                                        _refresh();
-                                        _toast(l.toastPinned);
-                                      },
-                                      drawing: _tool == 'draw',
-                                      onDrawn: (_) {
-                                        _refresh();
-                                        _toast(l.toastLineAdded);
-                                      },
-                                    ),
-                                  ),
-                                  if (_fitting)
-                                    const Positioned(
-                                      left: Space.m,
-                                      bottom: Space.m,
-                                      child: _FittingChip(),
-                                    ),
-                                ],
+                                    if (_fitting)
+                                      const Positioned(
+                                        left: Space.m,
+                                        bottom: Space.m,
+                                        child: _FittingChip(),
+                                      ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -1334,6 +1646,9 @@ class _ShellState extends State<Shell> {
                           key: _spotInspector,
                           selection: _selection,
                           points: _points,
+                          edges: _edges,
+                          constraints: _constraints,
+                          constraintGroups: _constraintGroups,
                           panel: _panel,
                           summary: _summary,
                           edge: _edge,
@@ -1343,6 +1658,7 @@ class _ShellState extends State<Shell> {
                             _guard(() => widget.engine.unpin(pin: pin));
                             _refresh();
                           },
+                          onArc: _askArc,
                           run: (step) async {
                             if (_longSteps.contains(step['type'])) {
                               await _runLong(step);
@@ -1382,6 +1698,8 @@ class _ShellState extends State<Shell> {
                   'bend' => l.hintBend,
                   'straighten' => l.hintStraighten,
                   'addPoint' => l.hintAddPoint,
+                  'arc' => l.hintArc,
+                  'guide' => l.hintGuide,
                   'cut' => l.hintCut,
                   'notch' => l.hintNotch,
                   _ when _selection.isEmpty => context.keys(l.hintIdle),
@@ -1871,7 +2189,7 @@ typedef _RailTool = (String, IconData, String, String, String);
 class _ToolRail extends StatelessWidget {
   const _ToolRail({
     required this.active,
-    required this.curveEdit,
+    required this.shown,
     required this.highlight,
     required this.keys,
     required this.onSelect,
@@ -1879,8 +2197,8 @@ class _ToolRail extends StatelessWidget {
 
   final String active;
 
-  /// The Edit curves tool shown on its button: the last one used.
-  final String curveEdit;
+  /// The tool shown on each group's button: the last one used.
+  final Map<String, String> shown;
 
   /// Buttons Learn points at, by tool.
   final Map<String, GlobalKey> keys;
@@ -1889,8 +2207,23 @@ class _ToolRail extends StatelessWidget {
   final String? highlight;
   final ValueChanged<String> onSelect;
 
-  /// The tools grouped under Edit curves.
-  static const curveEdits = ['bend', 'straighten', 'addPoint'];
+  /// The groups: one button, a menu of their tools.
+  static const groups = [
+    ('shapes', ['rectangle', 'ellipse', 'sector']),
+    ('curves', ['bend', 'straighten', 'addPoint', 'arc']),
+  ];
+
+  static List<_RailTool> _shapes(L l) => [
+    (
+      'rectangle',
+      Icons.crop_square_rounded,
+      l.toolRectangle,
+      'R',
+      l.toolRectangleHint,
+    ),
+    ('ellipse', Icons.circle_outlined, l.toolEllipse, 'E', l.toolEllipseHint),
+    ('sector', Icons.donut_large_rounded, l.toolSector, '', l.toolSectorHint),
+  ];
 
   static List<_RailTool> _curveEdits(L l) => [
     ('bend', Icons.gesture_rounded, l.toolBend, 'B', l.toolBendHint),
@@ -1908,21 +2241,17 @@ class _ToolRail extends StatelessWidget {
       'A',
       l.toolAddPointHint,
     ),
+    ('arc', Icons.looks_rounded, l.toolArc, '', l.toolArcHint),
   ];
 
   /// The rail, top to bottom; a list is a group (one button, a menu).
   static List<Object> _tools(L l) => [
     ('select', Icons.near_me_outlined, l.toolSelect, 'V', l.toolSelectHint),
-    (
-      'rectangle',
-      Icons.crop_square_rounded,
-      l.toolRectangle,
-      'R',
-      l.toolRectangleHint,
-    ),
+    ('shapes', l.toolShapes, _shapes(l)),
     ('polygon', Icons.pentagon_outlined, l.toolPolygon, 'P', l.toolPolygonHint),
     ('curve', Icons.draw_outlined, l.toolCurve, 'C', l.toolCurveHint),
-    _curveEdits(l),
+    ('curves', l.toolEditCurve, _curveEdits(l)),
+    ('guide', Icons.straighten_rounded, l.toolGuide, 'G', l.toolGuideHint),
     ('cut', Icons.content_cut_rounded, l.toolCut, 'K', l.toolCutHint),
     ('draw', Icons.brush_rounded, l.toolDraw, 'D', l.toolDrawHint),
     (
@@ -2005,22 +2334,29 @@ class _ToolRail extends StatelessWidget {
                 active: t.$1 == active,
                 onTap: () => onSelect(t.$1),
               )
-            else if (t is List<_RailTool>)
+            else if (t case (
+              final String group,
+              final String name,
+              final List<_RailTool> tools,
+            ))
               button(
-                t.firstWhere((x) => x.$1 == curveEdit, orElse: () => t.first),
-                l.toolEditCurve,
+                tools.firstWhere(
+                  (x) => x.$1 == shown[group],
+                  orElse: () => tools.first,
+                ),
+                name,
                 TextSpan(
                   children: [
                     TextSpan(
-                      text: '${l.toolEditCurve}\n',
+                      text: '$name\n',
                       style: ts(fontWeight: FontWeight.w700),
                     ),
-                    for (final (i, x) in t.indexed) line(x, first: i == 0),
+                    for (final (i, x) in tools.indexed) line(x, first: i == 0),
                   ],
                 ),
-                active: t.any((x) => x.$1 == active),
+                active: tools.any((x) => x.$1 == active),
                 onTap: null,
-                onMenu: (context) => _openGroup(context, t),
+                onMenu: (context) => _openGroup(context, tools),
               ),
         ],
       ),
@@ -2287,6 +2623,10 @@ class _Inspector extends StatelessWidget {
     super.key,
     required this.selection,
     required this.points,
+    required this.edges,
+    required this.constraints,
+    required this.constraintGroups,
+    required this.onArc,
     required this.panel,
     required this.summary,
     required this.edge,
@@ -2302,6 +2642,14 @@ class _Inspector extends StatelessWidget {
 
   final List<String> selection;
   final List<PickedPoint> points;
+
+  /// Every edge picked, and the selected piece's constraints.
+  final List<String> edges;
+  final List<dynamic> constraints;
+  final List<dynamic> constraintGroups;
+
+  /// Make an edge an arc (asks how much it bulges): edge id, length (mm).
+  final void Function(String edge, double lengthMm) onArc;
   final Map<String, dynamic>? panel;
   final Map<String, dynamic> summary;
   final String? edge;
@@ -2350,6 +2698,10 @@ class _Inspector extends StatelessWidget {
               garments: garments,
               grading: grading,
               points: points,
+              edges: edges,
+              constraints: constraints,
+              constraintGroups: constraintGroups,
+              onArc: onArc,
               edge: edge,
               seams: seams,
               run: run,
@@ -2539,6 +2891,10 @@ class _PanelInspector extends StatelessWidget {
     required this.garments,
     required this.grading,
     required this.points,
+    required this.edges,
+    required this.constraints,
+    required this.constraintGroups,
+    required this.onArc,
     required this.edge,
     required this.seams,
     required this.run,
@@ -2553,6 +2909,10 @@ class _PanelInspector extends StatelessWidget {
   /// The project's size range (`project.summary`), if any.
   final Map<String, dynamic>? grading;
   final List<PickedPoint> points;
+  final List<String> edges;
+  final List<dynamic> constraints;
+  final List<dynamic> constraintGroups;
+  final void Function(String edge, double lengthMm) onArc;
   final String? edge;
   final List<dynamic> seams;
   final ValueChanged<Map<String, Object?>> run;
@@ -2563,6 +2923,7 @@ class _PanelInspector extends StatelessWidget {
     final p = Tokens.of(context);
     final id = panel['id'] as String;
     final linked = panel['mirror_of'] != null;
+    final symmetric = panel['symmetry'] != null;
     final area = (panel['area_mm2'] as num) / 1e6;
     final perimeter = (panel['perimeter_mm'] as num) / 10;
     final allowance = (panel['seam_allowance_mm'] as num).toDouble();
@@ -2585,13 +2946,49 @@ class _PanelInspector extends StatelessWidget {
             onAction: () => run({'type': 'panel.unlink', 'panel': id}),
           ),
         ],
+        if (symmetric) ...[
+          const SizedBox(height: Space.s),
+          _Badge(
+            icon: Icons.flip_rounded,
+            text: l.symmetricPiece,
+            action: l.unlinkHalves,
+            onAction: () => run({'type': 'panel.unlink', 'panel': id}),
+          ),
+        ],
         if ((panel['edges'] as List).firstWhere(
               (e) => e['id'] == edge,
               orElse: () => null,
             )
             case final Map<String, dynamic> e) ...[
           const SizedBox(height: Space.m),
-          _EdgeCard(edge: e, seams: seams, run: run),
+          _EdgeCard(
+            edge: e,
+            seams: seams,
+            run: run,
+            // A straight edge of a whole piece can be its axis.
+            unfold: linked || symmetric || e['curve']?['kind'] != 'line'
+                ? null
+                : () => run({
+                    'type': 'panel.unfold',
+                    'panel': id,
+                    'edge': e['id'],
+                  }),
+            onArc: e['derived'] == true || linked
+                ? null
+                : () => onArc(
+                    e['id'] as String,
+                    (e['length_mm'] as num).toDouble(),
+                  ),
+          ),
+        ],
+        if (!linked && (points.isNotEmpty || edges.isNotEmpty)) ...[
+          const SizedBox(height: Space.m),
+          _ConstrainCard(
+            points: points,
+            edges: edges,
+            constraints: constraints,
+            run: run,
+          ),
         ],
         if (points.isNotEmpty) ...[
           const SizedBox(height: Space.m),
@@ -2600,6 +2997,14 @@ class _PanelInspector extends StatelessWidget {
             run: run,
             grading: linked ? null : grading,
             panel: panel,
+          ),
+        ],
+        if (!linked) ...[
+          const SizedBox(height: Space.l),
+          _ConstraintsCard(
+            constraints: constraints,
+            groups: constraintGroups,
+            run: run,
           ),
         ],
         const SizedBox(height: Space.l),
@@ -3451,11 +3856,23 @@ class _FabricPicker extends StatelessWidget {
 
 /// The edge picked in either view: its length and its seam.
 class _EdgeCard extends StatelessWidget {
-  const _EdgeCard({required this.edge, required this.seams, required this.run});
+  const _EdgeCard({
+    required this.edge,
+    required this.seams,
+    required this.run,
+    required this.unfold,
+    required this.onArc,
+  });
 
   final Map<String, dynamic> edge;
   final List<dynamic> seams;
   final ValueChanged<Map<String, Object?>> run;
+
+  /// Unfold the piece on this edge (null when it cannot be its axis).
+  final VoidCallback? unfold;
+
+  /// Make this edge an arc (null when it follows other geometry).
+  final VoidCallback? onArc;
 
   @override
   Widget build(BuildContext context) {
@@ -3517,19 +3934,32 @@ class _EdgeCard extends StatelessWidget {
               'length_mm': cm * 10,
             }),
           ),
-          if (edge['curve']?['kind'] == 'cubic')
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: () => run({
-                  'type': 'edge.set_curve',
-                  'edge': id,
-                  'curve': {'kind': 'line'},
-                }),
-                icon: const Icon(Icons.horizontal_rule_rounded, size: 16),
-                label: Text(l.straighten),
-              ),
-            ),
+          Wrap(
+            children: [
+              if (edge['curve']?['kind'] == 'cubic')
+                TextButton.icon(
+                  onPressed: () => run({
+                    'type': 'edge.set_curve',
+                    'edge': id,
+                    'curve': {'kind': 'line'},
+                  }),
+                  icon: const Icon(Icons.horizontal_rule_rounded, size: 16),
+                  label: Text(l.straighten),
+                ),
+              if (onArc case final arc?)
+                TextButton.icon(
+                  onPressed: arc,
+                  icon: const Icon(Icons.looks_rounded, size: 16),
+                  label: Text(l.makeArc),
+                ),
+              if (unfold case final unfold?)
+                TextButton.icon(
+                  onPressed: unfold,
+                  icon: const Icon(Icons.flip_rounded, size: 16),
+                  label: Text(l.unfold),
+                ),
+            ],
+          ),
           if (seam != null)
             Row(
               children: [

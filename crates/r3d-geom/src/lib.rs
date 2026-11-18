@@ -12,6 +12,7 @@ pub mod bezier;
 pub mod fit;
 pub mod mesh;
 pub mod polygon;
+pub mod solve;
 pub mod transform;
 
 pub use bezier::CubicBez;

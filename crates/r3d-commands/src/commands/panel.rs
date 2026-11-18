@@ -15,13 +15,13 @@ use crate::spec::{CommandOutput, CommandSpec, Described};
 /// Default grainline: vertical on the board, the usual layout for garments.
 pub const DEFAULT_GRAIN_ANGLE_DEG: f64 = 90.0;
 
-fn default_grain() -> f64 {
+pub(crate) fn default_grain() -> f64 {
     DEFAULT_GRAIN_ANGLE_DEG
 }
 
 /// A closed outline: each point with the shape of the edge from it to the
 /// next point (the last edge returns to the first point).
-type Outline = Vec<(DVec2, EdgeCurve)>;
+pub(crate) type Outline = Vec<(DVec2, EdgeCurve)>;
 
 /// The outline flattened into a polygon (mm).
 fn flattened(outline: &Outline) -> Vec<DVec2> {
@@ -58,7 +58,7 @@ fn reversed(outline: Outline) -> Outline {
 
 /// Create a panel from a closed outline. Shared by the rectangle, polygon
 /// and path commands.
-fn create_panel(
+pub(crate) fn create_panel(
     tx: &mut Transaction<'_>,
     name: Option<&str>,
     mut outline: Outline,
@@ -137,6 +137,7 @@ fn create_panel(
             seam_allowance_mm: 0.0,
             mirror_of: None,
             placement: None,
+            symmetry: None,
         },
     );
     let mut created: Vec<AnyId> = vec![panel.into()];
@@ -199,11 +200,40 @@ pub struct PanelCreatePolygon {
     /// Grainline angle in degrees from +X. Defaults to 90 (vertical).
     #[serde(default = "default_grain")]
     pub grain_angle_deg: f64,
+    /// The points draw half a piece: the closing edge, from the last point
+    /// back to the first, is its axis, and the piece is unfolded across it
+    /// (as panel.unfold does).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub symmetric: bool,
 }
 
 impl Described for PanelCreatePolygon {
-    const SUMMARY: &'static str =
-        "Create a panel from a closed polygon. Returns the panel, then its points, then its edges.";
+    const SUMMARY: &'static str = "Create a panel from a closed polygon. With `symmetric`, the points draw half a piece against an axis, the closing edge: the other half follows (panel.unfold). Returns the panel, then its points, then its edges (then, symmetric, the reflected half's points and edges).";
+}
+
+/// Unfold a piece just drawn (`create_panel`'s output) across its closing
+/// edge, the one back to the first point (`symmetric` drawing), adding the
+/// reflected half to `out`.
+fn unfold_closing(
+    tx: &mut Transaction<'_>,
+    mut out: CommandOutput,
+) -> Result<CommandOutput, CommandError> {
+    // Created last, whichever way round the outline was stored.
+    let (Some(AnyId::Panel(panel)), Some(AnyId::Edge(edge))) =
+        (out.created.first().copied(), out.created.last().copied())
+    else {
+        return Ok(out);
+    };
+    if !matches!(
+        tx.project().edge(edge).map(|e| &e.curve),
+        Some(EdgeCurve::Line)
+    ) {
+        return Err(CommandError::invalid("symmetric", Invalid::NotStraight));
+    }
+    let unfolded = super::PanelUnfold { panel, edge }.apply(tx)?;
+    out.created.retain(|id| *id != AnyId::Edge(edge));
+    out.created.extend(unfolded.created);
+    Ok(out)
 }
 
 impl CommandSpec for PanelCreatePolygon {
@@ -213,7 +243,12 @@ impl CommandSpec for PanelCreatePolygon {
             .iter()
             .map(|p| (v(*p), EdgeCurve::Line))
             .collect();
-        create_panel(tx, self.name.as_deref(), outline, self.grain_angle_deg)
+        let out = create_panel(tx, self.name.as_deref(), outline, self.grain_angle_deg)?;
+        if self.symmetric {
+            unfold_closing(tx, out)
+        } else {
+            Ok(out)
+        }
     }
 }
 
@@ -233,10 +268,15 @@ pub struct PanelCreatePath {
     /// Grainline angle in degrees from +X. Defaults to 90 (vertical).
     #[serde(default = "default_grain")]
     pub grain_angle_deg: f64,
+    /// The path draws half a piece: the straight edge back to `start` is
+    /// its axis, and the piece is unfolded across it (as panel.unfold
+    /// does).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub symmetric: bool,
 }
 
 impl Described for PanelCreatePath {
-    const SUMMARY: &'static str = "Create a panel from a closed path of straight and cubic Bézier edges (mm), like internal_line.add but closed. Must form a simple outline; stored counter-clockwise. Returns the panel, then its points, then its edges.";
+    const SUMMARY: &'static str = "Create a panel from a closed path of straight and cubic Bézier edges (mm), like internal_line.add but closed. Must form a simple outline; stored counter-clockwise. With `symmetric`, the path draws half a piece against an axis, the straight edge back to `start`: the other half follows (panel.unfold). Returns the panel, then its points, then its edges (then, symmetric, the reflected half's points and edges).";
 }
 
 /// Two outline points closer than this are the same point (mm).
@@ -260,7 +300,12 @@ impl CommandSpec for PanelCreatePath {
         if at.distance(start) > SAME_POINT_MM {
             outline.push((at, EdgeCurve::Line));
         }
-        create_panel(tx, self.name.as_deref(), outline, self.grain_angle_deg)
+        let out = create_panel(tx, self.name.as_deref(), outline, self.grain_angle_deg)?;
+        if self.symmetric {
+            unfold_closing(tx, out)
+        } else {
+            Ok(out)
+        }
     }
 }
 
@@ -308,6 +353,11 @@ impl CommandSpec for PanelTranslate {
         // The pattern abscissa its placement is centred on moves with it.
         if let Some(place) = &mut panel.placement {
             place.centre_x_mm = place.centre_x_mm.map(|x| x + d.x);
+        }
+        // A symmetric piece's axis moves with it.
+        if let Some(sym) = &mut panel.symmetry {
+            sym.origin += d;
+            tx.put_panel(self.panel, panel.clone());
         }
         // A linked copy is placed by its link's offset; the sync pass then
         // moves its geometry.

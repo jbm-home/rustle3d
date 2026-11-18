@@ -7,9 +7,9 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `cloth_hit`, `corner_at`, `edge_spot`, `edited`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form_now`, `form_soon`, `frozen_board`, `gpu_solver`, `graphics`, `import_from`, `long`, `new`, `new`, `offset_along`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `selected`, `set_busy`, `sim`, `solver`, `to_theme`, `workspace`
+// These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `cloth_hit`, `corner_at`, `corner_landing`, `edge_spot`, `edited`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form_now`, `form_soon`, `frozen_board`, `gpu_solver`, `graphics`, `import_from`, `long`, `new`, `new`, `offset_along`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `selected`, `set_busy`, `sim`, `solver`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`
 
 /// The GPU adapter the UI composites on (Windows: its LUID), so the views
 /// render on it and share their textures without a copy. Call it before
@@ -92,6 +92,10 @@ abstract class Engine implements RustOpaqueInterface {
 
   /// A drag of (`dx`, `dy`) pixels: orbit the 3D camera, pan the board.
   void drag({required int view, required double dx, required double dy});
+
+  /// Where the corner being dragged on the board last landed, if it
+  /// snapped to something.
+  Snap? dragSnap();
 
   /// Write an export to `path`, a file the user chose (anywhere): the
   /// pattern (every size of a graded one, nested), or the garment as the
@@ -226,6 +230,12 @@ abstract class Engine implements RustOpaqueInterface {
   /// either view), if any.
   String? selectedEdge();
 
+  /// Every edge picked (one, or two picked with ⇧).
+  List<String> selectedEdges();
+
+  /// The construction line picked on the board, if any.
+  String? selectedGuide();
+
   /// The corners picked on the board: one, or two to measure between.
   List<PickedPoint> selectedPoints();
 
@@ -244,6 +254,17 @@ abstract class Engine implements RustOpaqueInterface {
 
   /// The latest simulation state.
   SimStatus simulationStatus();
+
+  /// Where a pointer at pattern point (`x_mm`, `y_mm`) lands within
+  /// `max_mm`: on a corner, an edge's middle, an edge, a construction
+  /// line or a symmetry axis, or level with one of `align` (points
+  /// given as `[x0, y0, x1, y1, …]`, e.g. the points drawn so far).
+  Snap snap({
+    required double xMm,
+    required double yMm,
+    required double maxMm,
+    required List<double> align,
+  });
 
   /// Start a photo of the garment as the 3D view shows it now (camera,
   /// drape), replacing any other; the 3D view shows it while it
@@ -647,6 +668,38 @@ class SimStatus {
           particles == other.particles &&
           maxSeamGapMm == other.maxSeamGapMm &&
           backend == other.backend;
+}
+
+/// Where a pointer lands on the board, and why: `kind` is `point`,
+/// `midpoint`, `edge`, `guide`, `axis`, `horizontal`, `vertical` or
+/// `free`; for `horizontal` and `vertical`, `from` is the point it is
+/// level with (`[x, y]` mm).
+class Snap {
+  final double xMm;
+  final double yMm;
+  final String kind;
+  final Float64List? from;
+
+  const Snap({
+    required this.xMm,
+    required this.yMm,
+    required this.kind,
+    this.from,
+  });
+
+  @override
+  int get hashCode =>
+      xMm.hashCode ^ yMm.hashCode ^ kind.hashCode ^ from.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Snap &&
+          runtimeType == other.runtimeType &&
+          xMm == other.xMm &&
+          yMm == other.yMm &&
+          kind == other.kind &&
+          from == other.from;
 }
 
 /// Where a long step is, for the UI: `task` is a stable code

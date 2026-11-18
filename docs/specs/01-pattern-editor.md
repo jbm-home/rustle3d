@@ -2,7 +2,12 @@
 
 Provenance: maintainer's functional brief (2026-11-14); general garment-making knowledge (panels, notches, grainline, seam allowance); open SVG path semantics for cubic Béziers.
 
-## Status (2026-11-16, M12)
+## Status (2026-11-18, M27)
+
+M27 added constraints and dimensions, symmetric half pieces,
+construction lines, snapping, ellipses, circle skirt sectors, arcs,
+smooth and corner points and Delete on a corner: see
+[19-constraints](19-constraints.md). The rest of this status is M12's.
 
 Implemented in the app's board: Rectangle (R); **Polygon** (P: click the
 corners, close on the first one or with Enter, Esc cancels); **Curve**

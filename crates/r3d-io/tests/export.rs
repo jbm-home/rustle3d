@@ -49,6 +49,7 @@ fn project(w: f64, h: f64, allowance: f64) -> Project {
             seam_allowance_mm: allowance,
             mirror_of: None,
             placement: None,
+            symmetry: None,
         },
     );
     tx.commit();

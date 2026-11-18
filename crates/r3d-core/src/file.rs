@@ -20,7 +20,7 @@ use crate::model::Project;
 /// Identifies a Rustle3D project file.
 pub const FORMAT: &str = "rustle3d.project";
 /// Version written by this build.
-pub const SCHEMA_VERSION: u32 = 10;
+pub const SCHEMA_VERSION: u32 = 11;
 
 type Migration = fn(Value) -> Result<Value, FileError>;
 
@@ -35,6 +35,7 @@ const MIGRATIONS: &[Migration] = &[
     migrate_v7_to_v8,
     migrate_v8_to_v9,
     migrate_v9_to_v10,
+    migrate_v10_to_v11,
 ];
 
 fn object<'a>(
@@ -44,6 +45,15 @@ fn object<'a>(
     value.as_object_mut().ok_or_else(|| FileError::Json {
         detail: format!("{what} is not an object"),
     })
+}
+
+/// v11 adds constraints and dimensions, construction lines, and symmetric
+/// pieces (absent: drawn whole).
+fn migrate_v10_to_v11(mut project: Value) -> Result<Value, FileError> {
+    let p = object(&mut project, "project")?;
+    p.insert("constraints".into(), Value::Object(Default::default()));
+    p.insert("guides".into(), Value::Object(Default::default()));
+    Ok(project)
 }
 
 /// v10 adds a size range (until then, one size) and points' grades

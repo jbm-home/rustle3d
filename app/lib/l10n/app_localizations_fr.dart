@@ -1630,6 +1630,17 @@ class LFr extends L {
       'template_apply': 'Ajouter un modèle',
       'pattern_import': 'Importer un patron',
       'batch': 'Plusieurs modifications',
+      'constraint_add': 'Ajouter une contrainte',
+      'constraint_remove': 'Retirer une contrainte',
+      'constraint_set_value': 'Changer une cote',
+      'point_set_smooth': 'Point lisse',
+      'panel_unfold': 'Déplier la pièce',
+      'guide_add': 'Ajouter une ligne de construction',
+      'guide_move': 'Déplacer une ligne de construction',
+      'guide_remove': 'Retirer une ligne de construction',
+      'panel_create_ellipse': 'Ajouter une ellipse',
+      'panel_create_sector': 'Ajouter une jupe cercle',
+      'edge_set_arc': 'Faire un arc',
       'other': '$step',
     });
     return '$_temp0';
@@ -1740,4 +1751,193 @@ class LFr extends L {
 
   @override
   String get bodyFitting => 'Ajustement du corps…';
+
+  @override
+  String get toolShapes => 'Formes';
+
+  @override
+  String get toolEllipse => 'Ellipse';
+
+  @override
+  String get toolEllipseHint =>
+      'Un cercle ou une ellipse aux dimensions saisies';
+
+  @override
+  String get toolSector => 'Jupe cercle';
+
+  @override
+  String get toolSectorHint =>
+      'Des pièces en anneau d’après le tour de taille et la longueur de jupe';
+
+  @override
+  String get toolArc => 'Arc';
+
+  @override
+  String get toolArcHint => 'Cliquez une arête pour en faire un arc de cercle';
+
+  @override
+  String get toolGuide => 'Ligne de construction';
+
+  @override
+  String get toolGuideHint =>
+      'Cliquez deux points : une ligne pour tracer, jamais coupée ni cousue';
+
+  @override
+  String get hintGuide =>
+      'Ligne de construction : cliquez deux points · Échap annule · V pour arrêter';
+
+  @override
+  String get hintArc => 'Arc : cliquez une arête · V pour arrêter';
+
+  @override
+  String get toastGuideAdded => 'Ligne de construction ajoutée.';
+
+  @override
+  String get symmetricHalf => 'Demi-pièce';
+
+  @override
+  String get symmetricHalfTip =>
+      'Tracez la moitié d’une pièce symétrique : l’arête de fermeture est l’axe, l’autre moitié suit';
+
+  @override
+  String get width => 'Largeur';
+
+  @override
+  String get height => 'Hauteur';
+
+  @override
+  String get sectorWaist => 'Tour de taille';
+
+  @override
+  String get sectorLength => 'Longueur de jupe';
+
+  @override
+  String get sectorFull => 'Complète';
+
+  @override
+  String get sectorHalf => 'Demi';
+
+  @override
+  String get sectorQuarter => 'Quart';
+
+  @override
+  String get sectorHint =>
+      'Une jupe cercle complète se fait en deux demi-pièces, à coudre sur les côtés.';
+
+  @override
+  String get arcTitle => 'Arc';
+
+  @override
+  String get arcBulge => 'Flèche';
+
+  @override
+  String get arcHint =>
+      'Distance entre le milieu de l’arc et la ligne droite ; négative, l’arc rentre vers l’intérieur.';
+
+  @override
+  String get constraints => 'Contraintes';
+
+  @override
+  String get constraintsEmpty =>
+      'Choisissez un coin ou une arête sur le patron (⇧-clic pour un second) pour les contraindre.';
+
+  @override
+  String constraintsFreedom(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count degrés de liberté restants',
+      one: '1 degré de liberté restant',
+      zero: 'Entièrement contraint',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get constraintsRedundant =>
+      'Certaines contraintes en répètent d’autres.';
+
+  @override
+  String get constraintBroken => 'Non respectée';
+
+  @override
+  String constraintKind(String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'fixed': 'Fixe',
+      'coincident': 'Joints',
+      'horizontal': 'Horizontale',
+      'vertical': 'Verticale',
+      'parallel': 'Parallèles',
+      'perpendicular': 'D’équerre',
+      'tangent': 'Lisse',
+      'equal_length': 'Même longueur',
+      'on_edge': 'Sur l’arête',
+      'distance': 'Distance',
+      'width': 'Largeur',
+      'height': 'Hauteur',
+      'length': 'Longueur',
+      'angle': 'Angle',
+      'other': '$kind',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get constrain => 'Contraindre';
+
+  @override
+  String get removeConstraint => 'Retirer';
+
+  @override
+  String get pointSmooth => 'Lisse';
+
+  @override
+  String get pointCorner => 'Coin';
+
+  @override
+  String get pointRemove => 'Retirer le point';
+
+  @override
+  String get symmetricPiece => 'Pièce symétrique';
+
+  @override
+  String get unlinkHalves => 'Séparer les moitiés';
+
+  @override
+  String get unfold => 'Déplier ici';
+
+  @override
+  String get makeArc => 'Arc';
+
+  @override
+  String snapKind(String kind) {
+    String _temp0 = intl.Intl.selectLogic(kind, {
+      'point': 'Point',
+      'midpoint': 'Milieu',
+      'edge': 'Sur l’arête',
+      'guide': 'Sur la ligne',
+      'axis': 'Sur l’axe',
+      'horizontal': 'Même hauteur',
+      'vertical': 'Aligné',
+      'other': '$kind',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get errDerived =>
+      'Cette partie suit la moitié tracée ou la pièce d’origine : modifiez celle-ci.';
+
+  @override
+  String get errUnsolvable =>
+      'Ces contraintes ne peuvent pas toutes tenir : rien n’a été changé.';
+
+  @override
+  String get errSymmetric => 'Pièce symétrique : séparez d’abord ses moitiés.';
+
+  @override
+  String get errNotStraight => 'Il faut une arête droite.';
+
+  @override
+  String get errDuplicate => 'Déjà contraint de cette façon.';
 }
