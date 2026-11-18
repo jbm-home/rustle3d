@@ -812,6 +812,21 @@ class LEn extends L {
   String get restartTip => 'Start again from the pattern';
 
   @override
+  String get motionTip => 'Make the avatar move';
+
+  @override
+  String get motionStill => 'Stand still';
+
+  @override
+  String get motionWalk => 'Walk';
+
+  @override
+  String get motionTurn => 'Turn';
+
+  @override
+  String get motionRaiseArms => 'Raise arms';
+
+  @override
   String get maximizeViewTip => 'Use the space of both views  M';
 
   @override

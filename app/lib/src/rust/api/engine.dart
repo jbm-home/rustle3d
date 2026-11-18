@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `cloth_hit`, `corner_at`, `corner_landing`, `edge_spot`, `edited`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form_now`, `form_soon`, `frozen_board`, `gpu_solver`, `graphics`, `import_from`, `long`, `new`, `new`, `offset_along`, `parse_track`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `selected`, `set_busy`, `sim`, `solver`, `to_theme`, `workspace`
+// These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `cloth_hit`, `corner_at`, `corner_landing`, `edge_spot`, `edited`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form_now`, `form_soon`, `frozen_board`, `gpu_solver`, `graphics`, `import_from`, `long`, `motion_name`, `moving_avatar`, `new`, `new`, `offset_along`, `parse_track`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `selected`, `set_busy`, `sim`, `solver`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`
 
@@ -263,6 +263,13 @@ abstract class Engine implements RustOpaqueInterface {
   /// Set the canvas colours from the UI design system, so the board and
   /// the 3D view match the app theme.
   void setCanvas({required CanvasColors colors});
+
+  /// Make the avatar move (`walk`, `turn`, `raise_arms`) or stand still
+  /// (`None`) while the garment drapes, and run the simulation. A motion
+  /// starts once the garment has closed (after 1.5 s of draping); a body
+  /// in motion first comes back to rest. Can take seconds when the
+  /// garment is not loaded yet (see [`Engine::reset_simulation`]).
+  Future<SimStatus> setMotion({String? motion});
 
   /// Whether the board shows the other sizes' outlines around each piece
   /// (a view setting, not saved in the project).
@@ -771,6 +778,10 @@ class SimStatus {
   /// Where the solver runs: `cpu` or `gpu`.
   final String backend;
 
+  /// The avatar's motion chosen last (`walk`, `turn`, `raise_arms`), if
+  /// any: playing, or next once the body is back at rest.
+  final String? motion;
+
   const SimStatus({
     required this.loaded,
     required this.running,
@@ -779,6 +790,7 @@ class SimStatus {
     required this.particles,
     required this.maxSeamGapMm,
     required this.backend,
+    this.motion,
   });
 
   @override
@@ -789,7 +801,8 @@ class SimStatus {
       stepMs.hashCode ^
       particles.hashCode ^
       maxSeamGapMm.hashCode ^
-      backend.hashCode;
+      backend.hashCode ^
+      motion.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -802,7 +815,8 @@ class SimStatus {
           stepMs == other.stepMs &&
           particles == other.particles &&
           maxSeamGapMm == other.maxSeamGapMm &&
-          backend == other.backend;
+          backend == other.backend &&
+          motion == other.motion;
 }
 
 /// Where a pointer lands on the board, and why: `kind` is `point`,

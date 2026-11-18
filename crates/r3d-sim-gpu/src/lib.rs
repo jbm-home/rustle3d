@@ -14,9 +14,10 @@
 //! A frame is one command buffer (about thirty dispatches per substep);
 //! positions and velocities are read back at its end. A moving body's
 //! parts (`r3d_sim::motion`) are uploaded with each frame, three rigid
-//! motions per part and substep. (Kernels may bind at most 8 storage
-//! buffers: the parts of the body's field follow its values in one
-//! buffer, and the parts' boxes lead the body's motions in another.)
+//! motions per bone and substep. (Kernels may bind at most 8 storage
+//! buffers: the field's nodes' vertices and the skin weights follow its
+//! values in one buffer, and the bones' boxes lead the body's motions in
+//! another.)
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -26,7 +27,7 @@ use glam::Vec3;
 use r3d_geom::Rigid;
 use r3d_sim::collide::{BAND, BRICK};
 use r3d_sim::model::Model;
-use r3d_sim::motion::BodyMotion;
+use r3d_sim::motion::{BodyMotion, ITERATIONS, ON_SKIN};
 use r3d_sim::selfcollide::MARGIN;
 use r3d_sim::solver::{
     GRAB_COMPLIANCE, NEAR, SKIN, SUBSTEPS, StepError, StepStats, grabbed, sewing,
@@ -71,8 +72,8 @@ struct SceneUniform {
     sdf_dims: [u32; 4],
     contact: [f32; 4],
     counts: [u32; 4],
-    /// Where the field's parts start in its values; parts of a moving
-    /// body (0: it stands still).
+    /// Where the field's nodes' vertices start in its values, bones of a
+    /// moving body (0: it stands still), where the skin weights start.
     body: [u32; 4],
 }
 
@@ -211,11 +212,9 @@ pub struct GpuContext {
 #[derive(Debug)]
 struct BodyBuffers {
     slots: Vec<u32>,
-    values: Vec<f32>,
-    parts: Vec<u32>,
+    field: Vec<u32>,
     slots_buffer: wgpu::Buffer,
-    /// The values, then the parts (as `f32` bit patterns).
-    values_buffer: wgpu::Buffer,
+    field_buffer: wgpu::Buffer,
 }
 
 /// A storage buffer holding `bytes` (at least 16: a binding cannot be
@@ -248,7 +247,8 @@ impl GpuContext {
     fn compile(device: &wgpu::Device, queue: &wgpu::Queue) -> Self {
         let source = format!(
             "const SKIN: f32 = {SKIN:?};\nconst NEAR: f32 = {NEAR:?};\nconst BAND: f32 = {BAND:?};\n\
-             const BRICK: u32 = {BRICK}u;\nconst MAX_NEIGHBOURS: u32 = {MAX_NEIGHBOURS}u;\n{}",
+             const BRICK: u32 = {BRICK}u;\nconst MAX_NEIGHBOURS: u32 = {MAX_NEIGHBOURS}u;\n\
+             const ITERATIONS: u32 = {ITERATIONS}u;\nconst ON_SKIN: f32 = {ON_SKIN:?};\n{}",
             include_str!("shaders/xpbd.wgsl")
         );
         let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -321,43 +321,35 @@ impl GpuContext {
         }
     }
 
-    /// The buffers of a body's field: its `slots`, and its `values`
-    /// followed by its `parts`. The last ones if they hold the same
+    /// The buffers of a body's field: its `slots`, and the words of
+    /// `field` (see [`field_words`]). The last ones if they hold the same
     /// field, new ones otherwise.
-    fn body_buffers(
-        &self,
-        slots: &[u32],
-        values: &[f32],
-        parts: &[u32],
-    ) -> (wgpu::Buffer, wgpu::Buffer) {
-        let mut both: Vec<u32> = values.iter().map(|v| v.to_bits()).collect();
-        both.extend_from_slice(parts);
-        let make = || BodyBuffers {
+    fn body_buffers(&self, slots: &[u32], field: Vec<u32>) -> (wgpu::Buffer, wgpu::Buffer) {
+        let make = |field: Vec<u32>| BodyBuffers {
             slots: slots.to_vec(),
-            values: values.to_vec(),
-            parts: parts.to_vec(),
             slots_buffer: storage(
                 &self.device,
                 "body slots",
                 bytemuck::cast_slice(slots),
                 wgpu::BufferUsages::empty(),
             ),
-            values_buffer: storage(
+            field_buffer: storage(
                 &self.device,
-                "body values",
-                bytemuck::cast_slice(&both),
+                "body field",
+                bytemuck::cast_slice(&field),
                 wgpu::BufferUsages::empty(),
             ),
+            field,
         };
         let Ok(mut cached) = self.body.lock() else {
-            let b = make();
-            return (b.slots_buffer, b.values_buffer);
+            let b = make(field);
+            return (b.slots_buffer, b.field_buffer);
         };
         let b = match cached.take() {
-            Some(b) if b.slots == slots && b.values == values && b.parts == parts => b,
-            _ => make(),
+            Some(b) if b.slots == slots && b.field == field => b,
+            _ => make(field),
         };
-        let out = (b.slots_buffer.clone(), b.values_buffer.clone());
+        let out = (b.slots_buffer.clone(), b.field_buffer.clone());
         *cached = Some(b);
         out
     }
@@ -498,9 +490,22 @@ fn groups(count: u32) -> u32 {
     count.div_ceil(WORKGROUP)
 }
 
-/// Bytes per part and substep in the body buffer: three rigid motions of
+/// Bytes per bone and substep in the body buffer: three rigid motions of
 /// two `vec4f` each.
 const BODY_BYTES: u64 = 3 * 2 * 16;
+
+/// A body's field as the kernels read it, in 32-bit words: its values,
+/// then per value its node's vertex, then per vertex its skin weights
+/// (four bone indices in one word, then four weights).
+fn field_words(grid: &r3d_sim::collide::Grid<'_>) -> Vec<u32> {
+    let mut words: Vec<u32> = grid.values.iter().map(|v| v.to_bits()).collect();
+    words.extend_from_slice(grid.nodes);
+    for s in grid.skin {
+        words.push(u32::from_le_bytes(s.bones));
+        words.extend(s.weights.map(f32::to_bits));
+    }
+    words
+}
 
 /// The body buffer's rows for a frame from `time` in substeps of `h`:
 /// per substep and part, its motion at the substep's end (quaternion,
@@ -598,8 +603,8 @@ impl GpuSolver {
             })
             .collect();
 
-        // The body's field, and its parts if it moves.
-        let (sdf_origin, sdf_dims, sdf_slots, sdf_values, sdf_parts) = match &model.collider {
+        // The body's field, with its skin if it moves.
+        let (sdf_origin, sdf_dims, sdf_slots, field, values) = match &model.collider {
             Some(mesh) => {
                 let g = mesh.grid();
                 let d = g.dims.map(|d| d as u32);
@@ -607,11 +612,11 @@ impl GpuSolver {
                     [g.origin.x, g.origin.y, g.origin.z, g.voxel],
                     [d[0], d[1], d[2], 1],
                     g.slots,
-                    g.values,
-                    g.parts,
+                    field_words(&g),
+                    g.values.len() as u32,
                 )
             }
-            None => ([0.0, 0.0, 0.0, 1.0], [0; 4], &[][..], &[][..], &[][..]),
+            None => ([0.0, 0.0, 0.0, 1.0], [0; 4], &[][..], Vec::new(), 0),
         };
         let part_boxes: Vec<[f32; 4]> = match (&model.collider, &model.motion) {
             (Some(mesh), Some(_)) => mesh
@@ -638,14 +643,13 @@ impl GpuSolver {
                 reach,
             ],
             counts: [n32, table, 0, 0],
-            body: [sdf_values.len() as u32, parts, 0, 0],
+            body: [values, parts, 2 * values, 0],
         };
 
         // Buffers.
         use wgpu::BufferUsages as U;
         let storage = |label: &str, bytes: &[u8], extra: U| storage(device, label, bytes, extra);
-        let (sdf_slots_buffer, sdf_values_buffer) =
-            context.body_buffers(sdf_slots, sdf_values, sdf_parts);
+        let (sdf_slots_buffer, sdf_values_buffer) = context.body_buffers(sdf_slots, field);
         let body_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("body motion"),
             size: (16 * part_boxes.len() as u64

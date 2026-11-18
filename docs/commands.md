@@ -4726,12 +4726,34 @@ Export all panels as an SVG at 1:1 scale (cutting and sewing lines, notches, int
 
 ### `simulate`
 
-Drape the placed and sewn panels on the avatar for a number of frames (1/60 s each, deterministic) and cache the result in the project, so `r3d render --view 3d` shows it. Returns the garment's extent, how open the seams are and whether the cloth has settled.
+Drape the placed and sewn panels on the avatar for a number of frames (1/60 s each, deterministic) and cache the result in the project, so `r3d render --view 3d` shows it. With `motion`, the avatar walks, turns or raises its arms after 1.5 s and the cloth follows; renders and exports then show the body and the garment as they are at the last frame. Returns the garment's extent, how open the seams are and whether the cloth has settled.
 
 <details><summary>Parameters (JSON schema)</summary>
 
 ```json
 {
+  "$defs": {
+    "AvatarMotion": {
+      "description": "A motion of the avatar.",
+      "oneOf": [
+        {
+          "const": "walk",
+          "description": "Walking on the spot (a 1.1 s step cycle).",
+          "type": "string"
+        },
+        {
+          "const": "turn",
+          "description": "Half a turn to the left and back (6 s).",
+          "type": "string"
+        },
+        {
+          "const": "raise_arms",
+          "description": "Both arms raised overhead and lowered (4 s).",
+          "type": "string"
+        }
+      ]
+    }
+  },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Drape the garment headless and cache the result.",
@@ -4742,6 +4764,17 @@ Drape the placed and sewn panels on the avatar for a number of frames (1/60 s ea
       "format": "uint32",
       "minimum": 0,
       "type": "integer"
+    },
+    "motion": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AvatarMotion"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A motion of the avatar, started after 1.5 s of draping (once the\ngarment has closed); the cloth follows it. Omitted: the avatar\nstands still."
     }
   },
   "title": "Simulate",

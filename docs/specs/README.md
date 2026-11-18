@@ -31,3 +31,4 @@ descriptions, public papers, open standards, general garment-making knowledge.
 | 19 | [Sketching: constraints, dimensions and symmetry](19-constraints.md) | M27 |
 | 20 | [Parametric patterns](20-parametric.md) | M28 |
 | 21 | [Construction details](21-construction-details.md) | M29 |
+| 22 | [Animated avatars](22-animated-avatars.md) | M23 |

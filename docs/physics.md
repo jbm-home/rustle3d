@@ -200,38 +200,60 @@ after 4 s; the skirt still holds at the waist.
 
 ### Moving body (M23)
 
-The avatar moves by its skeleton (24 bones; its skin follows by linear
-blend skinning [19]). Rebuilding the distance field of the posed body
-every frame (0.16 s on the CPU) is too slow, and a BVH over the moving
-mesh with continuous tests [6] would replace the constant-time query
-the solver is built on. Instead (our own scheme, `r3d_sim::motion`):
+The avatar moves by its skeleton (24 bones); its skin follows by linear
+blend skinning [19], each vertex by up to four bones. Rebuilding the
+distance field of the posed body every frame (0.16 s on the CPU) is too
+slow, and a BVH over the moving mesh with continuous tests [6] would
+replace the constant-time query the solver is built on. Instead the
+rest pose's field is queried through the skinning (our own scheme,
+`r3d_sim::motion`):
 
-- The field of the **rest pose** also stores, per node, the bones the
-  closest surface belongs to: those weighing at least 0.1 in the skin of
-  the closest point's vertices (one bit per bone), and per bone the box
-  of its nodes.
-- For each particle and each bone, the particle is taken back to the
-  rest pose by the inverse of the bone's rigid motion; when it lands in
-  that bone's box, near a surface of that bone, the bone touches it at
-  the distance read there (a rigid motion keeps distances), along the
-  normal turned by the bone's motion. The deepest touching bone wins.
-- The body is thus the **union of its bones' rigid pieces**. Around a
-  bent joint the pieces overlap where skinning folds the skin, so the
-  cloth may stand a few millimetres off the skin there, never inside it.
-  A bone only counts where the closest rest surface is its own, so a
-  bone never collides with another's rest position (the arm hanging
-  where the torso used to be).
+- The field also stores, per node, the body vertex nearest to its
+  closest surface point, and so its skin weights; and, per bone, the box
+  of the nodes whose vertex it leads (weighs at least half the vertex's
+  heaviest bone).
+- **Inverse skinning.** To see the body from a particle `p`, find the
+  rest point `q` whose skinned position `Σ wₖ Gₖ(q)` is `p`. With the
+  weights held constant near `q` it is one linear solve,
+  `q = M⁻¹ (p − T)` with `M = Σ wₖ Rₖ` and `T = Σ wₖ tₖ`, repeated three
+  times with the weights found at the new `q`. Each bone whose rest box
+  holds `Gᵦ⁻¹(p)` and leads the skin there gives a starting point, so
+  every limb near `p` is tried; a start is kept only if the skin it
+  finds passes within 2 mm of `p`. The distance read at `q` is mapped to
+  the posed skin by `M` to first order (`d / |M⁻ᵀ n|`, along `M⁻ᵀ n`),
+  and of the points found the deepest wins. The cloth thus collides with
+  the very skin the views draw.
+- A first version took the body as the union of its bones' rigid pieces
+  (each bone's inverse motion only). Raising an arm swept the rigid copy
+  of the shoulder and the chest beside the armpit up through the shirt,
+  where the blended skin does not go: deep false contacts that threw the
+  cloth at 15 m/s. Following the blended skin removed them.
+- **Pre-stabilisation** (as in [7]): a contact gives the cloth no more speed
+  along the normal than the surface touched has; the rest of the push (a
+  penetration the cloth already had) moves the particle's previous
+  position too, so it is undone without throwing the cloth out. Only
+  for a moving body: a still one drapes exactly as before (trousers held
+  at the hips by friction slid down with it). Where
+  linear blend skinning folds the skin onto itself (an arm raised high
+  folds the armpit), cloth caught in the fold was squeezed out at
+  10–20 m/s; the arms are therefore raised to about 40° above the
+  horizontal, which MakeHuman's weights (made for the A pose) handle.
 - **Friction** cancels the sliding relative to the touched surface,
-  which moved by `p − motion_before(q)` during the substep (`q` the
-  rest-pose point): the cloth is carried along with the body.
-- The motion is sampled 60 times a second, interpolated per substep
-  (rotations by slerp), and on the GPU uploaded once per frame (per
-  substep and bone: the motion at its end, its inverse and the motion at
-  its start). Cost: about 24 inverse transforms and box tests per
-  particle and substep, then one or two field samples.
-- Checked by a reference scene on both backends: a sheet lying on a box
-  that moves 20 cm sideways and 5 cm up in a second goes along within
-  3 cm and never goes inside it (`a_moving_body_carries_the_cloth`).
+  which moved by `p − (M_before q + T_before)` during the substep: the
+  cloth is carried along with the body.
+- The motion is sampled 60 times a second and interpolated per substep
+  (rotations by slerp); the GPU gets it once per frame (per substep and
+  bone: the motion at its end, its inverse and the motion at its start).
+  Cost: about 24 inverse transforms and box tests per particle and
+  substep, then a few inverse-skinning solves; the dress walks at
+  ≈ 80 ms per frame on the CPU (debug-optimised build), and well within
+  the frame on the GPU.
+- Checked on both backends: a sheet lying on a box that moves 20 cm
+  sideways and 5 cm up in a second goes along within 3 cm and never goes
+  inside it (`a_moving_body_carries_the_cloth`); a dress walking, a
+  skirt turning and a T-shirt raising its arms stay out of the moving
+  skin by less than 3 mm with their seams closed (`r3d-commands`
+  `tests/motion.rs`, `r3d-sim-gpu` `a_dress_walks_on_the_gpu`).
 
 ### Starting positions
 

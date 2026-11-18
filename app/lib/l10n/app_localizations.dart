@@ -1495,6 +1495,36 @@ abstract class L {
   /// **'Start again from the pattern'**
   String get restartTip;
 
+  /// No description provided for @motionTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Make the avatar move'**
+  String get motionTip;
+
+  /// No description provided for @motionStill.
+  ///
+  /// In en, this message translates to:
+  /// **'Stand still'**
+  String get motionStill;
+
+  /// No description provided for @motionWalk.
+  ///
+  /// In en, this message translates to:
+  /// **'Walk'**
+  String get motionWalk;
+
+  /// No description provided for @motionTurn.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn'**
+  String get motionTurn;
+
+  /// No description provided for @motionRaiseArms.
+  ///
+  /// In en, this message translates to:
+  /// **'Raise arms'**
+  String get motionRaiseArms;
+
   /// No description provided for @maximizeViewTip.
   ///
   /// In en, this message translates to:

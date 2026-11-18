@@ -462,6 +462,16 @@ class _ShellState extends State<Shell> {
     _drape(() => widget.engine.runSimulation(running: running));
   }
 
+  /// Make the avatar move (`walk`, `turn`, `raise_arms`) or stand still
+  /// (`null`); the drape runs, and the 3D view comes back if needed.
+  void _setMotion(String? motion) {
+    if (_maximized == ViewKind.board) {
+      _resumeDrape = false;
+      setState(() => _maximized = null);
+    }
+    _drape(() => widget.engine.setMotion(motion: motion));
+  }
+
   /// Rebuild the simulation from the pattern, keeping it running if it was.
   Future<void> _restart() async {
     final wasRunning = _sim?.running ?? false;
@@ -2065,6 +2075,7 @@ class _ShellState extends State<Shell> {
                                             status: _sim,
                                             onRun: _setRunning,
                                             onRestart: _restart,
+                                            onMotion: _setMotion,
                                           ),
                                           const SizedBox(width: Space.s),
                                           _Pill(
@@ -4127,18 +4138,29 @@ class _CameraBar extends StatelessWidget {
   }
 }
 
-/// Simulate / pause and restart, over the 3D view.
+/// Simulate / pause, restart and the avatar's motion, over the 3D view.
 class _SimControls extends StatelessWidget {
   const _SimControls({
     super.key,
     required this.status,
     required this.onRun,
     required this.onRestart,
+    required this.onMotion,
   });
 
   final SimStatus? status;
   final ValueChanged<bool> onRun;
   final VoidCallback onRestart;
+
+  /// A motion's name, or `null` to stand still.
+  final ValueChanged<String?> onMotion;
+
+  static List<(String?, String)> _motions(L l) => [
+    (null, l.motionStill),
+    ('walk', l.motionWalk),
+    ('turn', l.motionTurn),
+    ('raise_arms', l.motionRaiseArms),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -4175,7 +4197,33 @@ class _SimControls extends StatelessWidget {
             tip: context.l.restartTip,
             onTap: onRestart,
           ),
+          _motionMenu(context),
         ],
+      ),
+    );
+  }
+
+  Widget _motionMenu(BuildContext context) {
+    final p = Tokens.of(context);
+    final l = context.l;
+    final current = status?.motion;
+    // Menu values cannot be null: '' stands for standing still.
+    return PopupMenuButton<String>(
+      key: const ValueKey('motionButton'),
+      tooltip: l.motionTip,
+      onSelected: (choice) => onMotion(choice.isEmpty ? null : choice),
+      itemBuilder: (_) => [
+        for (final (motion, label) in _motions(l))
+          CheckedPopupMenuItem(
+            value: motion ?? '',
+            checked: motion == current,
+            child: Text(label),
+          ),
+      ],
+      icon: Icon(
+        Icons.directions_walk_rounded,
+        size: 19,
+        color: current == null ? p.textMuted : p.accent,
       ),
     );
   }

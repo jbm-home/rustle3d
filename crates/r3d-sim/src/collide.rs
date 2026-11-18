@@ -9,9 +9,9 @@
 //! avatar. A query is a trilinear interpolation: constant time.
 //!
 //! A body that moves (an animated avatar) keeps the field of its rest
-//! pose: each node also records which body parts (bones) the closest
-//! surface belongs to, and [`crate::motion`] queries the field in the rest
-//! frame of each part.
+//! pose: each node also records the body vertex nearest to its closest
+//! surface point, whose skin weights let [`crate::motion`] follow the
+//! skin as the bones move it.
 
 use std::collections::HashMap;
 
@@ -36,11 +36,38 @@ pub struct StaticMesh {
     /// the surface.
     slots: Vec<u32>,
     values: Vec<f32>,
-    /// Per node (as `values`), the parts of the body the closest surface
-    /// belongs to, one bit per part; empty for a body without parts.
-    parts: Vec<u32>,
-    /// Per part, the box (rest pose) holding the nodes near its surface.
+    /// Per node (as `values`), the vertex nearest to the closest surface
+    /// point (`u32::MAX`: none); empty for a body without a skin.
+    nodes: Vec<u32>,
+    /// Per vertex, how it follows the bones.
+    skin: Vec<Skin>,
+    /// Per bone, the box (rest pose) holding the nodes whose vertex it
+    /// leads ([`Skin::leading`]).
     part_boxes: Vec<(Vec3, Vec3)>,
+}
+
+/// How a vertex of a moving body follows its bones (parts): up to four,
+/// weights summing to 1 (linear blend skinning; unused slots weigh 0).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Skin {
+    pub bones: [u8; 4],
+    pub weights: [f32; 4],
+}
+
+/// A bone leads a vertex when it weighs at least this share of the
+/// vertex's heaviest bone.
+const LEADING_SHARE: f32 = 0.5;
+
+impl Skin {
+    /// The bones that lead this vertex, one bit each.
+    pub fn leading(&self) -> u32 {
+        let heaviest = self.weights.iter().copied().fold(0.0, f32::max);
+        self.bones
+            .iter()
+            .zip(self.weights)
+            .filter(|(b, w)| *w > 0.0 && *w >= LEADING_SHARE * heaviest && usize::from(**b) < 32)
+            .fold(0, |m, (b, _)| m | 1u32 << b)
+    }
 }
 
 /// The field's storage, for backends that sample it themselves (a node
@@ -59,9 +86,11 @@ pub struct Grid<'a> {
     pub slots: &'a [u32],
     /// `BRICK³` values per slot (x fastest); [`BAND`] far from the surface.
     pub values: &'a [f32],
-    /// Per value, the body parts of the closest surface (one bit each);
-    /// empty for a body without parts.
-    pub parts: &'a [u32],
+    /// Per value, the vertex nearest to the closest surface point
+    /// (`u32::MAX`: none); empty for a body without a skin.
+    pub nodes: &'a [u32],
+    /// Per vertex, how it follows the bones.
+    pub skin: &'a [Skin],
 }
 
 /// The surface seen from a query point.
@@ -123,24 +152,20 @@ impl PseudoNormals {
     }
 }
 
-/// Most body parts a field can tell apart (one bit each in a `u32`).
-pub const MAX_PARTS: usize = 32;
-
 impl StaticMesh {
     /// Build the field of a closed mesh with nodes `voxel` metres apart.
     /// Triangles with out-of-range corners are ignored.
     pub fn new(positions: Vec<Vec3>, triangles: Vec<[u32; 3]>, voxel: f32) -> Self {
-        Self::with_parts(positions, triangles, voxel, &[])
+        Self::with_skin(positions, triangles, voxel, Vec::new())
     }
 
-    /// The same, for a body made of parts that move: `vertex_parts` gives
-    /// each vertex's parts (one bit each, at most [`MAX_PARTS`]); a node
-    /// gets those of the closest point's vertices. Empty: no parts.
-    pub fn with_parts(
+    /// The same, for a body whose bones move it: `skin` holds each
+    /// vertex's (bones below 32); empty: a body that stands still.
+    pub fn with_skin(
         positions: Vec<Vec3>,
         triangles: Vec<[u32; 3]>,
         voxel: f32,
-        vertex_parts: &[u32],
+        skin: Vec<Skin>,
     ) -> Self {
         let voxel = voxel.max(1e-3);
         let n = positions.len();
@@ -198,9 +223,8 @@ impl StaticMesh {
 
         // Each brick's nodes, from the triangles near it (in parallel; each
         // brick writes only its own values).
-        let with_parts = !vertex_parts.is_empty();
-        let part_of = |v: u32| vertex_parts.get(v as usize).copied().unwrap_or(0);
-        let mut nodes = vec![(BAND, 0u32); filled.len() * BRICK_NODES];
+        let skinned = !skin.is_empty() && skin.len() == n;
+        let mut nodes = vec![(BAND, u32::MAX); filled.len() * BRICK_NODES];
         nodes
             .par_chunks_mut(BRICK_NODES)
             .zip(&filled)
@@ -210,7 +234,7 @@ impl StaticMesh {
                     (id / dims[0]) % dims[1],
                     id / (dims[0] * dims[1]),
                 ];
-                for (k, (value, parts)) in out.iter_mut().enumerate() {
+                for (k, (value, vertex)) in out.iter_mut().enumerate() {
                     let local = [k % BRICK, (k / BRICK) % BRICK, k / (BRICK * BRICK)];
                     let node = Vec3::new(
                         (b[0] * BRICK + local[0]) as f32,
@@ -232,20 +256,25 @@ impl StaticMesh {
                         let pn = normals.at(ti, &triangles[ti], feature);
                         let sign = if (p - q).dot(pn) < 0.0 { -1.0 } else { 1.0 };
                         *value = sign * d2.sqrt();
-                        if with_parts {
-                            let t = &triangles[ti];
-                            *parts = match feature {
-                                Feature::Vertex(k) => part_of(t[k]),
-                                Feature::Edge(k) => part_of(t[k]) | part_of(t[(k + 1) % 3]),
-                                Feature::Face => t.iter().fold(0, |m, v| m | part_of(*v)),
-                            };
+                        if skinned {
+                            // The corner of the closest triangle nearest
+                            // to the node.
+                            *vertex = triangles[ti]
+                                .iter()
+                                .copied()
+                                .min_by(|a, b| {
+                                    let da = positions[*a as usize].distance_squared(p);
+                                    let db = positions[*b as usize].distance_squared(p);
+                                    da.total_cmp(&db)
+                                })
+                                .unwrap_or(u32::MAX);
                         }
                     }
                 }
             });
-        let (values, parts): (Vec<f32>, Vec<u32>) = nodes.into_iter().unzip();
-        let part_boxes = if with_parts {
-            boxes(&values, &parts, &filled, dims, origin, voxel)
+        let (values, nodes): (Vec<f32>, Vec<u32>) = nodes.into_iter().unzip();
+        let part_boxes = if skinned {
+            boxes(&values, &nodes, &skin, &filled, dims, origin, voxel)
         } else {
             Vec::new()
         };
@@ -255,14 +284,15 @@ impl StaticMesh {
             dims,
             slots,
             values,
-            parts: if with_parts { parts } else { Vec::new() },
+            nodes: if skinned { nodes } else { Vec::new() },
+            skin: if skinned { skin } else { Vec::new() },
             part_boxes,
         }
     }
 
-    /// Per part, the box (rest pose) around the field's nodes near its
-    /// surface; a point outside it cannot touch that part. Empty for a
-    /// body without parts.
+    /// Per bone, the box (rest pose) around the field's nodes near the
+    /// surface it leads; a point outside it is not near that bone's skin.
+    /// Empty for a body without a skin.
     pub fn part_boxes(&self) -> &[(Vec3, Vec3)] {
         &self.part_boxes
     }
@@ -274,7 +304,8 @@ impl StaticMesh {
             dims: self.dims,
             slots: &self.slots,
             values: &self.values,
-            parts: &self.parts,
+            nodes: &self.nodes,
+            skin: &self.skin,
         }
     }
 
@@ -302,18 +333,16 @@ impl StaticMesh {
             .unwrap_or(BAND)
     }
 
-    /// The body parts the surface closest to `p` belongs to (one bit
-    /// each), read at the nearest node; 0 far from the surface or for a
-    /// body without parts.
-    pub fn parts_at(&self, p: Vec3) -> u32 {
+    /// How the skin closest to `p` follows the bones: the weights of the
+    /// vertex recorded at the nearest node. `None` far from the surface or
+    /// for a body without a skin.
+    pub fn skin_at(&self, p: Vec3) -> Option<&Skin> {
         let q = ((p - self.origin) / self.voxel).round();
         if q.min_element() < 0.0 {
-            return 0;
+            return None;
         }
-        self.index(q.x as usize, q.y as usize, q.z as usize)
-            .and_then(|i| self.parts.get(i))
-            .copied()
-            .unwrap_or(0)
+        let i = self.index(q.x as usize, q.y as usize, q.z as usize)?;
+        self.skin.get(*self.nodes.get(i)? as usize)
     }
 
     /// Signed distance and outward direction at `p`, when `p` is within
@@ -358,19 +387,21 @@ impl StaticMesh {
     }
 }
 
-/// Per part, the box around the nodes within the band whose parts include
-/// it, one node spacing wider.
+/// Per bone, the box around the nodes within the band whose vertex it
+/// leads, one node spacing wider.
 fn boxes(
     values: &[f32],
-    parts: &[u32],
+    nodes: &[u32],
+    skin: &[Skin],
     filled: &[usize],
     dims: [usize; 3],
     origin: Vec3,
     voxel: f32,
 ) -> Vec<(Vec3, Vec3)> {
-    let count = parts
+    let lead = |node: &u32| skin.get(*node as usize).map_or(0, Skin::leading);
+    let count = nodes
         .iter()
-        .map(|m| (u32::BITS - m.leading_zeros()) as usize)
+        .map(|v| (u32::BITS - lead(v).leading_zeros()) as usize)
         .max()
         .unwrap_or(0);
     let mut out = vec![(Vec3::MAX, Vec3::MIN); count];
@@ -382,10 +413,10 @@ fn boxes(
         ];
         for k in 0..BRICK_NODES {
             let i = slot * BRICK_NODES + k;
-            let (Some(v), Some(m)) = (values.get(i), parts.get(i)) else {
+            let (Some(v), Some(m)) = (values.get(i), nodes.get(i).map(lead)) else {
                 continue;
             };
-            if *v >= BAND || *m == 0 {
+            if *v >= BAND || m == 0 {
                 continue;
             }
             let local = [k % BRICK, (k / BRICK) % BRICK, k / (BRICK * BRICK)];

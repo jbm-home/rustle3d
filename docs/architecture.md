@@ -1,6 +1,6 @@
 # Rustle3D architecture
 
-Status: living document, last updated 2026-11-18 (M29).
+Status: living document, last updated 2026-11-18 (M23).
 
 Every choice here is the **current best guess**, not a rule. Each one says
 why it was made and what was considered, so it can be challenged and changed
@@ -57,7 +57,7 @@ the change log at the end. Sections marked **Open** are explicitly undecided.
 | `r3d-geom` | `glam` (later `spade` for triangulation, M4) | anything r3d, GUI, GPU |
 | `r3d-core` | `r3d-geom`, `serde`, `serde_json`, `schemars` | sim, GUI, GPU |
 | `r3d-sim` | `r3d-geom`, `glam`, `rayon`, `thiserror` | core, GUI, GPU |
-| `r3d-sim-gpu` | `r3d-sim`, `wgpu`, `bytemuck`, `pollster`, `thiserror` | core, commands, render, GUI |
+| `r3d-sim-gpu` | `r3d-sim`, `r3d-geom`, `wgpu`, `bytemuck`, `pollster`, `thiserror` | core, commands, render, GUI |
 | `r3d-io` | `r3d-core`, `r3d-geom`, `pdf-writer`, `lopdf`, `roxmltree`, `svgtypes`, `serde_json`, `thiserror` | sim, GUI, GPU; no file I/O (takes and returns bytes) |
 | `r3d-commands` | core, geom, io (sim from M4), avatar, `rayon` | GUI, GPU |
 | `r3d-render` | core, geom, `wgpu`, `image` | commands, GUI toolkit |
@@ -594,3 +594,8 @@ code stays **i18n-ready** for more:
 | 2026-11-18 | M29: the board fills pieces from a constrained triangulation (`mesh::fill`) instead of ear clipping | Pieces may have holes; one triangulator for the board and the cloth |
 | 2026-11-18 | M32: the Sew and Dimension tools pick on the board in the bridge (`r3d-ffi/src/sew.rs`, `corner_or_edge_near`) and build ordinary `seam.add` / `constraint.add` steps; a press a board tool does not hold falls through to Select's corner and edge drag | As for snapping: picking depends on the zoom; agents name edges, lines and stretches directly, so no new command was needed |
 | 2026-11-18 | Licence changed from MIT to GPL-3.0-or-later before the repository goes public; dependencies must be GPL-3.0-compatible, permissive preferred (MPL-2.0, LGPL-3.0, GPL-3.0 with a justification) | Keeps Rustle3D and its derivatives free software, as Blender, Krita and Inkscape do: a fork or a closed product built on it must publish its changes. All dependencies so far (MIT, Apache-2.0, BSD, Zlib, OFL font, CC0 body) are compatible with GPLv3. Possible while every commit has a single author |
+| 2026-11-18 | M23 (taken before M20, M21, M30, M24, M31): the avatar's skeleton is MakeHuman's default rig (CC0) reduced to 24 bones, its joints moved by the body's targets, in the body pack (v2); the motions are our own procedural ones (joint angles over a cycle), no motion capture | The rig and weights come with the body we already ship, under the same licence, and follow every measurement; CC-licensed motion capture sets have attribution or non-commercial strings attached, and three smooth cycles are short to write |
+| 2026-11-18 | M23: a moving body is its rest-pose distance field queried through inverse linear blend skinning (each bone gives a starting point, one linear solve per step with the weights held), not a field rebuilt every frame nor a BVH over the posed mesh. A first version, the union of the bones' rigid pieces, was dropped | A rebuilt field costs 0.16 s a frame; a BVH would replace the constant-time query both backends are built on. The rigid pieces swept the shoulder and the chest up with a raised arm, where the blended skin does not go, and threw the cloth at 15 m/s; following the skin the views draw removed it |
+| 2026-11-18 | M23: contacts are pre-stabilised (the push gives the cloth no more normal speed than the surface touched has) | Where linear blend skinning folds the skin (a raised arm's armpit), cloth caught in the fold was squeezed out at 10–20 m/s |
+| 2026-11-18 | M23: the avatar's motion is app state (`Engine::set_motion`) and an argument of the headless `simulate` action, cached with the drape; not a document field | It does not change the garment, so it has no place in the undo history or the project file; agents reach it through `simulate`, and renders and exports read it from the cache |
+| 2026-11-18 | M23: `r3d-sim` (as the table above already allowed) and `r3d-sim-gpu` depend on `r3d-geom` for `Rigid`, the rigid motion of a bone | The avatar crate and the solver share one type; `r3d-geom` is the pure-math crate both already sit on |

@@ -147,7 +147,7 @@ impl CpuSolver {
         let (collider, ground) = (m.collider.as_ref(), m.ground);
         self.x
             .par_iter_mut()
-            .zip(&self.prev)
+            .zip(self.prev.par_iter_mut())
             .zip(self.near.par_iter_mut())
             .enumerate()
             .with_min_len(64)
@@ -176,6 +176,18 @@ impl CpuSolver {
                     if c.distance < distance {
                         let depth = distance - c.distance;
                         *x += c.normal * depth;
+                        // Pre-stabilisation (Macklin et al. 2014):
+                        // the push gives the cloth no more speed along the
+                        // normal than the surface touched has; the rest of
+                        // it, a penetration the cloth already had (cloth
+                        // caught where a moving skin folds), is undone
+                        // without throwing the cloth out. Only for a
+                        // body that moves: a still one drapes as before.
+                        let gained = (*x - *prev).dot(c.normal);
+                        let allowed = carried.dot(c.normal).max(0.0);
+                        if posed.is_some() && gained > allowed {
+                            *prev += c.normal * (gained - allowed);
+                        }
                         contact = Some((c.normal, depth, carried));
                     }
                 }

@@ -7,7 +7,8 @@
 mod gpu;
 
 use glam::Vec3;
-use r3d_commands::drape::{DEFAULT_SPACING_MM, Form, build};
+use r3d_commands::actions::AvatarMotion;
+use r3d_commands::drape::{Animation, DEFAULT_SPACING_MM, Form, build};
 use r3d_commands::{Session, Step};
 use r3d_core::Project;
 use r3d_sim::{CpuSolver, SimScene, Solver};
@@ -116,4 +117,47 @@ fn a_t_shirt_comes_to_rest_on_the_gpu() {
         .sum::<f32>()
         / before.len() as f32;
     assert!(speed < 0.01, "still moving at {speed} m/s on average");
+}
+
+#[test]
+fn a_dress_walks_on_the_gpu() {
+    let Some(gpu) = gpu::context() else {
+        return;
+    };
+    let mut s = Session::new(Project::new("Untitled"));
+    for step in [
+        json!({"type": "avatar.set", "preset": "Women M", "body": {"masculinity": 0,
+            "height_cm": 168, "bust_cm": 90, "waist_cm": 73, "hips_cm": 98}}),
+        json!({"type": "template.apply", "template": "dress"}),
+    ] {
+        s.run_step(&Step::from_value(step).unwrap()).unwrap();
+    }
+    let form = Form::of_project(s.project()).unwrap().unwrap();
+    let mut scene = build(s.project(), Some(&form), DEFAULT_SPACING_MM)
+        .unwrap()
+        .scene;
+    scene.motion = form.body_motion(&Animation::starting(AvatarMotion::Walk.into(), 0.0));
+    let mut solver = GpuSolver::new(gpu, scene.clone()).unwrap();
+    // 1.5 s of draping, a second of easing in, a step cycle.
+    let frames = 220;
+    for _ in 0..frames {
+        solver.step(1.0 / 60.0).unwrap();
+    }
+    let p = solver.positions();
+    assert!(p.iter().all(|v| v.is_finite()));
+    let (body, moving) = (
+        scene.collider.as_ref().unwrap(),
+        scene.motion.as_ref().unwrap(),
+    );
+    let t = frames as f32 / 60.0;
+    let posed = r3d_sim::motion::Posed::new(moving.at(t - 1.0 / 1800.0), moving.at(t));
+    let inside = p
+        .iter()
+        .filter_map(|q| r3d_sim::motion::touch(body, Some(&posed), *q))
+        .map(|(c, _)| -c.distance)
+        .fold(0.0f32, f32::max);
+    assert!(inside < 0.003, "{inside} m inside the walking body");
+    assert!(solver.stats().max_seam_gap < 0.01, "{:?}", solver.stats());
+    let top = p.iter().map(|v| v.y).fold(f32::MIN, f32::max);
+    assert!(top > 1.2, "the dress slid down: {top}");
 }

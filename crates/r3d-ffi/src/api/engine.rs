@@ -10,7 +10,8 @@ use std::time::Instant;
 
 use flutter_rust_bridge::frb;
 
-use r3d_commands::drape::{self, Drape, Form};
+use r3d_commands::actions::AvatarMotion;
+use r3d_commands::drape::{self, Animation, Drape, Form};
 use r3d_commands::{Progress, Script, Status, Step, Workspace};
 use r3d_sim::{CpuSolver, SimScene, Solver};
 use r3d_sim_gpu::{GpuContext, GpuSolver};
@@ -383,6 +384,9 @@ pub struct SimStatus {
     pub max_seam_gap_mm: f64,
     /// Where the solver runs: `cpu` or `gpu`.
     pub backend: String,
+    /// The avatar's motion chosen last (`walk`, `turn`, `raise_arms`), if
+    /// any: playing, or next once the body is back at rest.
+    pub motion: Option<String>,
 }
 
 /// A photo to render (see `Engine::start_photo`).
@@ -461,6 +465,8 @@ pub struct Engine {
     sim: Mutex<Option<SimThread>>,
     /// The loaded simulation's scene (pieces, pattern positions).
     cloth: Mutex<Option<Drape>>,
+    /// How the avatar moves while the garment drapes, if it does.
+    animation: Mutex<Option<Animation>>,
     /// Simulate on the CPU only: asked for (`R3D_SOLVER=cpu`), or the
     /// GPU solver failed in this session.
     cpu_only: AtomicBool,
@@ -507,6 +513,14 @@ fn poisoned() -> ApiError {
     ApiError::new("internal", "engine lock poisoned")
 }
 
+/// A motion's name as agents and the UI write it (`raise_arms`).
+fn motion_name(m: AvatarMotion) -> String {
+    serde_json::to_value(m)
+        .ok()
+        .and_then(|v| v.as_str().map(str::to_owned))
+        .unwrap_or_default()
+}
+
 /// Width of the pattern lines drawn on the garment, and how far they sit
 /// off the cloth (m).
 const LINE_WIDTH_M: f32 = 0.003;
@@ -537,6 +551,7 @@ impl Engine {
             selected_points: Mutex::new(Vec::new()),
             sim: Mutex::new(None),
             cloth: Mutex::new(None),
+            animation: Mutex::new(None),
             show_sizes: AtomicBool::new(true),
             cpu_only: AtomicBool::new(
                 std::env::var("R3D_SOLVER").is_ok_and(|v| v.eq_ignore_ascii_case("cpu")),
@@ -709,6 +724,19 @@ impl Engine {
         if carry && let Some(old) = cloth.as_ref() {
             drape::carry_over(old, &now.positions, &mut drape);
         }
+        {
+            // The avatar's motion goes on from where it is, or starts
+            // again with the drape.
+            let mut animation = self.animation.lock().map_err(|_| poisoned())?;
+            *animation = if carry {
+                animation.and_then(|a| a.settled(now.time))
+            } else {
+                animation.and_then(Animation::restarted)
+            };
+            if let (Some(f), Some(a)) = (form.as_deref(), animation.as_ref()) {
+                drape.scene.motion = f.body_motion(a);
+            }
+        }
         if drape.pieces.is_empty() {
             thread.clear();
         } else {
@@ -804,6 +832,34 @@ impl Engine {
         self.simulation_status()
     }
 
+    /// Make the avatar move (`walk`, `turn`, `raise_arms`) or stand still
+    /// (`None`) while the garment drapes, and run the simulation. A motion
+    /// starts once the garment has closed (after 1.5 s of draping); a body
+    /// in motion first comes back to rest. Can take seconds when the
+    /// garment is not loaded yet (see [`Engine::reset_simulation`]).
+    pub fn set_motion(&self, motion: Option<String>) -> Result<SimStatus, ApiError> {
+        let to = match motion {
+            Some(name) => {
+                let m: AvatarMotion = serde_json::from_value(serde_json::Value::String(name))
+                    .map_err(|e| ApiError::new("invalid_motion", e.to_string()))?;
+                Some(m.into())
+            }
+            None => None,
+        };
+        let now = self
+            .sim()?
+            .as_ref()
+            .map(SimThread::latest)
+            .unwrap_or_default();
+        {
+            let mut animation = self.animation.lock().map_err(|_| poisoned())?;
+            let time = if now.loaded { now.time } else { 0.0 };
+            *animation = Animation::switch(*animation, to, time);
+        }
+        self.long("drape.prepare", |_| self.rebuild(true))?;
+        self.run_simulation(true)
+    }
+
     /// The latest simulation state.
     #[frb(sync)]
     pub fn simulation_status(&self) -> Result<SimStatus, ApiError> {
@@ -812,6 +868,13 @@ impl Engine {
             .as_ref()
             .map(SimThread::latest)
             .unwrap_or_default();
+        let motion = self
+            .animation
+            .lock()
+            .map_err(|_| poisoned())?
+            .and_then(|a| a.settled(p.time))
+            .and_then(|a| a.chosen())
+            .map(|m| motion_name(m.into()));
         Ok(SimStatus {
             loaded: p.loaded,
             running: p.running,
@@ -820,6 +883,7 @@ impl Engine {
             particles: p.positions.len() as u32,
             max_seam_gap_mm: f64::from(p.max_seam_gap) * 1000.0,
             backend: p.backend.into(),
+            motion,
         })
     }
 
@@ -1049,13 +1113,21 @@ impl Engine {
                     };
                     let start: Vec<glam::Vec3> =
                         drape.scene.particles.iter().map(|p| p.position).collect();
+                    let time = live.as_ref().map_or(0.0, |now| now.time);
                     let positions = match live {
                         Some(now) if now.loaded && now.positions.len() == start.len() => {
                             now.positions
                         }
                         _ => start,
                     };
-                    let body = form.as_deref().filter(|_| avatar);
+                    let animation = *self.animation.lock().map_err(|_| poisoned())?;
+                    let surface = form
+                        .as_deref()
+                        .filter(|_| avatar)
+                        .map(|f| f.posed(animation.as_ref(), time));
+                    let body = surface
+                        .as_deref()
+                        .zip(form.as_deref().map(|f| &f.triangles[..]));
                     let scene = drape::scene3d(project, drape, &positions, body);
                     if format == ExportFormat::Glb {
                         r3d_io::gltf::to_glb(&scene)
@@ -1323,6 +1395,35 @@ impl Engine {
         Ok(())
     }
 
+    /// The avatar as it is at `time` while it moves; `None` while it
+    /// stands still (the fitted mesh is drawn then).
+    fn moving_avatar(
+        &self,
+        project: &r3d_core::Project,
+        time: f32,
+    ) -> Result<Option<Mesh>, ApiError> {
+        let animation = *self.animation.lock().map_err(|_| poisoned())?;
+        let Some(animation) = animation.and_then(|a| a.settled(time)) else {
+            return Ok(None);
+        };
+        if time < animation.start {
+            return Ok(None);
+        }
+        let Some(body) = project.shown_body() else {
+            return Ok(None);
+        };
+        let Some(form) = self.form_soon(body)? else {
+            return Ok(None);
+        };
+        let mut mesh = Mesh {
+            positions: form.posed(Some(&animation), time),
+            normals: Vec::new(),
+            indices: form.triangles.iter().flatten().copied().collect(),
+        };
+        mesh.recompute_normals();
+        Ok(Some(mesh))
+    }
+
     /// Draw the live garment on the avatar into `view`.
     fn render_garment(
         &self,
@@ -1383,8 +1484,9 @@ impl Engine {
             .map(|d| piece_meshes(d, &published.positions))
             .unwrap_or_default();
         drop(cloth);
+        let moving = self.moving_avatar(project, published.time)?;
         let mut draws = Vec::with_capacity(pieces.len() + 1);
-        if let Some((_, avatar)) = &g.avatar {
+        if let Some(avatar) = moving.as_ref().or(g.avatar.as_ref().map(|(_, m)| m)) {
             draws.push(Draw {
                 mesh: avatar,
                 material: Material::mannequin(&theme),
@@ -1496,9 +1598,13 @@ impl Engine {
             .as_ref()
             .map(|d| piece_meshes(d, &published.positions))
             .unwrap_or_default();
+        let body = match self.moving_avatar(project, published.time)? {
+            Some(moving) => Some(moving),
+            None => g.avatar.as_ref().map(|(_, m)| m.clone()),
+        };
         let subject = Subject {
             cloth: cloth.into_iter().map(|(p, m)| (m, surface(p))).collect(),
-            body: g.avatar.as_ref().map(|(_, m)| m.clone()),
+            body,
             camera: g.camera,
         };
         let job = PhotoJob::start(g.gpu.clone(), subject, settings, width, height)
@@ -2816,6 +2922,42 @@ mod tests {
             .unwrap_err();
         assert_eq!(e.code, "malformed");
         assert!(engine.progress().unwrap().is_none());
+    }
+
+    #[test]
+    fn the_avatar_moves_while_the_garment_drapes() {
+        let tmp = tempfile::tempdir().unwrap();
+        let engine = Engine::open(tmp.path().join("P.r3d").to_string_lossy().into()).unwrap();
+        engine.cpu_only.store(true, Ordering::Relaxed);
+        for step in [
+            r#"{"type":"avatar.set","preset":"Women M","body":{"masculinity":0,"height_cm":168,"bust_cm":90,"waist_cm":73,"hips_cm":98}}"#,
+            r#"{"type":"template.apply","template":"a_line_skirt"}"#,
+        ] {
+            engine.run_long(step.into()).unwrap();
+        }
+        assert_eq!(engine.simulation_status().unwrap().motion, None);
+        let status = engine.set_motion(Some("walk".into())).unwrap();
+        assert!(status.loaded && status.running);
+        assert_eq!(status.motion.as_deref(), Some("walk"));
+        let bad = engine.set_motion(Some("dance".into())).unwrap_err();
+        assert_eq!(bad.code, "invalid_motion");
+        // Once the motion has begun, the 3D view draws the body moving.
+        let deadline = Instant::now() + std::time::Duration::from_secs(60);
+        let mut time = 0.0;
+        while time < 1.7 && Instant::now() < deadline {
+            std::thread::sleep(std::time::Duration::from_millis(20));
+            time = engine.simulation_status().unwrap().time_s;
+        }
+        let project = engine.workspace().unwrap().session().project().clone();
+        let moving = engine
+            .moving_avatar(&project, time as f32)
+            .unwrap()
+            .unwrap();
+        let rest = engine.moving_avatar(&project, 1.0).unwrap();
+        assert!(rest.is_none() && !moving.positions.is_empty());
+        // Standing still again: nothing chosen, the body comes back to rest.
+        let status = engine.set_motion(None).unwrap();
+        assert_eq!(status.motion, None);
     }
 
     #[test]

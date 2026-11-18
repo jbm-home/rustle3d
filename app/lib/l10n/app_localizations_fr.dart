@@ -821,6 +821,21 @@ class LFr extends L {
   String get restartTip => 'Recommencer depuis le patron';
 
   @override
+  String get motionTip => 'Faire bouger l\'avatar';
+
+  @override
+  String get motionStill => 'Immobile';
+
+  @override
+  String get motionWalk => 'Marcher';
+
+  @override
+  String get motionTurn => 'Se tourner';
+
+  @override
+  String get motionRaiseArms => 'Lever les bras';
+
+  @override
   String get maximizeViewTip => 'Agrandir à la place des deux vues  M';
 
   @override

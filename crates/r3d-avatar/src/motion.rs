@@ -31,7 +31,7 @@ pub enum Motion {
 
 /// How far the arms come down from the rest (A) pose to hang relaxed
 /// (degrees).
-const ARMS_DOWN: f32 = 30.0;
+const ARMS_DOWN: f32 = 20.0;
 
 impl Motion {
     pub const ALL: [Motion; 3] = [Motion::Walk, Motion::Turn, Motion::RaiseArms];
@@ -57,18 +57,12 @@ impl Motion {
             Motion::Turn => turn(&mut b, u),
             Motion::RaiseArms => raise_arms(&mut b, u),
         }
-        let w = ease((t / EASE_IN_S).clamp(0.0, 1.0));
-        let mut pose = b.pose;
-        for q in &mut pose.rotations {
-            *q = Quat::IDENTITY.slerp(*q, w);
-        }
-        pose.offset *= w;
-        pose
+        b.pose.scaled(ease(t / EASE_IN_S))
     }
 }
 
 /// Smooth 0 → 1 over 0 → 1 (smoothstep).
-fn ease(x: f32) -> f32 {
+pub fn ease(x: f32) -> f32 {
     let x = x.clamp(0.0, 1.0);
     x * x * (3.0 - 2.0 * x)
 }
@@ -181,7 +175,10 @@ fn turn(b: &mut Builder<'_>, u: f32) {
     b.pose.offset = q * (head - pivot) + pivot - head;
 }
 
-/// Both arms raised overhead over 1.5 s, held, lowered over 1.5 s, held.
+/// Both arms raised over 1.5 s to about 40° above the horizontal, held,
+/// lowered over 1.5 s, held. Higher, linear blend skinning folds the skin
+/// of the armpit onto itself (MakeHuman's weights are made for the A
+/// pose), and cloth caught in the fold is squeezed out.
 fn raise_arms(b: &mut Builder<'_>, u: f32) {
     let s = u * 4.0;
     let amount = if s < 1.5 {
@@ -194,8 +191,8 @@ fn raise_arms(b: &mut Builder<'_>, u: f32) {
         0.0
     };
     for (side, sign) in SIDES {
-        b.turn(&format!("clavicle_{side}"), Vec3::Z * sign, 20.0 * amount);
-        b.turn(&format!("upper_arm_{side}"), Vec3::Z * sign, 100.0 * amount);
+        b.turn(&format!("clavicle_{side}"), Vec3::Z * sign, 15.0 * amount);
+        b.turn(&format!("upper_arm_{side}"), Vec3::Z * sign, 70.0 * amount);
         b.elbow(side, 10.0 * amount);
     }
 }
@@ -242,10 +239,11 @@ mod tests {
         // Walking: the left arm is back when the left heel strikes.
         let at_strike = Motion::Walk.pose(&skeleton, 2.0 * Motion::Walk.period());
         assert!(wrist(&at_strike, "l").z < wrist(&at_strike, "r").z - 0.1);
-        // Raising the arms: the hands go above the head.
+        // Raising the arms: the hands go above the shoulders, beside the
+        // head.
         let up = Motion::RaiseArms.pose(&skeleton, 1.75);
-        let head = skeleton.bones[skeleton.find("head").unwrap()].tail.y;
-        assert!(wrist(&up, "l").y > head && wrist(&up, "r").y > head);
+        let neck = skeleton.bones[skeleton.find("neck").unwrap()].head.y;
+        assert!(wrist(&up, "l").y > neck + 0.1 && wrist(&up, "r").y > neck + 0.1);
         // Turning: half round, the left hand is on the right.
         let round = Motion::Turn.pose(&skeleton, 2.5);
         assert!(wrist(&round, "l").x < -0.1);

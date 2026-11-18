@@ -235,7 +235,15 @@ impl Dressed {
         } else {
             "start"
         };
-        let positions = cached.unwrap_or(start);
+        // The avatar as it was at the drape's last frame, if it moved.
+        let avatar = form.map(|f| {
+            let surface = match &cached {
+                Some(c) => f.posed(c.animation.as_ref(), c.time),
+                None => f.positions.clone(),
+            };
+            mesh(surface, f.triangles.iter().flatten().copied().collect())
+        });
+        let positions = cached.map_or(start, |c| c.positions);
         let pieces = built
             .pieces
             .iter()
@@ -257,8 +265,7 @@ impl Dressed {
             .map(|l| Mesh::ribbon(l, LINE_WIDTH_M, LINE_LIFT_M))
             .collect();
         Ok(Self {
-            avatar: form
-                .map(|f| mesh(f.positions, f.triangles.iter().flatten().copied().collect())),
+            avatar,
             pieces,
             lines,
             state,

@@ -7,7 +7,8 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-18 (handles dragged with Select; Dimension tool, formulas typed in a value;
+Last updated: 2026-11-18 (M23, the avatar walks, turns and raises its arms;
+handles dragged with Select; Dimension tool, formulas typed in a value;
 Sew: part of an edge, several edges, internal lines; ⌘-click to pick a second corner or edge,
 rail tips beside the rail; M14; long sleeves, mirrored seams, agent status;
 rename, delete, export and import projects; smooth views on Windows;
@@ -333,6 +334,15 @@ size to size (its grade), and the other sizes follow.
   that side of the hips above it; place its top at the waist.
 - **Arrange around the body** places every piece side by side in seam
   order at the waist, each taking room in proportion to its width.
+- **Motion** (the walking figure next to Simulate) makes the avatar move
+  while the garment drapes: **Walk** on the spot, **Turn** half round and
+  back, **Raise arms** above the shoulders and down; **Stand still**
+  stops. The motion starts once the garment has closed on the body
+  (after about 1.5 s of draping) and repeats; choosing another one first
+  brings the body back to rest. The cloth follows the body: watch a skirt
+  swing, or a shirt ride up when the arms go up. You can keep editing the
+  pattern meanwhile, and a photo or a 3D export shows the body where it
+  is.
 - The drape runs on the graphics card, about five times faster than on
   the processor; the status bar says **GPU** and the time of a step.
   Without a usable graphics card, or if it fails, the drape carries on
@@ -423,7 +433,10 @@ Protocol):
   `r3d mcp --attach`.
 - **Without the app**: `r3d mcp --project My.r3d` serves a project
   headless. Drapes made there (and with `r3d simulate`) run on the
-  processor, so they give the same result every time.
+  processor, so they give the same result every time. A drape can make
+  the avatar move: `r3d simulate My.r3d --frames 300 --motion walk`
+  (`walk`, `turn` or `raise_arms`); pictures and exports then show the
+  body and the garment at the last frame.
 - An agent can look at its work: a picture of the pattern, of the 3D
   view, or a photo like the app's (`render_photo`). From the command
   line: `r3d render My.r3d --view photo --out photo.png`.
@@ -448,6 +461,9 @@ DXF-AAMA; garments go out as glTF and OBJ: open formats only.
 - Garments worn close together can show through each other where they
   touch, and a shirt cannot be tucked into fitted trousers yet: layers of
   cloth keep about 2 cm apart in the simulation.
+- The avatar walks on the spot (not along a path), raises its arms to
+  above the shoulders but not straight up, and only the built-in body
+  moves (not an imported one).
 - Not yet in the simulation: elastic and shirring, visible topstitching,
   interfacing, quilting and padding. Holes are cut on their line (no seam
   allowance inside them), and a mirrored or symmetric piece cannot have

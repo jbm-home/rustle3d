@@ -239,6 +239,10 @@ enum Cmd {
         /// Frames of 1/60 s (default 300 = 5 s).
         #[arg(long, default_value_t = 300)]
         frames: u32,
+        /// Move the avatar after 1.5 s of draping: walk, turn or
+        /// raise_arms.
+        #[arg(long)]
+        motion: Option<String>,
     },
     /// Render the pattern (`board`), the garment on the avatar (`3d`) or a
     /// photorealistic studio image of it (`photo`) to a PNG file.
@@ -438,9 +442,13 @@ fn cmd_import(
     print_json(&result)
 }
 
-fn cmd_simulate(project: &Path, frames: u32) -> Result<(), Failure> {
+fn cmd_simulate(project: &Path, frames: u32, motion: Option<String>) -> Result<(), Failure> {
     let mut ws = Workspace::open(project)?;
-    let step = Step::from_value(json!({ "type": "simulate", "frames": frames }))?;
+    let mut step = json!({ "type": "simulate", "frames": frames });
+    if let Some(m) = motion {
+        step["motion"] = json!(m);
+    }
+    let step = Step::from_value(step)?;
     print_json(&ws.run_step_with(&step, &progress())?)
 }
 
@@ -579,7 +587,11 @@ fn main() -> ExitCode {
             scale,
             page,
         } => cmd_import(&project, &file, units, scale, page),
-        Cmd::Simulate { project, frames } => cmd_simulate(&project, frames),
+        Cmd::Simulate {
+            project,
+            frames,
+            motion,
+        } => cmd_simulate(&project, frames, motion),
         Cmd::Render {
             project,
             view,

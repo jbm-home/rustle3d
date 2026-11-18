@@ -62,6 +62,18 @@ impl Pose {
             offset: Vec3::ZERO,
         }
     }
+
+    /// Between the rest pose (`w` = 0) and this one (`w` = 1).
+    pub fn scaled(&self, w: f32) -> Self {
+        Self {
+            rotations: self
+                .rotations
+                .iter()
+                .map(|q| Quat::IDENTITY.slerp(*q, w))
+                .collect(),
+            offset: self.offset * w,
+        }
+    }
 }
 
 impl Skeleton {

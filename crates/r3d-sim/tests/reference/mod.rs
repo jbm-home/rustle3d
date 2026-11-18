@@ -4,7 +4,7 @@
 
 use glam::{Vec2, Vec3};
 use r3d_geom::Rigid;
-use r3d_sim::collide::StaticMesh;
+use r3d_sim::collide::{Skin, StaticMesh};
 use r3d_sim::motion::BodyMotion;
 use r3d_sim::scene::{Particle, Triangle};
 use r3d_sim::{FabricPreset, SimScene, Solver};
@@ -157,7 +157,7 @@ pub fn cloth_drapes_over_a_sphere_without_going_through(make: Make) {
     assert!(min_y(&*s) < center.y);
 }
 
-/// A closed box from `lo` to `hi` as a body of one part, that can move.
+/// A closed box from `lo` to `hi` as a body of one bone, that can move.
 pub fn moving_box(lo: Vec3, hi: Vec3) -> StaticMesh {
     let positions: Vec<Vec3> = (0..8)
         .map(|i| {
@@ -181,7 +181,11 @@ pub fn moving_box(lo: Vec3, hi: Vec3) -> StaticMesh {
         .iter()
         .flat_map(|[a, b, c, d]| [[*a, *b, *c], [*a, *c, *d]])
         .collect();
-    StaticMesh::with_parts(positions, triangles, 0.005, &[1; 8])
+    let skin = Skin {
+        bones: [0; 4],
+        weights: [1.0, 0.0, 0.0, 0.0],
+    };
+    StaticMesh::with_skin(positions, triangles, 0.005, vec![skin; 8])
 }
 
 /// A sheet lying on a table-like box; then the box moves 20 cm sideways

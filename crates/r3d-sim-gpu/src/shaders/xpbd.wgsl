@@ -6,7 +6,8 @@
 // contacts and self-collision are per particle and gather what they need,
 // so no two invocations write the same particle.
 //
-// Prepended by the Rust side: SKIN, NEAR, BAND, BRICK, MAX_NEIGHBOURS.
+// Prepended by the Rust side: SKIN, NEAR, BAND, BRICK, MAX_NEIGHBOURS,
+// ITERATIONS, ON_SKIN.
 
 struct Step {
     // xyz: gravity (m/s²), w: substep h (s).
@@ -36,8 +37,8 @@ struct Scene {
     // x: particles, y: hash table size (power of two), z: grabbed
     // particles.
     counts: vec4u,
-    // x: where the field's parts start in `sdf_values`, y: parts of a
-    // moving body (0: the body stands still).
+    // x: where the nodes' vertices start in `sdf_values`, y: bones of a
+    // moving body (0: the body stands still), z: where the skin starts.
     body: vec4u,
 }
 
@@ -74,8 +75,10 @@ struct Hinge {
 @group(1) @binding(10) var<storage, read> sewn_csr: array<u32>;
 @group(1) @binding(11) var<storage, read> excluded_csr: array<u32>;
 @group(1) @binding(12) var<storage, read> sdf_slots: array<u32>;
-// The field's values, then (from scene.body.x) its parts: per value, the
-// body parts of the closest surface, one bit each (as f32 bit patterns).
+// The field's values; then (from scene.body.x) per value the vertex nearest
+// to the closest surface point (u32::MAX: none); then (from scene.body.z)
+// per vertex its skin: four bone indices in one word, four weights (u32
+// words as f32 bit patterns).
 @group(1) @binding(13) var<storage, read> sdf_values: array<f32>;
 // xyz: offset from the target, w: particle index (exact as a float).
 @group(1) @binding(14) var<storage, read> grab: array<vec4f>;
@@ -86,10 +89,10 @@ struct Hinge {
 @group(1) @binding(19) var<storage, read_write> neighbour_count: array<u32>;
 // Per particle: how many candidates it overlaps this substep.
 @group(1) @binding(20) var<storage, read_write> contacts: array<u32>;
-// Per part, the box (rest pose) its surface's nodes lie in: low, high.
-// Then per substep and part, three rigid motions (rotation quaternion,
-// then translation): the part's at the substep's end, its inverse, and
-// the part's at the substep's start.
+// Per bone, the box (rest pose) of the nodes whose vertex it leads: low,
+// high. Then per substep and bone, three rigid motions (rotation
+// quaternion, then translation): the bone's at the substep's end, its
+// inverse, and the bone's at the substep's start.
 @group(1) @binding(21) var<storage, read> body: array<vec4f>;
 
 const WG: u32 = 64u;
@@ -328,26 +331,53 @@ fn sdf_sample(p: vec3f) -> vec4f {
     return vec4f(g / l, distance);
 }
 
-// The body parts the surface closest to `p` belongs to, at the nearest
-// node; 0 far from the surface.
-fn sdf_parts_at(p: vec3f) -> u32 {
+// The skin weights of the vertex recorded at the node nearest `p`
+// (r3d-sim `StaticMesh::skin_at`): four bone indices, eight bits each,
+// and their weights.
+struct SkinAt {
+    found: bool,
+    bones: u32,
+    w: vec4f,
+}
+
+fn skin_at(p: vec3f) -> SkinAt {
+    let none = SkinAt(false, 0u, vec4f(0.0));
     let q = round((p - scene.sdf_origin.xyz) / scene.sdf_origin.w);
     if min(q.x, min(q.y, q.z)) < 0.0 || max(q.x, max(q.y, q.z)) > 1e7 {
-        return 0u;
+        return none;
     }
     let c = vec3u(q);
     let b = c / BRICK;
     let dims = scene.sdf_dims.xyz;
     if any(b >= dims) {
-        return 0u;
+        return none;
     }
     let slot = sdf_slots[(b.z * dims.y + b.y) * dims.x + b.x];
     if slot == 0xffffffffu {
-        return 0u;
+        return none;
     }
     let l = c % BRICK;
     let k = slot * BRICK * BRICK * BRICK + (l.z * BRICK + l.y) * BRICK + l.x;
-    return bitcast<u32>(sdf_values[scene.body.x + k]);
+    let v = bitcast<u32>(sdf_values[scene.body.x + k]);
+    if v == 0xffffffffu {
+        return none;
+    }
+    let s = scene.body.z + 5u * v;
+    let w = vec4f(sdf_values[s + 1u], sdf_values[s + 2u], sdf_values[s + 3u], sdf_values[s + 4u]);
+    return SkinAt(true, bitcast<u32>(sdf_values[s]), w);
+}
+
+// The bones that lead a vertex (r3d-sim `Skin::leading`), one bit each.
+fn leading(s: SkinAt) -> u32 {
+    let heaviest = max(max(s.w.x, s.w.y), max(s.w.z, s.w.w));
+    var mask = 0u;
+    for (var i = 0u; i < 4u; i++) {
+        let bone = (s.bones >> (8u * i)) & 0xffu;
+        if s.w[i] > 0.0 && s.w[i] >= 0.5 * heaviest && bone < 32u {
+            mask |= 1u << bone;
+        }
+    }
+    return mask;
 }
 
 fn rotate(q: vec4f, v: vec3f) -> vec3f {
@@ -357,6 +387,54 @@ fn rotate(q: vec4f, v: vec3f) -> vec3f {
 // Rigid motion `k` of the body buffer applied to `p`.
 fn rigid(k: u32, p: vec3f) -> vec3f {
     return rotate(body[k], p) + body[k + 1u].xyz;
+}
+
+// A vertex's skinning `p ↦ M p + t`, M by its columns; `ok` is false when
+// a bone is missing or M is singular.
+struct Blend {
+    c0: vec3f,
+    c1: vec3f,
+    c2: vec3f,
+    t: vec3f,
+    ok: bool,
+}
+
+// `which`: 0 for the bones' motions at the substep's end, 4 at its start.
+fn blend(s: SkinAt, base: u32, which: u32) -> Blend {
+    var m = Blend(vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), true);
+    for (var i = 0u; i < 4u; i++) {
+        let w = s.w[i];
+        if w > 0.0 {
+            let bone = (s.bones >> (8u * i)) & 0xffu;
+            if bone >= scene.body.y {
+                m.ok = false;
+                return m;
+            }
+            let k = base + bone * 6u + which;
+            m.c0 += rotate(body[k], vec3f(1.0, 0.0, 0.0)) * w;
+            m.c1 += rotate(body[k], vec3f(0.0, 1.0, 0.0)) * w;
+            m.c2 += rotate(body[k], vec3f(0.0, 0.0, 1.0)) * w;
+            m.t += body[k + 1u].xyz * w;
+        }
+    }
+    m.ok = abs(dot(m.c0, cross(m.c1, m.c2))) > 1e-3;
+    return m;
+}
+
+fn apply_blend(m: Blend, q: vec3f) -> vec3f {
+    return m.c0 * q.x + m.c1 * q.y + m.c2 * q.z + m.t;
+}
+
+// M⁻¹ y.
+fn solve(m: Blend, y: vec3f) -> vec3f {
+    let d = dot(m.c0, cross(m.c1, m.c2));
+    return vec3f(dot(cross(m.c1, m.c2), y), dot(cross(m.c2, m.c0), y), dot(cross(m.c0, m.c1), y)) / d;
+}
+
+// M⁻ᵀ n.
+fn inverse_transpose(m: Blend, n: vec3f) -> vec3f {
+    let d = dot(m.c0, cross(m.c1, m.c2));
+    return (cross(m.c1, m.c2) * n.x + cross(m.c2, m.c0) * n.y + cross(m.c0, m.c1) * n.z) / d;
 }
 
 // The body seen from `p` (r3d-sim `motion::touch`).
@@ -375,16 +453,47 @@ fn touch(p: vec3f) -> Touch {
     var best = Touch(vec4f(0.0, 0.0, 0.0, BAND), vec3f(0.0));
     let base = 2u * parts + u32(step.params.w) * parts * 6u;
     for (var part = 0u; part < parts; part++) {
-        let k = base + part * 6u;
-        let q = rigid(k + 2u, p);
+        var q = rigid(base + part * 6u + 2u, p);
         if any(q < body[2u * part].xyz) || any(q > body[2u * part + 1u].xyz) {
             continue;
         }
-        let c = sdf_sample(q);
-        if c.w >= BAND || c.w >= best.c.w || (sdf_parts_at(q) & (1u << part)) == 0u {
+        let start = skin_at(q);
+        if !start.found || (leading(start) & (1u << part)) == 0u {
             continue;
         }
-        best = Touch(vec4f(rotate(body[k], c.xyz), c.w), p - rigid(k + 4u, q));
+        var solved = true;
+        for (var i = 0u; i < ITERATIONS; i++) {
+            let s = skin_at(q);
+            let m = blend(s, base, 0u);
+            if !s.found || !m.ok {
+                solved = false;
+                break;
+            }
+            q = solve(m, p - m.t);
+        }
+        let s = skin_at(q);
+        if !solved || !s.found {
+            continue;
+        }
+        let m = blend(s, base, 0u);
+        let mb = blend(s, base, 4u);
+        if !m.ok || !mb.ok || distance(apply_blend(m, q), p) > ON_SKIN {
+            continue;
+        }
+        let c = sdf_sample(q);
+        if c.w >= BAND {
+            continue;
+        }
+        let n = inverse_transpose(m, c.xyz);
+        let stretch = length(n);
+        if !(stretch > 1e-6) {
+            continue;
+        }
+        let d = c.w / stretch;
+        if d >= best.c.w {
+            continue;
+        }
+        best = Touch(vec4f(n / stretch, d), p - apply_blend(mb, q));
     }
     return best;
 }
@@ -422,6 +531,13 @@ fn collide(@builtin(global_invocation_id) id: vec3u) {
             normal = c.xyz;
             carried = t.moved;
             touching = true;
+            // Pre-stabilisation, as on the CPU: no more speed along the
+            // normal than the surface touched has (a moving body only).
+            let gained = dot(p - prev[i].xyz, normal);
+            let allowed = max(dot(carried, normal), 0.0);
+            if scene.body.y > 0u && gained > allowed {
+                prev[i] = vec4f(prev[i].xyz + normal * (gained - allowed), 0.0);
+            }
         }
     }
     if scene.contact.z > 0.5 && p.y < d.y {

@@ -198,8 +198,9 @@ fn a_skirt_made_from_scratch_sews_arranges_and_drapes() {
     );
     run(&mut s, serde_json::json!({"type": "garment.arrange"}));
 
-    let out = r3d_commands::drape::simulate(s.project(), 120, &r3d_commands::Progress::default())
-        .unwrap();
+    let out =
+        r3d_commands::drape::simulate(s.project(), 120, None, &r3d_commands::Progress::default())
+            .unwrap();
     let top = out.positions.iter().map(|p| p.y).fold(f32::MIN, f32::max);
     assert!(out.stats.max_seam_gap < 0.005, "{:?}", out.stats);
     assert!(top > 0.95, "slid down: {top}");

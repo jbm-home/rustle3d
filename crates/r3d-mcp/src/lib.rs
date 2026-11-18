@@ -46,7 +46,8 @@ Every successful change is saved to the project folder. \
 export_pdf / export_svg write 1:1 patterns under exports/ (paths stay inside the project); \
 export_gltf / export_obj write the draped garment (after simulate) for 3D tools and game engines. \
 To dress the avatar: avatar_set, panel_place each panel around the body, seam_add, garment_set_fabric, \
-then simulate (headless drape, cached) and render_3d to see the result; render_board shows the pattern; \
+then simulate (headless drape, cached; with `motion` the avatar walks, turns or raises its arms and the \
+cloth follows) and render_3d to see the result; render_board shows the pattern; \
 render_photo makes a photorealistic studio image of the draped garment (quality quick for a first look). \
 Errors carry a stable `code`, `args` and an English `text`.";
 

@@ -39,12 +39,12 @@ can be tested through MCP as soon as they exist.
 | M28 | Parametric patterns ✅ | 2–3 wk | A skirt whose waist is `waist / 4 + 10 mm` redrafts itself on another body |
 | M29 | Construction details ✅ | 3–4 wk | A skirt with darts, a pleat and a patch pocket sewn on an internal line |
 | M32 | Editor finishing ✅ | 1–2 wk | A patch pocket sewn on its line and a dimension drawn on the board, all with the mouse |
+| M23 | Animated avatars ✅ | 3–4 wk | The avatar walks and the garment follows |
 | M20 | Trims: buttons and zippers | 2–3 wk | A shirt that buttons and trousers with a fly zipper, draped closed |
 | M21 | Textures and prints | 2–3 wk | A striped shirt whose stripes follow the grainline on every piece |
 | M30 | Production: marker, yardage, tech pack, projector | 3–4 wk | A graded shirt nested on a 150 cm fabric, its yardage and cost, its tech pack PDF |
 | M24 | Fit maps and virtual tape measure | 2 wk | Tight spots show in colour; the ease at the chest is read on the drape |
 | M31 | Imported avatars | 2–3 wk | A body scan in OBJ/glTF is checked, the pieces placed around it and draped |
-| M23 | Animated avatars | 3–4 wk | The avatar walks and the garment follows |
 | M15 | Game-ready export | 3–4 wk | LODs + baked wrinkle normal maps + skinning, imported in Godot/Unity/Unreal |
 
 M10 came before M9: the first-time user test, not the export, decided
@@ -69,7 +69,10 @@ gives the details that make a garment look real. M30 groups what a
 small brand needs to produce. M19's open point (close layers, a tucked
 in shirt) is hard physics: it is taken up after M32. M32 (2026-11-18)
 brings to the app what M27–M29 left to agents and scripts: the commands
-exist, the mouse cannot reach them yet.
+exist, the mouse cannot reach them yet. M23 came next (maintainer,
+2026-11-18): it could be done autonomously, the skeleton and weights
+shipping with the body we already use (CC0) and the motions being our
+own.
 
 ---
 
@@ -784,6 +787,21 @@ tests below, in the real app):
 - A skeleton for the avatar and a few motions (walk, turn, raise arms);
   the cloth follows the moving body. Animation assets under a
   redistributable licence only (CLAUDE.md §1).
+- Delivered (spec 22): MakeHuman's default skeleton and weights (CC0)
+  reduced to 24 bones in the body pack, fitted with every body; our own
+  procedural motions (walk on the spot, half a turn and back, arms raised
+  above the shoulders), eased in and out, the body back at rest before
+  the next one; the cloth collides with the moving skin through inverse
+  linear blend skinning of the rest pose's distance field, with friction
+  relative to the skin and pre-stabilised contacts, on the CPU and the
+  GPU (physics.md §5, Moving body); the app's Motion menu; `simulate`
+  with `motion` for agents and the CLI, cached with the drape, so renders
+  and exports show the posed body.
+- **Demo**: `./demos/m23/demo.sh` (a dress walking, a skirt turning, a
+  T-shirt raising its arms, rendered and exported at the last frame).
+- Left for later: walking along a path, arms straight overhead (needs a
+  skinning that does not fold the armpit, e.g. dual quaternions),
+  imported avatars' motions (M31), a timeline and a video of a motion.
 
 ## M24 — Fit maps and virtual tape measure
 - Stress and strain shown in colour on the draped garment, to find

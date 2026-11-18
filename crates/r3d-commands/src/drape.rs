@@ -9,6 +9,10 @@
 //! [`simulate`] runs a drape headless (CLI, agents); its result is cached in
 //! the project folder, keyed by a fingerprint of the document, so renders
 //! can show it without simulating again.
+//!
+//! The avatar can move ([`Animation`]): its skeleton's motion is sampled
+//! for the solver ([`Form::body_motion`]) and its skin posed for the views
+//! ([`Form::posed`]).
 
 use std::collections::{BTreeMap, HashMap};
 use std::ops::Range;
@@ -16,12 +20,17 @@ use std::path::Path;
 use std::time::Instant;
 
 use glam::{Vec2, Vec3};
-use r3d_avatar::fit::fitted_positions;
+use r3d_avatar::fit::{fitted_body, fitted_positions};
+use r3d_avatar::motion::{EASE_IN_S, Motion, ease};
+use r3d_avatar::pack::Influences;
+use r3d_avatar::skeleton::{Skeleton, skin};
 use r3d_core::seam::{Span, Track};
 use r3d_core::{Around, EdgeId, Fabric, GarmentId, PanelId, PinId, Project, SeamSide};
 use r3d_geom::DVec2;
+use r3d_geom::Rigid;
 use r3d_geom::mesh::mesh_panel;
-use r3d_sim::collide::StaticMesh;
+use r3d_sim::collide::{Skin, StaticMesh};
+use r3d_sim::motion::BodyMotion;
 use r3d_sim::scene::{Particle, Triangle};
 use r3d_sim::{CpuSolver, FabricPreset, SUBSTEPS, SimScene, Solver, StepStats};
 
@@ -77,6 +86,92 @@ pub struct Form {
     /// plane, below which the legs are apart.
     crotch: f32,
     collider: StaticMesh,
+    /// What moves the body, if it can move.
+    rig: Option<Rig>,
+}
+
+/// A body's skeleton and skin weights.
+#[derive(Debug, Clone)]
+struct Rig {
+    skeleton: Skeleton,
+    weights: Vec<Influences>,
+}
+
+/// The solver gets a motion sampled this many times a second.
+const MOTION_FPS: f32 = 60.0;
+/// A motion starts once the garment has closed and settled on the body:
+/// not before this much draping (s).
+pub const MOTION_START_S: f32 = 1.5;
+/// A stopped motion brings the body back to rest over this time (s).
+pub const STOP_S: f32 = 1.0;
+
+/// The avatar's motion over simulated time.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Animation {
+    pub motion: Motion,
+    /// When it starts (simulated time, s).
+    pub start: f32,
+    /// When it was stopped, if it was: the body then comes back to rest
+    /// over [`STOP_S`]...
+    pub stop: Option<f32>,
+    /// ...and starts this motion, if one was chosen meanwhile.
+    pub then: Option<Motion>,
+}
+
+impl Animation {
+    /// `motion`, from [`MOTION_START_S`] of draping or `now`, whichever
+    /// comes later.
+    pub fn starting(motion: Motion, now: f32) -> Self {
+        Self {
+            motion,
+            start: now.max(MOTION_START_S),
+            stop: None,
+            then: None,
+        }
+    }
+
+    /// What the body does once `to` (`None`: stand still) is chosen at
+    /// `now`, after `current`: a motion that has begun first comes back
+    /// to rest, so the body never jumps.
+    pub fn switch(current: Option<Self>, to: Option<Motion>, now: f32) -> Option<Self> {
+        match current.and_then(|a| a.settled(now)) {
+            None => to.map(|m| Self::starting(m, now)),
+            Some(a) if a.stop.is_none() && to == Some(a.motion) => Some(a),
+            Some(a) if now < a.start => to.map(|m| Self::starting(m, now)),
+            Some(a) => Some(Self {
+                stop: Some(a.stop.unwrap_or(now)),
+                then: to,
+                ..a
+            }),
+        }
+    }
+
+    /// The same animation seen from `now` on: once a stopped motion is
+    /// back at rest, the next one (or nothing).
+    pub fn settled(self, now: f32) -> Option<Self> {
+        match self.stop {
+            Some(stop) if now >= stop + STOP_S => self.then.map(|m| Self {
+                motion: m,
+                start: stop + STOP_S,
+                stop: None,
+                then: None,
+            }),
+            _ => Some(self),
+        }
+    }
+
+    /// The same animation for a drape started again from the beginning.
+    pub fn restarted(self) -> Option<Self> {
+        self.chosen().map(|m| Self::starting(m, 0.0))
+    }
+
+    /// The motion chosen last, if any: playing, or next after a stop.
+    pub fn chosen(&self) -> Option<Motion> {
+        match self.stop {
+            None => Some(self.motion),
+            Some(_) => self.then,
+        }
+    }
 }
 
 /// An arm: an axis down the upper arm to the elbow, then down the
@@ -439,7 +534,12 @@ impl Arm {
 }
 
 impl Form {
+    /// A dress form that stands still.
     pub fn new(positions: Vec<Vec3>, triangles: Vec<[u32; 3]>) -> Self {
+        Self::with_rig(positions, triangles, None)
+    }
+
+    fn with_rig(positions: Vec<Vec3>, triangles: Vec<[u32; 3]>, rig: Option<Rig>) -> Self {
         let height = positions.iter().map(|p| p.y).fold(0.0, f32::max);
         let arms = [1.0, -1.0].map(|side| Arm::find(&positions, height, side));
         let body: Vec<Vec3> = positions
@@ -457,7 +557,16 @@ impl Form {
             .filter(|p| p.x.abs() < MEDIAN_POINT_M && p.y > CROTCH_ABOVE * height)
             .map(|p| p.y)
             .fold(CROTCH_FRACTION * height, f32::min);
-        let collider = StaticMesh::new(positions.clone(), triangles.clone(), BODY_VOXEL);
+        let skin: Vec<Skin> = rig
+            .iter()
+            .flat_map(|r| &r.weights)
+            .map(|w| Skin {
+                bones: w.bones,
+                weights: w.weights,
+            })
+            .collect();
+        let collider =
+            StaticMesh::with_skin(positions.clone(), triangles.clone(), BODY_VOXEL, skin);
         Self {
             positions,
             triangles,
@@ -466,7 +575,67 @@ impl Form {
             legs,
             crotch,
             collider,
+            rig,
         }
+    }
+
+    /// Each bone's motion at `time` (simulated, s) of `animation`; `None`
+    /// for a form without a skeleton.
+    fn transforms(&self, animation: &Animation, time: f32) -> Option<Vec<Rigid>> {
+        let rig = self.rig.as_ref()?;
+        let since = |t: f32| (t - animation.start).max(0.0);
+        let pose = match animation.stop {
+            Some(stop) if time >= stop => match animation.then {
+                Some(next) if time >= stop + STOP_S => {
+                    next.pose(&rig.skeleton, time - stop - STOP_S)
+                }
+                _ => {
+                    let left = animation.motion.pose(&rig.skeleton, since(stop));
+                    left.scaled(1.0 - ease((time - stop) / STOP_S))
+                }
+            },
+            _ => animation.motion.pose(&rig.skeleton, since(time)),
+        };
+        Some(rig.skeleton.transforms(&pose))
+    }
+
+    /// The body's surface at `time` of `animation` (at rest without one).
+    pub fn posed(&self, animation: Option<&Animation>, time: f32) -> Vec<Vec3> {
+        match (animation.and_then(|a| self.transforms(a, time)), &self.rig) {
+            (Some(t), Some(rig)) => skin(&self.positions, &rig.weights, &t),
+            _ => self.positions.clone(),
+        }
+    }
+
+    /// `animation` as the solver runs it, sampled from where it starts (or
+    /// was stopped) on; `None` for a form without a skeleton.
+    pub fn body_motion(&self, animation: &Animation) -> Option<BodyMotion> {
+        let frames = |from: f32, seconds: f32| -> Option<Vec<Vec<Rigid>>> {
+            (0..(seconds * MOTION_FPS).round() as usize)
+                .map(|k| self.transforms(animation, from + k as f32 / MOTION_FPS))
+                .collect()
+        };
+        let (start, intro, cycle) = match (animation.stop, animation.then) {
+            // Back to rest, then the next motion.
+            (Some(stop), Some(next)) => (
+                stop,
+                frames(stop, STOP_S + EASE_IN_S)?,
+                frames(stop + STOP_S + EASE_IN_S, next.period())?,
+            ),
+            // Back to rest, then still (the last sample holds).
+            (Some(stop), None) => (stop, frames(stop, STOP_S + 1.0 / MOTION_FPS)?, Vec::new()),
+            (None, _) => (
+                animation.start,
+                frames(animation.start, EASE_IN_S)?,
+                frames(animation.start + EASE_IN_S, animation.motion.period())?,
+            ),
+        };
+        Some(BodyMotion {
+            start,
+            fps: MOTION_FPS,
+            intro,
+            cycle,
+        })
     }
 
     /// The project's avatar fitted to its measurements, if it has one
@@ -475,11 +644,20 @@ impl Form {
         project.shown_body().map(|b| Self::of_body(&b)).transpose()
     }
 
-    /// The built-in body fitted to `body` (seconds the first time).
+    /// The built-in body fitted to `body`, with its skeleton (seconds the
+    /// first time).
     pub fn of_body(body: &r3d_core::Body) -> Result<Self, CommandError> {
         let model = body_model()?;
-        let positions = fitted_positions(model, &fitted(body)?);
-        Ok(Self::new(positions, model.triangles().to_vec()))
+        let shaped = fitted_body(model, &fitted(body)?);
+        let rig = Rig {
+            skeleton: Skeleton::new(model, &shaped),
+            weights: model.weights().to_vec(),
+        };
+        Ok(Self::with_rig(
+            shaped.positions,
+            model.triangles().to_vec(),
+            Some(rig),
+        ))
     }
 }
 
@@ -1469,19 +1647,29 @@ pub struct Simulated {
     pub frames: u32,
     pub ms_per_frame: f64,
     pub stats: StepStats,
+    /// The avatar's motion, if it moved.
+    pub animation: Option<Animation>,
 }
 
 /// Simulate `frames` frames of 1/60 s from the starting positions, on the
-/// CPU backend: deterministic, so a cached drape can be reproduced.
+/// CPU backend: deterministic, so a cached drape can be reproduced. With a
+/// `motion`, the avatar starts moving after [`MOTION_START_S`].
 pub fn simulate(
     project: &Project,
     frames: u32,
+    motion: Option<Motion>,
     progress: &Progress,
 ) -> Result<Simulated, CommandError> {
     let form = Form::of_project(project)?;
-    let drape = prepare(project, form.as_ref())?;
+    let mut drape = prepare(project, form.as_ref())?;
     if drape.pieces.is_empty() {
         return Err(CommandError::NothingToSimulate);
+    }
+    let animation = motion
+        .filter(|_| form.is_some())
+        .map(|m| Animation::starting(m, 0.0));
+    if let (Some(f), Some(a)) = (&form, &animation) {
+        drape.scene.motion = f.body_motion(a);
     }
     let mut solver = CpuSolver::new(drape.scene.clone());
     let start = Instant::now();
@@ -1507,6 +1695,7 @@ pub fn simulate(
         form,
         frames,
         ms_per_frame,
+        animation,
     })
 }
 
@@ -1515,7 +1704,9 @@ const PROGRESS_FRAMES: u32 = 10;
 
 /// Where the last headless drape is cached, relative to the project folder.
 pub const CACHE_FILE: &str = ".r3d-cache/drape.bin";
-const CACHE_MAGIC: &[u8; 8] = b"R3DDRP01";
+const CACHE_MAGIC: &[u8; 8] = b"R3DDRP02";
+/// Bytes before the positions: magic, fingerprint, motion, time.
+const CACHE_HEAD: usize = 8 + 8 + 4 + 4;
 
 /// Fingerprint of everything a drape depends on: the document (schema
 /// JSON), the mesh spacing and the solver's substeps. FNV-1a, stable
@@ -1533,11 +1724,31 @@ pub fn fingerprint(project: &Project) -> Result<u64, CommandError> {
     Ok(hash)
 }
 
-/// Encode a drape for [`CACHE_FILE`].
-pub fn encode_cache(fingerprint: u64, positions: &[Vec3]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(16 + positions.len() * 12);
+/// A cached drape: where the cloth was at `time`, and how the avatar
+/// moved, if it did.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Cached {
+    pub positions: Vec<Vec3>,
+    pub animation: Option<Animation>,
+    /// Simulated time at the end (s).
+    pub time: f32,
+}
+
+/// Encode a drape for [`CACHE_FILE`]: the fingerprint, the motion (its
+/// index in [`Motion::ALL`] plus one, 0 for none; it started at
+/// [`MOTION_START_S`]), the time, the positions.
+pub fn encode_cache(fingerprint: u64, out: &Simulated) -> Vec<u8> {
+    let positions = &out.positions;
+    let motion = out
+        .animation
+        .and_then(|a| Motion::ALL.iter().position(|m| *m == a.motion))
+        .map_or(0, |i| i as u32 + 1);
+    let time = out.frames as f32 / 60.0;
+    let mut bytes = Vec::with_capacity(CACHE_HEAD + positions.len() * 12);
     bytes.extend_from_slice(CACHE_MAGIC);
     bytes.extend_from_slice(&fingerprint.to_le_bytes());
+    bytes.extend_from_slice(&motion.to_le_bytes());
+    bytes.extend_from_slice(&time.to_le_bytes());
     for p in positions {
         for c in p.to_array() {
             bytes.extend_from_slice(&c.to_le_bytes());
@@ -1546,42 +1757,53 @@ pub fn encode_cache(fingerprint: u64, positions: &[Vec3]) -> Vec<u8> {
     bytes
 }
 
-/// The cached drape positions in the project folder `dir`, if they were
-/// made from this exact document; `None` otherwise (stale, missing or
-/// damaged cache: it is only a cache).
-pub fn load_cache(dir: &Path, project: &Project, particles: usize) -> Option<Vec<Vec3>> {
+/// The cached drape in the project folder `dir`, if it was made from this
+/// exact document; `None` otherwise (stale, missing or damaged cache: it
+/// is only a cache).
+pub fn load_cache(dir: &Path, project: &Project, particles: usize) -> Option<Cached> {
     let bytes = std::fs::read(dir.join(CACHE_FILE)).ok()?;
-    let (head, body) = bytes.split_at_checked(16)?;
-    let (magic, print) = head.split_at(8);
+    let (head, body) = bytes.split_at_checked(CACHE_HEAD)?;
+    let (magic, rest) = head.split_at(8);
+    let (print, rest) = rest.split_at(8);
+    let (motion, time) = rest.split_at(4);
     if magic != CACHE_MAGIC
         || print != fingerprint(project).ok()?.to_le_bytes()
         || body.len() != particles * 12
     {
         return None;
     }
-    Some(
-        body.as_chunks::<12>()
-            .0
-            .iter()
-            .map(|c| {
-                let (xyz, _) = c.as_chunks::<4>();
-                let [x, y, z] =
-                    [0, 1, 2].map(|i| xyz.get(i).map_or(0.0, |b| f32::from_le_bytes(*b)));
-                Vec3::new(x, y, z)
-            })
-            .collect(),
-    )
+    let motion = u32::from_le_bytes(motion.try_into().ok()?) as usize;
+    let time = f32::from_le_bytes(time.try_into().ok()?);
+    let animation = match motion {
+        0 => None,
+        i => Some(Animation::starting(*Motion::ALL.get(i - 1)?, 0.0)),
+    };
+    let positions = body
+        .as_chunks::<12>()
+        .0
+        .iter()
+        .map(|c| {
+            let (xyz, _) = c.as_chunks::<4>();
+            let [x, y, z] = [0, 1, 2].map(|i| xyz.get(i).map_or(0.0, |b| f32::from_le_bytes(*b)));
+            Vec3::new(x, y, z)
+        })
+        .collect();
+    Some(Cached {
+        positions,
+        animation,
+        time,
+    })
 }
 
 /// The garment draped at `positions` (one per particle of `drape`), as
 /// meshes to export: one per piece, named after it, with its pattern
-/// position as texture coordinates; the dress form too when `form` is
-/// given.
+/// position as texture coordinates; the avatar too when `avatar` (its
+/// surface and triangles) is given.
 pub fn scene3d(
     project: &Project,
     drape: &Drape,
     positions: &[Vec3],
-    form: Option<&Form>,
+    avatar: Option<(&[Vec3], &[[u32; 3]])>,
 ) -> r3d_io::scene3d::Scene3d {
     use r3d_io::scene3d::{Material3d, Mesh3d, Scene3d};
     // One material per garment, named after it.
@@ -1622,7 +1844,7 @@ pub fn scene3d(
         })
         .collect();
     let avatar_material = materials.len();
-    let avatar = form.map(|f| {
+    let avatar = avatar.map(|(surface, triangles)| {
         materials.push(Material3d {
             name: "Avatar".into(),
             rgb: 0xC9C6C1,
@@ -1633,9 +1855,9 @@ pub fn scene3d(
         });
         Mesh3d {
             name: "Avatar".into(),
-            positions: f.positions.iter().map(|p| p.to_array()).collect(),
+            positions: surface.iter().map(|p| p.to_array()).collect(),
             uvs: Vec::new(),
-            indices: f.triangles.iter().flatten().copied().collect(),
+            indices: triangles.iter().flatten().copied().collect(),
             material: avatar_material,
         }
     });

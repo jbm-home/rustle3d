@@ -167,6 +167,43 @@ pub struct Simulate {
     /// Frames of 1/60 s to simulate (1–3600, default 300 = 5 s).
     #[serde(default = "default_frames")]
     pub frames: u32,
+    /// A motion of the avatar, started after 1.5 s of draping (once the
+    /// garment has closed); the cloth follows it. Omitted: the avatar
+    /// stands still.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub motion: Option<AvatarMotion>,
+}
+
+/// A motion of the avatar.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AvatarMotion {
+    /// Walking on the spot (a 1.1 s step cycle).
+    Walk,
+    /// Half a turn to the left and back (6 s).
+    Turn,
+    /// Both arms raised overhead and lowered (4 s).
+    RaiseArms,
+}
+
+impl From<AvatarMotion> for r3d_avatar::motion::Motion {
+    fn from(m: AvatarMotion) -> Self {
+        match m {
+            AvatarMotion::Walk => Self::Walk,
+            AvatarMotion::Turn => Self::Turn,
+            AvatarMotion::RaiseArms => Self::RaiseArms,
+        }
+    }
+}
+
+impl From<r3d_avatar::motion::Motion> for AvatarMotion {
+    fn from(m: r3d_avatar::motion::Motion) -> Self {
+        match m {
+            r3d_avatar::motion::Motion::Walk => Self::Walk,
+            r3d_avatar::motion::Motion::Turn => Self::Turn,
+            r3d_avatar::motion::Motion::RaiseArms => Self::RaiseArms,
+        }
+    }
 }
 
 fn default_frames() -> u32 {
@@ -174,7 +211,7 @@ fn default_frames() -> u32 {
 }
 
 impl Described for Simulate {
-    const SUMMARY: &'static str = "Drape the placed and sewn panels on the avatar for a number of frames (1/60 s each, deterministic) and cache the result in the project, so `r3d render --view 3d` shows it. Returns the garment's extent, how open the seams are and whether the cloth has settled.";
+    const SUMMARY: &'static str = "Drape the placed and sewn panels on the avatar for a number of frames (1/60 s each, deterministic) and cache the result in the project, so `r3d render --view 3d` shows it. With `motion`, the avatar walks, turns or raises its arms after 1.5 s and the cloth follows; renders and exports then show the body and the garment as they are at the last frame. Returns the garment's extent, how open the seams are and whether the cloth has settled.";
 }
 
 impl ActionSpec for Simulate {
@@ -187,8 +224,9 @@ impl ActionSpec for Simulate {
             return Err(CommandError::invalid("frames", Invalid::Range(1.0, 3600.0)).into());
         }
         let project = ws.session().project();
-        let out = drape::simulate(project, self.frames, progress)?;
-        let cache = drape::encode_cache(drape::fingerprint(project)?, &out.positions);
+        let motion = self.motion.map(Into::into);
+        let out = drape::simulate(project, self.frames, motion, progress)?;
+        let cache = drape::encode_cache(drape::fingerprint(project)?, &out);
         ws.write(drape::CACHE_FILE, &cache)?;
         let ys = out.positions.iter().map(|p| p.y);
         let top = ys.clone().fold(f32::MIN, f32::max);
@@ -205,6 +243,10 @@ impl ActionSpec for Simulate {
             "max_seam_gap_mm": r3(f64::from(out.stats.max_seam_gap) * 1000.0),
             "max_speed_m_s": r3(out.stats.max_speed.into()),
             "settled": out.stats.max_speed < SETTLED_SPEED,
+            "motion": out.animation.map(|a| AvatarMotion::from(a.motion)),
+            "motion_s": out
+                .animation
+                .map(|a| r3((f64::from(out.frames) / 60.0 - f64::from(a.start)).max(0.0))),
         }))
     }
 }
@@ -225,9 +267,13 @@ fn draped(
     } else {
         "start"
     };
-    let positions = cached.unwrap_or(start);
-    let form = if avatar { form.as_ref() } else { None };
-    Ok((drape::scene3d(project, &built, &positions, form), state))
+    let body = form.as_ref().filter(|_| avatar).map(|f| match &cached {
+        Some(c) => f.posed(c.animation.as_ref(), c.time),
+        None => f.positions.clone(),
+    });
+    let positions = cached.map_or(start, |c| c.positions);
+    let avatar = body.as_deref().zip(form.as_ref().map(|f| &f.triangles[..]));
+    Ok((drape::scene3d(project, &built, &positions, avatar), state))
 }
 
 /// Export the draped garment as glTF 2.0 (GLB).
