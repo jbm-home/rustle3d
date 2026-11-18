@@ -12,12 +12,11 @@ box pleats, optionally stitched down (`pleat.add`); holes in pieces
 (`panel.boolean`). The cloth follows: internal lines that are sewn and
 holes are part of each piece's mesh. Project files: schema v13. The
 app: the Details tools (Dart, Pleat, Hole), Join or cut in the
-inspector, the Ease of a seam in the edge card.
+inspector, the Ease of a seam in the edge card; since M32 the Sew tool
+picks every kind of side (spec 02, The Sew tool).
 
 Not yet (the solver would need more): elastic and shirring, visible
-topstitching, interfacing (local stiffening), quilting and padding. In
-the app, a partial seam or a seam on an internal line is made by an
-agent or a script (`seam.add`); the Sew tool sews whole edges. Holes are
+topstitching, interfacing (local stiffening), quilting and padding. Holes are
 cut on their line (no seam allowance inward). Mirror copies and
 symmetric pieces cannot have holes yet.
 

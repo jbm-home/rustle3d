@@ -669,7 +669,8 @@ class LFr extends L {
   String get toolSew => 'Coudre';
 
   @override
-  String get toolSewHint => 'Cliquez deux bords sur le patron';
+  String get toolSewHint =>
+      'Cliquez deux bords ou lignes sur le patron ; glissez le long d’un bord pour n’en coudre qu’une partie';
 
   @override
   String get viewPattern => 'Patron';
@@ -733,11 +734,15 @@ class LFr extends L {
 
   @override
   String get hintSewFirst =>
-      'Coudre : cliquez le premier bord sur le patron · V pour arrêter';
+      'Coudre : cliquez un bord ou une ligne, ou glissez le long pour n’en coudre qu’une partie · ⌘-cliquez des bords qui se suivent pour les coudre comme un seul côté · V pour arrêter';
 
   @override
   String get hintSewSecond =>
-      'Coudre : cliquez maintenant le bord à y coudre · V pour arrêter';
+      'Coudre : maintenant le côté à y coudre : cliquez-le, glissez le long d’une partie ou ⌘-cliquez plusieurs bords · Échap pour recommencer';
+
+  @override
+  String get hintSewRun =>
+      'Coudre : ⌘-cliquez les bords suivants, puis cliquez le dernier ou appuyez sur Entrée · Échap pour recommencer';
 
   @override
   String get hintDraw =>

@@ -662,7 +662,8 @@ class LEn extends L {
   String get toolSew => 'Sew';
 
   @override
-  String get toolSewHint => 'Click two edges on the pattern';
+  String get toolSewHint =>
+      'Click two edges or lines on the pattern; drag along one to sew part of it';
 
   @override
   String get viewPattern => 'Pattern';
@@ -725,11 +726,15 @@ class LEn extends L {
 
   @override
   String get hintSewFirst =>
-      'Sew: click the first edge on the pattern · V to stop';
+      'Sew: click an edge or a line, or drag along it to sew part of it · ⌘-click edges that follow each other to sew them as one side · V to stop';
 
   @override
   String get hintSewSecond =>
-      'Sew: now click the edge to sew it to · V to stop';
+      'Sew: now the side to sew it to: click it, drag along part of it or ⌘-click several edges · Esc starts again';
+
+  @override
+  String get hintSewRun =>
+      'Sew: ⌘-click the next edges, then click the last one or press Enter · Esc starts again';
 
   @override
   String get hintDraw =>

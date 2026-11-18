@@ -7,7 +7,8 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-18 (⌘-click to pick a second corner or edge,
+Last updated: 2026-11-18 (Sew: part of an edge, several edges, internal
+lines; ⌘-click to pick a second corner or edge,
 rail tips beside the rail; M14; long sleeves, mirrored seams, agent status;
 rename, delete, export and import projects; smooth views on Windows;
 cloth comes to rest; pieces arranged side by side by width; M17,
@@ -102,7 +103,7 @@ of related tools (the last one used stays on the button).
 | Cut | K | Click (or drag, for curves) a line across a piece, from outside to outside, then Enter: the piece becomes two pieces sewn together along the line |
 | Draw on garment | D | Drag across the 3D garment: the line lands on the pattern |
 | Notch | N | Click an edge where the notch goes |
-| Sew | S | Click an edge, then the edge to sew it to |
+| Sew | S | Click an edge or a line, then the one to sew it to; drag along one to sew part of it; ⌘-click several edges in a row to sew them as one side |
 
 **Make a view bigger**: the button at the top right of the board or of
 the 3D view (or **M** with the pointer over it) lets that view take the
@@ -218,8 +219,7 @@ others.
   a difference beyond the ease is flagged.
 - Seams on part of an edge, on several edges in a row (a pocket's sides
   and bottom) or on an internal line (a patch pocket on its placement
-  line, a tuck) are made by an AI agent or a script for now
-  (`seam.add`); the Sew tool sews whole edges.
+  line, a tuck) are made with **Sew**: see Sewing below.
 
 ### Formulas: patterns made to measure
 A distance, a length or an angle can follow the body: click **ƒ** next
@@ -247,10 +247,19 @@ pieces start the drape where the whole piece was. A piece that has a
 linked mirror copy must be unlinked first.
 
 ## Sewing
-- With **Sew** (S), click two edges. Matching arrows on both edges show
-  how they join; a mismatch in length is flagged in red. An edge sewn to
-  the same edge on its mirror copy (a centre front or back) joins it end
-  to matching end.
+- With **Sew** (S), pick one side, then the side to sew it to. The edge
+  or line under the pointer lights up. A side is:
+  - an edge or an internal line: click it;
+  - part of one: drag along it from where the seam starts to where it
+    ends (the ends catch on corners, notches and the ends of other
+    seams);
+  - several edges in a row (a pocket's sides and bottom): ⌘-click each
+    of them, in any order, then click the last one or press Enter.
+
+  Esc starts again. Matching arrows on both sides show how they join; a
+  mismatch in length is flagged in red. If the seam looks twisted, flip
+  it in the edge's card. An edge sewn to the same edge on its mirror copy
+  (a centre front or back) joins it end to matching end.
 - **Gathered**: in an edge's card, a seam can be gathered: the longer side
   is gathered evenly onto the shorter one (a skirt into a waistband, a
   sleeve cap). The ratio is shown (for example 2 : 1).

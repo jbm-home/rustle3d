@@ -22,7 +22,10 @@ use crate::cloth::{
 use crate::forms::Forms;
 use crate::photo::{PhotoJob, Subject};
 use crate::sim::SimThread;
-use r3d_core::{Body, EdgeId, Fabric, GuideId, Localizable, Message, PanelId, PointId};
+use r3d_core::seam::Track;
+use r3d_core::{
+    Body, EdgeId, Fabric, GuideId, InternalLineId, Localizable, Message, PanelId, PointId, SeamSide,
+};
 use r3d_render::board::BoardView;
 use r3d_render::photo::{Lighting, Quality, Settings, Surface};
 use r3d_render::theme::PIECE_COLORS;
@@ -83,6 +86,14 @@ fn corner_at(
         .filter_map(|(panel, point)| Some((panel, point, project.point(point)?.pos)))
         .filter(|(.., pos)| pos.distance(at) <= max_mm)
         .min_by(|a, b| a.2.distance(at).total_cmp(&b.2.distance(at)))
+}
+
+/// A seam track named `edge:N` or `line:N`.
+fn parse_track(name: &str) -> Result<Track, ApiError> {
+    name.parse::<EdgeId>()
+        .map(Track::Edge)
+        .or_else(|_| name.parse::<InternalLineId>().map(Track::Line))
+        .map_err(|_| ApiError::new("bad_id", format!("not an edge or a line: {name}")))
 }
 
 /// How far along `polyline` (mm, from its start) the point nearest to
@@ -210,6 +221,20 @@ pub struct EdgeSpot {
     pub edge: String,
     pub offset_mm: f64,
     pub length_mm: f64,
+}
+
+/// A place on something a seam can run along (the Sew tool): an outline
+/// edge or an internal line, how far along it (mm), its length (mm) and
+/// where that is on the board (mm).
+#[derive(Debug, Clone)]
+pub struct SewSpot {
+    /// `edge:N` or `line:N`.
+    pub track: String,
+    pub panel: String,
+    pub offset_mm: f64,
+    pub length_mm: f64,
+    pub x_mm: f64,
+    pub y_mm: f64,
 }
 
 /// A corner picked on the board, and where it is (mm).
@@ -1756,6 +1781,76 @@ impl Engine {
                 offset_mm,
                 length_mm,
             }))
+    }
+
+    /// Where a seam side picked at pattern point (`x_mm`, `y_mm`) would
+    /// start or end: on the outline edge or internal line within `max_mm`,
+    /// or, given `along` (`edge:N` or `line:N`, the track being dragged
+    /// along), anywhere along it; snapped within `max_mm` to the track's
+    /// ends, notches and the ends of the seams already on it. `None` off
+    /// the tracks.
+    #[frb(sync)]
+    pub fn sew_spot_near(
+        &self,
+        x_mm: f64,
+        y_mm: f64,
+        max_mm: f64,
+        along: Option<String>,
+    ) -> Result<Option<SewSpot>, ApiError> {
+        let ws = self.workspace()?;
+        let project = ws.session().project();
+        let at = r3d_geom::DVec2::new(x_mm, y_mm);
+        let spot = match along {
+            Some(track) => crate::sew::spot_on(project, parse_track(&track)?, at, max_mm),
+            None => crate::sew::spot_near(project, at, max_mm),
+        };
+        Ok(spot.map(|s| SewSpot {
+            track: match s.track {
+                Track::Edge(e) => e.to_string(),
+                Track::Line(l) => l.to_string(),
+            },
+            panel: s.panel.to_string(),
+            offset_mm: s.offset,
+            length_mm: s.length,
+            x_mm: s.at.x,
+            y_mm: s.at.y,
+        }))
+    }
+
+    /// Edges of one piece in their order around it (a run picked in any
+    /// order with the Sew tool, sewn as one side).
+    #[frb(sync)]
+    pub fn sew_chain(&self, edges: Vec<String>) -> Result<Vec<String>, ApiError> {
+        let ids = edges
+            .iter()
+            .map(|e| {
+                e.parse::<EdgeId>()
+                    .map_err(|_| ApiError::new("bad_id", format!("not an edge: {e}")))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let ws = self.workspace()?;
+        Ok(crate::sew::chain_order(ws.session().project(), &ids)
+            .iter()
+            .map(ToString::to_string)
+            .collect())
+    }
+
+    /// Where a seam side (as `seam.add` takes it, JSON) runs on the board,
+    /// as `[x0, y0, x1, y1, …]` (mm); empty when it names something
+    /// missing.
+    #[frb(sync)]
+    pub fn sew_side_points(&self, side_json: String) -> Result<Vec<f64>, ApiError> {
+        let side: SeamSide = serde_json::from_str(&side_json)
+            .map_err(|e| ApiError::new("bad_side", e.to_string()))?;
+        let ws = self.workspace()?;
+        Ok(ws
+            .session()
+            .project()
+            .side_polyline(&side)
+            .unwrap_or_default()
+            .iter()
+            .flat_map(|p| [p.x, p.y])
+            .collect())
     }
 
     /// Run a step and return the first ID it created.

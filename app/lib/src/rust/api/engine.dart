@@ -7,9 +7,9 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `cloth_hit`, `corner_at`, `corner_landing`, `edge_spot`, `edited`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form_now`, `form_soon`, `frozen_board`, `gpu_solver`, `graphics`, `import_from`, `long`, `new`, `new`, `offset_along`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `selected`, `set_busy`, `sim`, `solver`, `to_theme`, `workspace`
+// These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `cloth_hit`, `corner_at`, `corner_landing`, `edge_spot`, `edited`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form_now`, `form_soon`, `frozen_board`, `gpu_solver`, `graphics`, `import_from`, `long`, `new`, `new`, `offset_along`, `parse_track`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `selected`, `set_busy`, `sim`, `solver`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`
 
 /// The GPU adapter the UI composites on (Windows: its LUID), so the views
 /// render on it and share their textures without a copy. Call it before
@@ -258,6 +258,28 @@ abstract class Engine implements RustOpaqueInterface {
   /// Whether the board shows the other sizes' outlines around each piece
   /// (a view setting, not saved in the project).
   void setShowSizes({required bool show_});
+
+  /// Edges of one piece in their order around it (a run picked in any
+  /// order with the Sew tool, sewn as one side).
+  List<String> sewChain({required List<String> edges});
+
+  /// Where a seam side (as `seam.add` takes it, JSON) runs on the board,
+  /// as `[x0, y0, x1, y1, …]` (mm); empty when it names something
+  /// missing.
+  Float64List sewSidePoints({required String sideJson});
+
+  /// Where a seam side picked at pattern point (`x_mm`, `y_mm`) would
+  /// start or end: on the outline edge or internal line within `max_mm`,
+  /// or, given `along` (`edge:N` or `line:N`, the track being dragged
+  /// along), anywhere along it; snapped within `max_mm` to the track's
+  /// ends, notches and the ends of the seams already on it. `None` off
+  /// the tracks.
+  SewSpot? sewSpotNear({
+    required double xMm,
+    required double yMm,
+    required double maxMm,
+    String? along,
+  });
 
   bool showSizes();
 
@@ -647,6 +669,49 @@ class PickedPoint {
       other is PickedPoint &&
           runtimeType == other.runtimeType &&
           id == other.id &&
+          xMm == other.xMm &&
+          yMm == other.yMm;
+}
+
+/// A place on something a seam can run along (the Sew tool): an outline
+/// edge or an internal line, how far along it (mm), its length (mm) and
+/// where that is on the board (mm).
+class SewSpot {
+  /// `edge:N` or `line:N`.
+  final String track;
+  final String panel;
+  final double offsetMm;
+  final double lengthMm;
+  final double xMm;
+  final double yMm;
+
+  const SewSpot({
+    required this.track,
+    required this.panel,
+    required this.offsetMm,
+    required this.lengthMm,
+    required this.xMm,
+    required this.yMm,
+  });
+
+  @override
+  int get hashCode =>
+      track.hashCode ^
+      panel.hashCode ^
+      offsetMm.hashCode ^
+      lengthMm.hashCode ^
+      xMm.hashCode ^
+      yMm.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SewSpot &&
+          runtimeType == other.runtimeType &&
+          track == other.track &&
+          panel == other.panel &&
+          offsetMm == other.offsetMm &&
+          lengthMm == other.lengthMm &&
           xMm == other.xMm &&
           yMm == other.yMm;
 }

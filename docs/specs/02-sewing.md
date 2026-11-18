@@ -11,8 +11,9 @@ immediately whether the seam is consistent.
 M29 made a seam side a whole edge, a run of consecutive outline edges or
 an internal line, all of it or a stretch (`from_mm`, `to_mm`), and added
 ease (`ease_mm`, `seam.set_ease`): see
-[21-construction-details](21-construction-details.md). The Sew tool in
-the app still sews whole edges; the rest of this status is M6's.
+[21-construction-details](21-construction-details.md). Since M32
+(2026-11-18) the Sew tool picks all of these on the board (The Sew tool,
+below); the rest of this status is M6's.
 
 ## Status (2026-11-15)
 
@@ -48,8 +49,13 @@ mismatch badges and direction arrows on the board, welding.
   card has a Gathered switch with the ratio.
 
 ## UX
-- **Seam tool**: click side A (hover previews the range; click and drag
-  along an edge to pick a partial range), then side B. Thin colored lines
+- **The Sew tool** (S): pick side A, then side B, which sews them.
+  Hovering lights up the edge or internal line under the pointer. A
+  click picks it whole; a drag along it picks the stretch dragged (its
+  ends snap to the track's ends, its notches and other seams' ends);
+  ⌘-clicks gather edges of one piece into a run (any order, put in
+  contour order), ended by a plain click or Enter. Esc starts again.
+  Built in M32 (2026-11-18). Thin colored lines
   join the two sides on the board. The same color is used in 3D.
 - Direction is shown with small arrows. If the seam lines cross (a likely
   twist), a "Flip" button appears on the seam.

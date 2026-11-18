@@ -508,8 +508,18 @@ class _ShellState extends State<Shell> {
     }
   }
 
-  /// The first edge picked with the Sew tool.
-  String? _sewFrom;
+  /// The Sew tool's first side, once picked (as `seam.add` takes it).
+  Map<String, Object>? _sewFirst;
+
+  /// Edges ⌘-clicked so far for the side being picked.
+  final List<String> _sewChain = [];
+
+  /// A press on a track with the Sew tool: where it started, where the
+  /// pointer is along it now, and the board's scale then.
+  (SewSpot, SewSpot, double)? _sewDrag;
+
+  /// Where the Sew tool would pick, under the pointer.
+  SewSpot? _sewHover;
 
   /// The Polygon tool's corners so far (mm).
   final List<Offset> _polygon = [];
@@ -541,7 +551,10 @@ class _ShellState extends State<Shell> {
     for (final (group, tools) in _ToolRail.groups) {
       if (tools.contains(tool)) _groupShown[group] = tool;
     }
-    _sewFrom = null;
+    _sewFirst = null;
+    _sewChain.clear();
+    _sewDrag = null;
+    _sewHover = null;
     _polygon.clear();
     _path.clear();
     _guideStart = null;
@@ -890,6 +903,9 @@ class _ShellState extends State<Shell> {
   /// Enter: close the polygon or the curved piece, or make the cut.
   void _finish() {
     if (_tool == 'polygon' || _tool == 'hole') return _finishPolygon();
+    if (_tool == 'sew' && _sewChain.isNotEmpty) {
+      return _sewRun(List.of(_sewChain));
+    }
     if (_tool == 'curve' || _tool == 'cut') return _finishPath();
   }
 
@@ -1030,6 +1046,7 @@ class _ShellState extends State<Shell> {
       canvas.drawCircle(at, r, dot);
     }
 
+    if (_tool == 'sew') _paintSew(canvas, toScreen, p);
     if (_polygon.isNotEmpty) {
       final pts = [for (final q in _polygon) toScreen(q)];
       for (var i = 1; i < pts.length; i++) {
@@ -1127,28 +1144,154 @@ class _ShellState extends State<Shell> {
     }
   }
 
-  /// Sew tool: the first click picks an edge, the second sews them.
-  void _sewClick() {
-    final edge = _guard<String?>(widget.engine.selectedEdge);
-    if (edge == null) {
-      _refresh();
-      return;
+  /// Where the Sew tool picks at `mm`: on the edge or line there, or
+  /// along track `on`; snapped to ends, notches and other seams' ends.
+  SewSpot? _sewSpot(Offset mm, double mmPerPx, {String? on}) =>
+      _guard<SewSpot?>(
+        () => widget.engine.sewSpotNear(
+          xMm: mm.dx,
+          yMm: mm.dy,
+          maxMm: _pickPx * mmPerPx,
+          along: on,
+        ),
+      );
+
+  void _sewHoverAt(Offset mm, double mmPerPx) =>
+      setState(() => _sewHover = _sewSpot(mm, mmPerPx));
+
+  /// Sew tool: a press on an edge or a line holds it (a click picks it
+  /// whole, a drag picks the stretch dragged along); elsewhere it pans.
+  bool _sewPress(Offset mm, double mmPerPx) {
+    final spot = _sewSpot(mm, mmPerPx);
+    if (spot == null) return false;
+    setState(() => _sewDrag = (spot, spot, mmPerPx));
+    return true;
+  }
+
+  void _sewDragTo(Offset mm) {
+    final drag = _sewDrag;
+    if (drag == null) return;
+    final (start, _, mmPerPx) = drag;
+    final spot = _sewSpot(mm, mmPerPx, on: start.track);
+    if (spot != null) setState(() => _sewDrag = (start, spot, mmPerPx));
+  }
+
+  void _sewRelease() {
+    final drag = _sewDrag;
+    if (drag == null) return;
+    setState(() => _sewDrag = null);
+    final (start, end, mmPerPx) = drag;
+    final key = start.track.startsWith('line:') ? 'line' : 'edge';
+    final (from, to) = start.offsetMm < end.offsetMm
+        ? (start.offsetMm, end.offsetMm)
+        : (end.offsetMm, start.offsetMm);
+    // Dragged along: that stretch only (all of it when dragged end to end).
+    if (to - from > _pickPx * mmPerPx) {
+      final whole = from < 1e-6 && to > start.lengthMm - 1e-6;
+      return _sewSide({
+        key: start.track,
+        if (!whole) 'from_mm': from,
+        if (!whole) 'to_mm': to,
+      });
     }
-    final from = _sewFrom;
-    if (from == null || from == edge) {
-      setState(() => _sewFrom = edge);
-      _refresh();
-      return;
+    if (key == 'line') return _sewSide({'line': start.track});
+    final keys = HardwareKeyboard.instance;
+    if (keys.isControlPressed || keys.isMetaPressed || keys.isShiftPressed) {
+      // ⌘-click: one more edge of a run sewn as one side (again: one less).
+      return setState(() {
+        if (!_sewChain.remove(start.track)) _sewChain.add(start.track);
+      });
     }
-    final out = _run({
-      'type': 'seam.add',
-      'a': {'edge': from},
-      'b': {'edge': edge},
+    _sewRun([..._sewChain.where((e) => e != start.track), start.track]);
+  }
+
+  /// The edges ⌘-clicked, as one side, in their order around the piece.
+  void _sewRun(List<String> edges) {
+    final run = _guard(() => widget.engine.sewChain(edges: edges)) ?? edges;
+    _sewSide(run.length == 1 ? {'edge': run.first} : {'edges': run});
+  }
+
+  /// A side picked: the first is kept, the second sews them.
+  void _sewSide(Map<String, Object> side) {
+    final first = _sewFirst;
+    setState(() {
+      _sewChain.clear();
+      _sewFirst = first == null ? side : null;
     });
-    setState(() => _sewFrom = null);
+    if (first == null) return;
+    final out = _run({'type': 'seam.add', 'a': first, 'b': side});
     _refresh();
-    if (out != null) {
-      _toast(context.l.toastSewn);
+    if (out != null) _toast(context.l.toastSewn);
+  }
+
+  /// Where a seam side runs on the board (mm).
+  List<Offset> _sidePoints(Map<String, Object> side) {
+    // As the document stores it: one edge is a run of one.
+    final stored = {
+      for (final MapEntry(:key, :value) in side.entries)
+        if (key == 'edge') 'edges': [value] else key: value,
+      'reversed': false,
+    };
+    final List<double> xy;
+    try {
+      xy = widget.engine.sewSidePoints(sideJson: jsonEncode(stored));
+    } on ApiError {
+      return const []; // painting: nothing to show, nothing to report
+    }
+    return [
+      for (var i = 0; i + 1 < xy.length; i += 2) Offset(xy[i], xy[i + 1]),
+    ];
+  }
+
+  /// The Sew tool's picks: the track under the pointer, the edges
+  /// ⌘-clicked, the first side and the stretch being dragged.
+  void _paintSew(
+    Canvas canvas,
+    Offset Function(Offset mm) toScreen,
+    Palette p,
+  ) {
+    Paint pen(double alpha, double width) => Paint()
+      ..color = p.accent.withValues(alpha: alpha)
+      ..strokeWidth = width
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    void stroke(List<Offset> mm, Paint paint) {
+      if (mm.length < 2) return;
+      final pts = [for (final q in mm) toScreen(q)];
+      final path = Path()..moveTo(pts.first.dx, pts.first.dy);
+      for (final s in pts.skip(1)) {
+        path.lineTo(s.dx, s.dy);
+      }
+      canvas.drawPath(path, paint);
+    }
+
+    Map<String, Object> whole(String track) => {
+      track.startsWith('line:') ? 'line' : 'edge': track,
+    };
+    final drag = _sewDrag;
+    if (_sewHover case final h? when drag == null) {
+      stroke(_sidePoints(whole(h.track)), pen(0.35, 5));
+    }
+    for (final e in _sewChain) {
+      stroke(_sidePoints({'edge': e}), pen(0.7, 4));
+    }
+    if (_sewFirst case final first?) {
+      stroke(_sidePoints(first), pen(1, 4));
+    }
+    final dot = Paint()..color = p.accent;
+    if (drag case (final a, final b, _)) {
+      final (from, to) = a.offsetMm < b.offsetMm
+          ? (a.offsetMm, b.offsetMm)
+          : (b.offsetMm, a.offsetMm);
+      stroke(
+        _sidePoints({...whole(a.track), 'from_mm': from, 'to_mm': to}),
+        pen(1, 4),
+      );
+      for (final s in [a, b]) {
+        canvas.drawCircle(toScreen(Offset(s.xMm, s.yMm)), 4, dot);
+      }
+    } else if (_sewHover case final h?) {
+      canvas.drawCircle(toScreen(Offset(h.xMm, h.yMm)), 4, dot);
     }
   }
 
@@ -1445,6 +1588,8 @@ class _ShellState extends State<Shell> {
           _polygon.clear();
           _path.clear();
           _guideStart = null;
+          _sewFirst = null;
+          _sewChain.clear();
         }),
         const SingleActivator(LogicalKeyboardKey.backspace): _deleteSelected,
         const SingleActivator(LogicalKeyboardKey.delete): _deleteSelected,
@@ -1596,6 +1741,12 @@ class _ShellState extends State<Shell> {
                                           'straighten' => PatternPointer(
                                             onTap: _straightenTap,
                                           ),
+                                          'sew' => PatternPointer(
+                                            onPress: _sewPress,
+                                            onDrag: _sewDragTo,
+                                            onRelease: _sewRelease,
+                                            onHover: _sewHoverAt,
+                                          ),
                                           'addPoint' => PatternPointer(
                                             onTap: _addPointTap,
                                           ),
@@ -1607,9 +1758,7 @@ class _ShellState extends State<Shell> {
                                               toScreen,
                                               Tokens.of(context),
                                             ),
-                                        onSelection: (_) => _tool == 'sew'
-                                            ? _sewClick()
-                                            : _refresh(),
+                                        onSelection: (_) => _refresh(),
                                         onFrameTime: (ms) => _onFrame(true, ms),
                                       ),
                                     ),
@@ -1779,8 +1928,9 @@ class _ShellState extends State<Shell> {
               ),
               _StatusBar(
                 hint: switch (_tool) {
-                  'sew' when _sewFrom == null => l.hintSewFirst,
-                  'sew' => l.hintSewSecond,
+                  'sew' when _sewChain.isNotEmpty => context.keys(l.hintSewRun),
+                  'sew' when _sewFirst == null => context.keys(l.hintSewFirst),
+                  'sew' => context.keys(l.hintSewSecond),
                   'draw' => l.hintDraw,
                   'polygon' => l.hintPolygon,
                   'curve' => l.hintCurve,

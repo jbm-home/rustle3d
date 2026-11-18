@@ -1240,7 +1240,7 @@ abstract class L {
   /// No description provided for @toolSewHint.
   ///
   /// In en, this message translates to:
-  /// **'Click two edges on the pattern'**
+  /// **'Click two edges or lines on the pattern; drag along one to sew part of it'**
   String get toolSewHint;
 
   /// No description provided for @viewPattern.
@@ -1348,14 +1348,20 @@ abstract class L {
   /// No description provided for @hintSewFirst.
   ///
   /// In en, this message translates to:
-  /// **'Sew: click the first edge on the pattern · V to stop'**
+  /// **'Sew: click an edge or a line, or drag along it to sew part of it · ⌘-click edges that follow each other to sew them as one side · V to stop'**
   String get hintSewFirst;
 
   /// No description provided for @hintSewSecond.
   ///
   /// In en, this message translates to:
-  /// **'Sew: now click the edge to sew it to · V to stop'**
+  /// **'Sew: now the side to sew it to: click it, drag along part of it or ⌘-click several edges · Esc starts again'**
   String get hintSewSecond;
+
+  /// No description provided for @hintSewRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Sew: ⌘-click the next edges, then click the last one or press Enter · Esc starts again'**
+  String get hintSewRun;
 
   /// No description provided for @hintDraw.
   ///

@@ -38,6 +38,7 @@ can be tested through MCP as soon as they exist.
 | M27 | Sketching 2: constraints and symmetry ✅ | 4–5 wk | Draw a half bodice against a symmetry axis with fixed dimensions; change one, the shape follows |
 | M28 | Parametric patterns ✅ | 2–3 wk | A skirt whose waist is `waist / 4 + 10 mm` redrafts itself on another body |
 | M29 | Construction details ✅ | 3–4 wk | A skirt with darts, a pleat and a patch pocket sewn on an internal line |
+| M32 | Editor finishing | 1–2 wk | A patch pocket sewn on its line and a dimension drawn on the board, all with the mouse |
 | M20 | Trims: buttons and zippers | 2–3 wk | A shirt that buttons and trousers with a fly zipper, draped closed |
 | M21 | Textures and prints | 2–3 wk | A striped shirt whose stripes follow the grainline on every piece |
 | M30 | Production: marker, yardage, tech pack, projector | 3–4 wk | A graded shirt nested on a 150 cm fabric, its yardage and cost, its tech pack PDF |
@@ -66,7 +67,9 @@ M27 because constraints and formulas add steps that must undo cleanly;
 M28 builds on M27's dimensions (a formula is a computed dimension); M29
 gives the details that make a garment look real. M30 groups what a
 small brand needs to produce. M19's open point (close layers, a tucked
-in shirt) is hard physics: it is taken up after M29.
+in shirt) is hard physics: it is taken up after M32. M32 (2026-11-18)
+brings to the app what M27–M29 left to agents and scripts: the commands
+exist, the mouse cannot reach them yet.
 
 ---
 
@@ -716,6 +719,30 @@ Built (2026-11-18), demo `./demos/m29/demo.sh`, spec 21:
   padding (need solver work); partial and line seams from the app's Sew
   tool; holes in mirror copies and symmetric pieces; seam allowance
   inside holes.
+
+## M32 — Editor finishing
+From the maintainer (2026-11-18): what M27–M29 built must be drawable
+in the app, not only through commands. Mostly UI work on existing
+commands; in this order:
+1. **Sew tool**: seams on part of an edge, on a run of outline edges and
+   on an internal line (M29's open point), picked with the mouse.
+2. **Dimensions drawn on the board**: pick two points or an edge and
+   pull a dimension out, its value typed in place (M27's open point).
+3. Dragging a point's handles with Select (M27); formulas typed directly
+   in a value field (M28).
+4. If time allows: constraints on internal lines, notches and
+   construction lines (M27); holes in mirror copies and symmetric
+   pieces, seam allowance inside holes (M29).
+- **Demo**: a skirt whose patch pocket is sewn on its placement line
+  and whose waist dimension is drawn on the board, all with the mouse;
+  an integration test drives the same steps.
+
+Built so far (2026-11-18):
+- Step 1: the Sew tool picks a whole edge or internal line (click), a
+  stretch of one (drag along it, the ends caught on corners, notches and
+  other seams' ends) or a run of edges (⌘-clicks in any order, put in
+  contour order); the track under the pointer lights up
+  (`r3d_ffi::sew`, `app/integration_test/sewing_test.dart`).
 
 ## M30 — Production: marker, yardage, tech pack, projector
 - **Indicators per piece**: area, fabric mass; totals per garment.
