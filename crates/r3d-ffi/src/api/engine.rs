@@ -12,6 +12,7 @@ use flutter_rust_bridge::frb;
 
 use r3d_commands::actions::AvatarMotion;
 use r3d_commands::drape::{self, Animation, Drape, Form};
+use r3d_commands::production;
 use r3d_commands::{Progress, Script, Status, Step, Workspace};
 use r3d_sim::{CpuSolver, SimScene, Solver};
 use r3d_sim_gpu::{GpuContext, GpuSolver};
@@ -64,6 +65,15 @@ impl ApiError {
             text: text.into(),
         }
     }
+}
+
+/// A marker's spec, as JSON.
+fn marker_spec(json: &str) -> Result<production::MarkerSpec, ApiError> {
+    serde_json::from_str(json).map_err(|e| ApiError {
+        code: "malformed".into(),
+        args: HashMap::from([("detail".into(), e.to_string())]),
+        text: format!("malformed marker: {e}"),
+    })
 }
 
 pub(crate) fn err(e: impl Localizable) -> ApiError {
@@ -1141,6 +1151,51 @@ impl Engine {
             ApiError::from(
                 Message::new("write_failed", format!("cannot write {path}: {e}")).arg("path", path),
             )
+        })
+    }
+
+    /// Lay a marker out: `spec_json` is `marker.compute`'s `marker`
+    /// (garment, sizes, width_mm…). Returns its JSON result with the
+    /// pieces' outlines. Off the UI thread: many sizes take a while.
+    pub fn marker(&self, spec_json: String) -> Result<String, ApiError> {
+        let spec = marker_spec(&spec_json)?;
+        let ws = self.workspace()?;
+        let marker = production::compute(ws.session().project(), &spec).map_err(err)?;
+        Ok(marker.to_json(true).to_string())
+    }
+
+    /// Write a marker (`spec_json` as in [`Engine::marker`]) to `path`, a
+    /// file the user chose (anywhere): SVG, or with `pdf` a PDF on one
+    /// page, at 1:1.
+    pub fn export_marker(
+        &self,
+        spec_json: String,
+        path: String,
+        pdf: bool,
+    ) -> Result<(), ApiError> {
+        self.long("export", |_| {
+            let spec = marker_spec(&spec_json)?;
+            let format = if pdf {
+                production::MarkerFormat::Pdf
+            } else {
+                production::MarkerFormat::Svg
+            };
+            let (bytes, _) = {
+                let ws = self.workspace()?;
+                production::marker_file(
+                    ws.session().project(),
+                    &spec,
+                    format,
+                    r3d_io::pdf::Paper::Single,
+                )
+                .map_err(err)?
+            };
+            std::fs::write(&path, bytes).map_err(|e| {
+                ApiError::from(
+                    Message::new("write_failed", format!("cannot write {path}: {e}"))
+                        .arg("path", &path),
+                )
+            })
         })
     }
 

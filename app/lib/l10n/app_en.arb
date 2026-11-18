@@ -1062,5 +1062,41 @@
   "errNotWholeEdges": "This works on seams between two whole edges.",
   "errApart": "The result would be several pieces, or nothing.",
   "errHasHoles": "This piece has holes: fill them first.",
-  "errNotJoined": "These edges do not follow each other on one piece."
+  "errNotJoined": "These edges do not follow each other on one piece.",
+  "close": "Close",
+  "marker": "Marker",
+  "exportMarker": "Marker: the pieces laid out on the fabric…",
+  "markerHint": "The pieces, with their seam allowances, laid out on the fabric along its grain. Pick the sizes to cut and the fabric's width: you get the length to buy and its cost.",
+  "markerGarment": "Garment",
+  "markerSizes": "Sizes to cut",
+  "markerWidth": "Fabric width",
+  "markerLayOut": "Lay out",
+  "markerLength": "Length",
+  "markerEfficiency": "Fabric used",
+  "markerYardage": "To buy",
+  "markerCost": "Cost",
+  "markerNoPrice": "Give the fabric a price per metre (inspector, with nothing selected, under the garment) to see the cost.",
+  "markerSaveSvg": "Save SVG",
+  "markerSavePdf": "Save PDF",
+  "fabricBought": "As bought",
+  "fabricWeight": "Weight",
+  "fabricWidth": "Width",
+  "fabricPrice": "Price / m",
+  "cutArea": "Cut area",
+  "pieceMass": "Mass",
+  "errMarkerTooNarrow": "A piece is wider than the fabric: choose a wider fabric.",
+  "garmentTotals": "{pieces} pieces · {area} m² of fabric cut · {mass} g",
+  "@garmentTotals": {
+    "placeholders": {
+      "pieces": {
+        "type": "int"
+      },
+      "area": {
+        "type": "String"
+      },
+      "mass": {
+        "type": "String"
+      }
+    }
+  }
 }

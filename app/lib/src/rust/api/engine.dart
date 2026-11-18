@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `cloth_hit`, `corner_at`, `corner_landing`, `edge_spot`, `edited`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form_now`, `form_soon`, `frozen_board`, `gpu_solver`, `graphics`, `import_from`, `long`, `motion_name`, `moving_avatar`, `new`, `new`, `offset_along`, `parse_track`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `selected`, `set_busy`, `sim`, `solver`, `to_theme`, `workspace`
+// These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `cloth_hit`, `corner_at`, `corner_landing`, `edge_spot`, `edited`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form_now`, `form_soon`, `frozen_board`, `gpu_solver`, `graphics`, `import_from`, `long`, `marker_spec`, `motion_name`, `moving_avatar`, `new`, `new`, `offset_along`, `parse_track`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `selected`, `set_busy`, `sim`, `solver`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`
 
@@ -126,6 +126,15 @@ abstract class Engine implements RustOpaqueInterface {
     required bool avatar,
   });
 
+  /// Write a marker (`spec_json` as in [`Engine::marker`]) to `path`, a
+  /// file the user chose (anywhere): SVG, or with `pdf` a PDF on one
+  /// page, at 1:1.
+  Future<void> exportMarker({
+    required String specJson,
+    required String path,
+    required bool pdf,
+  });
+
   /// The fabrics the UI offers, with the colour each one renders with by
   /// default (ARGB), so swatches match the 3D view.
   static List<FabricSwatch> fabrics() =>
@@ -145,6 +154,11 @@ abstract class Engine implements RustOpaqueInterface {
 
   /// Look at the body from one side, framed head to toe.
   void lookFrom({required CameraSide side});
+
+  /// Lay a marker out: `spec_json` is `marker.compute`'s `marker`
+  /// (garment, sizes, width_mm…). Returns its JSON result with the
+  /// pieces' outlines. Off the UI thread: many sizes take a while.
+  Future<String> marker({required String specJson});
 
   /// Open the project folder at `path`, creating it if it does not exist.
   static Engine open({required String path}) =>

@@ -2144,4 +2144,78 @@ class LFr extends L {
 
   @override
   String get errNotJoined => 'Ces arêtes ne se suivent pas sur une même pièce.';
+
+  @override
+  String get close => 'Fermer';
+
+  @override
+  String get marker => 'Placement';
+
+  @override
+  String get exportMarker => 'Placement : les pièces posées sur le tissu…';
+
+  @override
+  String get markerHint =>
+      'Les pièces, avec leurs valeurs de couture, posées sur le tissu dans le droit fil. Choisissez les tailles à couper et la laize du tissu : vous obtenez la longueur à acheter et son coût.';
+
+  @override
+  String get markerGarment => 'Vêtement';
+
+  @override
+  String get markerSizes => 'Tailles à couper';
+
+  @override
+  String get markerWidth => 'Laize du tissu';
+
+  @override
+  String get markerLayOut => 'Placer';
+
+  @override
+  String get markerLength => 'Longueur';
+
+  @override
+  String get markerEfficiency => 'Tissu utilisé';
+
+  @override
+  String get markerYardage => 'À acheter';
+
+  @override
+  String get markerCost => 'Coût';
+
+  @override
+  String get markerNoPrice =>
+      'Donnez au tissu un prix au mètre (inspecteur, sans sélection, sous le vêtement) pour voir le coût.';
+
+  @override
+  String get markerSaveSvg => 'Enregistrer en SVG';
+
+  @override
+  String get markerSavePdf => 'Enregistrer en PDF';
+
+  @override
+  String get fabricBought => 'À l’achat';
+
+  @override
+  String get fabricWeight => 'Grammage';
+
+  @override
+  String get fabricWidth => 'Laize';
+
+  @override
+  String get fabricPrice => 'Prix / m';
+
+  @override
+  String get cutArea => 'Surface coupée';
+
+  @override
+  String get pieceMass => 'Masse';
+
+  @override
+  String get errMarkerTooNarrow =>
+      'Une pièce est plus large que le tissu : choisissez une laize plus grande.';
+
+  @override
+  String garmentTotals(int pieces, String area, String mass) {
+    return '$pieces pièces · $area m² de tissu coupé · $mass g';
+  }
 }

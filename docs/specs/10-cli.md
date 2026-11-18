@@ -8,7 +8,8 @@ scripts, simulate, export and render.
 
 ## Behavior
 `r3d` binary (clap). Implemented: `new`, `run`, `query`, `schema` (M1),
-`export`, `mcp` (M2), `simulate`, `render` (M4), `import` (M13). `run
+`export`, `mcp` (M2), `simulate`, `render` (M4), `import` (M13),
+`marker` (M30). `run
 --dry-run` uses a bare session: actions such as exports are refused and
 nothing is written. Scripts can refer to earlier results
 (`"$3.created[0]"`), see `docs/commands.md`.
@@ -39,6 +40,11 @@ nothing is written. Scripts can refer to earlier results
   [--avatar] [--sizes 36,44|all] [--out path]`: the pattern (in some sizes
   of its range, nested, with `--sizes`; spec 18), or the draped garment
   (see 07, 15).
+- `r3d marker <project> [--sizes 38,40|all] [--width-cm W] [--garment id]
+  [--format svg|pdf] [--paper single|a4|letter] [--out path]`: lay the
+  garment's pieces out on the fabric and print the length, efficiency,
+  yardage, cost and where each piece lies (`marker.compute`); with
+  `--format`, also write the marker at 1:1 (`export.marker`; spec 23).
 - `r3d schema [command]`: print JSON schemas.
 - Output is machine-readable JSON by default when piped. Exit codes: 0 ok,
   1 user error, 2 internal error.

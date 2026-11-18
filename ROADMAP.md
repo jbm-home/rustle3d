@@ -42,7 +42,7 @@ can be tested through MCP as soon as they exist.
 | M23 | Animated avatars ✅ | 3–4 wk | The avatar walks and the garment follows |
 | M20 | Trims: buttons and zippers | 2–3 wk | A shirt that buttons and trousers with a fly zipper, draped closed |
 | M21 | Textures and prints | 2–3 wk | A striped shirt whose stripes follow the grainline on every piece |
-| M30 | Production: marker, yardage, tech pack, projector | 3–4 wk | A graded shirt nested on a 150 cm fabric, its yardage and cost, its tech pack PDF |
+| M30 | Production: marker, yardage ✅, tech pack, projector (open) | 3–4 wk | A graded shirt nested on a 150 cm fabric, its yardage and cost, its tech pack PDF |
 | M24 | Fit maps and virtual tape measure | 2 wk | Tight spots show in colour; the ease at the chest is read on the drape |
 | M31 | Imported avatars | 2–3 wk | A body scan in OBJ/glTF is checked, the pieces placed around it and draped |
 | M15 | Game-ready export | 3–4 wk | LODs + baked wrinkle normal maps + skinning, imported in Godot/Unity/Unreal |
@@ -772,6 +772,26 @@ tests below, in the real app):
   the bill of materials (fabrics, trims), colourways and sewing notes.
 - **Demo**: a graded shirt nested on a 150 cm fabric with its yardage
   and cost; its tech pack; the back piece projected at 1:1.
+- Delivered, first half (2026-11-18, spec 23): fabric details on each
+  garment (weight g/m², width, price per metre; schema v14; the weight
+  is also the drape's mass), indicators per piece and per garment
+  (`production.indicators`: area, cut area with the allowance,
+  perimeter, mass), the marker (`marker.compute`: one garment in one or
+  several sizes on a fabric width, cutting lines with the allowance,
+  grain along the length at 0°/180° or free at 45° steps, quantities and
+  mirrored pairs; raster bottom-left-fill after Jakobs 1996 and Burke et
+  al. 2006 in `r3d_geom::nest`; length, efficiency, yardage, cost), its
+  export at 1:1 (`export.marker`, `r3d marker`, SVG and PDF), and the
+  app (fabric fields and totals under each garment, cut area and mass
+  of a piece, Export → Marker… dialog with sizes, width, the layout to
+  scale and its figures, Save SVG/PDF). A shirt in sizes 38, 40 and 42
+  on 150 cm: 2.80 m, 78 % of the fabric used.
+- **Demo** (first half): `./demos/m30/demo.sh`.
+- **Open** (second half, next): the tech pack PDF, the projector
+  export. Later: true-shape nesting (no-fit polygons) and a gap
+  between pieces, one-way fabrics (nap, prints), folded fabric and
+  several plies, a marker of several garments in one fabric, PDF pages
+  longer than 5 m for Acrobat.
 
 ## M31 — Imported avatars
 - Import a body in OBJ, glTF or GLB (a scan, a game character); the

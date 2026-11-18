@@ -183,6 +183,57 @@ fn export_writes_into_the_project() {
 }
 
 #[test]
+fn marker_lays_out_and_writes() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("Bag.r3d");
+    r3d().arg("new").arg(&dir).assert().success();
+    r3d()
+        .arg("run")
+        .arg(&dir)
+        .arg("-")
+        .write_stdin(
+            r#"[{"type": "panel.create_rect", "width": 400, "height": 600},
+                {"type": "panel.create_rect", "width": 400, "height": 600},
+                {"type": "garment.set_fabric_details", "price_per_m": 10}]"#,
+        )
+        .assert()
+        .success();
+    // Figures only: two 40 x 60 cm pieces, grain along the length, side
+    // by side across a 140 cm fabric.
+    let out = r3d()
+        .arg("marker")
+        .arg(&dir)
+        .args(["--width-cm", "140"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let v = json_of(&out);
+    assert_eq!(v["length_mm"], 600.0);
+    assert_eq!(v["cost"], 6.0);
+    assert!(!dir.join("exports").join("Bag-marker.svg").exists());
+    let out = r3d()
+        .arg("marker")
+        .arg(&dir)
+        .args(["--width-cm", "140", "--format", "pdf"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    assert_eq!(json_of(&out)["path"], "exports/Bag-marker.pdf");
+    assert!(dir.join("exports/Bag-marker.pdf").is_file());
+    // Too narrow for a piece: a user error.
+    r3d()
+        .arg("marker")
+        .arg(&dir)
+        .args(["--width-cm", "35"])
+        .assert()
+        .code(1);
+}
+
+#[test]
 fn dry_run_refuses_actions() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("P.r3d");

@@ -2122,4 +2122,78 @@ class LEn extends L {
   @override
   String get errNotJoined =>
       'These edges do not follow each other on one piece.';
+
+  @override
+  String get close => 'Close';
+
+  @override
+  String get marker => 'Marker';
+
+  @override
+  String get exportMarker => 'Marker: the pieces laid out on the fabric…';
+
+  @override
+  String get markerHint =>
+      'The pieces, with their seam allowances, laid out on the fabric along its grain. Pick the sizes to cut and the fabric\'s width: you get the length to buy and its cost.';
+
+  @override
+  String get markerGarment => 'Garment';
+
+  @override
+  String get markerSizes => 'Sizes to cut';
+
+  @override
+  String get markerWidth => 'Fabric width';
+
+  @override
+  String get markerLayOut => 'Lay out';
+
+  @override
+  String get markerLength => 'Length';
+
+  @override
+  String get markerEfficiency => 'Fabric used';
+
+  @override
+  String get markerYardage => 'To buy';
+
+  @override
+  String get markerCost => 'Cost';
+
+  @override
+  String get markerNoPrice =>
+      'Give the fabric a price per metre (inspector, with nothing selected, under the garment) to see the cost.';
+
+  @override
+  String get markerSaveSvg => 'Save SVG';
+
+  @override
+  String get markerSavePdf => 'Save PDF';
+
+  @override
+  String get fabricBought => 'As bought';
+
+  @override
+  String get fabricWeight => 'Weight';
+
+  @override
+  String get fabricWidth => 'Width';
+
+  @override
+  String get fabricPrice => 'Price / m';
+
+  @override
+  String get cutArea => 'Cut area';
+
+  @override
+  String get pieceMass => 'Mass';
+
+  @override
+  String get errMarkerTooNarrow =>
+      'A piece is wider than the fabric: choose a wider fabric.';
+
+  @override
+  String garmentTotals(int pieces, String area, String mass) {
+    return '$pieces pieces · $area m² of fabric cut · $mass g';
+  }
 }

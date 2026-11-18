@@ -21,6 +21,7 @@ import 'rust/api/engine.dart';
 import 'start_screen.dart' show Logo;
 import 'views/rust_view.dart';
 
+part 'marker.dart';
 part 'sketch.dart';
 
 class Shell extends StatefulWidget {
@@ -1563,6 +1564,19 @@ class _ShellState extends State<Shell> {
     }
   }
 
+  /// The marker dialog: the pieces laid out on the fabric.
+  Future<void> _openMarker() async {
+    final indicators = _run({'type': 'production.indicators'});
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _MarkerDialog(
+        engine: widget.engine,
+        summary: _summary,
+        indicators: indicators is Map<String, dynamic> ? indicators : null,
+      ),
+    );
+  }
+
   /// Ask for a pattern file and import its pieces. When the file does not
   /// say how big its units are, ask which unit it was drawn in and import
   /// it again in that unit (the first import is undone).
@@ -1844,6 +1858,7 @@ class _ShellState extends State<Shell> {
                 onGoTo: _goToStep,
                 onBody: _showBody,
                 onExport: _export,
+                onMarker: _openMarker,
                 onImport: _importPattern,
                 agent: _agent,
                 onAllowAgents: _allowAgents,
@@ -2234,6 +2249,7 @@ class _TopBar extends StatelessWidget {
     required this.onRedo,
     required this.onBody,
     required this.onExport,
+    required this.onMarker,
     required this.onImport,
     required this.agent,
     required this.onAllowAgents,
@@ -2264,6 +2280,9 @@ class _TopBar extends StatelessWidget {
 
   /// Export in a format (with the avatar, for 3D formats).
   final void Function(ExportFormat format, bool avatar) onExport;
+
+  /// Lay the pieces out on the fabric (a marker).
+  final VoidCallback onMarker;
 
   /// Import a pattern drawn elsewhere.
   final VoidCallback onImport;
@@ -2381,9 +2400,15 @@ class _TopBar extends StatelessWidget {
                 label: Text(l.importPattern),
               ),
             ),
-            PopupMenuButton<(ExportFormat, bool)>(
+            PopupMenuButton<(ExportFormat?, bool)>(
               tooltip: l.export,
-              onSelected: (choice) => onExport(choice.$1, choice.$2),
+              onSelected: (choice) {
+                if (choice.$1 case final format?) {
+                  onExport(format, choice.$2);
+                } else {
+                  onMarker();
+                }
+              },
               itemBuilder: (_) => [
                 for (final (format, avatar, label) in [
                   (ExportFormat.svg, false, l.exportSvg),
@@ -2395,6 +2420,12 @@ class _TopBar extends StatelessWidget {
                   (ExportFormat.obj, false, l.exportObj),
                 ])
                   PopupMenuItem(value: (format, avatar), child: Text(label)),
+                const PopupMenuDivider(),
+                PopupMenuItem(
+                  key: const Key('export-marker'),
+                  value: (null, false),
+                  child: Text(l.exportMarker),
+                ),
               ],
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -3201,6 +3232,11 @@ class _Inspector extends StatelessWidget {
     final p = Tokens.of(context);
     final garments = (summary['garments'] as List<dynamic>?) ?? const [];
     final grading = summary['grading'] as Map<String, dynamic>?;
+    final figures = query({'type': 'production.indicators'});
+    final indicators = [
+      if (figures is Map<String, dynamic>)
+        for (final g in figures['garments'] as List) g as Map<String, dynamic>,
+    ];
     return Container(
       decoration: BoxDecoration(
         color: p.surface,
@@ -3215,6 +3251,7 @@ class _Inspector extends StatelessWidget {
           child: switch (selection.length) {
             0 => _EmptyInspector(
               summary: summary,
+              indicators: indicators,
               run: run,
               query: query,
               showSizes: showSizes,
@@ -3225,6 +3262,11 @@ class _Inspector extends StatelessWidget {
             ),
             1 when panel != null => _PanelInspector(
               panel: panel!,
+              figures: [
+                for (final g in indicators)
+                  for (final f in g['pieces'] as List)
+                    if (f['panel'] == panel!['id']) f as Map<String, dynamic>,
+              ].firstOrNull,
               garments: garments,
               grading: grading,
               points: points,
@@ -3253,6 +3295,7 @@ class _Inspector extends StatelessWidget {
 class _EmptyInspector extends StatelessWidget {
   const _EmptyInspector({
     required this.summary,
+    required this.indicators,
     required this.run,
     required this.query,
     required this.showSizes,
@@ -3263,6 +3306,9 @@ class _EmptyInspector extends StatelessWidget {
   });
 
   final Map<String, dynamic> summary;
+
+  /// `production.indicators`' garments: fabric details and totals.
+  final List<Map<String, dynamic>> indicators;
   final ValueChanged<Map<String, Object?>> run;
   final dynamic Function(Map<String, Object?>) query;
   final bool showSizes;
@@ -3314,6 +3360,7 @@ class _EmptyInspector extends StatelessWidget {
         const SizedBox(height: Space.l),
         _GarmentList(
           garments: (summary['garments'] as List<dynamic>?) ?? const [],
+          indicators: indicators,
           run: run,
         ),
         const SizedBox(height: Space.xl),
@@ -3439,7 +3486,11 @@ class _PanelInspector extends StatelessWidget {
     required this.run,
     required this.onDelete,
     required this.others,
+    required this.figures,
   });
+
+  /// Its `production.indicators` entry: cut area and mass.
+  final Map<String, dynamic>? figures;
 
   /// The other pieces, as the project summary lists them.
   final List<Map<String, dynamic>> others;
@@ -3572,6 +3623,27 @@ class _PanelInspector extends StatelessWidget {
             ),
           ],
         ),
+        if (figures case final f?) ...[
+          const SizedBox(height: Space.s),
+          Row(
+            children: [
+              Expanded(
+                child: _Stat(
+                  label: l.cutArea,
+                  value:
+                      '${context.number((f['cut_area_mm2'] as num) / 1e6, 3)} m²',
+                ),
+              ),
+              const SizedBox(width: Space.s),
+              Expanded(
+                child: _Stat(
+                  label: l.pieceMass,
+                  value: '${context.number(f['mass_g'] as num, 1)} g',
+                ),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: Space.xl),
         _SliderRow(
           label: l.seamAllowance,
@@ -3932,7 +4004,11 @@ class _NumberField extends StatelessWidget {
     this.signed = false,
     this.formula = false,
     this.autofocus = false,
+    this.hint,
   });
+
+  /// Shown while the field is empty (the value used then).
+  final String? hint;
 
   final TextEditingController controller;
   final FocusNode? focus;
@@ -3984,6 +4060,7 @@ class _NumberField extends StatelessWidget {
         onSubmitted: (_) => onSubmitted?.call(),
         decoration: InputDecoration(
           isDense: true,
+          hintText: hint,
           suffixText: unit,
           suffixStyle: ts(fontSize: 12, color: p.textMuted),
           contentPadding: const EdgeInsets.symmetric(
@@ -4232,10 +4309,17 @@ class _SimControls extends StatelessWidget {
 /// The project's garments from the body out: each one's fabric, its
 /// layer, and a way to delete it; and a way to add one.
 class _GarmentList extends StatelessWidget {
-  const _GarmentList({required this.garments, required this.run});
+  const _GarmentList({
+    required this.garments,
+    required this.indicators,
+    required this.run,
+  });
 
   /// As `project.summary` lists them, next to the body first.
   final List<dynamic> garments;
+
+  /// `production.indicators`' garments.
+  final List<Map<String, dynamic>> indicators;
   final ValueChanged<Map<String, Object?>> run;
 
   @override
@@ -4261,6 +4345,7 @@ class _GarmentList extends StatelessWidget {
           const SizedBox(height: Space.m),
           _GarmentCard(
             garment: g as Map<String, dynamic>,
+            figures: indicators.where((f) => f['id'] == g['id']).firstOrNull,
             layer: i,
             count: garments.length,
             run: run,
@@ -4285,12 +4370,16 @@ class _GarmentList extends StatelessWidget {
 class _GarmentCard extends StatelessWidget {
   const _GarmentCard({
     required this.garment,
+    required this.figures,
     required this.layer,
     required this.count,
     required this.run,
   });
 
   final Map<String, dynamic> garment;
+
+  /// Its `production.indicators` entry: fabric details and totals.
+  final Map<String, dynamic>? figures;
 
   /// Its place in the list, 0 next to the body.
   final int layer;
@@ -4368,8 +4457,175 @@ class _GarmentCard extends StatelessWidget {
               'fabric': fabric,
             }),
           ),
+          if (figures case final f?) ...[
+            const SizedBox(height: Space.m),
+            _FabricDetails(garment: id, figures: f, run: run),
+          ],
         ],
       ),
+    );
+  }
+}
+
+/// The garment's fabric as bought (weight, width, price per metre), each
+/// typed in a field, and what its pieces take of it.
+class _FabricDetails extends StatefulWidget {
+  const _FabricDetails({
+    required this.garment,
+    required this.figures,
+    required this.run,
+  });
+
+  final String garment;
+
+  /// Its `production.indicators` entry.
+  final Map<String, dynamic> figures;
+  final ValueChanged<Map<String, Object?>> run;
+
+  @override
+  State<_FabricDetails> createState() => _FabricDetailsState();
+}
+
+class _FabricDetailsState extends State<_FabricDetails> {
+  final _weight = TextEditingController();
+  final _width = TextEditingController();
+  final _price = TextEditingController();
+  final _focus = [FocusNode(), FocusNode(), FocusNode()];
+
+  Map<String, dynamic> get _details =>
+      (widget.figures['fabric_details'] as Map<String, dynamic>?) ?? const {};
+
+  void _fill() {
+    String shown(Object? v, double scale, int digits) =>
+        v is num ? context.decimal(v / scale, digits) : '';
+    _weight.text = shown(_details['weight_gsm'], 1, 0);
+    _width.text = shown(_details['width_mm'], 10, 0);
+    _price.text = shown(_details['price_per_m'], 1, 2);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    for (final f in _focus) {
+      f.addListener(() {
+        if (!f.hasFocus) _submit();
+      });
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _fill();
+    });
+  }
+
+  @override
+  void didUpdateWidget(_FabricDetails old) {
+    super.didUpdateWidget(old);
+    if (!_focus.any((f) => f.hasFocus)) _fill();
+  }
+
+  @override
+  void dispose() {
+    for (final c in [_weight, _width, _price]) {
+      c.dispose();
+    }
+    for (final f in _focus) {
+      f.dispose();
+    }
+    super.dispose();
+  }
+
+  void _submit() {
+    final weight = _parseNumber(_weight.text);
+    final width = _parseNumber(_width.text);
+    final price = _parseNumber(_price.text);
+    final step = <String, Object?>{
+      'type': 'garment.set_fabric_details',
+      'garment': widget.garment,
+      'weight_gsm': ?weight,
+      'width_mm': ?(width == null ? null : width * 10),
+      'price_per_m': ?price,
+    };
+    final now = <String, Object?>{
+      'weight_gsm': ?weight,
+      'width_mm': ?(width == null ? null : width * 10),
+      'price_per_m': ?price,
+    };
+    final was = {
+      for (final k in ['weight_gsm', 'width_mm', 'price_per_m'])
+        if (_details[k] case final num v) k: v.toDouble(),
+    };
+    if (now.length == was.length &&
+        now.entries.every((e) => was[e.key] == e.value)) {
+      return;
+    }
+    widget.run(step);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final l = context.l;
+    final totals = widget.figures['totals'] as Map<String, dynamic>?;
+    final usual = widget.figures['weight_gsm'] as num?;
+    Widget field(
+      String label,
+      TextEditingController c,
+      FocusNode f,
+      String unit,
+      String key, {
+      String? hint,
+    }) => Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: ts(fontSize: 11.5, color: p.textMuted)),
+          const SizedBox(height: 2),
+          _NumberField(
+            key: Key(key),
+            controller: c,
+            focus: f,
+            unit: unit,
+            hint: hint,
+            onSubmitted: _submit,
+          ),
+        ],
+      ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l.fabricBought,
+          style: ts(fontSize: 13, fontWeight: FontWeight.w600, color: p.text),
+        ),
+        const SizedBox(height: Space.xs),
+        Row(
+          children: [
+            field(
+              l.fabricWeight,
+              _weight,
+              _focus[0],
+              'g/m²',
+              'fabric-weight',
+              hint: usual == null ? null : context.decimal(usual, 0),
+            ),
+            const SizedBox(width: Space.xs),
+            field(l.fabricWidth, _width, _focus[1], l.cm, 'fabric-width'),
+            const SizedBox(width: Space.xs),
+            field(l.fabricPrice, _price, _focus[2], '', 'fabric-price'),
+          ],
+        ),
+        if (totals != null) ...[
+          const SizedBox(height: Space.s),
+          Text(
+            l.garmentTotals(
+              totals['pieces'] as int,
+              context.number((totals['cut_area_mm2'] as num) / 1e6, 2),
+              context.number(totals['mass_g'] as num, 0),
+            ),
+            style: ts(fontSize: 12, height: 1.4, color: p.textMuted),
+          ),
+        ],
+      ],
     );
   }
 }

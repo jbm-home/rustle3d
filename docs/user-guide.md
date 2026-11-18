@@ -7,7 +7,8 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-18 (M23, the avatar walks, turns and raises its arms;
+Last updated: 2026-11-18 (M30, fabric as bought, area and mass of the
+pieces, the marker with its length and cost; M23, the avatar walks, turns and raises its arms;
 handles dragged with Select; Dimension tool, formulas typed in a value;
 Sew: part of an edge, several edges, internal lines; ⌘-click to pick a second corner or edge,
 rail tips beside the rail; M14; long sleeves, mirrored seams, agent status;
@@ -282,6 +283,15 @@ Fabric changes how a garment hangs and looks; the drape follows. (A
 custom colour can be set by an agent or the command line,
 `garment.set_color`; not yet in the app.)
 
+Under the fabric, **As bought** describes the fabric you buy: its
+**Weight** (grams per square metre; left empty, the usual weight of that
+fabric, shown in grey), its **Width** (cm, from one selvedge to the
+other) and its **Price / m** (a metre of length, in your currency).
+The weight is also what the cloth weighs in the drape. Below, the
+garment's totals: how many pieces, the fabric they take once cut (with
+their seam allowances) and what they weigh. With a piece selected, its
+area, perimeter, cut area and mass are in the inspector.
+
 A project can hold several garments, for example trousers and a shirt.
 Start a second template from the project (or **Add a garment**): it
 comes as a garment of its own, worn over the others. The list goes from
@@ -399,6 +409,31 @@ the other sizes' cutting lines in colour, named in a legend next to the
 test square; in DXF-AAMA, every piece once per size, with its size. To
 export one size or a few, use the command line
 (`r3d export My.r3d --format pdf --sizes 44`) or an agent.
+
+## Marker: fabric needed and cost
+**Export** → **Marker: the pieces laid out on the fabric…** lays the
+pieces of a garment out on its fabric the way a cutting room does, to
+know how much fabric to buy:
+- Pick the **sizes to cut** (with a size range; the size shown in 3D is
+  picked first) and the **fabric width** (the garment's, else 150 cm).
+  Each piece is laid once per size, with its seam allowance, its
+  grainline along the selvedge (it may be turned end for end). A left
+  and a right piece (a mirror copy) are two pieces.
+- The layout is drawn to scale, each size in its colour, with the
+  **length** of fabric it takes, the share of the fabric **used** (the
+  rest is waste), the length **to buy** (rounded up to the centimetre)
+  and its **cost**, when the garment's fabric has a price per metre.
+- **Save SVG** or **Save PDF** writes the marker at 1:1 (one long page,
+  for a plotter): the fabric's edges, each piece's lines, grainline,
+  name and size, the figures and the 100 mm test square.
+
+The layout is automatic and the same every time. Pieces are placed on
+a 5 mm grid, so they may sit a few millimetres apart; a careful layout
+by hand may still save a little. Fabric with a direction
+(a nap, a one-way print), folded fabric and several layers are not
+handled yet. Agents and scripts can cut a piece more times, in pairs or
+with a free grain (`marker.compute`, `r3d marker My.r3d --sizes 38,40,42
+--width-cm 150 --format pdf`).
 
 ## Import
 **Import** in the top bar brings in a pattern drawn in another program:

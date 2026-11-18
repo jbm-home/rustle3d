@@ -4747,7 +4747,7 @@ List the named variables, each with its formula and its value in the size drawn 
 
 ### `production.indicators`
 
-Production indicators, per garment (next to the body first): its fabric details (weight g/m², width mm, price per metre), each piece's area (sewing line, holes left out, mm²), cut area (with its seam allowance), perimeter (mm) and mass (cut area × weight, g), and the garment's totals. In one size of the range with `size`.
+Production indicators, per garment (next to the body first): the weight in use (g/m²) and the fabric details as set (weight_gsm, width_mm, price_per_m), each piece's area (sewing line, holes left out, mm²), cut area (with its seam allowance), perimeter (mm) and mass (cut area × weight, g), and the garment's totals. In one size of the range with `size`.
 
 <details><summary>Parameters (JSON schema)</summary>
 

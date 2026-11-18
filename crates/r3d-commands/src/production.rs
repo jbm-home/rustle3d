@@ -110,7 +110,7 @@ pub struct ProductionIndicators {
 }
 
 impl Described for ProductionIndicators {
-    const SUMMARY: &'static str = "Production indicators, per garment (next to the body first): its fabric details (weight g/m², width mm, price per metre), each piece's area (sewing line, holes left out, mm²), cut area (with its seam allowance), perimeter (mm) and mass (cut area × weight, g), and the garment's totals. In one size of the range with `size`.";
+    const SUMMARY: &'static str = "Production indicators, per garment (next to the body first): the weight in use (g/m²) and the fabric details as set (weight_gsm, width_mm, price_per_m), each piece's area (sewing line, holes left out, mm²), cut area (with its seam allowance), perimeter (mm) and mass (cut area × weight, g), and the garment's totals. In one size of the range with `size`.";
 }
 
 #[derive(Serialize)]
@@ -155,8 +155,7 @@ impl QuerySpec for ProductionIndicators {
                     "name": g.name,
                     "fabric": g.fabric,
                     "weight_gsm": gsm,
-                    "width_mm": g.fabric_details.width_mm,
-                    "price_per_m": g.fabric_details.price_per_m,
+                    "fabric_details": g.fabric_details,
                     "pieces": pieces,
                     "totals": {
                         "pieces": pieces.len(),

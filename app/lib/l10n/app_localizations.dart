@@ -3570,6 +3570,144 @@ abstract class L {
   /// In en, this message translates to:
   /// **'These edges do not follow each other on one piece.'**
   String get errNotJoined;
+
+  /// No description provided for @close.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get close;
+
+  /// No description provided for @marker.
+  ///
+  /// In en, this message translates to:
+  /// **'Marker'**
+  String get marker;
+
+  /// No description provided for @exportMarker.
+  ///
+  /// In en, this message translates to:
+  /// **'Marker: the pieces laid out on the fabric…'**
+  String get exportMarker;
+
+  /// No description provided for @markerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The pieces, with their seam allowances, laid out on the fabric along its grain. Pick the sizes to cut and the fabric\'s width: you get the length to buy and its cost.'**
+  String get markerHint;
+
+  /// No description provided for @markerGarment.
+  ///
+  /// In en, this message translates to:
+  /// **'Garment'**
+  String get markerGarment;
+
+  /// No description provided for @markerSizes.
+  ///
+  /// In en, this message translates to:
+  /// **'Sizes to cut'**
+  String get markerSizes;
+
+  /// No description provided for @markerWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Fabric width'**
+  String get markerWidth;
+
+  /// No description provided for @markerLayOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Lay out'**
+  String get markerLayOut;
+
+  /// No description provided for @markerLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Length'**
+  String get markerLength;
+
+  /// No description provided for @markerEfficiency.
+  ///
+  /// In en, this message translates to:
+  /// **'Fabric used'**
+  String get markerEfficiency;
+
+  /// No description provided for @markerYardage.
+  ///
+  /// In en, this message translates to:
+  /// **'To buy'**
+  String get markerYardage;
+
+  /// No description provided for @markerCost.
+  ///
+  /// In en, this message translates to:
+  /// **'Cost'**
+  String get markerCost;
+
+  /// No description provided for @markerNoPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Give the fabric a price per metre (inspector, with nothing selected, under the garment) to see the cost.'**
+  String get markerNoPrice;
+
+  /// No description provided for @markerSaveSvg.
+  ///
+  /// In en, this message translates to:
+  /// **'Save SVG'**
+  String get markerSaveSvg;
+
+  /// No description provided for @markerSavePdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Save PDF'**
+  String get markerSavePdf;
+
+  /// No description provided for @fabricBought.
+  ///
+  /// In en, this message translates to:
+  /// **'As bought'**
+  String get fabricBought;
+
+  /// No description provided for @fabricWeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Weight'**
+  String get fabricWeight;
+
+  /// No description provided for @fabricWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Width'**
+  String get fabricWidth;
+
+  /// No description provided for @fabricPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Price / m'**
+  String get fabricPrice;
+
+  /// No description provided for @cutArea.
+  ///
+  /// In en, this message translates to:
+  /// **'Cut area'**
+  String get cutArea;
+
+  /// No description provided for @pieceMass.
+  ///
+  /// In en, this message translates to:
+  /// **'Mass'**
+  String get pieceMass;
+
+  /// No description provided for @errMarkerTooNarrow.
+  ///
+  /// In en, this message translates to:
+  /// **'A piece is wider than the fabric: choose a wider fabric.'**
+  String get errMarkerTooNarrow;
+
+  /// No description provided for @garmentTotals.
+  ///
+  /// In en, this message translates to:
+  /// **'{pieces} pieces · {area} m² of fabric cut · {mass} g'**
+  String garmentTotals(int pieces, String area, String mass);
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

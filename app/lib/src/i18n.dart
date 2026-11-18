@@ -101,6 +101,7 @@ extension Messages on BuildContext {
       'nothing_to_undo' => l.errNothingToUndo,
       'nothing_to_redo' => l.errNothingToRedo,
       'nothing_to_simulate' => l.errNothingToSimulate,
+      'marker_too_narrow' => l.errMarkerTooNarrow,
       'cancelled' => l.errCancelled,
       'invalid.inverted' => l.errInverted,
       'invalid.range' => l.errRange(arg('min'), arg('max')),
