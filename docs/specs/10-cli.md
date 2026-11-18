@@ -9,7 +9,7 @@ scripts, simulate, export and render.
 ## Behavior
 `r3d` binary (clap). Implemented: `new`, `run`, `query`, `schema` (M1),
 `export`, `mcp` (M2), `simulate`, `render` (M4), `import` (M13),
-`marker`, `techpack` (M30). `run
+`marker`, `techpack` (M30), `fit` (M24). `run
 --dry-run` uses a bare session: actions such as exports are refused and
 nothing is written. Scripts can refer to earlier results
 (`"$3.created[0]"`), see `docs/commands.md`.
@@ -33,7 +33,13 @@ nothing is written. Scripts can refer to earlier results
   `--lighting studio|soft|dramatic`, `--camera
   front|three-quarter|side|back`, `--frame garment|body`, `--samples N`,
   `--bounces N` and `--no-denoise`; its output adds the samples and the
-  seconds taken.
+  seconds taken. `--fit-map strain|gap` (3D only, M24, spec 24) colours
+  the cloth by how tight it is, with a scale bar at the right edge; the
+  output adds the scale and the tightest value.
+- `r3d fit <project> [--threshold-pct P] [--heights-cm 100,120]`: how the
+  cached drape fits (`fit.report`, spec 24): strain per piece, the tight
+  spots, the ease at the chest, waist and hips (and at the heights
+  given).
 - `r3d mcp --project path`: MCP server over a folder; `r3d mcp --attach
   [--endpoint file]`: relay to the project open in the app (see 09).
 - `r3d export <project> --format svg|pdf|dxf|glb|obj [--paper a4|letter|single]

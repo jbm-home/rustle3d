@@ -7,11 +7,13 @@ use glam::Vec3;
 use r3d_commands::CommandError;
 use r3d_commands::Workspace;
 use r3d_commands::drape;
+use r3d_commands::fit::FitMap;
 use r3d_commands::techpack::{ExportTechPack, Image};
 use r3d_core::Fabric;
 use r3d_core::{Localizable, Message};
 use r3d_render::board::BoardView;
-use r3d_render::offscreen::{PNG_FORMAT, render_png};
+use r3d_render::fitmap;
+use r3d_render::offscreen::{PNG_FORMAT, encode_png, render_pixels, render_png};
 use r3d_render::photo::{self, Lighting, PhotoScene, Quality, Settings, Surface};
 use r3d_render::{
     BoardRenderer, BoardScene, Draw, Gpu, Material, Mesh, OrbitCamera, Target, Theme,
@@ -24,8 +26,9 @@ use serde_json::{Value, json};
 pub enum View {
     /// The 2D pattern.
     Board,
-    /// The garment on the avatar (the cached drape if it is up to date).
-    Garment,
+    /// The garment on the avatar (the cached drape if it is up to date),
+    /// coloured by a fit map if one is given.
+    Garment(Option<FitMap>),
     /// A path-traced photo of the garment on the avatar.
     Photo(PhotoOptions),
 }
@@ -208,6 +211,7 @@ fn mesh(positions: Vec<Vec3>, indices: Vec<u32>) -> Mesh {
         positions,
         normals: Vec::new(),
         indices,
+        colors: Vec::new(),
     };
     mesh.recompute_normals();
     mesh
@@ -222,54 +226,88 @@ struct Dressed {
     lines: Vec<Mesh>,
     /// `simulated` (the cached drape) or `start`.
     state: &'static str,
+    /// The facts of the fit map the pieces are coloured by, if any.
+    fit: Option<Value>,
 }
 
 impl Dressed {
-    fn of(ws: &Workspace) -> Result<Self, RenderError> {
+    /// The latest drape, its pieces coloured by `fit_map` if given.
+    fn of(ws: &Workspace, fit_map: Option<FitMap>) -> Result<Self, RenderError> {
         let project = ws.session().project();
-        let form = drape::Form::of_project(project)?;
-        let built = drape::prepare(project, form.as_ref())?;
-        let start: Vec<Vec3> = built.scene.particles.iter().map(|p| p.position).collect();
-        let cached = drape::load_cache(ws.dir(), project, start.len());
-        let state = if cached.is_some() {
-            "simulated"
-        } else {
-            "start"
-        };
+        let latest = drape::Latest::load(ws.dir(), project)?;
+        let positions = &latest.positions;
         // The avatar as it was at the drape's last frame, if it moved.
-        let avatar = form.map(|f| {
-            let surface = match &cached {
-                Some(c) => f.posed(c.animation.as_ref(), c.time),
-                None => f.positions.clone(),
-            };
-            mesh(surface, f.triangles.iter().flatten().copied().collect())
-        });
-        let positions = cached.map_or(start, |c| c.positions);
-        let pieces = built
+        let avatar = latest
+            .form
+            .as_ref()
+            .zip(latest.body.clone())
+            .map(|(f, surface)| mesh(surface, f.triangles.iter().flatten().copied().collect()));
+        let body = latest
+            .body
+            .as_deref()
+            .zip(latest.form.as_ref().map(|f| &f.triangles[..]));
+        let values = fit_map.map(|m| (m, m.values(&latest.drape, positions, body)));
+        let pieces: Vec<(Mesh, Fabric, Option<String>)> = latest
+            .drape
             .pieces
             .iter()
             .filter_map(|p| {
                 let garment = project.garment_of(p.panel);
+                let mut m = mesh(
+                    positions.get(p.particles.clone())?.to_vec(),
+                    p.indices.clone(),
+                );
+                if let Some((map, v)) = &values {
+                    m.colors = v
+                        .get(p.particles.clone())?
+                        .iter()
+                        .map(|x| fitmap::color(map.level(*x)))
+                        .collect();
+                }
                 Some((
-                    mesh(
-                        positions.get(p.particles.clone())?.to_vec(),
-                        p.indices.clone(),
-                    ),
+                    m,
                     garment.map(|g| g.fabric).unwrap_or_default(),
                     garment.and_then(|g| g.color.clone()),
                 ))
             })
             .collect();
-        let lines = drape::LinesOnCloth::new(&built, &positions)
+        let lines = drape::LinesOnCloth::new(&latest.drape, positions)
             .internal_lines(project)
             .iter()
             .map(|l| Mesh::ribbon(l, LINE_WIDTH_M, LINE_LIFT_M))
             .collect();
+        let fit = values.map(|(map, v)| {
+            // The tightest value on the garment, and its piece.
+            let (loose, tight) = map.range();
+            let tightest = v
+                .iter()
+                .enumerate()
+                .max_by(|a, b| map.level(*a.1).total_cmp(&map.level(*b.1)))
+                .map(|(i, x)| {
+                    let piece = latest
+                        .drape
+                        .pieces
+                        .iter()
+                        .find(|p| p.particles.contains(&i))
+                        .and_then(|p| project.panel(p.panel))
+                        .map(|p| p.name.clone());
+                    json!({ "value": (f64::from(*x) * 10.0).round() / 10.0, "piece": piece })
+                });
+            json!({
+                "map": map.name(),
+                "unit": map.unit(),
+                "loose": loose,
+                "tight": tight,
+                "tightest": tightest,
+                "legend": "bar at the right edge: tight (yellow) at the top, loose (dark) at the bottom",
+            })
+        });
         Ok(Self {
             avatar,
             pieces,
             lines,
-            state,
+            state: latest.state(),
+            fit,
         })
     }
 }
@@ -306,9 +344,19 @@ fn garment_png(
             material: Material::mannequin(&theme),
         });
     }
-    draws.extend(dressed.pieces.iter().map(|(m, fabric, color)| Draw {
-        mesh: m,
-        material: Material::fabric(*fabric, color.as_deref()),
+    draws.extend(dressed.pieces.iter().map(|(m, fabric, color)| {
+        let material = Material::fabric(*fabric, color.as_deref());
+        Draw {
+            mesh: m,
+            material: match m.colors.is_empty() {
+                true => material,
+                // A fit map: its colours, no sheen over them.
+                false => Material {
+                    sheen_amount: 0.0,
+                    ..material
+                },
+            },
+        }
     }));
     draws.extend(dressed.lines.iter().map(|mesh| Draw {
         mesh,
@@ -319,7 +367,7 @@ fn garment_png(
         },
     }));
     let mut renderer = ViewRenderer3d::new(gpu, PNG_FORMAT);
-    render_png(gpu, width, height, |view| {
+    let mut pixels = render_pixels(gpu, width, height, |view| {
         let target = Target {
             view,
             width,
@@ -327,7 +375,11 @@ fn garment_png(
         };
         renderer.render(gpu, target, camera, &draws, &theme);
     })
-    .map_err(gpu_failure)
+    .map_err(gpu_failure)?;
+    if dressed.fit.is_some() {
+        fitmap::paint_legend(&mut pixels, width, height);
+    }
+    encode_png(width, height, &pixels).map_err(gpu_failure)
 }
 
 /// Which pictures of the garment open a tech pack.
@@ -375,7 +427,7 @@ pub fn techpack_views(
     let pngs: Vec<(Vec<u8>, &str)> = match views {
         TechPackViews::None => Vec::new(),
         TechPackViews::View3d => {
-            let dressed = Dressed::of(ws)?;
+            let dressed = Dressed::of(ws, None)?;
             sides
                 .iter()
                 .map(|(angle, caption)| {
@@ -436,17 +488,18 @@ pub fn render(
                 json!({ "view": "board", "panels": scene.panels.len() }),
             ))
         }
-        View::Garment => {
-            let dressed = Dressed::of(ws)?;
+        View::Garment(fit_map) => {
+            let dressed = Dressed::of(ws, fit_map)?;
             let png = garment_png(gpu, &dressed, &OrbitCamera::default(), width, height)?;
-            Ok((
-                png,
-                json!({ "view": "3d", "drape": dressed.state, "pieces": dressed.pieces.len(), "avatar": dressed.avatar.is_some() }),
-            ))
+            let mut facts = json!({ "view": "3d", "drape": dressed.state, "pieces": dressed.pieces.len(), "avatar": dressed.avatar.is_some() });
+            if let Some(fit) = &dressed.fit {
+                facts["fit_map"] = fit.clone();
+            }
+            Ok((png, facts))
         }
         View::Photo(options) => {
             let start = std::time::Instant::now();
-            let dressed = Dressed::of(ws)?;
+            let dressed = Dressed::of(ws, None)?;
             let cloth: Vec<(&Mesh, Surface)> = dressed
                 .pieces
                 .iter()

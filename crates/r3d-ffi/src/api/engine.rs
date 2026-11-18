@@ -141,6 +141,7 @@ fn piece_meshes(drape: &Drape, positions: &[glam::Vec3]) -> Vec<(PanelId, Mesh)>
                 positions: positions.get(piece.particles.clone())?.to_vec(),
                 normals: Vec::new(),
                 indices: piece.indices.clone(),
+                colors: Vec::new(),
             };
             mesh.recompute_normals();
             Some((piece.panel, mesh))
@@ -1343,6 +1344,7 @@ impl Engine {
                 positions: f.posed(animation.as_ref(), time),
                 normals: Vec::new(),
                 indices: f.triangles.iter().flatten().copied().collect(),
+                colors: Vec::new(),
             };
             mesh.recompute_normals();
             mesh
@@ -1601,6 +1603,7 @@ impl Engine {
                 positions: form.positions.clone(),
                 normals: Vec::new(),
                 indices: form.triangles.iter().flatten().copied().collect(),
+                colors: Vec::new(),
             };
             mesh.recompute_normals();
             g.avatar = Some((body, mesh));
@@ -1632,6 +1635,7 @@ impl Engine {
             positions: form.posed(Some(&animation), time),
             normals: Vec::new(),
             indices: form.triangles.iter().flatten().copied().collect(),
+            colors: Vec::new(),
         };
         mesh.recompute_normals();
         Ok(Some(mesh))

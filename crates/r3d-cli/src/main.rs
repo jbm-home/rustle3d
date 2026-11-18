@@ -96,6 +96,23 @@ enum ViewArg {
 }
 
 #[derive(Clone, Copy, ValueEnum)]
+enum FitMapArg {
+    /// Stretch beyond the pattern, 0 (dark) to 20 % (yellow).
+    Strain,
+    /// Distance to the body, 50 mm (dark) to 0 (yellow).
+    Gap,
+}
+
+impl From<FitMapArg> for r3d_commands::fit::FitMap {
+    fn from(m: FitMapArg) -> Self {
+        match m {
+            FitMapArg::Strain => Self::Strain,
+            FitMapArg::Gap => Self::Gap,
+        }
+    }
+}
+
+#[derive(Clone, Copy, ValueEnum)]
 enum QualityArg {
     Quick,
     Good,
@@ -322,8 +339,25 @@ enum Cmd {
         /// Image size, e.g. 1200x900.
         #[arg(long, default_value = "1200x900", value_parser = parse_size)]
         size: (u32, u32),
+        /// 3D: colour the cloth by how tight it is (a bar at the right
+        /// edge is the scale: yellow tight, dark loose).
+        #[arg(long, value_enum)]
+        fit_map: Option<FitMapArg>,
         #[command(flatten)]
         photo: PhotoArgs,
+    },
+    /// How the draped garment fits (the cached `simulate` result): strain
+    /// per piece, the tight spots, and the ease at the chest, waist and
+    /// hips.
+    Fit {
+        project: PathBuf,
+        /// Strain (%) from which the cloth counts as tight.
+        #[arg(long, default_value_t = 5.0)]
+        threshold_pct: f64,
+        /// More heights above the floor (cm) to take the tape at,
+        /// comma-separated.
+        #[arg(long, value_delimiter = ',')]
+        heights_cm: Vec<f64>,
     },
     /// List every operation, or print the JSON schema of one.
     Schema { name: Option<String> },
@@ -640,17 +674,36 @@ fn parse_size(s: &str) -> Result<(u32, u32), String> {
     Ok((parse(w)?, parse(h)?))
 }
 
+fn cmd_fit(project: &Path, threshold_pct: f64, heights_cm: Vec<f64>) -> Result<(), Failure> {
+    let mut ws = Workspace::open(project)?;
+    let step = json!({
+        "type": "fit.report",
+        "threshold_pct": threshold_pct,
+        "heights_cm": heights_cm,
+    });
+    let result = ws.run_step(&Step::from_value(step)?)?;
+    print_json(&result)
+}
+
 fn cmd_render(
     project: &Path,
     view: ViewArg,
     out: &Path,
     size: (u32, u32),
+    fit_map: Option<FitMapArg>,
     photo: &PhotoArgs,
 ) -> Result<(), Failure> {
+    if fit_map.is_some() && !matches!(view, ViewArg::Garment) {
+        return Err(r3d_commands::CommandError::Malformed {
+            name: "fit-map".into(),
+            detail: "only with --view 3d".into(),
+        }
+        .into());
+    }
     let ws = Workspace::open(project)?;
     let view = match view {
         ViewArg::Board => render::View::Board,
-        ViewArg::Garment => render::View::Garment,
+        ViewArg::Garment => render::View::Garment(fit_map.map(Into::into)),
         ViewArg::Photo => render::View::Photo(photo.options()?),
     };
     let gpu = render::headless_gpu()?;
@@ -768,8 +821,14 @@ fn main() -> ExitCode {
             view,
             out,
             size,
+            fit_map,
             photo,
-        } => cmd_render(&project, view, &out, size, &photo),
+        } => cmd_render(&project, view, &out, size, fit_map, &photo),
+        Cmd::Fit {
+            project,
+            threshold_pct,
+            heights_cm,
+        } => cmd_fit(&project, threshold_pct, heights_cm),
         Cmd::Schema { name } => cmd_schema(name.as_deref()),
         Cmd::Mcp {
             project,

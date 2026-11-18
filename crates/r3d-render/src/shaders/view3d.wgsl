@@ -14,7 +14,7 @@ struct Globals {
 struct Material {
     base: vec4<f32>,
     sheen: vec4<f32>,
-    // x: sheen amount
+    // x: sheen amount; y: 1 to use the vertex colours (a fit map)
     params: vec4<f32>,
 };
 @group(1) @binding(0) var<uniform> m: Material;
@@ -75,12 +75,14 @@ fn fs_ground(i: GroundOut) -> @location(0) vec4<f32> {
 struct SurfaceIn {
     @location(0) pos: vec3<f32>,
     @location(1) normal: vec3<f32>,
+    @location(2) color: vec4<f32>,
 };
 
 struct SurfaceOut {
     @builtin(position) clip: vec4<f32>,
     @location(0) world: vec3<f32>,
     @location(1) normal: vec3<f32>,
+    @location(2) color: vec4<f32>,
 };
 
 @vertex
@@ -89,6 +91,7 @@ fn vs_surface(v: SurfaceIn) -> SurfaceOut {
     o.clip = g.view_proj * vec4<f32>(v.pos, 1.0);
     o.world = v.pos;
     o.normal = v.normal;
+    o.color = v.color;
     return o;
 }
 
@@ -103,7 +106,7 @@ fn fs_surface(i: SurfaceOut, @builtin(front_facing) front: bool) -> @location(0)
     let key = normalize(vec3<f32>(-0.6, 0.7, 0.4));
     let fill = normalize(vec3<f32>(0.8, 0.2, 0.35));
     let rim = normalize(vec3<f32>(-0.2, 0.4, -0.9));
-    let base = lin(m.base.rgb);
+    let base = select(lin(m.base.rgb), lin(i.color.rgb), m.params.y > 0.5);
     let hemi = mix(lin(g.ground.rgb) * 0.35, lin(g.sky_top.rgb), n.y * 0.5 + 0.5);
     // Slightly wrapped diffuse: fabric scatters a little past the
     // terminator, but folds must keep their shading.

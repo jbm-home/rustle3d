@@ -12,6 +12,18 @@ pub fn render_png(
     height: u32,
     draw: impl FnOnce(&wgpu::TextureView),
 ) -> Result<Vec<u8>, RenderError> {
+    let pixels = render_pixels(gpu, width, height, draw)?;
+    encode_png(width.max(1), height.max(1), &pixels)
+}
+
+/// Render with `draw` into a `width × height` texture and read its RGBA
+/// pixels back (row after row, no padding).
+pub fn render_pixels(
+    gpu: &Gpu,
+    width: u32,
+    height: u32,
+    draw: impl FnOnce(&wgpu::TextureView),
+) -> Result<Vec<u8>, RenderError> {
     let (width, height) = (width.max(1), height.max(1));
     let texture = gpu.device.create_texture(&wgpu::TextureDescriptor {
         label: Some("offscreen"),
@@ -28,8 +40,7 @@ pub fn render_png(
         view_formats: &[],
     });
     draw(&texture.create_view(&wgpu::TextureViewDescriptor::default()));
-    let pixels = read_pixels(gpu, &texture)?;
-    encode_png(width, height, &pixels)
+    read_pixels(gpu, &texture)
 }
 
 /// Encode RGBA pixels (row after row, no padding) as PNG.

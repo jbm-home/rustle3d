@@ -211,4 +211,28 @@ fn agents_simulate_and_look_at_the_garment() {
     let (err, body) = call(&s, "render_3d", json!({ "quality": "good" }));
     assert!(err);
     assert_eq!(body["error"]["args"]["name"], "quality");
+
+    // The fit: a map in colour, and the numbers.
+    let fit = serde_json::to_value(s.call(
+        "render_3d",
+        Some(Map::from_iter([
+            ("width".into(), json!(64)),
+            ("height".into(), json!(48)),
+            ("fit_map".into(), json!("strain")),
+        ])),
+    ))
+    .unwrap();
+    assert_eq!(fit["content"][0]["type"], "image", "{fit}");
+    let info: Value = serde_json::from_str(fit["content"][1]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(info["fit_map"]["map"], "strain");
+    assert_eq!(info["fit_map"]["unit"], "%");
+    let (err, body) = call(&s, "render_3d", json!({ "fit_map": "stress" }));
+    assert!(err);
+    assert_eq!(body["error"]["args"]["name"], "fit_map");
+    let (err, report) = call(&s, "fit_report", json!({}));
+    assert!(!err, "{report}");
+    assert_eq!(report["pieces"].as_array().unwrap().len(), 3);
+    let (err, tape) = call(&s, "fit_tape", json!({ "height_cm": 95 }));
+    assert!(!err, "{tape}");
+    assert!(tape["body_cm"].as_f64().is_some(), "{tape}");
 }

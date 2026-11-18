@@ -46,6 +46,12 @@ and look at the result, either headless or live in the user's open app.
   (front/three_quarter/side/back), `frame` (garment/body), and advanced
   `samples`, `bounces`, `denoise`; the text result gives the time taken.
   Highlighting of ids comes later.
+- **Fit** (M24, spec 24): `render_3d` takes `fit_map` (`strain` or
+  `gap`) to colour the cloth by how tight it is, a scale bar at the right
+  edge; the text result gives the scale and the tightest value with its
+  piece. `fit_report` and `fit_tape` are the `fit.report` and `fit.tape`
+  actions: strain per piece, tight spots, ease at the chest, waist and
+  hips; a tape at a height or a point.
 - **Tech pack** (M30, spec 23): `export_techpack` is the
   `export.techpack` action with one more parameter, `views` (`3d`
   default, `photo`, `none`): the server renders the garment's front and

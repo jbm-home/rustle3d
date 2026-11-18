@@ -22,6 +22,7 @@ pub mod render;
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
+use r3d_commands::fit::FitMap;
 use r3d_commands::{
     Action, Command, CommandError, Info, Progress, Query, Status, Step, Workspace, WorkspaceError,
     step,
@@ -234,10 +235,21 @@ fn catalog() -> (Vec<Tool>, BTreeMap<String, Target>) {
         "render_3d".into(),
         "Render the garment on the avatar as a PNG image: the last `simulate` result if the \
          project has not changed since, otherwise the panels where the simulation starts. The \
-         text result says which (`drape`: simulated or start)."
+         text result says which (`drape`: simulated or start). With `fit_map`, the cloth is \
+         coloured by how tight it is (viridis: dark loose, yellow tight; a bar at the right \
+         edge): `strain`, stretch beyond the pattern from 0 to 20 %; `gap`, distance to the \
+         body from 50 mm to 0. The text result gives the scale and the tightest value."
             .into(),
-        size_schema(),
-        Target::Render(render::View::Garment),
+        object(json!({
+            "type": "object",
+            "properties": {
+                "width": { "type": "integer", "minimum": 16, "maximum": 4096, "default": 1024 },
+                "height": { "type": "integer", "minimum": 16, "maximum": 4096, "default": 768 },
+                "fit_map": { "enum": FitMap::ALL.map(FitMap::name) }
+            },
+            "additionalProperties": false
+        })),
+        Target::Render(render::View::Garment(None)),
     );
     let photo_schema = {
         let names = |all: &[&str]| json!(all);
@@ -389,6 +401,21 @@ impl Server {
                 render::View::Photo(render::PhotoOptions::from_args(args)?),
                 &render::PhotoOptions::KEYS,
             ),
+            render::View::Garment(_) => {
+                let map = match args.get("fit_map") {
+                    None => None,
+                    Some(v) => Some(v.as_str().and_then(FitMap::from_name).ok_or_else(|| {
+                        CommandError::Malformed {
+                            name: "fit_map".into(),
+                            detail: format!(
+                                "expected one of: {}",
+                                FitMap::ALL.map(FitMap::name).join(", ")
+                            ),
+                        }
+                    })?),
+                };
+                (render::View::Garment(map), &["fit_map"])
+            }
             other => (other, &[]),
         };
         if let Some(key) = args

@@ -1,6 +1,6 @@
 # Rendering
 
-Status: living document, last updated 2026-11-17 (M14).
+Status: living document, last updated 2026-11-19 (M24, fit maps).
 
 How `r3d-render` draws, and where each algorithm comes from. Read it
 before touching `crates/r3d-render/src/photo` or its shaders. Every
@@ -18,6 +18,18 @@ implementing code cites it too.
 All three render offscreen too (PNG for the CLI and MCP) with the same
 code as the app. A fabric's look comes from `r3d_core::Fabric::look`,
 shared by the three tiers and the glTF export.
+
+**Fit maps** (M24, spec 24) are drawn by the interactive tier: a mesh may
+carry one colour per vertex (`Mesh::colors`), used instead of the
+material's base colour, with the same lighting so folds stay readable
+(no sheen over them). The colours come from `fitmap::color`, the viridis
+scale (van der Walt & Smith 2015, CC0; its lightness rises steadily, so
+it reads in grey and for colour-blind viewers: Nuñez et al. 2018), nine
+stops linear in between; 0 is loose (dark violet), 1 tight (yellow).
+What a level means (strain 0–20 %, gap 50–0 mm) is
+`r3d_commands::fit::FitMap`. Headless renders paint the scale as a bar
+at the right edge (`fitmap::paint_legend`); the app draws its own legend
+with the same stops.
 
 ## 2. The photo renderer
 

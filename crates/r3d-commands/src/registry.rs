@@ -9,6 +9,7 @@ use serde_json::Value;
 use crate::actions::*;
 use crate::commands::*;
 use crate::error::CommandError;
+use crate::fit::{FitReport, FitTape};
 use crate::production::*;
 use crate::progress::Progress;
 use crate::queries::*;
@@ -228,4 +229,6 @@ action_registry! {
     "import.pattern" => ImportPattern,
     "export.marker" => ExportMarker,
     "export.techpack" => ExportTechPack,
+    "fit.report" => FitReport,
+    "fit.tape" => FitTape,
 }

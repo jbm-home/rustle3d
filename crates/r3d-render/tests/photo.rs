@@ -59,6 +59,7 @@ fn skirt_scene(fabric: Fabric) -> PhotoScene {
         positions: fitted_positions(&model, &fitted),
         normals: Vec::new(),
         indices: model.triangles().iter().flatten().copied().collect(),
+        colors: Vec::new(),
     };
     avatar.recompute_normals();
     let mut session = Session::new(Project::new("t"));
@@ -79,6 +80,7 @@ fn skirt_scene(fabric: Fabric) -> PhotoScene {
                     .collect(),
                 normals: Vec::new(),
                 indices: p.indices.clone(),
+                colors: Vec::new(),
             };
             m.recompute_normals();
             m

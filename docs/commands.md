@@ -5537,3 +5537,78 @@ Write the project's tech pack as a PDF (landscape A4 or Letter): pictures of the
 
 </details>
 
+### `fit.report`
+
+How the draped garment fits, read from the cached drape (`simulate` first; says `drape`: simulated or start): per piece its largest and mean strain (% stretch beyond the pattern), the share of its area at or above `threshold_pct` (default 5), its mean gap to the body (mm) and the share touching it; the tight spots (neighbouring cloth at or above the threshold, strongest first, at most 10: piece, peak strain, area in cm², height above the floor in cm, centre on the pattern in mm); and the ease (garment circumference minus body circumference, cm) at the chest, waist and hips and at any `heights_cm`.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "How the draped garment fits.",
+  "properties": {
+    "heights_cm": {
+      "description": "More heights above the floor (cm) to take the tape at, besides the\nchest, waist and hips.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "threshold_pct": {
+      "default": 5.0,
+      "description": "Strain (%) from which the cloth counts as tight (default 5).",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "title": "FitReport",
+  "type": "object"
+}
+```
+
+</details>
+
+### `fit.tape`
+
+A tape measure on the cached drape: at `height_cm`, the garment's circumference around the body (cloth length along the horizontal cut, folds included), the body's (a tape around its section) and the ease between them (cm); or, at a point `near` on the drape (m), the same for the loop passing there (a sleeve, the body) plus the gap between the cloth and the body there (mm). `closed` is false when the cut does not go round (an open front, a hem): no ease then.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A tape measure on the drape.",
+  "properties": {
+    "height_cm": {
+      "description": "Height above the floor (cm): the loop around the body there.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "near": {
+      "description": "A point on the drape (m, x right, y up, z forward): the loop\nthrough it at its height (a sleeve, the body…), and the gap to the\nbody there.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 3,
+      "minItems": 3,
+      "type": [
+        "array",
+        "null"
+      ]
+    }
+  },
+  "title": "FitTape",
+  "type": "object"
+}
+```
+
+</details>
+

@@ -1800,6 +1800,48 @@ pub fn load_cache(dir: &Path, project: &Project, particles: usize) -> Option<Cac
     })
 }
 
+/// The garment as it was last draped headless (renders, exports, fit):
+/// the cached drape if it was made from this exact document, otherwise
+/// where the simulation starts.
+#[derive(Debug, Clone)]
+pub struct Latest {
+    pub drape: Drape,
+    pub form: Option<Form>,
+    /// One per particle of `drape`.
+    pub positions: Vec<Vec3>,
+    /// The avatar's surface at that moment (posed if it moved).
+    pub body: Option<Vec<Vec3>>,
+    /// From the cache (`true`) or the starting positions.
+    pub simulated: bool,
+}
+
+impl Latest {
+    /// The latest drape of `project`, whose folder is `dir`.
+    pub fn load(dir: &Path, project: &Project) -> Result<Self, CommandError> {
+        let form = Form::of_project(project)?;
+        let drape = prepare(project, form.as_ref())?;
+        let start: Vec<Vec3> = drape.scene.particles.iter().map(|p| p.position).collect();
+        let cached = load_cache(dir, project, start.len());
+        let body = form.as_ref().map(|f| match &cached {
+            Some(c) => f.posed(c.animation.as_ref(), c.time),
+            None => f.positions.clone(),
+        });
+        let simulated = cached.is_some();
+        Ok(Self {
+            positions: cached.map_or(start, |c| c.positions),
+            drape,
+            form,
+            body,
+            simulated,
+        })
+    }
+
+    /// `simulated` or `start`, for results.
+    pub fn state(&self) -> &'static str {
+        if self.simulated { "simulated" } else { "start" }
+    }
+}
+
 /// The garment draped at `positions` (one per particle of `drape`), as
 /// meshes to export: one per piece, named after it, with its pattern
 /// position as texture coordinates; the avatar too when `avatar` (its

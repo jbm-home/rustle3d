@@ -90,6 +90,7 @@ fn view3d_renders_the_avatar_and_the_cloth() {
         positions,
         normals: Vec::new(),
         indices: model.triangles().iter().flatten().copied().collect(),
+        colors: Vec::new(),
     };
     avatar.recompute_normals();
     // The skirt template where the simulation starts it, around the body.
@@ -106,6 +107,7 @@ fn view3d_renders_the_avatar_and_the_cloth() {
         positions: scene.particles.iter().map(|p| p.position).collect(),
         normals: Vec::new(),
         indices: scene.triangles.iter().flat_map(|t| t.vertices).collect(),
+        colors: Vec::new(),
     };
     skirt.recompute_normals();
     let camera = OrbitCamera::default();

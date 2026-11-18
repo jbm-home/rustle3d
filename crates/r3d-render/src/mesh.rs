@@ -2,6 +2,8 @@
 
 use glam::Vec3;
 
+use crate::theme::Rgba;
+
 /// A triangle mesh in metres: positions, per-vertex normals and triangles
 /// (cloth from the simulation, the avatar body, …).
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -9,6 +11,9 @@ pub struct Mesh {
     pub positions: Vec<Vec3>,
     pub normals: Vec<Vec3>,
     pub indices: Vec<u32>,
+    /// Per-vertex colours (sRGB) drawn instead of the material's base
+    /// colour, e.g. a fit map; empty for the material's.
+    pub colors: Vec<Rgba>,
 }
 
 impl Mesh {
@@ -72,6 +77,7 @@ mod tests {
             positions: vec![Vec3::ZERO, Vec3::X, Vec3::new(1.0, 0.0, -1.0), -Vec3::Z],
             normals: Vec::new(),
             indices: vec![0, 1, 2, 0, 2, 3],
+            colors: Vec::new(),
         };
         quad.recompute_normals();
         assert!(quad.normals.iter().all(|n| (*n - Vec3::Y).length() < 1e-6));

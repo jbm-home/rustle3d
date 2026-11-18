@@ -153,6 +153,7 @@ mod tests {
             indices: vec![
                 0, 2, 4, 4, 2, 1, 1, 2, 5, 5, 2, 0, 4, 3, 0, 1, 3, 4, 5, 3, 1, 0, 3, 5,
             ],
+            colors: Vec::new(),
         }
     }
 
@@ -202,6 +203,7 @@ mod tests {
             positions: vec![Vec3::ZERO, Vec3::X, Vec3::Y],
             normals: vec![Vec3::new(-1.0, -1.0, 1.0).normalize(), Vec3::X, Vec3::Y],
             indices: vec![0, 1, 2],
+            colors: Vec::new(),
         };
         for (p, _) in tessellate(&mesh, 3) {
             for v in p {

@@ -405,6 +405,37 @@ fn simulate_caches_a_drape_that_render_uses() {
         assert_eq!(json_of(&render.stderr)["error"]["code"], "gpu");
     }
 
+    // How it fits: the numbers, and the map in colour.
+    let fit = r3d().arg("fit").arg(&dir).assert().success();
+    let report = json_of(&fit.get_output().stdout);
+    assert_eq!(report["drape"], "simulated");
+    assert_eq!(report["pieces"].as_array().unwrap().len(), 3);
+    assert_eq!(report["ease"][1]["at"], "waist");
+    let render = r3d()
+        .args([
+            "render",
+            "--view",
+            "3d",
+            "--fit-map",
+            "gap",
+            "--size",
+            "64x48",
+        ])
+        .arg("--out")
+        .arg(&png)
+        .arg(&dir)
+        .output()
+        .unwrap();
+    if render.status.success() {
+        assert_eq!(json_of(&render.stdout)["fit_map"]["map"], "gap");
+    }
+    r3d()
+        .args(["render", "--view", "board", "--fit-map", "strain", "--out"])
+        .arg(&png)
+        .arg(&dir)
+        .assert()
+        .failure();
+
     // Any edit makes the cached drape stale: renders fall back to the start.
     r3d()
         .arg("run")

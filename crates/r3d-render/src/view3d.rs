@@ -91,6 +91,8 @@ const MATERIAL_STRIDE: u64 = 256;
 struct Vertex {
     pos: [f32; 3],
     normal: [f32; 3],
+    /// The mesh's own colour (sRGB), used when the material says so.
+    color: [f32; 4],
 }
 
 /// A GPU buffer that grows when needed.
@@ -251,7 +253,7 @@ impl ViewRenderer3d {
         let vertex_layout = wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<Vertex>() as u64,
             step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3],
+            attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32x4],
         };
         Self {
             format,
@@ -327,14 +329,23 @@ impl ViewRenderer3d {
         for (i, d) in draws.iter().enumerate() {
             let first_index = indices.len() as u32;
             let base_vertex = vertices.len() as i32;
+            let painted = d.mesh.colors.len() == d.mesh.positions.len();
             vertices.extend(
                 d.mesh
                     .positions
                     .iter()
                     .zip(&d.mesh.normals)
-                    .map(|(p, n)| Vertex {
+                    .enumerate()
+                    .map(|(k, (p, n))| Vertex {
                         pos: p.to_array(),
                         normal: n.to_array(),
+                        color: d
+                            .mesh
+                            .colors
+                            .get(k)
+                            .copied()
+                            .filter(|_| painted)
+                            .unwrap_or_default(),
                     }),
             );
             indices.extend_from_slice(&d.mesh.indices);
@@ -342,7 +353,12 @@ impl ViewRenderer3d {
             let uniform = MaterialUniform {
                 base: d.material.base,
                 sheen: d.material.sheen,
-                params: [d.material.sheen_amount, 0.0, 0.0, 0.0],
+                params: [
+                    d.material.sheen_amount,
+                    if painted { 1.0 } else { 0.0 },
+                    0.0,
+                    0.0,
+                ],
             };
             let at = i * MATERIAL_STRIDE as usize;
             material_bytes[at..at + std::mem::size_of::<MaterialUniform>()]

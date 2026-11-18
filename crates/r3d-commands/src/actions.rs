@@ -267,22 +267,13 @@ fn draped(
     avatar: bool,
 ) -> Result<(r3d_io::scene3d::Scene3d, &'static str), WorkspaceError> {
     let project = ws.session().project();
-    let form = drape::Form::of_project(project)?;
-    let built = drape::prepare(project, form.as_ref())?;
-    let start: Vec<glam::Vec3> = built.scene.particles.iter().map(|p| p.position).collect();
-    let cached = drape::load_cache(ws.dir(), project, start.len());
-    let state = if cached.is_some() {
-        "simulated"
-    } else {
-        "start"
-    };
-    let body = form.as_ref().filter(|_| avatar).map(|f| match &cached {
-        Some(c) => f.posed(c.animation.as_ref(), c.time),
-        None => f.positions.clone(),
-    });
-    let positions = cached.map_or(start, |c| c.positions);
-    let avatar = body.as_deref().zip(form.as_ref().map(|f| &f.triangles[..]));
-    Ok((drape::scene3d(project, &built, &positions, avatar), state))
+    let latest = drape::Latest::load(ws.dir(), project)?;
+    let body = latest.body.as_deref().filter(|_| avatar);
+    let avatar = body.zip(latest.form.as_ref().map(|f| &f.triangles[..]));
+    Ok((
+        drape::scene3d(project, &latest.drape, &latest.positions, avatar),
+        latest.state(),
+    ))
 }
 
 /// Export the draped garment as glTF 2.0 (GLB).

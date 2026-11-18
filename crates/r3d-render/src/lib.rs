@@ -12,6 +12,7 @@
 pub mod blit;
 pub mod board;
 pub mod camera;
+pub mod fitmap;
 pub mod gpu;
 pub mod mesh;
 pub mod offscreen;

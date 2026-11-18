@@ -22,6 +22,7 @@ pub mod commands;
 pub mod docs;
 pub mod drape;
 pub mod error;
+pub mod fit;
 pub mod history;
 pub mod production;
 pub mod progress;

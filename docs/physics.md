@@ -1,6 +1,6 @@
 # Cloth physics
 
-Status: living document (2026-11-18, M23); the solver choice is revisable (see
+Status: living document (2026-11-19, M24); the solver choice is revisable (see
 the alternatives below). All algorithms come from the
 published papers listed in §9. Code that implements a method cites the paper
 in its doc comment.
@@ -510,6 +510,25 @@ the body, triangles not cut into it, seams closed, the T-shirt at rest)
 and that the GPU drape ends within 2 cm of the CPU's (it is within a few
 mm).
 
+### Reading the fit (M24)
+
+`r3d_commands::fit` (spec 24) measures a drape after the fact, from the
+positions alone, so the CPU and GPU results read alike:
+- **Strain** of a triangle: the largest principal stretch of its
+  deformation gradient `F` (rest shape from the pattern, `FᵀF`'s larger
+  eigenvalue, square root) minus one [20], as Strain Based Dynamics
+  writes the same `F` [4]. Not the solver's constraint error: a jersey
+  T-shirt after 5 s reads 1–6 % on average per piece and up to 40 %
+  under the arms, where the arms in their A pose pull the sleeves; a
+  woven stays near its stretch limit (≈ 3 %).
+- **Gap**: each vertex's distance to the body's triangles (closest
+  point on a triangle [18], triangles bucketed in a 4 cm grid). Cloth
+  that touches reads 3–5 mm (thickness and the skin margin, §5).
+- **Tape**: a horizontal cut through the cloth's triangles, joined
+  across seams (the seam pairs name one vertex for both sides) and
+  across gaps under 2 cm; the body's cut is measured by its convex hull,
+  as a tape around the body reads it (`r3d_avatar::measure`).
+
 ## 9. References
 
 1. M. Müller, B. Heidelberger, M. Hennix, J. Ratcliff. *Position Based Dynamics.* VRIPHYS 2006 / JVCIR 2007.
@@ -531,5 +550,6 @@ mm).
 17. J. A. Bærentzen, H. Aanæs. *Signed Distance Computation Using the Angle Weighted Pseudonormal.* IEEE TVCG 11(3), 2005.
 18. C. Ericson. *Real-Time Collision Detection*, §5.1.5 (closest point on a triangle). Morgan Kaufmann, 2004.
 19. N. Magnenat-Thalmann, R. Laperrière, D. Thalmann. *Joint-Dependent Local Deformations for Hand Animation and Object Grasping.* Graphics Interface 1988.
+20. J. Bonet, R. D. Wood. *Nonlinear Continuum Mechanics for Finite Element Analysis.* Cambridge University Press, 1997 (§3: deformation gradient, principal stretches).
 
 Reading order for contributors: [1] → [2] → [3] → [4] → [5] → [7] → [8] → [6].
