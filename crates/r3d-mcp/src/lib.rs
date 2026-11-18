@@ -14,6 +14,7 @@
 //! live. See `docs/specs/09-mcp-connector.md`.
 
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 pub mod attach;
@@ -22,14 +23,16 @@ pub mod render;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 use r3d_commands::{
-    Action, Command, CommandError, Info, Query, Step, Workspace, WorkspaceError, step,
+    Action, Command, CommandError, Info, Progress, Query, Status, Step, Workspace, WorkspaceError,
+    step,
 };
 use r3d_core::{Localizable, Message};
 use r3d_render::Gpu;
 use r3d_render::photo;
 use rmcp::model::{
     CallToolRequestParams, CallToolResponse, CallToolResult, ContentBlock, Implementation,
-    ListToolsResult, PaginatedRequestParams, ServerCapabilities, ServerConfig, Tool,
+    ListToolsResult, PaginatedRequestParams, ProgressNotificationParam, ServerCapabilities,
+    ServerConfig, Tool,
 };
 use rmcp::service::RequestContext;
 use rmcp::{ErrorData as McpError, RoleServer, ServerHandler, ServiceExt};
@@ -291,6 +294,17 @@ impl Server {
     /// Execute a tool call; tool errors are returned as structured results
     /// the agent can read, never as protocol errors.
     pub fn call(&self, name: &str, arguments: Option<Map<String, Value>>) -> CallToolResult {
+        self.call_with(name, arguments, &Progress::default())
+    }
+
+    /// [`Server::call`], a long step reporting to `progress` and stopping
+    /// when it asks.
+    pub fn call_with(
+        &self,
+        name: &str,
+        arguments: Option<Map<String, Value>>,
+        progress: &Progress,
+    ) -> CallToolResult {
         let args = arguments.unwrap_or_default();
         let type_name = match self.targets.get(name) {
             None => {
@@ -312,7 +326,7 @@ impl Server {
             Some(Target::GoTo) => step::GO_TO,
             Some(Target::Batch) => step::BATCH,
         };
-        match self.run_step(type_name, args) {
+        match self.run_step(type_name, args, progress) {
             Ok(value) => {
                 let body = serde_json::to_string(&value).unwrap_or_default();
                 CallToolResult::success(vec![ContentBlock::text(body)])
@@ -379,6 +393,7 @@ impl Server {
         &self,
         type_name: &str,
         mut args: Map<String, Value>,
+        progress: &Progress,
     ) -> Result<Value, WorkspaceError> {
         args.insert("type".into(), Value::from(type_name));
         let step = Step::from_value(Value::Object(args))?;
@@ -387,7 +402,7 @@ impl Server {
                 detail: "workspace lock poisoned".into(),
             })
         })?;
-        let value = ws.run_step(&step)?;
+        let value = ws.run_step_with(&step, progress)?;
         let changed = ws.session().is_dirty();
         if changed {
             ws.save()?;
@@ -418,12 +433,61 @@ impl ServerHandler for Server {
         Ok(ListToolsResult::with_all_items(self.tools.as_ref().clone()))
     }
 
+    /// Long steps (a graded template, a drape) send progress notifications
+    /// when the client asked for them (a progress token), and stop when
+    /// the client cancels the request. The step runs off the async
+    /// threads.
     async fn call_tool(
         &self,
         request: CallToolRequestParams,
-        _context: RequestContext<RoleServer>,
+        context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, McpError> {
-        Ok(self.call(&request.name, request.arguments).into())
+        let cancel = Arc::new(AtomicBool::new(false));
+        // Ends when the client cancels, or when the call is over.
+        let over = context.ct.child_token();
+        let (waiting, flag) = (over.clone(), cancel.clone());
+        tokio::spawn(async move {
+            waiting.cancelled().await;
+            flag.store(true, Ordering::Relaxed);
+        });
+        let progress = match context.meta.get_progress_token() {
+            Some(token) => {
+                let (peer, runtime) = (context.peer.clone(), tokio::runtime::Handle::current());
+                Progress::new(
+                    move |s: &Status| {
+                        let mut note = ProgressNotificationParam::new(token.clone(), s.done.into());
+                        note.total = Some(s.total.into());
+                        note.message = Some(if s.item.is_empty() {
+                            s.task.to_owned()
+                        } else {
+                            format!("{} {}", s.task, s.item)
+                        });
+                        let peer = peer.clone();
+                        runtime.spawn(async move {
+                            // A client gone away: nothing to tell.
+                            let _ = peer.notify_progress(note).await;
+                        });
+                    },
+                    cancel,
+                )
+            }
+            None => Progress::new(|_: &Status| {}, cancel),
+        };
+        let server = self.clone();
+        let result = tokio::task::spawn_blocking(move || {
+            server.call_with(&request.name, request.arguments, &progress)
+        })
+        .await
+        .unwrap_or_else(|e| {
+            error_result(
+                &CommandError::Internal {
+                    detail: e.to_string(),
+                }
+                .message(),
+            )
+        });
+        over.cancel();
+        Ok(result.into())
     }
 }
 

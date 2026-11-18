@@ -456,5 +456,20 @@
   "copied": "{count, plural, =1{1 pièce copiée} other{{count} pièces copiées}}, avec les coutures entre elles. ⌘V les colle, ici ou dans un autre projet.",
   "pasted": "{count, plural, =1{1 pièce collée} other{{count} pièces collées}}.",
   "nothingToPaste": "Rien à coller : copiez d’abord des pièces (⌘C).",
-  "selectToCopy": "Sélectionnez les pièces à copier."
+  "selectToCopy": "Sélectionnez les pièces à copier.",
+  "errCancelled": "Arrêté : rien n’a été modifié.",
+  "busyStop": "Arrêter",
+  "busyStep": "En cours…",
+  "busySizes": "Tracé de la taille {size} ({done} sur {total})",
+  "busySizesStart": "Tracé de chaque taille ({total})",
+  "busyBodyFit": "Ajustement du corps aux mesures…",
+  "busyDrape": "Mise en place des pièces autour du corps…",
+  "busyExport": "Export en cours…",
+  "busyImport": "Lecture du patron…",
+  "busyOpening": "Ouverture du projet",
+  "busyTemplate": "Ajout du modèle",
+  "busySizesTitle": "Réglage des tailles",
+  "busyBodyTitle": "Modification du corps",
+  "busyDrapeTitle": "Lancement du drapé",
+  "bodyFitting": "Ajustement du corps…"
 }

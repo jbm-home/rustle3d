@@ -42,6 +42,9 @@ nothing is written. Scripts can refer to earlier results
 - `r3d schema [command]`: print JSON schemas.
 - Output is machine-readable JSON by default when piped. Exit codes: 0 ok,
   1 user error, 2 internal error.
+- Long steps (M26: a template drafted in every size, a drape) print their
+  progress on one rewritten stderr line (`drafting sizes: 3/9 (40)`),
+  only when stderr is a terminal: stdout stays the JSON result.
 
 ## Acceptance criteria
 - Each subcommand has an integration test using `assert_cmd`.

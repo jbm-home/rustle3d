@@ -7,9 +7,9 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `cloth_hit`, `corner_at`, `edge_spot`, `edited`, `err`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form`, `frozen_board`, `gpu_solver`, `graphics`, `new`, `new`, `offset_along`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `resync_if_due`, `rgba`, `run_created`, `selected`, `sim`, `solver`, `to_theme`, `workspace`
+// These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `cloth_hit`, `corner_at`, `edge_spot`, `edited`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form_now`, `form_soon`, `frozen_board`, `gpu_solver`, `graphics`, `import_from`, `long`, `new`, `new`, `offset_along`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `selected`, `set_busy`, `sim`, `solver`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
 
 /// The GPU adapter the UI composites on (Windows: its LUID), so the views
 /// render on it and share their textures without a copy. Call it before
@@ -63,6 +63,15 @@ abstract class Engine implements RustOpaqueInterface {
     required int height,
   });
 
+  /// Whether the body is being fitted to new measurements: the 3D view
+  /// shows the old body until it is done.
+  bool bodyFitting();
+
+  /// Stop the long step running, if it can stop (a template drafted in
+  /// every size, a size range set): it then fails with `cancelled` and
+  /// changes nothing.
+  void cancel();
+
   /// A click at pixel (`x`, `y`) of a view. Updates the shared selection
   /// and returns it (panel ids).
   List<String> click({
@@ -87,8 +96,9 @@ abstract class Engine implements RustOpaqueInterface {
   /// Write an export to `path`, a file the user chose (anywhere): the
   /// pattern (every size of a graded one, nested), or the garment as the
   /// 3D view shows it now (the running drape, or its starting positions),
-  /// with the avatar if `avatar`.
-  void exportFile({
+  /// with the avatar if `avatar`. Off the UI thread (a big nest or a
+  /// garment takes a while).
+  Future<void> exportFile({
     required ExportFormat format,
     required String path,
     required bool avatar,
@@ -107,8 +117,9 @@ abstract class Engine implements RustOpaqueInterface {
   /// `imports/` folder, then read, as one undo step. `units` (`mm`, `cm`,
   /// `in`, `px`…) overrides what the file says. Returns the JSON result
   /// of `import.pattern`: `panels`, `ignored`, and `scale` (`assumed`
-  /// when the file did not say how big a unit is).
-  String importPattern({required String path, String? units});
+  /// when the file did not say how big a unit is). Off the UI thread (a
+  /// big PDF takes a while).
+  Future<String> importPattern({required String path, String? units});
 
   /// Look at the body from one side, framed head to toe.
   void lookFrom({required CameraSide side});
@@ -150,6 +161,9 @@ abstract class Engine implements RustOpaqueInterface {
     required Gesture gesture,
   });
 
+  /// Where the long step running is, or `None` when none is.
+  StepProgress? progress();
+
   /// Pointer moved to (`x`, `y`) after `press`: pull the cloth there (on
   /// the plane facing the camera through the grabbed point; the
   /// simulation runs while it is held); with the Length tool, move the
@@ -177,12 +191,19 @@ abstract class Engine implements RustOpaqueInterface {
   Future<double> renderView({required int view});
 
   /// Start the simulation again from the pattern: the pieces around the
-  /// body, paused.
-  SimStatus resetSimulation();
+  /// body, paused. Can take seconds (a new body is fitted first): the UI
+  /// thread does not wait, and [`Engine::progress`] says where it is.
+  Future<SimStatus> resetSimulation();
 
   /// Run one step (a JSON object, as in scripts and MCP) and return its
   /// JSON result. Changes are saved immediately.
   String run({required String stepJson});
+
+  /// [`Engine::run`] for a step that may take seconds (a template, a size
+  /// range, new measurements), off the UI thread: [`Engine::progress`]
+  /// says where it is, [`Engine::cancel`] stops it (nothing changed).
+  /// New measurements are fitted before it returns.
+  Future<String> runLong({required String stepJson});
 
   /// Run a script (a JSON array of steps, with `"$N.path"` references to
   /// earlier results) and return the JSON array of results. Used for
@@ -190,8 +211,8 @@ abstract class Engine implements RustOpaqueInterface {
   String runScript({required String scriptJson});
 
   /// Run or pause the simulation. Running with nothing loaded loads the
-  /// garment first.
-  SimStatus runSimulation({required bool running});
+  /// garment first (see [`Engine::reset_simulation`]).
+  Future<SimStatus> runSimulation({required bool running});
 
   /// Save the photo as it is now as a PNG file at `path` (anywhere the
   /// user chose).
@@ -626,6 +647,39 @@ class SimStatus {
           particles == other.particles &&
           maxSeamGapMm == other.maxSeamGapMm &&
           backend == other.backend;
+}
+
+/// Where a long step is, for the UI: `task` is a stable code
+/// (`template.sizes`: drafting a template in every size, `item` the size
+/// just drafted; `body.fit`: fitting the body to new measurements;
+/// `drape.prepare`: placing the pieces around the body; `step`: anything
+/// else), with `done` of `total` parts (`total` 0: unknown).
+class StepProgress {
+  final String task;
+  final int done;
+  final int total;
+  final String item;
+
+  const StepProgress({
+    required this.task,
+    required this.done,
+    required this.total,
+    required this.item,
+  });
+
+  @override
+  int get hashCode =>
+      task.hashCode ^ done.hashCode ^ total.hashCode ^ item.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is StepProgress &&
+          runtimeType == other.runtimeType &&
+          task == other.task &&
+          done == other.done &&
+          total == other.total &&
+          item == other.item;
 }
 
 /// What a view shows.

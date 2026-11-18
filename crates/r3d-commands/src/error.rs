@@ -131,6 +131,8 @@ pub enum CommandError {
     },
     #[error("nothing to simulate: place at least one panel around the body (panel.place)")]
     NothingToSimulate,
+    #[error("stopped before the end: nothing was changed")]
+    Cancelled,
     #[error("internal error: {detail}")]
     Internal { detail: String },
 }
@@ -190,6 +192,7 @@ impl Localizable for CommandError {
             Self::BadReference { reference, reason } => Message::new("bad_reference", text)
                 .arg("reference", reference)
                 .arg("reason", reason),
+            Self::Cancelled => Message::new("cancelled", text),
             Self::Internal { detail } => Message::new("internal", text).arg("detail", detail),
         }
     }

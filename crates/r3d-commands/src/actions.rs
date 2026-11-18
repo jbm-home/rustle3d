@@ -17,6 +17,7 @@ use crate::commands::{
 };
 use crate::drape;
 use crate::error::{CommandError, Invalid};
+use crate::progress::Progress;
 use crate::registry::Command;
 use crate::spec::Described;
 use crate::workspace::{Workspace, WorkspaceError};
@@ -26,6 +27,12 @@ pub trait ActionSpec:
     crate::spec::Named + Described + Serialize + serde::de::DeserializeOwned + JsonSchema + Clone
 {
     fn run(&self, ws: &mut Workspace) -> Result<Value, WorkspaceError>;
+
+    /// [`ActionSpec::run`], reporting to `progress` and stopping when it
+    /// asks: for actions that take seconds. The default ignores it.
+    fn run_with(&self, ws: &mut Workspace, _progress: &Progress) -> Result<Value, WorkspaceError> {
+        self.run(ws)
+    }
 }
 
 /// Default export path: `exports/<project name>.<ext>`.
@@ -172,11 +179,15 @@ impl Described for Simulate {
 
 impl ActionSpec for Simulate {
     fn run(&self, ws: &mut Workspace) -> Result<Value, WorkspaceError> {
+        self.run_with(ws, &Progress::default())
+    }
+
+    fn run_with(&self, ws: &mut Workspace, progress: &Progress) -> Result<Value, WorkspaceError> {
         if !(1..=3600).contains(&self.frames) {
             return Err(CommandError::invalid("frames", Invalid::Range(1.0, 3600.0)).into());
         }
         let project = ws.session().project();
-        let out = drape::simulate(project, self.frames)?;
+        let out = drape::simulate(project, self.frames, progress)?;
         let cache = drape::encode_cache(drape::fingerprint(project)?, &out.positions);
         ws.write(drape::CACHE_FILE, &cache)?;
         let ys = out.positions.iter().map(|p| p.y);

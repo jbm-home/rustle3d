@@ -8,6 +8,7 @@
 //! the stature.
 
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use rayon::prelude::*;
 
@@ -26,6 +27,7 @@ use crate::commands::{
 };
 use crate::drape::arm_drop;
 use crate::error::{CommandError, positive};
+use crate::progress::{Progress, Status};
 use crate::spec::CommandSpec;
 
 /// The starter garments.
@@ -465,9 +467,10 @@ pub fn draft(
     tx: &mut Transaction<'_>,
     template: Template,
     sizes: Sizes,
+    progress: &Progress,
 ) -> Result<Vec<AnyId>, CommandError> {
     let drafts = match tx.project().grading() {
-        Some(_) => Some(every_size(tx.project(), template, sizes)?),
+        Some(_) => Some(every_size(tx.project(), template, sizes, progress)?),
         None => None,
     };
     // Each piece takes the room of its widest size on the board, so the
@@ -529,7 +532,11 @@ fn template_ref(template: Template, sizes: Sizes) -> TemplateRef {
 /// as the template moves between sizes. Left as it is when a piece was
 /// added or deleted; a piece whose outline gained or lost points is
 /// skipped. Returns whether anything was graded.
-pub fn grade_garment(tx: &mut Transaction<'_>, garment: GarmentId) -> Result<bool, CommandError> {
+pub fn grade_garment(
+    tx: &mut Transaction<'_>,
+    garment: GarmentId,
+    progress: &Progress,
+) -> Result<bool, CommandError> {
     let p = tx.project();
     let (Some(g), Some(reference)) = (
         p.grading().cloned(),
@@ -557,7 +564,7 @@ pub fn grade_garment(tx: &mut Transaction<'_>, garment: GarmentId) -> Result<boo
     if graded || panels.is_empty() {
         return Ok(false);
     }
-    let drafts = every_size(p, template, sizes)?;
+    let drafts = every_size(p, template, sizes, progress)?;
     // A piece added or deleted since: the pieces cannot be matched.
     if drafts.iter().any(|d| d.origins.len() != panels.len()) {
         return Ok(false);
@@ -576,33 +583,72 @@ struct Drafted {
 /// `template` drafted for the body of every size of `p`'s range, in
 /// parallel. Body measurements given (chest, waist, hips) were taken in
 /// the base size: each size changes them as its body differs; lengths
-/// and ease stay as given.
-fn every_size(p: &Project, template: Template, sizes: Sizes) -> Result<Vec<Drafted>, CommandError> {
+/// and ease stay as given. Each size fits a body (seconds): `progress`
+/// hears of each one drafted, and stops the drafting when it asks.
+fn every_size(
+    p: &Project,
+    template: Template,
+    sizes: Sizes,
+    progress: &Progress,
+) -> Result<Vec<Drafted>, CommandError> {
     let n = p.grading().map_or(0, |g| g.sizes.len());
+    let done = AtomicU32::new(0);
+    let total = u32::try_from(n).unwrap_or(u32::MAX);
+    progress.report(&Status {
+        task: "template.sizes",
+        done: 0,
+        total,
+        item: String::new(),
+    });
     (0..n)
         .into_par_iter()
         .map(|i| {
-            let body = size_body(p, i).ok_or_else(|| internal(format!("no size {i}")))?;
-            let size = p
-                .grading()
-                .and_then(|g| g.sizes.get(i))
-                .ok_or_else(|| internal(format!("no size {i}")))?;
-            let sizes = Sizes {
-                chest_cm: sizes.chest_cm.map(|v| v + size.bust_cm),
-                waist_cm: sizes.waist_cm.map(|v| v + size.waist_cm),
-                hips_cm: sizes.hips_cm.map(|v| v + size.hips_cm),
-                ..sizes
-            };
-            let mut project = Project::new("");
-            let mut tx = Transaction::begin(&mut project);
-            tx.set_avatar(Some(Avatar { body, preset: None }));
-            let (_, origins) = draft_in(&mut tx, template, sizes, &[])?;
-            Ok(Drafted {
-                origins,
-                project: tx.project().clone(),
-            })
+            // Sizes run side by side: stop before a size and after it
+            // (a body fit cannot stop halfway).
+            progress.check()?;
+            let drafted = draft_size(p, template, sizes, i)?;
+            progress.check()?;
+            progress.report(&Status {
+                task: "template.sizes",
+                done: done.fetch_add(1, Ordering::Relaxed) + 1,
+                total,
+                item: p
+                    .grading()
+                    .and_then(|g| g.sizes.get(i))
+                    .map(|s| s.name.clone())
+                    .unwrap_or_default(),
+            });
+            Ok(drafted)
         })
         .collect()
+}
+
+/// `template` drafted for the body of size `i` of `p`'s range.
+fn draft_size(
+    p: &Project,
+    template: Template,
+    sizes: Sizes,
+    i: usize,
+) -> Result<Drafted, CommandError> {
+    let body = size_body(p, i).ok_or_else(|| internal(format!("no size {i}")))?;
+    let size = p
+        .grading()
+        .and_then(|g| g.sizes.get(i))
+        .ok_or_else(|| internal(format!("no size {i}")))?;
+    let sizes = Sizes {
+        chest_cm: sizes.chest_cm.map(|v| v + size.bust_cm),
+        waist_cm: sizes.waist_cm.map(|v| v + size.waist_cm),
+        hips_cm: sizes.hips_cm.map(|v| v + size.hips_cm),
+        ..sizes
+    };
+    let mut project = Project::new("");
+    let mut tx = Transaction::begin(&mut project);
+    tx.set_avatar(Some(Avatar { body, preset: None }));
+    let (_, origins) = draft_in(&mut tx, template, sizes, &[])?;
+    Ok(Drafted {
+        origins,
+        project: tx.project().clone(),
+    })
 }
 
 /// The body a template is drafted for in size `i`: the avatar's (or a

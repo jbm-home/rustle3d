@@ -5,6 +5,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::error::CommandError;
+use crate::progress::Progress;
 use crate::spec::{CommandOutput, CommandSpec, Described};
 use crate::templates::{Sizes, Template, draft};
 
@@ -26,8 +27,18 @@ impl Described for TemplateApply {
 
 impl CommandSpec for TemplateApply {
     fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        self.apply_with(tx, &Progress::default())
+    }
+
+    /// Graded, the template is drafted in every size (seconds): reported
+    /// size by size.
+    fn apply_with(
+        &self,
+        tx: &mut Transaction<'_>,
+        progress: &Progress,
+    ) -> Result<CommandOutput, CommandError> {
         Ok(CommandOutput {
-            created: draft(tx, self.template, self.sizes)?,
+            created: draft(tx, self.template, self.sizes, progress)?,
         })
     }
 }

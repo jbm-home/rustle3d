@@ -146,15 +146,19 @@ class ProjectStore {
 
   /// Make a project called [name] for [body] (a preset entry: `{name,
   /// body}`), drafted from [template] with [sizes] if given, its pieces
-  /// renamed by [pieceNames], and return its folder. The project is then opened fresh, so its history starts
-  /// empty.
-  String create({
+  /// renamed by [pieceNames], and return its folder. The project is then
+  /// opened fresh, so its history starts empty. Drafting takes seconds
+  /// (the body is fitted): [busy] runs the long steps, showing their
+  /// progress.
+  Future<String> create({
     required String name,
     required Map<String, dynamic> body,
+    Future<String> Function(Engine engine, Future<String> Function()) busy =
+        _noCard,
     String? template,
     Map<String, double> sizes = const {},
     Map<String, String> pieceNames = const {},
-  }) {
+  }) async {
     final path = freeProjectPath(parent: projectsDir, name: name);
     final engine = Engine.open(path: path);
     try {
@@ -166,12 +170,15 @@ class ProjectStore {
         }),
       );
       if (template != null) {
-        engine.run(
-          stepJson: jsonEncode({
-            'type': 'template.apply',
-            'template': template,
-            'sizes': sizes,
-          }),
+        await busy(
+          engine,
+          () => engine.runLong(
+            stepJson: jsonEncode({
+              'type': 'template.apply',
+              'template': template,
+              'sizes': sizes,
+            }),
+          ),
         );
         // The template names its pieces in English: give them their names
         // in the UI language.
@@ -193,9 +200,17 @@ class ProjectStore {
       engine.run(
         stepJson: jsonEncode({'type': 'project.rename', 'name': name}),
       );
-    } finally {
+    } catch (_) {
+      // Stopped or failed: leave no half-made project behind.
       engine.dispose();
+      Directory(path).deleteSync(recursive: true);
+      rethrow;
     }
+    engine.dispose();
     return path;
   }
 }
+
+/// Long steps run as they are, without showing their progress (tests,
+/// review aids).
+Future<String> _noCard(Engine _, Future<String> Function() job) => job();

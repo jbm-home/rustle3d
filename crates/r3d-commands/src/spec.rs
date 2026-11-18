@@ -7,6 +7,7 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::error::CommandError;
+use crate::progress::Progress;
 
 /// The stable, public name of a command or query (`"panel.create_rect"`).
 /// Implemented by the registry macros, so the name is written exactly once.
@@ -30,6 +31,17 @@ pub trait CommandSpec:
     /// Validate and apply. Errors leave the document untouched: the session
     /// drops the transaction, which rolls back partial changes.
     fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError>;
+
+    /// [`CommandSpec::apply`], reporting how far it is to `progress` and
+    /// stopping when it asks: for commands that take seconds. The default
+    /// is quick and ignores it.
+    fn apply_with(
+        &self,
+        tx: &mut Transaction<'_>,
+        _progress: &Progress,
+    ) -> Result<CommandOutput, CommandError> {
+        self.apply(tx)
+    }
 
     /// Consecutive commands with the same key merge into one undo step
     /// (e.g. dragging the same point).

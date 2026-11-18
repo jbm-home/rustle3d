@@ -9,6 +9,7 @@ use r3d_core::{Localizable, Message, Project, project_dir};
 use serde_json::Value;
 
 use crate::error::CommandError;
+use crate::progress::Progress;
 use crate::session::Session;
 use crate::step::Step;
 
@@ -134,9 +135,19 @@ impl Workspace {
 
     /// Run any step, including actions that write files.
     pub fn run_step(&mut self, step: &Step) -> Result<Value, WorkspaceError> {
+        self.run_step_with(step, &Progress::default())
+    }
+
+    /// [`Workspace::run_step`], reporting to `progress` and stopping when
+    /// it asks (long steps only; see [`Progress`]).
+    pub fn run_step_with(
+        &mut self,
+        step: &Step,
+        progress: &Progress,
+    ) -> Result<Value, WorkspaceError> {
         match step {
-            Step::Action(action) => action.run(self),
-            other => Ok(self.session.run_step(other)?),
+            Step::Action(action) => action.run(self, progress),
+            other => Ok(self.session.run_step_with(other, progress)?),
         }
     }
 

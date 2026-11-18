@@ -421,25 +421,34 @@ pub fn body_model() -> Result<&'static r3d_avatar::model::BodyModel, CommandErro
 
 /// The built-in body fitted to `body`. Fitting takes a few seconds, so
 /// the last bodies fitted are kept (a graded template drafts each size,
-/// the drape fits the shown size again).
+/// the drape fits the shown size again), and a body asked for while it
+/// is being fitted waits for that fit instead of doing it again (the app
+/// fits on a thread of its own while a step may need the same body).
+/// Different bodies fit in parallel.
 pub fn fitted(body: &r3d_core::Body) -> Result<r3d_avatar::fit::Fit, CommandError> {
+    type Cell = std::sync::Arc<std::sync::OnceLock<r3d_avatar::fit::Fit>>;
     const KEPT: usize = 32;
-    static FITS: std::sync::Mutex<Vec<(r3d_core::Body, r3d_avatar::fit::Fit)>> =
-        std::sync::Mutex::new(Vec::new());
-    let cached = |fits: &[(r3d_core::Body, r3d_avatar::fit::Fit)]| {
-        fits.iter().find(|(b, _)| b == body).map(|(_, f)| f.clone())
-    };
-    if let Some(fit) = FITS.lock().ok().and_then(|f| cached(&f)) {
-        return Ok(fit);
-    }
-    let fit = r3d_avatar::fit::fit(body_model()?, body);
-    if let Ok(mut fits) = FITS.lock() {
-        if fits.len() >= KEPT {
-            fits.remove(0);
+    static FITS: std::sync::Mutex<Vec<(r3d_core::Body, Cell)>> = std::sync::Mutex::new(Vec::new());
+    let model = body_model()?;
+    let cell: Cell = {
+        let mut fits = FITS.lock().map_err(|_| CommandError::Internal {
+            detail: "fit cache lock poisoned".into(),
+        })?;
+        match fits.iter().find(|(b, _)| b == body) {
+            Some((_, cell)) => cell.clone(),
+            None => {
+                if fits.len() >= KEPT {
+                    fits.remove(0);
+                }
+                let cell = Cell::default();
+                fits.push((*body, cell.clone()));
+                cell
+            }
         }
-        fits.push((*body, fit.clone()));
-    }
-    Ok(fit)
+    };
+    Ok(cell
+        .get_or_init(|| r3d_avatar::fit::fit(model, body))
+        .clone())
 }
 
 /// The avatar and what the fitted body actually measures.

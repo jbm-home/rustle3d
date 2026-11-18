@@ -5,9 +5,19 @@ use serde_json::{Value, json};
 
 use crate::error::{CommandError, Invalid};
 use crate::history::{History, Moved};
+use crate::progress::Progress;
 use crate::registry::{Command, Query};
 use crate::spec::{CommandOutput, to_value};
 use crate::step::Step;
+
+/// How a list of commands runs as one undo step.
+struct Run<'a> {
+    label: &'a str,
+    merge_key: Option<String>,
+    /// Errors say which command failed (a batch).
+    indexed: bool,
+    progress: &'a Progress,
+}
 
 /// A project plus its undo history. All front-ends edit through this.
 #[derive(Debug)]
@@ -50,13 +60,24 @@ impl Session {
 
     /// Execute one command as one undo step.
     pub fn execute(&mut self, cmd: &Command) -> Result<CommandOutput, CommandError> {
-        self.execute_all(
-            std::slice::from_ref(cmd),
-            cmd.name(),
-            cmd.merge_key(),
-            false,
-        )
-        .map(|mut outs| outs.pop().unwrap_or_default())
+        self.execute_with(cmd, &Progress::default())
+    }
+
+    /// [`Session::execute`], reporting to `progress` and stopping when it
+    /// asks (long commands only; see [`Progress`]).
+    pub fn execute_with(
+        &mut self,
+        cmd: &Command,
+        progress: &Progress,
+    ) -> Result<CommandOutput, CommandError> {
+        let step = Run {
+            label: cmd.name(),
+            merge_key: cmd.merge_key(),
+            indexed: false,
+            progress,
+        };
+        self.execute_all(std::slice::from_ref(cmd), step)
+            .map(|mut outs| outs.pop().unwrap_or_default())
     }
 
     /// Execute commands atomically as a single undo step named `label`. If
@@ -66,16 +87,35 @@ impl Session {
         label: &str,
         cmds: &[Command],
     ) -> Result<Vec<CommandOutput>, CommandError> {
-        self.execute_all(cmds, label, None, true)
+        self.execute_batch_with(label, cmds, &Progress::default())
+    }
+
+    fn execute_batch_with(
+        &mut self,
+        label: &str,
+        cmds: &[Command],
+        progress: &Progress,
+    ) -> Result<Vec<CommandOutput>, CommandError> {
+        let step = Run {
+            label,
+            merge_key: None,
+            indexed: true,
+            progress,
+        };
+        self.execute_all(cmds, step)
     }
 
     fn execute_all(
         &mut self,
         cmds: &[Command],
-        label: &str,
-        merge_key: Option<String>,
-        indexed: bool,
+        step: Run<'_>,
     ) -> Result<Vec<CommandOutput>, CommandError> {
+        let Run {
+            label,
+            merge_key,
+            indexed,
+            progress,
+        } = step;
         let wrap = |i: usize, e: CommandError| if indexed { e.at(i) } else { e };
         for (i, cmd) in cmds.iter().enumerate() {
             if cmd.destructive() && !cmd.confirmed() {
@@ -90,7 +130,7 @@ impl Session {
         let mut tx = Transaction::begin(&mut self.project);
         let mut outputs = Vec::with_capacity(cmds.len());
         for (i, cmd) in cmds.iter().enumerate() {
-            outputs.push(cmd.apply(&mut tx).map_err(|e| wrap(i, e))?);
+            outputs.push(cmd.apply(&mut tx, progress).map_err(|e| wrap(i, e))?);
         }
         // Linked mirror copies are derived data: refresh them once per step.
         crate::commands::sync_mirrors(&mut tx)?;
@@ -162,9 +202,21 @@ impl Session {
 
     /// Run any script step and return its JSON result.
     pub fn run_step(&mut self, step: &Step) -> Result<Value, CommandError> {
+        self.run_step_with(step, &Progress::default())
+    }
+
+    /// [`Session::run_step`], reporting to `progress` and stopping when it
+    /// asks (long steps only; see [`Progress`]).
+    pub fn run_step_with(
+        &mut self,
+        step: &Step,
+        progress: &Progress,
+    ) -> Result<Value, CommandError> {
         match step {
-            Step::Command(c) => to_value(&self.execute(c)?),
-            Step::Batch { label, commands } => to_value(&self.execute_batch(label, commands)?),
+            Step::Command(c) => to_value(&self.execute_with(c, progress)?),
+            Step::Batch { label, commands } => {
+                to_value(&self.execute_batch_with(label, commands, progress)?)
+            }
             Step::Query(q) => self.query(q),
             Step::Undo => {
                 let m = self.undo()?;

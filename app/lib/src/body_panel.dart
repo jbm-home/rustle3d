@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'busy.dart';
 import 'design/tokens.dart';
 import 'i18n.dart';
 import 'rust/api/engine.dart';
@@ -131,27 +132,38 @@ class _BodyPanelState extends State<_BodyPanel> {
     return body;
   }
 
-  void _apply() {
+  /// Fitting the body to new measurements takes seconds: off the UI
+  /// thread, with a card saying so.
+  Future<void> _apply() async {
     final body = _readBody();
     if (body == null) return;
+    final engine = widget.engine;
     try {
-      widget.engine.run(
-        stepJson: jsonEncode({
-          'type': 'avatar.set',
-          'body': body,
-          'preset': ?_preset,
-        }),
+      final got = await runBusy(
+        context,
+        engine,
+        context.l.busyBodyTitle,
+        () async {
+          await engine.runLong(
+            stepJson: jsonEncode({
+              'type': 'avatar.set',
+              'body': body,
+              'preset': ?_preset,
+            }),
+          );
+          return jsonDecode(
+            await engine.runLong(stepJson: '{"type":"avatar.get"}'),
+          );
+        },
       );
-      final got = jsonDecode(
-        widget.engine.run(stepJson: '{"type":"avatar.get"}'),
-      );
+      if (!mounted) return;
       setState(() {
         _error = null;
         _achieved = got['achieved'] as Map<String, dynamic>;
       });
       widget.onChanged();
     } on ApiError catch (e) {
-      setState(() => _error = context.error(e));
+      if (mounted) setState(() => _error = context.error(e));
     }
   }
 

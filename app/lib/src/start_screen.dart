@@ -12,6 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'design/tokens.dart';
 import 'i18n.dart';
+import 'busy.dart';
 import 'projects.dart';
 import 'rust/api/engine.dart';
 import 'rust/api/library.dart';
@@ -193,13 +194,13 @@ class _StartScreenState extends State<StartScreen> {
 
   Future<void> _blank() async {
     try {
-      final path = widget.store.create(
+      final path = await widget.store.create(
         name: context.l.untitled,
         body: widget.store.standardBody(),
       );
       widget.onOpen(path);
     } on ApiError catch (e) {
-      _toast(context, context.error(e));
+      if (mounted) _toast(context, context.error(e));
     }
   }
 
@@ -1178,7 +1179,7 @@ class _NewGarmentDialogState extends State<_NewGarmentDialog> {
       });
   }
 
-  void _create() {
+  Future<void> _create() async {
     final sizes = <String, double>{};
     for (final e in _sizes.entries) {
       final v = double.tryParse(e.value.text.replaceAll(',', '.'));
@@ -1194,16 +1195,23 @@ class _NewGarmentDialogState extends State<_NewGarmentDialog> {
     }
     final name = _name.text.trim().isEmpty ? widget.title : _name.text.trim();
     try {
-      final path = widget.store.create(
+      final path = await widget.store.create(
         name: name,
         body: _body,
         template: widget.template,
         sizes: sizes,
         pieceNames: pieceNames(context.l),
+        busy: (engine, job) => runBusy(
+          context,
+          engine,
+          context.l.busyTemplate,
+          job,
+          cancellable: true,
+        ),
       );
-      Navigator.pop(context, path);
+      if (mounted) Navigator.pop(context, path);
     } on ApiError catch (e) {
-      setState(() => _error = context.error(e));
+      if (mounted) setState(() => _error = context.error(e));
     }
   }
 

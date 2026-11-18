@@ -20,13 +20,13 @@ void main() {
     final dir = Directory.systemTemp.createTempSync('r3d').path;
     final store = ProjectStore(projectsDir: dir, libraryDir: dir);
     final engine = Engine.open(
-      path: store.create(
+      path: await store.create(
         name: 'Skirt',
         body: store.standardBody(),
         template: 'a_line_skirt',
       ),
     );
-    engine.resetSimulation();
+    await engine.resetSimulation();
     File('$dir/tour-seen').createSync();
     await tester.pumpWidget(Rustle3dApp(store: store, engine: engine));
     for (var i = 0; i < 20; i++) {

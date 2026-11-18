@@ -23,7 +23,7 @@ void main() {
     final dir = Directory.systemTemp.createTempSync('r3d').path;
     final store = ProjectStore(projectsDir: dir, libraryDir: dir);
     File('$dir/tour-seen').createSync();
-    final path = store.create(
+    final path = await store.create(
       name: 'Skirt',
       body: store.standardBody(),
       template: 'a_line_skirt',
@@ -75,7 +75,7 @@ void main() {
     final dir = Directory.systemTemp.createTempSync('r3d').path;
     final store = ProjectStore(projectsDir: dir, libraryDir: dir);
     File('$dir/tour-seen').createSync();
-    final path = store.create(
+    final path = await store.create(
       name: 'Skirt',
       body: store.standardBody(),
       template: 'a_line_skirt',

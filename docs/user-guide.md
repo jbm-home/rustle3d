@@ -12,7 +12,7 @@ rename, delete, export and import projects; smooth views on Windows;
 cloth comes to rest; pieces arranged side by side by width; M17,
 draping on the graphics card; M18, shirt and trousers templates, pieces
 placed on a leg; M19, several garments in layers; M22, sizes and
-grading; M25, maximized views; M26, history, copy and paste).
+grading; M25, maximized views; M26, history, copy and paste, progress of long steps).
 -->
 
 Rustle3D is a free, open-source desktop app for making clothes: draw the
@@ -87,6 +87,16 @@ comes back (a drape you paused yourself stays paused); starting the drape
 
 Other keys: **⌘Z** undo, **⇧⌘Z** redo (also Ctrl+Y on Windows and Linux),
 **Backspace/Delete** deletes the selection, **Esc** cancels a drawing.
+
+**Long steps**: opening a project, adding a template, choosing sizes,
+changing the body's measurements, importing, exporting and starting the
+drape can take a few seconds (fitting the body to new measurements
+alone takes about two). The app stays responsive: a card says what it is
+doing, with a bar showing the sizes being drafted when it knows how
+long it will be. **Stop** on the card cancels a template or a size
+range; nothing is changed. When the 3D view needs a body with new
+measurements, it keeps showing the old one, with "Fitting the body…"
+at the bottom, until the new one is ready.
 
 **Copy and paste**: **⌘C** copies the selected pieces, **⌘V** pastes
 them, in the same project or in another one (open it from the start

@@ -38,8 +38,8 @@ void main() {
 
   testWidgets('rename and delete a project from its card', (tester) async {
     final store = newStore();
-    final skirt = store.create(name: 'Skirt', body: store.standardBody());
-    store.create(name: 'Old draft', body: store.standardBody());
+    final skirt = await store.create(name: 'Skirt', body: store.standardBody());
+    await store.create(name: 'Old draft', body: store.standardBody());
 
     await tester.pumpWidget(Rustle3dApp(store: store));
     await tester.pumpAndSettle();
@@ -71,7 +71,7 @@ void main() {
 
   testWidgets('a project exported as .zip imports back', (tester) async {
     final store = newStore();
-    final path = store.create(
+    final path = await store.create(
       name: 'Tote',
       body: store.standardBody(),
       template: 'tote_bag',

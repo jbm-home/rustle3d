@@ -27,7 +27,7 @@ void main() {
     final fr = await L.delegate.load(const Locale('fr'));
 
     // Template pieces get their French names, mirror copies included.
-    final path = store.create(
+    final path = await store.create(
       name: 'Jupe',
       body: store.standardBody(),
       template: 'a_line_skirt',
@@ -39,7 +39,7 @@ void main() {
     );
     final names = [for (final p in summary['panels'] as List) p['name']];
     expect(names, containsAll(['Devant', 'Dos gauche', 'Dos droit']));
-    expect(engine.resetSimulation().loaded, isTrue);
+    expect((await engine.resetSimulation()).loaded, isTrue);
 
     await tester.pumpWidget(Rustle3dApp(store: store, engine: engine));
     for (var i = 0; i < 20; i++) {

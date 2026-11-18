@@ -1654,4 +1654,53 @@ class LEn extends L {
 
   @override
   String get selectToCopy => 'Select pieces to copy.';
+
+  @override
+  String get errCancelled => 'Stopped: nothing was changed.';
+
+  @override
+  String get busyStop => 'Stop';
+
+  @override
+  String get busyStep => 'Working…';
+
+  @override
+  String busySizes(String size, int done, int total) {
+    return 'Drafting size $size ($done of $total)';
+  }
+
+  @override
+  String busySizesStart(int total) {
+    return 'Drafting every size ($total)';
+  }
+
+  @override
+  String get busyBodyFit => 'Fitting the body to the measurements…';
+
+  @override
+  String get busyDrape => 'Placing the pieces around the body…';
+
+  @override
+  String get busyExport => 'Exporting…';
+
+  @override
+  String get busyImport => 'Reading the pattern…';
+
+  @override
+  String get busyOpening => 'Opening the project';
+
+  @override
+  String get busyTemplate => 'Adding the template';
+
+  @override
+  String get busySizesTitle => 'Setting the sizes';
+
+  @override
+  String get busyBodyTitle => 'Changing the body';
+
+  @override
+  String get busyDrapeTitle => 'Starting the drape';
+
+  @override
+  String get bodyFitting => 'Fitting the body…';
 }

@@ -39,7 +39,7 @@ void main() {
         'template': 'a_line_skirt',
       }),
     );
-    expect(engine.resetSimulation().loaded, isTrue);
+    expect((await engine.resetSimulation()).loaded, isTrue);
 
     // The first-launch tour would cover the views: seen already.
     File('$dir/tour-seen').createSync();
@@ -115,7 +115,7 @@ void main() {
 
     // From here, gestures aim at the cloth in its start pose (paused), so
     // where it is does not depend on timing.
-    engine.resetSimulation();
+    await engine.resetSimulation();
     await tester.pump();
     final before = frontBottom();
     for (var dy = 60.0; dy < 600 && frontBottom() == before; dy += 6) {
@@ -149,7 +149,7 @@ void main() {
       );
     }
 
-    engine.resetSimulation();
+    await engine.resetSimulation();
     await tester.pump();
     final wide = width();
     for (var dx = -160.0; dx <= 160 && width() == wide; dx += 6) {
@@ -192,11 +192,11 @@ void main() {
     }
 
     // Draw on the draped skirt: let it settle, then hold it still.
-    engine.runSimulation(running: true);
+    await engine.runSimulation(running: true);
     for (var i = 0; i < 30; i++) {
       await tester.pump(const Duration(milliseconds: 50));
     }
-    engine.runSimulation(running: false);
+    await engine.runSimulation(running: false);
     final linesBefore = lines();
     await tester.sendKeyEvent(LogicalKeyboardKey.keyD);
     await tester.pump();

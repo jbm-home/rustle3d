@@ -24,7 +24,7 @@ void main() {
     final store = ProjectStore(projectsDir: dir, libraryDir: dir);
     File('$dir/tour-seen').createSync();
     final engine = Engine.open(
-      path: store.create(
+      path: await store.create(
         name: 'Skirt',
         body: store.standardBody(),
         template: 'a_line_skirt',

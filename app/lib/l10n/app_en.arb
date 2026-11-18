@@ -855,5 +855,40 @@
     }
   },
   "nothingToPaste": "Nothing to paste: copy pieces first (⌘C).",
-  "selectToCopy": "Select pieces to copy."
+  "selectToCopy": "Select pieces to copy.",
+  "errCancelled": "Stopped: nothing was changed.",
+  "busyStop": "Stop",
+  "busyStep": "Working…",
+  "busySizes": "Drafting size {size} ({done} of {total})",
+  "@busySizes": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      },
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "busySizesStart": "Drafting every size ({total})",
+  "@busySizesStart": {
+    "placeholders": {
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "busyBodyFit": "Fitting the body to the measurements…",
+  "busyDrape": "Placing the pieces around the body…",
+  "busyExport": "Exporting…",
+  "busyImport": "Reading the pattern…",
+  "busyOpening": "Opening the project",
+  "busyTemplate": "Adding the template",
+  "busySizesTitle": "Setting the sizes",
+  "busyBodyTitle": "Changing the body",
+  "busyDrapeTitle": "Starting the drape",
+  "bodyFitting": "Fitting the body…"
 }

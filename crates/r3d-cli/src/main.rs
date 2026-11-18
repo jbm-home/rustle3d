@@ -5,13 +5,15 @@
 //! 1 user error (bad input, file problem), 2 internal error.
 //! See `docs/specs/10-cli.md`.
 
-use std::io::{Read, Write};
+use std::io::{IsTerminal, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use r3d_commands::step::parse_query;
-use r3d_commands::{Action, Command, CommandError, Info, Query, Script, Session, Step, Workspace};
+use r3d_commands::{
+    Action, Command, CommandError, Info, Progress, Query, Script, Session, Status, Step, Workspace,
+};
 use r3d_core::{Localizable, Message};
 use r3d_mcp::render;
 use serde_json::{Value, json};
@@ -344,7 +346,8 @@ fn cmd_run(project: &Path, script: &Path, dry_run: bool) -> Result<(), Failure> 
         let results = script.run(|step| session.run_step(step))?;
         return print_results(results, false);
     }
-    let results = script.run(|step| ws.run_step(step))?;
+    let progress = progress();
+    let results = script.run(|step| ws.run_step_with(step, &progress))?;
     let save = ws.session().is_dirty();
     if save {
         ws.save()?;
@@ -438,7 +441,36 @@ fn cmd_import(
 fn cmd_simulate(project: &Path, frames: u32) -> Result<(), Failure> {
     let mut ws = Workspace::open(project)?;
     let step = Step::from_value(json!({ "type": "simulate", "frames": frames }))?;
-    print_json(&ws.run_step(&step)?)
+    print_json(&ws.run_step_with(&step, &progress())?)
+}
+
+/// Where long steps report: a line on stderr when it is a terminal
+/// (`drafting sizes: 3/9 (40)`), nothing otherwise (scripts read stdout
+/// only).
+fn progress() -> Progress {
+    if !std::io::stderr().is_terminal() {
+        return Progress::default();
+    }
+    Progress::new(
+        |s: &Status| {
+            let task = match s.task {
+                "template.sizes" => "drafting sizes",
+                "simulate.frames" => "draping, frames",
+                other => other,
+            };
+            let item = if s.item.is_empty() {
+                String::new()
+            } else {
+                format!(" ({})", s.item)
+            };
+            // One line, rewritten as the step goes on.
+            eprint!("\r{task}: {}/{}{item}   ", s.done, s.total);
+            if s.done == s.total {
+                eprintln!();
+            }
+        },
+        std::sync::Arc::default(),
+    )
 }
 
 fn parse_size(s: &str) -> Result<(u32, u32), String> {

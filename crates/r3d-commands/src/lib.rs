@@ -22,6 +22,7 @@ pub mod docs;
 pub mod drape;
 pub mod error;
 pub mod history;
+pub mod progress;
 pub mod projects;
 pub mod queries;
 pub mod registry;
@@ -33,6 +34,7 @@ pub mod templates;
 pub mod workspace;
 
 pub use error::{CommandError, Invalid};
+pub use progress::{Progress, Status};
 pub use registry::{Action, Command, Query};
 pub use script::{Script, ScriptError};
 pub use session::Session;

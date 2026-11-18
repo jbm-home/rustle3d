@@ -18,19 +18,19 @@ void main() {
     final dir = Directory.systemTemp.createTempSync('r3d').path;
     final store = ProjectStore(projectsDir: dir, libraryDir: dir);
     final engine = Engine.open(
-      path: store.create(
+      path: await store.create(
         name: 'Skirt',
         body: store.standardBody(),
         template: 'a_line_skirt',
       ),
     );
-    engine.resetSimulation();
-    engine.runSimulation(running: true);
+    await engine.resetSimulation();
+    await engine.runSimulation(running: true);
     while (engine.simulationStatus().timeS < 0.2) {
       await tester.pump(const Duration(milliseconds: 50));
     }
 
-    engine.exportFile(
+    await engine.exportFile(
       format: ExportFormat.glb,
       path: '$dir/a.glb',
       avatar: true,
@@ -38,27 +38,27 @@ void main() {
     final glb = File('$dir/a.glb').readAsBytesSync();
     expect(String.fromCharCodes(glb.sublist(0, 4)), 'glTF');
     // The avatar makes it much larger than the garment alone.
-    engine.exportFile(
+    await engine.exportFile(
       format: ExportFormat.glb,
       path: '$dir/b.glb',
       avatar: false,
     );
     expect(glb.length, greaterThan(File('$dir/b.glb').lengthSync() * 2));
 
-    engine.exportFile(
+    await engine.exportFile(
       format: ExportFormat.obj,
       path: '$dir/a.obj',
       avatar: false,
     );
     expect(File('$dir/a.obj').readAsStringSync(), contains('o Front'));
-    engine.exportFile(
+    await engine.exportFile(
       format: ExportFormat.svg,
       path: '$dir/a.svg',
       avatar: false,
     );
     expect(File('$dir/a.svg').readAsStringSync(), contains('<svg'));
 
-    expect(
+    await expectLater(
       () => engine.exportFile(
         format: ExportFormat.svg,
         path: '$dir/missing/folder/a.svg',
@@ -66,7 +66,7 @@ void main() {
       ),
       throwsA(isA<ApiError>().having((e) => e.code, 'code', 'write_failed')),
     );
-    engine.runSimulation(running: false);
+    await engine.runSimulation(running: false);
   });
 
   testWidgets('a pattern exported as DXF imports into another project', (
@@ -75,13 +75,13 @@ void main() {
     final dir = Directory.systemTemp.createTempSync('r3d').path;
     final store = ProjectStore(projectsDir: dir, libraryDir: dir);
     final skirt = Engine.open(
-      path: store.create(
+      path: await store.create(
         name: 'Skirt',
         body: store.standardBody(),
         template: 'a_line_skirt',
       ),
     );
-    skirt.exportFile(
+    await skirt.exportFile(
       format: ExportFormat.dxf,
       path: '$dir/skirt.dxf',
       avatar: false,
@@ -91,10 +91,10 @@ void main() {
       contains('Piece Name: Front'),
     );
 
-    final path = store.create(name: 'Other', body: store.standardBody());
+    final path = await store.create(name: 'Other', body: store.standardBody());
     final other = Engine.open(path: path);
     final result =
-        jsonDecode(other.importPattern(path: '$dir/skirt.dxf')) as Map;
+        jsonDecode(await other.importPattern(path: '$dir/skirt.dxf')) as Map;
     expect(result['scale'], 'file');
     expect((result['panels'] as List).length, greaterThanOrEqualTo(2));
     // The project keeps the file it was made from.
@@ -102,11 +102,11 @@ void main() {
 
     // Units chosen by the user win over the file's.
     final inches = jsonDecode(
-      other.importPattern(path: '$dir/skirt.dxf', units: 'in'),
+      await other.importPattern(path: '$dir/skirt.dxf', units: 'in'),
     ) as Map;
     expect(inches['scale'], 'given');
 
-    expect(
+    await expectLater(
       () => other.importPattern(path: '$dir/missing.svg'),
       throwsA(isA<ApiError>().having((e) => e.code, 'code', 'read_failed')),
     );

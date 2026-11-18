@@ -173,6 +173,10 @@ pub trait CommandSpec: Named + Described + Serialize + DeserializeOwned + JsonSc
     /// Validate, then mutate through the transaction. An error drops the
     /// transaction, which rolls back any partial change.
     fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError>;
+    /// Long commands (seconds) override this one: report to `progress`,
+    /// stop with `Cancelled` when it asks. The default calls `apply`.
+    fn apply_with(&self, tx: &mut Transaction<'_>, progress: &Progress)
+        -> Result<CommandOutput, CommandError> { self.apply(tx) }
     fn merge_key(&self) -> Option<String> { None }   // e.g. "point.move:point:3"
     fn confirmed(&self) -> bool { false }
 }
@@ -193,10 +197,22 @@ Validation lives at the start of `apply` rather than in a separate
   last `after`), so dragging a point for 300 frames is one small undo step.
   `Session::seal_history` ends a merge run (e.g. on mouse release).
 - **Steps**: scripts and agents send *steps*. A step is a command, a query,
-  `history.undo`, `history.redo`, or `batch` (`{"type": "batch",
-  "commands": [...]}`), which runs atomically as one undo step. If any command
-  in a batch fails, nothing is applied and the error carries the index of the
-  failing command.
+  `history.undo`, `history.redo`, `history.list`, `history.go_to`, or
+  `batch` (`{"type": "batch", "label": "...", "commands": [...]}`), which
+  runs atomically as one undo step named by its label. If any command in a
+  batch fails, nothing is applied and the error carries the index of the
+  failing command. Undo, redo and go-to return the panels the steps
+  changed (`ChangeSet::panels`); the app selects them.
+- **Progress of long steps** (M26): a `Progress` (a report callback and a
+  cancel flag) goes down `Workspace::run_step_with` → `Session` →
+  `CommandSpec::apply_with` / `ActionSpec::run_with`. A template drafted
+  in every size reports each size (`template.sizes`), the headless drape
+  every ten frames (`simulate.frames`); both stop between parts with
+  `CommandError::Cancelled`, and the dropped transaction changes nothing.
+  Each front-end chooses the display: the app a card with a bar and Stop,
+  the CLI a line on stderr (a terminal only), the MCP server
+  `notifications/progress` when the client sent a progress token, and a
+  cancelled MCP request stops the step.
 - **Queries** (`ProjectSummary`, `ListPanels`, `GetPanelGeometry`,
   `Measure`, `SimState`, …) are a separate `Query` enum. They are read-only
   and have their own schemas, and they are also exposed through the CLI and
@@ -263,6 +279,8 @@ Validation lives at the start of `apply` rather than in a separate
 | **Rayon pool** | n/a | Used by the CPU solver inside a step (contacts, per particle). The GPU solver records a frame and waits for its readback on the simulation thread. |
 | **Remote/MCP** (app only, tokio) | MCP server on a local socket | Sends `(Command, reply_tx)` to the UI thread over a channel. The UI drains it each frame and calls `request_repaint`. |
 | **Background jobs** | SDF building, exports, triangulation of large panels | Job queue. Results come back as commands or events. |
+| **Long steps** (app, M26) | A step that takes seconds: a template or a size range drafted in every size, new measurements, opening (the body fitted), starting the drape, imports, exports | Called asynchronously over the bridge (a Rust worker thread). The engine records where the step is; the UI polls it (`Engine::progress`) for a card with a bar, and may `Engine::cancel`. The drape is prepared on a copy of the document, so the UI's calls never wait for a body fit. |
+| **Body fit** (app, M26) | Fitting the avatar to new measurements (≈ 2.5 s) | A thread of its own when the 3D view needs a body that is not ready; the view keeps the old body meanwhile. `queries::fitted` shares a fit in progress, so no body is fitted twice at once. |
 
 - In headless mode (CLI/MCP over stdio), the same `Session` runs on the tokio
   main task, and `sim.step N` can run the simulation synchronously in
@@ -531,3 +549,6 @@ code stays **i18n-ready** for more:
 | 2026-11-18 | M22: sizes as grade rules on the base pattern (an offset per size on each point, and on a curve's handles when known), every size derived on demand (`Project::at_size`), not stored pieces per size | One geometry to edit; the rules are what DXF-AAMA/ASTM grading exchanges; a size cannot drift from its rules. Offsets per size rather than one step per point: real charts change their step (+4 then +6 cm), and a template drafted per size gives exact offsets |
 | 2026-11-18 | M22: the drape uses the shown size through `Project::as_shown` inside `drape::build` and `Form::of_project`, so every caller (app, CLI, MCP, exports) drapes the same size | One choke point instead of each front-end grading the project |
 | 2026-11-18 | M22: `rayon` in `r3d-commands` (already in the tree through `r3d-sim`): a graded template drafts every size in parallel; body fits are kept (`queries::fitted`, last 32) | Each size's draft fits a body (≈ 2.5 s): a shirt on 9 sizes took 26 s, now 6.5 s |
+| 2026-11-18 | M26: history steps `history.list` and `history.go_to`, batch labels; the history names steps by command name (stable codes the UI translates) and undo/redo return the panels changed | One history for every front-end; labels stay translatable; the user sees what was undone |
+| 2026-11-18 | M26: semantic copy as a query (`panel.copy` returns a clip, the pieces with their points, edges, notches, lines, pins and the seams between them, under the document's schema) and `panel.paste` (fresh IDs); the app passes clips through the system clipboard | Copy changes nothing, so it is not a command; a clip is plain JSON, so pasting into another project, or by an agent, needs no app state. A clip pastes only into the same schema version |
+| 2026-11-18 | M26: progress and cancel through the command layer (`Progress`, `apply_with`, `run_with`); long engine calls asynchronous over the bridge, polled by the UI; the drape prepared on a copy of the document; body fits on a thread of their own, shared while in progress | Opening a project, new measurements and a graded template froze the app for seconds (a body fit is ≈ 2.5 s). Polling keeps the bridge simple (no streams) and every front-end reads the same reports |

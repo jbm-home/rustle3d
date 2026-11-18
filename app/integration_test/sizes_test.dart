@@ -23,7 +23,7 @@ void main() {
     // measurement of its form.
     final store = ProjectStore(projectsDir: dir, libraryDir: dir);
     final engine = Engine.open(
-      path: store.create(
+      path: await store.create(
         name: 'Skirt',
         body: store.standardBody(),
         template: 'straight_skirt',
@@ -125,7 +125,7 @@ void main() {
     expect(grade[base + 1][0] - grade[base][0], closeTo(-7, 1e-9));
 
     // The pattern exports as its graded nest.
-    engine.exportFile(
+    await engine.exportFile(
       format: ExportFormat.dxf,
       path: '$dir/nest.dxf',
       avatar: false,

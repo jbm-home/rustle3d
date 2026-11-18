@@ -29,8 +29,14 @@ and look at the result, either headless or live in the user's open app.
   names, schemas and descriptions as `docs/commands.md`.
 - **Read tools**: `project_summary`, `list_panels`, `list_seams`,
   `list_materials`, `get_panel_geometry`, `get_sim_state`, `measure`.
-- **Write tools**: one per command, plus `batch` (one undoable transaction),
-  `undo` and `redo`.
+- **Write tools**: one per command, plus `batch` (one undoable transaction,
+  with an optional `label` for the history), `history_undo`,
+  `history_redo`, `history_list` and `history_go_to`.
+- **Long tools** (M26): when the client sends a progress token, a graded
+  template or a drape sends `notifications/progress` (parts done, total,
+  and a message: the task code and the size). Cancelling the request
+  (`notifications/cancelled`) stops the step; nothing is changed. Tool
+  calls run off the server's async threads.
 - **Visual feedback**: `render_board` and `render_3d` return PNG images
   (`width`, `height`; implemented in M4). `render_3d` shows the last
   `simulate` result if the document has not changed since, otherwise the

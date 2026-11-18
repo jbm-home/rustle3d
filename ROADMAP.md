@@ -34,7 +34,7 @@ can be tested through MCP as soon as they exist.
 | M19 | Layers and multiple garments (tucked in: open) | 3–4 wk | A shirt tucked into trousers, each in its own fabric and colour |
 | M22 | Grading and sizes ✅ | 2–3 wk | A shirt graded from 36 to 52, each size draped on a matching avatar |
 | M25 | Maximized views ✅ | < 1 wk | The board fills the window, the drape pauses; one click brings both views back |
-| M26 | History, editing comfort, feedback on long steps | 2–3 wk | Jump back ten steps from the history panel; paste two sewn pieces with their seam; a graded template shows its progress |
+| M26 | History, editing comfort, feedback on long steps ✅ | 2–3 wk | Jump back ten steps from the history panel; paste two sewn pieces with their seam; a graded template shows its progress |
 | M27 | Sketching 2: constraints and symmetry | 4–5 wk | Draw a half bodice against a symmetry axis with fixed dimensions; change one, the shape follows |
 | M28 | Parametric patterns | 2–3 wk | A skirt whose waist is `waist / 4 + 10 mm` redrafts itself on another body |
 | M29 | Construction details | 3–4 wk | A skirt with darts, a pleat and a patch pocket sewn on an internal line |
@@ -551,7 +551,7 @@ Built (2026-11-18), UI only (no command; the layout is not saved):
   paused and resumes on restore; Space or the guide's Drape brings the
   3D view back. Tested by `app/integration_test/views_test.dart`.
 
-## M26 — History, editing comfort, feedback on long steps
+## M26 — History, editing comfort, feedback on long steps ✅ (2026-11-18)
 Spec 08 already plans most of it.
 - Undo/Redo labels naming the action ("Undo Move point") in the Edit
   menu and their tooltips; steps grouped the way the user sees them (a
@@ -575,6 +575,30 @@ Spec 08 already plans most of it.
 - **Demo**: draw, sew and move pieces, jump back ten steps from the
   panel, redo; copy two sewn pieces into a new project; add the shirt
   template to a project graded 36–52 and watch its sizes being drafted.
+
+Built (2026-11-18), demo `./demos/m26/demo.sh`:
+- History: `history.list` and `history.go_to` steps (MCP tools too),
+  batch labels; undo, redo and go-to return the panels they changed and
+  the app selects them (what changed, rather than the selection before:
+  the selection is not in the history). The app has no menu bar: the
+  undo and redo arrows name the action in their tooltips, and a clock
+  button lists the steps, the latest first; a click goes there. A
+  gesture is one step (release seals the history).
+- `panel.copy` (a query: a clip in JSON) and `panel.paste`; ⌘C/⌘V in
+  the app through the system clipboard, so pieces paste into another
+  project. A piece pasted where another already starts around the body
+  is left unplaced.
+- `Progress` through the command layer (`apply_with`, `run_with`): a
+  graded template reports each size and stops between sizes; the
+  headless drape reports frames. CLI: one stderr line in a terminal.
+  MCP: progress notifications on a progress token, cancellation honoured.
+  App: long calls are asynchronous, a card (after 300 ms) shows a bar or
+  an indeterminate bar, with Stop for templates and size ranges; the
+  body is fitted on a thread of its own while the 3D view keeps the old
+  one, and fits in progress are shared (`queries::fitted`).
+- Not covered by the Flutter integration tests yet (they run on macOS):
+  the history list, ⌘C/⌘V and the progress card were checked by hand on
+  Windows.
 
 ## M27 — Sketching 2: constraints and symmetry
 From the maintainer (2026-11-18): drafting lacks ease. General CAD ideas

@@ -11,7 +11,7 @@ use std::time::Instant;
 use flutter_rust_bridge::frb;
 
 use r3d_commands::drape::{self, Drape, Form};
-use r3d_commands::{Script, Step, Workspace};
+use r3d_commands::{Progress, Script, Status, Step, Workspace};
 use r3d_sim::{CpuSolver, SimScene, Solver};
 use r3d_sim_gpu::{GpuContext, GpuSolver};
 
@@ -19,6 +19,7 @@ use crate::cloth::{
     Adjust, CORNER_PICK_PX, ClothHit, EDGE_PICK_MM, EDGE_PICK_PX, Held, Hit, PICK_PX, RESYNC_EVERY,
     SEAM_END, STROKE_STEP_MM, Sync, Tool, ray_triangle,
 };
+use crate::forms::Forms;
 use crate::photo::{PhotoJob, Subject};
 use crate::sim::SimThread;
 use r3d_core::{Body, EdgeId, Fabric, Localizable, Message, PanelId, PointId};
@@ -396,8 +397,12 @@ pub struct Engine {
     show_sizes: AtomicBool,
     /// The GPU solver's kernels, compiled on the first drape.
     sim_gpu: Mutex<Option<GpuContext>>,
-    /// The dress form for the current measurements.
-    form: Mutex<Option<(Body, Form)>>,
+    /// The dress form for the shown body, and the body being fitted.
+    form: Arc<Mutex<Forms>>,
+    /// The long step running (off the UI thread), if any: where it is.
+    busy: Arc<Mutex<Option<Status>>>,
+    /// Set to stop the long step running.
+    cancel: Arc<AtomicBool>,
     /// Edits not yet carried into the running simulation.
     sync: Arc<Mutex<Sync>>,
     /// Changes made by agents so far, for the UI to refresh on, and the
@@ -412,6 +417,19 @@ pub struct Engine {
     stroke: Mutex<Option<(PanelId, Vec<r3d_geom::DVec2>)>>,
     /// The photo shown in the 3D view instead of the live garment.
     photo: Mutex<Option<PhotoJob>>,
+}
+
+/// Where a long step is, for the UI: `task` is a stable code
+/// (`template.sizes`: drafting a template in every size, `item` the size
+/// just drafted; `body.fit`: fitting the body to new measurements;
+/// `drape.prepare`: placing the pieces around the body; `step`: anything
+/// else), with `done` of `total` parts (`total` 0: unknown).
+#[derive(Debug, Clone)]
+pub struct StepProgress {
+    pub task: String,
+    pub done: u32,
+    pub total: u32,
+    pub item: String,
 }
 
 fn poisoned() -> ApiError {
@@ -451,7 +469,9 @@ impl Engine {
                 std::env::var("R3D_SOLVER").is_ok_and(|v| v.eq_ignore_ascii_case("cpu")),
             ),
             sim_gpu: Mutex::new(None),
-            form: Mutex::new(None),
+            form: Arc::default(),
+            busy: Arc::default(),
+            cancel: Arc::default(),
             sync: Arc::new(Mutex::new(Sync::default())),
             agent_changes: Arc::new(AtomicU64::new(0)),
             agent_changes_seen: AtomicU64::new(0),
@@ -483,33 +503,131 @@ impl Engine {
         Ok(slot)
     }
 
-    /// The dress form for the project's measurements, built when they
-    /// change (`None` without an avatar).
-    fn form(
-        &self,
-        project: &r3d_core::Project,
-    ) -> Result<MutexGuard<'_, Option<(Body, Form)>>, ApiError> {
-        let mut slot = self.form.lock().map_err(|_| poisoned())?;
-        let body = project.shown_body();
-        if slot.as_ref().map(|(b, _)| *b) != body {
-            *slot = match (body, Form::of_project(project).map_err(err)?) {
-                (Some(b), Some(f)) => Some((b, f)),
-                _ => None,
-            };
+    /// The dress form for `body` (`None` without an avatar), fitted on
+    /// this thread if it is not ready (seconds; a fit of the same body
+    /// running elsewhere is waited for, not done twice).
+    fn form_now(&self, body: Option<Body>) -> Result<Option<Arc<Form>>, ApiError> {
+        let Some(body) = body else {
+            return Ok(None);
+        };
+        if let Some(form) = self.form.lock().map_err(|_| poisoned())?.of(body) {
+            return Ok(Some(form));
         }
-        Ok(slot)
+        self.report("body.fit");
+        let form = Arc::new(Form::of_body(&body).map_err(err)?);
+        self.form.lock().map_err(|_| poisoned())?.ready = Some((body, form.clone()));
+        Ok(Some(form))
+    }
+
+    /// The dress form for `body` if it is ready; otherwise `None`, and the
+    /// body is fitted on a thread of its own: never waits.
+    fn form_soon(&self, body: Body) -> Result<Option<Arc<Form>>, ApiError> {
+        let mut forms = self.form.lock().map_err(|_| poisoned())?;
+        if let Some(form) = forms.of(body) {
+            return Ok(Some(form));
+        }
+        if forms.fitting != Some(body) {
+            forms.fitting = Some(body);
+            let slot = self.form.clone();
+            std::thread::spawn(move || {
+                // A body that cannot be fitted stays `fitting`: not tried
+                // again on every frame.
+                if let Ok(form) = Form::of_body(&body)
+                    && let Ok(mut forms) = slot.lock()
+                {
+                    forms.ready = Some((body, Arc::new(form)));
+                    forms.fitting = None;
+                }
+            });
+        }
+        Ok(None)
+    }
+
+    /// Run `job`, a step that may take seconds, called off the UI thread:
+    /// meanwhile the UI polls [`Engine::progress`] and may
+    /// [`Engine::cancel`] it.
+    fn long<T>(
+        &self,
+        task: &'static str,
+        job: impl FnOnce(&Progress) -> Result<T, ApiError>,
+    ) -> Result<T, ApiError> {
+        self.cancel.store(false, Ordering::Relaxed);
+        self.set_busy(Some(Status {
+            task,
+            ..Status::default()
+        }))?;
+        let busy = self.busy.clone();
+        let progress = Progress::new(
+            move |status| {
+                if let Ok(mut b) = busy.lock() {
+                    *b = Some(status.clone());
+                }
+            },
+            self.cancel.clone(),
+        );
+        let out = job(&progress);
+        self.set_busy(None)?;
+        out
+    }
+
+    fn set_busy(&self, status: Option<Status>) -> Result<(), ApiError> {
+        *self.busy.lock().map_err(|_| poisoned())? = status;
+        Ok(())
+    }
+
+    /// Tell the UI what the long step running is doing now.
+    fn report(&self, task: &'static str) {
+        if let Ok(mut busy) = self.busy.lock()
+            && busy.is_some()
+        {
+            *busy = Some(Status {
+                task,
+                ..Status::default()
+            });
+        }
+    }
+
+    /// Where the long step running is, or `None` when none is.
+    #[frb(sync)]
+    pub fn progress(&self) -> Result<Option<StepProgress>, ApiError> {
+        Ok(self
+            .busy
+            .lock()
+            .map_err(|_| poisoned())?
+            .as_ref()
+            .map(|s| StepProgress {
+                task: s.task.to_owned(),
+                done: s.done,
+                total: s.total,
+                item: s.item.clone(),
+            }))
+    }
+
+    /// Stop the long step running, if it can stop (a template drafted in
+    /// every size, a size range set): it then fails with `cancelled` and
+    /// changes nothing.
+    #[frb(sync)]
+    pub fn cancel(&self) {
+        self.cancel.store(true, Ordering::Relaxed);
+    }
+
+    /// Whether the body is being fitted to new measurements: the 3D view
+    /// shows the old body until it is done.
+    #[frb(sync)]
+    pub fn body_fitting(&self) -> Result<bool, ApiError> {
+        Ok(self.form.lock().map_err(|_| poisoned())?.fitting.is_some())
     }
 
     /// Rebuild the simulation from the document. With `carry`, the cloth
     /// continues from where it is (pattern edits while draping); without,
-    /// it starts again around the body, paused.
+    /// it starts again around the body, paused. Works on a copy of the
+    /// document: fitting a new body takes seconds, and the UI's calls must
+    /// not wait for it.
     fn rebuild(&self, carry: bool) -> Result<(), ApiError> {
-        let ws = self.workspace()?;
-        let project = ws.session().project();
-        let form = self.form(project)?;
-        let mut drape = drape::prepare(project, form.as_ref().map(|(_, f)| f)).map_err(err)?;
-        drop(form);
-        drop(ws);
+        let project = self.workspace()?.session().project().clone();
+        let form = self.form_now(project.shown_body())?;
+        self.report("drape.prepare");
+        let mut drape = drape::prepare(&project, form.as_deref()).map_err(err)?;
         let sim = self.sim()?;
         let thread = sim.as_ref().ok_or_else(poisoned)?;
         let now = thread.latest();
@@ -594,16 +712,15 @@ impl Engine {
     }
 
     /// Start the simulation again from the pattern: the pieces around the
-    /// body, paused.
-    #[frb(sync)]
+    /// body, paused. Can take seconds (a new body is fitted first): the UI
+    /// thread does not wait, and [`Engine::progress`] says where it is.
     pub fn reset_simulation(&self) -> Result<SimStatus, ApiError> {
-        self.rebuild(false)?;
+        self.long("drape.prepare", |_| self.rebuild(false))?;
         self.simulation_status()
     }
 
     /// Run or pause the simulation. Running with nothing loaded loads the
-    /// garment first.
-    #[frb(sync)]
+    /// garment first (see [`Engine::reset_simulation`]).
     pub fn run_simulation(&self, running: bool) -> Result<SimStatus, ApiError> {
         if running && !self.simulation_status()?.loaded {
             self.reset_simulation()?;
@@ -637,14 +754,31 @@ impl Engine {
     /// JSON result. Changes are saved immediately.
     #[frb(sync)]
     pub fn run(&self, step_json: String) -> Result<String, ApiError> {
-        let value: serde_json::Value = serde_json::from_str(&step_json).map_err(|e| ApiError {
+        self.run_with(&step_json, &Progress::default())
+    }
+
+    /// [`Engine::run`] for a step that may take seconds (a template, a size
+    /// range, new measurements), off the UI thread: [`Engine::progress`]
+    /// says where it is, [`Engine::cancel`] stops it (nothing changed).
+    /// New measurements are fitted before it returns.
+    pub fn run_long(&self, step_json: String) -> Result<String, ApiError> {
+        self.long("step", |progress| {
+            let out = self.run_with(&step_json, progress)?;
+            let body = self.workspace()?.session().project().shown_body();
+            self.form_now(body)?;
+            Ok(out)
+        })
+    }
+
+    fn run_with(&self, step_json: &str, progress: &Progress) -> Result<String, ApiError> {
+        let value: serde_json::Value = serde_json::from_str(step_json).map_err(|e| ApiError {
             code: "malformed".into(),
             args: HashMap::from([("detail".into(), e.to_string())]),
             text: format!("malformed step: {e}"),
         })?;
         let step = Step::from_value(value).map_err(err)?;
         let mut ws = self.workspace()?;
-        let result = ws.run_step(&step).map_err(err)?;
+        let result = ws.run_step_with(&step, progress).map_err(err)?;
         if !matches!(step, Step::Query(_) | Step::List) {
             self.edited()?;
         }
@@ -795,14 +929,18 @@ impl Engine {
     /// Write an export to `path`, a file the user chose (anywhere): the
     /// pattern (every size of a graded one, nested), or the garment as the
     /// 3D view shows it now (the running drape, or its starting positions),
-    /// with the avatar if `avatar`.
-    #[frb(sync)]
+    /// with the avatar if `avatar`. Off the UI thread (a big nest or a
+    /// garment takes a while).
     pub fn export_file(
         &self,
         format: ExportFormat,
         path: String,
         avatar: bool,
     ) -> Result<(), ApiError> {
+        self.long("export", |_| self.export_to(format, &path, avatar))
+    }
+
+    fn export_to(&self, format: ExportFormat, path: &str, avatar: bool) -> Result<(), ApiError> {
         use r3d_io::pdf::{Paper, to_pdf};
         let bytes = {
             let ws = self.workspace()?;
@@ -822,14 +960,13 @@ impl Engine {
                     // Locks in the engine's usual order: the simulation
                     // before the cloth.
                     let live = self.sim()?.as_ref().map(|t| t.latest());
-                    let form = self.form(project)?;
+                    let form = self.form_now(project.shown_body())?;
                     let fresh;
                     let cloth = self.cloth.lock().map_err(|_| poisoned())?;
                     let drape = match cloth.as_ref() {
                         Some(d) => d,
                         None => {
-                            fresh = drape::prepare(project, form.as_ref().map(|(_, f)| f))
-                                .map_err(err)?;
+                            fresh = drape::prepare(project, form.as_deref()).map_err(err)?;
                             &fresh
                         }
                     };
@@ -841,7 +978,7 @@ impl Engine {
                         }
                         _ => start,
                     };
-                    let body = form.as_ref().map(|(_, f)| f).filter(|_| avatar);
+                    let body = form.as_deref().filter(|_| avatar);
                     let scene = drape::scene3d(project, drape, &positions, body);
                     if format == ExportFormat::Glb {
                         r3d_io::gltf::to_glb(&scene)
@@ -851,10 +988,9 @@ impl Engine {
                 }
             }
         };
-        std::fs::write(&path, bytes).map_err(|e| {
+        std::fs::write(path, bytes).map_err(|e| {
             ApiError::from(
-                Message::new("write_failed", format!("cannot write {path}: {e}"))
-                    .arg("path", &path),
+                Message::new("write_failed", format!("cannot write {path}: {e}")).arg("path", path),
             )
         })
     }
@@ -864,11 +1000,15 @@ impl Engine {
     /// `imports/` folder, then read, as one undo step. `units` (`mm`, `cm`,
     /// `in`, `px`…) overrides what the file says. Returns the JSON result
     /// of `import.pattern`: `panels`, `ignored`, and `scale` (`assumed`
-    /// when the file did not say how big a unit is).
-    #[frb(sync)]
+    /// when the file did not say how big a unit is). Off the UI thread (a
+    /// big PDF takes a while).
     pub fn import_pattern(&self, path: String, units: Option<String>) -> Result<String, ApiError> {
+        self.long("import", |_| self.import_from(&path, units))
+    }
+
+    fn import_from(&self, path: &str, units: Option<String>) -> Result<String, ApiError> {
         let mut ws = self.workspace()?;
-        let rel = ws.adopt(std::path::Path::new(&path)).map_err(err)?;
+        let rel = ws.adopt(std::path::Path::new(path)).map_err(err)?;
         let mut step = serde_json::json!({ "type": "import.pattern", "path": rel });
         if let Some(u) = units {
             step["units"] = serde_json::Value::from(u);
@@ -1079,25 +1219,29 @@ impl Engine {
         Ok(start.elapsed().as_secs_f64() * 1000.0)
     }
 
-    /// The fitted avatar mesh for the project's measurements, refitted
-    /// when they change.
+    /// The fitted avatar mesh for the project's measurements. New ones
+    /// are fitted on a thread of their own: the old body stays until then.
     fn refresh_avatar(
         &self,
         g: &mut Graphics,
         project: &r3d_core::Project,
     ) -> Result<(), ApiError> {
         let body = project.shown_body();
-        if body != g.avatar.as_ref().map(|(b, _)| *b) {
-            let form = self.form(project)?;
-            g.avatar = form.as_ref().map(|(b, f)| {
-                let mut mesh = Mesh {
-                    positions: f.positions.clone(),
-                    normals: Vec::new(),
-                    indices: f.triangles.iter().flatten().copied().collect(),
-                };
-                mesh.recompute_normals();
-                (*b, mesh)
-            });
+        if body == g.avatar.as_ref().map(|(b, _)| *b) {
+            return Ok(());
+        }
+        let Some(body) = body else {
+            g.avatar = None;
+            return Ok(());
+        };
+        if let Some(form) = self.form_soon(body)? {
+            let mut mesh = Mesh {
+                positions: form.positions.clone(),
+                normals: Vec::new(),
+                indices: form.triangles.iter().flatten().copied().collect(),
+            };
+            mesh.recompute_normals();
+            g.avatar = Some((body, mesh));
         }
         Ok(())
     }
@@ -2302,6 +2446,27 @@ mod tests {
                 .unwrap()
                 .contains("panel:2")
         );
+    }
+
+    #[test]
+    fn long_steps_run_and_leave_no_progress_behind() {
+        let tmp = tempfile::tempdir().unwrap();
+        let engine = Engine::open(tmp.path().join("P.r3d").to_string_lossy().into()).unwrap();
+        assert!(engine.progress().unwrap().is_none());
+        // A cancel asked before a step does not stop it.
+        engine.cancel();
+        let out = engine
+            .run_long(r#"{"type":"template.apply","template":"tote_bag"}"#.into())
+            .unwrap();
+        assert!(out.contains("panel:"));
+        assert!(engine.progress().unwrap().is_none());
+        assert!(!engine.body_fitting().unwrap());
+        // Errors come back as from `run`, and leave no progress either.
+        let e = engine
+            .run_long(r#"{"type":"template.apply","template":"cape"}"#.into())
+            .unwrap_err();
+        assert_eq!(e.code, "malformed");
+        assert!(engine.progress().unwrap().is_none());
     }
 
     #[test]

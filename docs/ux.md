@@ -60,6 +60,14 @@ Every feature spec has a "UX" section that applies these principles.
   (`Tab` to type an exact value), and properties are edited in place.
 - Synchronized 2D and 3D: hovering or selecting in one view highlights the
   same element in the other.
+- **Never frozen** (M26): a step that can take seconds runs off the UI
+  thread. Past 300 ms a modal card says what is being done, with a bar
+  when the length is known (the size being drafted) and an
+  indeterminate one otherwise, and **Stop** where stopping changes
+  nothing. Work the user did not ask for (fitting the body the 3D view
+  needs) shows as a small note in that view, never a modal card.
+- Undo is cheap to reach: the arrows name what they will undo, the
+  history lists every step, and undoing selects what changed.
 
 ## 3. Visual design
 

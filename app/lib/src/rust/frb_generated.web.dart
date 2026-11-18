@@ -76,6 +76,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PhotoStatus dco_decode_box_autoadd_photo_status(dynamic raw);
 
   @protected
+  StepProgress dco_decode_box_autoadd_step_progress(dynamic raw);
+
+  @protected
   int dco_decode_box_autoadd_u_32(dynamic raw);
 
   @protected
@@ -136,6 +139,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PhotoStatus? dco_decode_opt_box_autoadd_photo_status(dynamic raw);
 
   @protected
+  StepProgress? dco_decode_opt_box_autoadd_step_progress(dynamic raw);
+
+  @protected
   int? dco_decode_opt_box_autoadd_u_32(dynamic raw);
 
   @protected
@@ -161,6 +167,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SimStatus dco_decode_sim_status(dynamic raw);
+
+  @protected
+  StepProgress dco_decode_step_progress(dynamic raw);
 
   @protected
   int dco_decode_u_32(dynamic raw);
@@ -234,6 +243,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PhotoStatus sse_decode_box_autoadd_photo_status(SseDeserializer deserializer);
 
   @protected
+  StepProgress sse_decode_box_autoadd_step_progress(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   int sse_decode_box_autoadd_u_32(SseDeserializer deserializer);
 
   @protected
@@ -302,6 +316,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  StepProgress? sse_decode_opt_box_autoadd_step_progress(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   int? sse_decode_opt_box_autoadd_u_32(SseDeserializer deserializer);
 
   @protected
@@ -331,6 +350,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SimStatus sse_decode_sim_status(SseDeserializer deserializer);
+
+  @protected
+  StepProgress sse_decode_step_progress(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_32(SseDeserializer deserializer);
@@ -410,6 +432,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_photo_status(
     PhotoStatus self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_step_progress(
+    StepProgress self,
     SseSerializer serializer,
   );
 
@@ -498,6 +526,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_step_progress(
+    StepProgress? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_u_32(int? self, SseSerializer serializer);
 
   @protected
@@ -529,6 +563,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_sim_status(SimStatus self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_step_progress(StepProgress self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_32(int self, SseSerializer serializer);

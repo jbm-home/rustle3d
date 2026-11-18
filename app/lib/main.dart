@@ -33,7 +33,7 @@ Future<void> main() async {
     );
     Directory(scratch.projectsDir).createSync(recursive: true);
     engine = Engine.open(
-      path: scratch.create(
+      path: await scratch.create(
         name: 'Demo',
         body: scratch.standardBody(),
         template: demo,
@@ -44,7 +44,7 @@ Future<void> main() async {
     const select = String.fromEnvironment('R3D_SELECT');
     if (select.isNotEmpty) engine.select(panels: [select]);
     if (const bool.fromEnvironment('R3D_SIMULATE')) {
-      engine.runSimulation(running: true);
+      await engine.runSimulation(running: true);
     }
   }
   runApp(Rustle3dApp(store: store, engine: engine));
@@ -76,27 +76,27 @@ class _Rustle3dAppState extends State<Rustle3dApp> {
   @override
   void initState() {
     super.initState();
-    _prepare(_engine);
+    _setCanvas(_engine);
   }
 
-  /// Show a project's garment placed around the body, ready to simulate,
-  /// in the current theme.
-  void _prepare(Engine? engine) {
-    if (engine == null) return;
-    engine.setCanvas(colors: (_dark ? Palette.dark : Palette.light).toCanvas());
-    if (!engine.simulationStatus().loaded) engine.resetSimulation();
+  /// Draw a project's views in the current theme. (The shell then places
+  /// the garment around the body, ready to simulate.)
+  void _setCanvas(Engine? engine) {
+    engine?.setCanvas(
+      colors: (_dark ? Palette.dark : Palette.light).toCanvas(),
+    );
   }
 
   void _toggleTheme() {
     setState(() => _dark = !_dark);
-    _prepare(_engine);
+    _setCanvas(_engine);
   }
 
   void _open(String path) {
     try {
       final engine = Engine.open(path: path);
       widget.store.remember(path);
-      _prepare(engine);
+      _setCanvas(engine);
       setState(() => _engine = engine);
     } on ApiError catch (e) {
       final messenger = _messenger.currentState;

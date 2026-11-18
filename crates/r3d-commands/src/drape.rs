@@ -25,6 +25,7 @@ use r3d_sim::scene::{Particle, Triangle};
 use r3d_sim::{CpuSolver, FabricPreset, SUBSTEPS, SimScene, Solver, StepStats};
 
 use crate::error::CommandError;
+use crate::progress::{Progress, Status};
 use crate::queries::{body_model, fitted};
 
 /// Default distance between cloth vertices (mm): interactive on a laptop.
@@ -470,12 +471,14 @@ impl Form {
     /// The project's avatar fitted to its measurements, if it has one
     /// (in the shown size's).
     pub fn of_project(project: &Project) -> Result<Option<Self>, CommandError> {
-        let Some(body) = project.shown_body() else {
-            return Ok(None);
-        };
+        project.shown_body().map(|b| Self::of_body(&b)).transpose()
+    }
+
+    /// The built-in body fitted to `body` (seconds the first time).
+    pub fn of_body(body: &r3d_core::Body) -> Result<Self, CommandError> {
         let model = body_model()?;
-        let positions = fitted_positions(model, &fitted(&body)?);
-        Ok(Some(Self::new(positions, model.triangles().to_vec())))
+        let positions = fitted_positions(model, &fitted(body)?);
+        Ok(Self::new(positions, model.triangles().to_vec()))
     }
 }
 
@@ -1310,7 +1313,11 @@ pub struct Simulated {
 
 /// Simulate `frames` frames of 1/60 s from the starting positions, on the
 /// CPU backend: deterministic, so a cached drape can be reproduced.
-pub fn simulate(project: &Project, frames: u32) -> Result<Simulated, CommandError> {
+pub fn simulate(
+    project: &Project,
+    frames: u32,
+    progress: &Progress,
+) -> Result<Simulated, CommandError> {
     let form = Form::of_project(project)?;
     let drape = prepare(project, form.as_ref())?;
     if drape.pieces.is_empty() {
@@ -1318,10 +1325,19 @@ pub fn simulate(project: &Project, frames: u32) -> Result<Simulated, CommandErro
     }
     let mut solver = CpuSolver::new(drape.scene.clone());
     let start = Instant::now();
-    for _ in 0..frames {
+    for frame in 1..=frames {
+        progress.check()?;
         solver
             .step(1.0 / 60.0)
             .map_err(|e| internal(e.to_string()))?;
+        if frame % PROGRESS_FRAMES == 0 || frame == frames {
+            progress.report(&Status {
+                task: "simulate.frames",
+                done: frame,
+                total: frames,
+                item: String::new(),
+            });
+        }
     }
     let ms_per_frame = start.elapsed().as_secs_f64() * 1000.0 / f64::from(frames.max(1));
     Ok(Simulated {
@@ -1333,6 +1349,9 @@ pub fn simulate(project: &Project, frames: u32) -> Result<Simulated, CommandErro
         ms_per_frame,
     })
 }
+
+/// How often a headless drape reports its progress (frames).
+const PROGRESS_FRAMES: u32 = 10;
 
 /// Where the last headless drape is cached, relative to the project folder.
 pub const CACHE_FILE: &str = ".r3d-cache/drape.bin";

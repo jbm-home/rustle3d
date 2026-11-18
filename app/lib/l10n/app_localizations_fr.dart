@@ -1672,4 +1672,53 @@ class LFr extends L {
 
   @override
   String get selectToCopy => 'Sélectionnez les pièces à copier.';
+
+  @override
+  String get errCancelled => 'Arrêté : rien n’a été modifié.';
+
+  @override
+  String get busyStop => 'Arrêter';
+
+  @override
+  String get busyStep => 'En cours…';
+
+  @override
+  String busySizes(String size, int done, int total) {
+    return 'Tracé de la taille $size ($done sur $total)';
+  }
+
+  @override
+  String busySizesStart(int total) {
+    return 'Tracé de chaque taille ($total)';
+  }
+
+  @override
+  String get busyBodyFit => 'Ajustement du corps aux mesures…';
+
+  @override
+  String get busyDrape => 'Mise en place des pièces autour du corps…';
+
+  @override
+  String get busyExport => 'Export en cours…';
+
+  @override
+  String get busyImport => 'Lecture du patron…';
+
+  @override
+  String get busyOpening => 'Ouverture du projet';
+
+  @override
+  String get busyTemplate => 'Ajout du modèle';
+
+  @override
+  String get busySizesTitle => 'Réglage des tailles';
+
+  @override
+  String get busyBodyTitle => 'Modification du corps';
+
+  @override
+  String get busyDrapeTitle => 'Lancement du drapé';
+
+  @override
+  String get bodyFitting => 'Ajustement du corps…';
 }

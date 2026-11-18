@@ -9,6 +9,7 @@ use serde_json::Value;
 use crate::actions::*;
 use crate::commands::*;
 use crate::error::CommandError;
+use crate::progress::Progress;
 use crate::queries::*;
 use crate::spec::{CommandOutput, CommandSpec, Info, Named, QuerySpec, schema_value};
 use crate::workspace::{Workspace, WorkspaceError};
@@ -37,8 +38,8 @@ macro_rules! command_registry {
             pub fn merge_key(&self) -> Option<String> {
                 match self { $( Command::$T(c) => c.merge_key(), )* }
             }
-            pub(crate) fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
-                match self { $( Command::$T(c) => c.apply(tx), )* }
+            pub(crate) fn apply(&self, tx: &mut Transaction<'_>, progress: &Progress) -> Result<CommandOutput, CommandError> {
+                match self { $( Command::$T(c) => c.apply_with(tx, progress), )* }
             }
             /// Every command, in registry order.
             pub fn registry() -> Vec<Info> {
@@ -99,8 +100,8 @@ macro_rules! action_registry {
             pub fn name(&self) -> &'static str {
                 match self { $( Action::$T(_) => $name, )* }
             }
-            pub fn run(&self, ws: &mut Workspace) -> Result<Value, WorkspaceError> {
-                match self { $( Action::$T(a) => a.run(ws), )* }
+            pub fn run(&self, ws: &mut Workspace, progress: &Progress) -> Result<Value, WorkspaceError> {
+                match self { $( Action::$T(a) => a.run_with(ws, progress), )* }
             }
             /// Every action, in registry order.
             pub fn registry() -> Vec<Info> {

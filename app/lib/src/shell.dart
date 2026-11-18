@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'body_panel.dart';
+import 'busy.dart';
 import 'design/tokens.dart';
 import 'guide.dart';
 import 'i18n.dart';
@@ -100,6 +101,10 @@ class _ShellState extends State<Shell> {
   /// The view under the pointer, which the shortcut maximizes.
   ViewKind _hovered = ViewKind.board;
 
+  /// The body is being fitted to new measurements (the 3D view shows the
+  /// old one meanwhile).
+  bool _fitting = false;
+
   /// The guided flow's current step, and whether the guide is shown.
   late GuideStep _step;
   bool _guide = true;
@@ -117,7 +122,13 @@ class _ShellState extends State<Shell> {
       seams: _seams.length,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _maybeTour();
+      if (!mounted) return;
+      _maybeTour();
+      // The garment placed around the body, ready to simulate (the body is
+      // fitted first: seconds on the first project opened).
+      if (!(_guard(widget.engine.simulationStatus)?.loaded ?? true)) {
+        _drape(widget.engine.resetSimulation, title: context.l.busyOpening);
+      }
     });
   }
 
@@ -138,6 +149,8 @@ class _ShellState extends State<Shell> {
     }
     final agent = _guard(widget.engine.agentStatus) ?? AgentStatus.off;
     if (agent != _agent) setState(() => _agent = agent);
+    final fitting = _guard(widget.engine.bodyFitting) ?? false;
+    if (fitting != _fitting) setState(() => _fitting = fitting);
     // An agent may start the drape while the 3D view is out of sight.
     if (_maximized == ViewKind.board) _pauseHidden();
   }
@@ -164,9 +177,7 @@ class _ShellState extends State<Shell> {
     if (status == null) return;
     if (status.running) {
       _resumeDrape = true;
-      setState(
-        () => _sim = _guard(() => widget.engine.runSimulation(running: false)),
-      );
+      _drape(() => widget.engine.runSimulation(running: false));
     } else if (status != _sim) {
       setState(() => _sim = status);
     }
@@ -277,6 +288,40 @@ class _ShellState extends State<Shell> {
     }
   }
 
+  /// Steps that can take seconds: drafting a template or a size range in
+  /// every size, fitting a body to new measurements.
+  static const _longSteps = {
+    'template.apply',
+    'grading.use_chart',
+    'grading.set_sizes',
+    'grading.show_size',
+    'avatar.set',
+  };
+
+  /// Run a step that can take seconds off the UI thread, showing its
+  /// progress; the user may stop it (nothing changes then).
+  Future<dynamic> _runLong(Map<String, Object?> step) async {
+    final l = context.l;
+    final title = switch (step['type']) {
+      'template.apply' => l.busyTemplate,
+      'avatar.set' => l.busyBodyTitle,
+      _ => l.busySizesTitle,
+    };
+    try {
+      final out = await runBusy(
+        context,
+        widget.engine,
+        title,
+        () => widget.engine.runLong(stepJson: jsonEncode(step)),
+        cancellable: true,
+      );
+      return jsonDecode(out);
+    } on ApiError catch (e) {
+      if (mounted) _toast(context.error(e));
+      return null;
+    }
+  }
+
   dynamic _run(Map<String, Object?> step) {
     try {
       return jsonDecode(widget.engine.run(stepJson: jsonEncode(step)));
@@ -354,26 +399,41 @@ class _ShellState extends State<Shell> {
     }
   }
 
+  /// Start, pause or rebuild the drape, off the UI thread: placing the
+  /// pieces around the body takes a moment, fitting a new body seconds.
+  Future<void> _drape(
+    Future<SimStatus> Function() call, {
+    String? title,
+  }) async {
+    try {
+      final status = await runBusy(
+        context,
+        widget.engine,
+        title ?? context.l.busyDrapeTitle,
+        call,
+      );
+      if (mounted) setState(() => _sim = status);
+    } on ApiError catch (e) {
+      if (mounted) _toast(context.error(e));
+    }
+  }
+
   /// Run or pause the drape; running it brings the 3D view back.
   void _setRunning(bool running) {
     if (running && _maximized == ViewKind.board) {
       _resumeDrape = false;
       setState(() => _maximized = null);
     }
-    setState(
-      () => _sim = _guard(() => widget.engine.runSimulation(running: running)),
-    );
+    _drape(() => widget.engine.runSimulation(running: running));
   }
 
   /// Rebuild the simulation from the pattern, keeping it running if it was.
-  void _restart() {
+  Future<void> _restart() async {
     final wasRunning = _sim?.running ?? false;
-    setState(() {
-      _sim = _guard(widget.engine.resetSimulation);
-      if (wasRunning) {
-        _sim = _guard(() => widget.engine.runSimulation(running: true));
-      }
-    });
+    await _drape(widget.engine.resetSimulation);
+    if (wasRunning && mounted) {
+      await _drape(() => widget.engine.runSimulation(running: true));
+    }
   }
 
   /// Ask how to render a photo, then show it refining in the 3D view.
@@ -812,14 +872,21 @@ class _ShellState extends State<Shell> {
     );
     if (location == null || !mounted) return;
     try {
-      widget.engine.exportFile(
-        format: format,
-        path: location.path,
-        avatar: avatar,
+      await runBusy(
+        context,
+        widget.engine,
+        l.export,
+        () => widget.engine.exportFile(
+          format: format,
+          path: location.path,
+          avatar: avatar,
+        ),
       );
-      _toast(l.exported(location.path.split(RegExp(r'[/\\]')).last));
+      if (mounted) {
+        _toast(l.exported(location.path.split(RegExp(r'[/\\]')).last));
+      }
     } on ApiError catch (e) {
-      _toast(context.error(e));
+      if (mounted) _toast(context.error(e));
     }
   }
 
@@ -837,13 +904,13 @@ class _ShellState extends State<Shell> {
       ],
     );
     if (file == null || !mounted) return;
-    Map<String, dynamic>? result = _importFile(file.path, null);
-    if (result == null) return;
+    Map<String, dynamic>? result = await _importFile(file.path, null);
+    if (result == null || !mounted) return;
     if (result['scale'] == 'assumed') {
       final unit = await _askUnits();
       if (unit != null && mounted) {
         _run({'type': 'history.undo'});
-        result = _importFile(file.path, unit) ?? result;
+        result = await _importFile(file.path, unit) ?? result;
       }
     }
     if (!mounted) return;
@@ -855,12 +922,17 @@ class _ShellState extends State<Shell> {
     );
   }
 
-  Map<String, dynamic>? _importFile(String path, String? units) {
+  Future<Map<String, dynamic>?> _importFile(String path, String? units) async {
     try {
-      return jsonDecode(widget.engine.importPattern(path: path, units: units))
-          as Map<String, dynamic>;
+      final out = await runBusy(
+        context,
+        widget.engine,
+        context.l.importPattern,
+        () => widget.engine.importPattern(path: path, units: units),
+      );
+      return jsonDecode(out) as Map<String, dynamic>;
     } on ApiError catch (e) {
-      _toast(context.error(e));
+      if (mounted) _toast(context.error(e));
       return null;
     }
   }
@@ -1225,20 +1297,32 @@ class _ShellState extends State<Shell> {
                                       onSave: _savePhoto,
                                       onClose: _closePhoto,
                                     ),
-                              child: RustView(
-                                engine: widget.engine,
-                                kind: ViewKind.garment,
-                                onSelection: (_) => _refresh(),
-                                onFrameTime: (ms) => _onFrame(false, ms),
-                                onPinned: (_) {
-                                  _refresh();
-                                  _toast(l.toastPinned);
-                                },
-                                drawing: _tool == 'draw',
-                                onDrawn: (_) {
-                                  _refresh();
-                                  _toast(l.toastLineAdded);
-                                },
+                              child: Stack(
+                                children: [
+                                  Positioned.fill(
+                                    child: RustView(
+                                      engine: widget.engine,
+                                      kind: ViewKind.garment,
+                                      onSelection: (_) => _refresh(),
+                                      onFrameTime: (ms) => _onFrame(false, ms),
+                                      onPinned: (_) {
+                                        _refresh();
+                                        _toast(l.toastPinned);
+                                      },
+                                      drawing: _tool == 'draw',
+                                      onDrawn: (_) {
+                                        _refresh();
+                                        _toast(l.toastLineAdded);
+                                      },
+                                    ),
+                                  ),
+                                  if (_fitting)
+                                    const Positioned(
+                                      left: Space.m,
+                                      bottom: Space.m,
+                                      child: _FittingChip(),
+                                    ),
+                                ],
                               ),
                             ),
                           ),
@@ -1259,8 +1343,13 @@ class _ShellState extends State<Shell> {
                             _guard(() => widget.engine.unpin(pin: pin));
                             _refresh();
                           },
-                          run: (step) {
-                            _run(step);
+                          run: (step) async {
+                            if (_longSteps.contains(step['type'])) {
+                              await _runLong(step);
+                            } else {
+                              _run(step);
+                            }
+                            if (!mounted) return;
                             _refresh();
                             // A new placement, or another size on its own
                             // body, starts the drape again from around the
@@ -1268,7 +1357,7 @@ class _ShellState extends State<Shell> {
                             if (step['type'] == 'panel.place' ||
                                 step['type'] == 'grading.show_size' ||
                                 step['type'] == 'grading.use_chart') {
-                              _restart();
+                              await _restart();
                             }
                           },
                           query: _run,
@@ -1613,6 +1702,39 @@ class _StepChip extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Says the body is being fitted to new measurements, over the 3D view
+/// (which shows the old body until then).
+class _FittingChip extends StatelessWidget {
+  const _FittingChip();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: Space.m, vertical: 6),
+      decoration: BoxDecoration(
+        color: p.surface.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(strokeWidth: 2, color: p.accent),
+          ),
+          const SizedBox(width: Space.s),
+          Text(
+            context.l.bodyFitting,
+            style: ts(fontSize: 12, color: p.textMuted),
+          ),
+        ],
       ),
     );
   }

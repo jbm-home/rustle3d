@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use super::avatar::validate_body;
 use super::{Vec2, editable_panel, v};
 use crate::error::{CommandError, Invalid, finite, non_blank};
+use crate::progress::Progress;
 use crate::spec::{CommandOutput, CommandSpec, Described};
 
 /// One size of a range, as commands take it.
@@ -191,6 +192,7 @@ fn set_sizes(
     tx: &mut Transaction<'_>,
     sizes: &[SizeSpec],
     base: &str,
+    progress: &Progress,
 ) -> Result<CommandOutput, CommandError> {
     if sizes.len() < 2 {
         return Err(CommandError::invalid("sizes", Invalid::TooFewSizes));
@@ -301,7 +303,7 @@ fn set_sizes(
         .map(|(id, _)| *id)
         .collect();
     for garment in garments {
-        crate::templates::grade_garment(tx, garment)?;
+        crate::templates::grade_garment(tx, garment, progress)?;
     }
     Ok(CommandOutput::default())
 }
@@ -331,7 +333,16 @@ impl Described for GradingSetSizes {
 
 impl CommandSpec for GradingSetSizes {
     fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
-        set_sizes(tx, &self.sizes, &self.base)
+        self.apply_with(tx, &Progress::default())
+    }
+
+    /// Grading a template's garment drafts it in every size (seconds).
+    fn apply_with(
+        &self,
+        tx: &mut Transaction<'_>,
+        progress: &Progress,
+    ) -> Result<CommandOutput, CommandError> {
+        set_sizes(tx, &self.sizes, &self.base, progress)
     }
 }
 
@@ -355,6 +366,15 @@ impl Described for GradingUseChart {
 
 impl CommandSpec for GradingUseChart {
     fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        self.apply_with(tx, &Progress::default())
+    }
+
+    /// Grading a template's garment drafts it in every size (seconds).
+    fn apply_with(
+        &self,
+        tx: &mut Transaction<'_>,
+        progress: &Progress,
+    ) -> Result<CommandOutput, CommandError> {
         let chart = self.chart.sizes();
         let index = |field: &'static str, name: &str| {
             chart
@@ -393,7 +413,7 @@ impl CommandSpec for GradingUseChart {
                 hips_cm: b.hips_cm - base_body.hips_cm,
             })
             .collect();
-        set_sizes(tx, &sizes, base_name)
+        set_sizes(tx, &sizes, base_name, progress)
     }
 }
 

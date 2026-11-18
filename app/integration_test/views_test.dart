@@ -47,7 +47,7 @@ void main() {
     final garment = view(ViewKind.garment);
     final boardWidth = tester.getSize(board).width;
 
-    engine.runSimulation(running: true);
+    await engine.runSimulation(running: true);
     await settle();
 
     // The board takes both views' space; the hidden drape pauses.
@@ -74,7 +74,7 @@ void main() {
     expect(garment, findsOneWidget);
 
     // A drape paused by the user stays paused when the views come back.
-    engine.runSimulation(running: false);
+    await engine.runSimulation(running: false);
     await tester.tap(find.byKey(const ValueKey('maximizeView')).first);
     await settle();
     await tester.tap(find.byKey(const ValueKey('restoreViews')));

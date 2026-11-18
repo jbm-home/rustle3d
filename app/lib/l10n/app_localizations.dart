@@ -2838,6 +2838,96 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Select pieces to copy.'**
   String get selectToCopy;
+
+  /// No description provided for @errCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped: nothing was changed.'**
+  String get errCancelled;
+
+  /// No description provided for @busyStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get busyStop;
+
+  /// No description provided for @busyStep.
+  ///
+  /// In en, this message translates to:
+  /// **'Working…'**
+  String get busyStep;
+
+  /// No description provided for @busySizes.
+  ///
+  /// In en, this message translates to:
+  /// **'Drafting size {size} ({done} of {total})'**
+  String busySizes(String size, int done, int total);
+
+  /// No description provided for @busySizesStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Drafting every size ({total})'**
+  String busySizesStart(int total);
+
+  /// No description provided for @busyBodyFit.
+  ///
+  /// In en, this message translates to:
+  /// **'Fitting the body to the measurements…'**
+  String get busyBodyFit;
+
+  /// No description provided for @busyDrape.
+  ///
+  /// In en, this message translates to:
+  /// **'Placing the pieces around the body…'**
+  String get busyDrape;
+
+  /// No description provided for @busyExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Exporting…'**
+  String get busyExport;
+
+  /// No description provided for @busyImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading the pattern…'**
+  String get busyImport;
+
+  /// No description provided for @busyOpening.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening the project'**
+  String get busyOpening;
+
+  /// No description provided for @busyTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Adding the template'**
+  String get busyTemplate;
+
+  /// No description provided for @busySizesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Setting the sizes'**
+  String get busySizesTitle;
+
+  /// No description provided for @busyBodyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Changing the body'**
+  String get busyBodyTitle;
+
+  /// No description provided for @busyDrapeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting the drape'**
+  String get busyDrapeTitle;
+
+  /// No description provided for @bodyFitting.
+  ///
+  /// In en, this message translates to:
+  /// **'Fitting the body…'**
+  String get bodyFitting;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {
