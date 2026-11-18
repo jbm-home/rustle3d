@@ -2805,6 +2805,10 @@ class _EmptyInspector extends StatelessWidget {
         const SizedBox(height: Space.l),
         Divider(color: p.border, height: 1),
         const SizedBox(height: Space.l),
+        _VariablesCard(query: query, run: run),
+        const SizedBox(height: Space.l),
+        Divider(color: p.border, height: 1),
+        const SizedBox(height: Space.l),
         _PinList(pins: pins, onUnpin: onUnpin),
       ],
     );

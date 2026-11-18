@@ -52,6 +52,8 @@ pub struct Project {
     pub(crate) constraints: IdMap<ConstraintId, Constraint>,
     /// Construction lines on the board.
     pub(crate) guides: IdMap<GuideId, Guide>,
+    /// Named variables for formulas: name → formula (`docs/specs/20-parametric.md`).
+    pub(crate) variables: BTreeMap<String, String>,
 }
 
 /// A relation the drawing keeps between points and edges: after every
@@ -90,12 +92,18 @@ pub enum Constraint {
         mm: f64,
         #[serde(default)]
         along: Along,
+        /// Computes `mm` from the body and the variables (a length).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        formula: Option<String>,
     },
     /// A dimension: the edge's length along its curve.
     Length {
         edge: EdgeId,
         /// mm, > 0.
         mm: f64,
+        /// Computes `mm` from the body and the variables (a length).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        formula: Option<String>,
     },
     /// A dimension: the angle between two edges (at their common point
     /// when they share one, between their chords otherwise).
@@ -104,6 +112,10 @@ pub enum Constraint {
         b: EdgeId,
         /// Degrees, 0–180.
         deg: f64,
+        /// Computes `deg` from the body and the variables (a plain
+        /// number).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        formula: Option<String>,
     },
 }
 
@@ -152,6 +164,39 @@ impl Constraint {
         match self {
             Constraint::Distance { mm, .. } | Constraint::Length { mm, .. } => Some(*mm),
             Constraint::Angle { deg, .. } => Some(*deg),
+            _ => None,
+        }
+    }
+
+    /// A dimension's formula, if it has one.
+    pub fn formula(&self) -> Option<&str> {
+        match self {
+            Constraint::Distance { formula, .. }
+            | Constraint::Length { formula, .. }
+            | Constraint::Angle { formula, .. } => formula.as_deref(),
+            _ => None,
+        }
+    }
+
+    /// The same dimension with another formula (or none); `None` for the
+    /// others.
+    pub fn with_formula(&self, f: Option<String>) -> Option<Constraint> {
+        let mut c = self.clone();
+        match &mut c {
+            Constraint::Distance { formula, .. }
+            | Constraint::Length { formula, .. }
+            | Constraint::Angle { formula, .. } => *formula = f,
+            _ => return None,
+        }
+        Some(c)
+    }
+
+    /// The length dimension a dimension's value has: 1 (mm) for a
+    /// distance or a length, 0 for an angle (degrees).
+    pub fn value_power(&self) -> Option<i32> {
+        match self {
+            Constraint::Distance { .. } | Constraint::Length { .. } => Some(1),
+            Constraint::Angle { .. } => Some(0),
             _ => None,
         }
     }
@@ -634,6 +679,7 @@ impl Project {
             grading: None,
             constraints: IdMap::new(),
             guides: IdMap::new(),
+            variables: BTreeMap::new(),
         }
     }
 
@@ -699,6 +745,19 @@ impl Project {
 
     pub fn guides(&self) -> &IdMap<GuideId, Guide> {
         &self.guides
+    }
+
+    pub fn variables(&self) -> &BTreeMap<String, String> {
+        &self.variables
+    }
+
+    /// Where formulas are computed in the size drawn: the avatar's body
+    /// and the variables.
+    pub fn formula_scope(&self) -> crate::formula::Scope<'_> {
+        crate::formula::Scope {
+            body: self.avatar.as_ref().map(|a| &a.body),
+            variables: &self.variables,
+        }
     }
 
     /// The panel a constraint is drawn on: that of its first point, or

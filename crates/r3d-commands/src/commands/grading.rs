@@ -515,6 +515,9 @@ impl CommandSpec for PointSetGrade {
     fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
         let point = super::editable_point(tx, self.point)?;
         let g = grading(tx.project())?;
+        if r3d_core::constraints::formula_graded_points(tx.project()).contains(&self.point) {
+            return Err(CommandError::invalid("point", Invalid::GradedByFormula));
+        }
         let grade = match (&self.step, &self.offsets) {
             (Some(step), None) => {
                 finite("step", step)?;

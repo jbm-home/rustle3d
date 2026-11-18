@@ -1,7 +1,10 @@
 //! Constraints and dimensions (spec 19), construction lines, smooth
 //! points; and the step that keeps every constraint satisfied.
 
-use r3d_core::constraints::{Touched, Update, measure, solve_project};
+use r3d_core::Localizable;
+use r3d_core::constraints::{
+    Touched, Update, formula_grades, formula_value, formula_values, measure, solve_project,
+};
 use r3d_core::edit::Change;
 use r3d_core::{
     AnyId, Constraint, ConstraintId, Edge, EdgeCurve, Guide, GuideId, Point, PointId, Transaction,
@@ -26,7 +29,7 @@ pub struct ConstraintAdd {
 }
 
 impl Described for ConstraintAdd {
-    const SUMMARY: &'static str = "Add a constraint (fixed, coincident, horizontal, vertical, parallel, perpendicular, tangent, equal_length, on_edge) or a dimension (distance, length, angle) on contour points and edges. The drawing is solved at once: the geometry moves as little as possible so that every constraint holds; constraints that cannot all hold are refused (`constraints_unsolvable`). With `measure`, a dimension keeps the value it has now. Returns the constraint; `constraint.list` shows them with the freedom left.";
+    const SUMMARY: &'static str = "Add a constraint (fixed, coincident, horizontal, vertical, parallel, perpendicular, tangent, equal_length, on_edge) or a dimension (distance, length, angle) on contour points and edges. A dimension with a `formula` (e.g. \"waist / 4 + 10 mm\") takes its value from the body's measurements and the variables, now and whenever they change, and in every size of the range. The drawing is solved at once: the geometry moves as little as possible so that every constraint holds; constraints that cannot all hold are refused (`constraints_unsolvable`). With `measure`, a dimension keeps the value it has now. Returns the constraint; `constraint.list` shows them with the freedom left.";
 }
 
 /// Refuse a point or edge that is missing or derived.
@@ -115,11 +118,18 @@ impl CommandSpec for ConstraintAdd {
             // An edge's own end is on it already.
             return Err(CommandError::invalid("constraint", Invalid::Duplicate));
         }
-        let c = if self.measure && c.value().is_some() {
-            let now = measure(tx.project(), c).unwrap_or_default();
-            c.with_value(now).unwrap_or_else(|| c.clone())
-        } else {
-            c.clone()
+        let c = match formula_value(&tx.project().formula_scope(), c) {
+            Some(v) => c
+                .with_value(v.map_err(|error| CommandError::Formula {
+                    of: "constraint".into(),
+                    error,
+                })?)
+                .unwrap_or_else(|| c.clone()),
+            None if self.measure && c.value().is_some() => {
+                let now = measure(tx.project(), c).unwrap_or_default();
+                c.with_value(now).unwrap_or_else(|| c.clone())
+            }
+            None => c.clone(),
         };
         check_value(&c)?;
         let k = key(&c);
@@ -183,6 +193,183 @@ impl CommandSpec for ConstraintSetValue {
 
     fn merge_key(&self) -> Option<String> {
         Some(format!("constraint.set_value:{}", self.constraint))
+    }
+}
+
+/// Give a dimension a formula, or take it away.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ConstraintSetFormula {
+    pub constraint: ConstraintId,
+    /// E.g. "waist / 4 + 10 mm", "bust / 2 + ease": arithmetic (+ - * /,
+    /// parentheses, min, max, abs, sqrt) on numbers with units (mm, cm, m,
+    /// in, deg), the body's measurements (height, bust, waist, hips) and
+    /// variables. A length for a distance or a length, a plain number
+    /// (degrees) for an angle. Omitted: the dimension keeps its value and
+    /// no longer follows the body.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub formula: Option<String>,
+}
+
+impl Described for ConstraintSetFormula {
+    const SUMMARY: &'static str = "Give a dimension a formula of the body's measurements and the variables (e.g. \"waist / 4 + 10 mm\"): its value follows them, the drawing is redrawn when the body changes, and each size of the range is drafted with its own measurements (the points the formulas move are graded by them). Without `formula`, the dimension keeps its value. Errors say what is wrong: formula.syntax, formula.unknown_name, formula.cycle, formula.unit, formula.no_body, formula.domain, formula.range.";
+}
+
+impl CommandSpec for ConstraintSetFormula {
+    fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        let c = tx
+            .project()
+            .constraint(self.constraint)
+            .ok_or_else(|| CommandError::not_found(self.constraint))?;
+        let formula = self
+            .formula
+            .as_deref()
+            .map(str::trim)
+            .filter(|f| !f.is_empty())
+            .map(str::to_owned);
+        let c = c
+            .with_formula(formula)
+            .ok_or_else(|| CommandError::invalid("constraint", Invalid::NotDimension))?;
+        let c = match formula_value(&tx.project().formula_scope(), &c) {
+            Some(v) => c
+                .with_value(v.map_err(|error| CommandError::Formula {
+                    of: self.constraint.to_string(),
+                    error,
+                })?)
+                .unwrap_or(c),
+            None => c,
+        };
+        tx.put_constraint(self.constraint, c);
+        Ok(CommandOutput::default())
+    }
+}
+
+/// Set a named variable for formulas.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct VariableSet {
+    /// A letter or _, then letters, digits or _ (not a body measurement,
+    /// a function or a unit).
+    pub name: String,
+    /// Its formula, e.g. "2 cm" or "bust / 20 + 5 mm".
+    pub formula: String,
+}
+
+impl Described for VariableSet {
+    const SUMMARY: &'static str = "Set a named variable that formulas can use (e.g. ease = \"2 cm\", dart = \"(hips - waist) / 8\"): created, or changed, and every formula using it follows.";
+}
+
+impl CommandSpec for VariableSet {
+    fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        let name = self.name.trim();
+        if !r3d_core::formula::valid_name(name) {
+            return Err(CommandError::Formula {
+                of: name.to_owned(),
+                error: r3d_core::formula::FormulaError::BadName {
+                    name: name.to_owned(),
+                },
+            });
+        }
+        let mut variables = tx.project().variables().clone();
+        variables.insert(name.to_owned(), self.formula.trim().to_owned());
+        // It must compute (a body measurement without a body waits).
+        let scope = r3d_core::formula::Scope {
+            body: tx.project().avatar().map(|a| &a.body),
+            variables: &variables,
+        };
+        match scope.eval(name) {
+            Ok(_) | Err(r3d_core::formula::FormulaError::NoBody { .. }) => {}
+            Err(error) => {
+                return Err(CommandError::Formula {
+                    of: name.to_owned(),
+                    error,
+                });
+            }
+        }
+        tx.set_variables(variables);
+        Ok(CommandOutput::default())
+    }
+
+    fn merge_key(&self) -> Option<String> {
+        Some(format!("variable.set:{}", self.name.trim()))
+    }
+}
+
+/// Remove a named variable.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct VariableRemove {
+    pub name: String,
+}
+
+impl Described for VariableRemove {
+    const SUMMARY: &'static str =
+        "Remove a named variable; refused while a formula uses it (formula.unknown_name).";
+}
+
+impl CommandSpec for VariableRemove {
+    fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        let mut variables = tx.project().variables().clone();
+        if variables.remove(self.name.trim()).is_none() {
+            return Err(CommandError::invalid("name", Invalid::Empty));
+        }
+        // Still used by another variable: say which.
+        let scope = r3d_core::formula::Scope {
+            body: tx.project().avatar().map(|a| &a.body),
+            variables: &variables,
+        };
+        for name in variables.keys() {
+            match scope.eval(name) {
+                Ok(_) | Err(r3d_core::formula::FormulaError::NoBody { .. }) => {}
+                Err(error) => {
+                    return Err(CommandError::Formula {
+                        of: name.clone(),
+                        error,
+                    });
+                }
+            }
+        }
+        tx.set_variables(variables);
+        Ok(CommandOutput::default())
+    }
+}
+
+/// The named variables, with their values.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct VariableList {}
+
+impl Described for VariableList {
+    const SUMMARY: &'static str = "List the named variables, each with its formula and its value in the size drawn (`mm` for a length, `number` otherwise; none while it needs a body the project does not have), and the body's measurements formulas can use (mm).";
+}
+
+impl crate::spec::QuerySpec for VariableList {
+    fn run(&self, p: &r3d_core::Project) -> Result<serde_json::Value, CommandError> {
+        let scope = p.formula_scope();
+        let round = |x: f64| (x * 1000.0).round() / 1000.0;
+        let variables: Vec<serde_json::Value> = p
+            .variables()
+            .iter()
+            .map(|(name, formula)| {
+                let mut out = serde_json::json!({ "name": name, "formula": formula });
+                match scope.eval(name) {
+                    Ok(q) if q.power == 1 => out["mm"] = serde_json::json!(round(q.value)),
+                    Ok(q) if q.power == 0 => out["number"] = serde_json::json!(round(q.value)),
+                    Ok(_) => {}
+                    Err(e) => out["error"] = serde_json::json!(e.message().code),
+                }
+                out
+            })
+            .collect();
+        let body = p.avatar().map(|a| {
+            serde_json::json!({
+                "height": a.body.height_cm * 10.0,
+                "bust": a.body.bust_cm * 10.0,
+                "waist": a.body.waist_cm * 10.0,
+                "hips": a.body.hips_cm * 10.0,
+            })
+        });
+        Ok(serde_json::json!({ "variables": variables, "body": body }))
     }
 }
 
@@ -418,6 +605,16 @@ pub(crate) fn settle_constraints(tx: &mut Transaction<'_>) -> Result<(), Command
     if tx.project().constraints().is_empty() {
         return Ok(());
     }
+    // Formulas first: the body or a variable may have changed.
+    let values = formula_values(tx.project()).map_err(|(id, error)| CommandError::Formula {
+        of: id.to_string(),
+        error,
+    })?;
+    for (id, v) in values {
+        if let Some(c) = tx.project().constraint(id).and_then(|c| c.with_value(v)) {
+            tx.put_constraint(id, c);
+        }
+    }
     let touched = touched(tx.changes());
     let updates = solve_project(tx.project(), &touched).map_err(|e| CommandError::Unsolvable {
         constraints: e.constraints.into_iter().map(AnyId::from).collect(),
@@ -434,6 +631,25 @@ pub(crate) fn settle_constraints(tx: &mut Transaction<'_>) -> Result<(), Command
                     tx.put_edge(id, Edge { curve, ..e });
                 }
             }
+        }
+    }
+    // Then every size of the range, drafted with its own measurements.
+    let unsolvable = |e: r3d_core::constraints::Unsolvable| CommandError::Unsolvable {
+        constraints: e.constraints.into_iter().map(AnyId::from).collect(),
+    };
+    let grades = formula_grades(tx.project()).map_err(unsolvable)?;
+    for (id, grade) in grades.points {
+        if let Some(pt) = tx.project().point(id).cloned()
+            && pt.grade != grade
+        {
+            tx.put_point(id, Point { grade, ..pt });
+        }
+    }
+    for (id, grade) in grades.curves {
+        if let Some(e) = tx.project().edge(id).cloned()
+            && e.grade != grade
+        {
+            tx.put_edge(id, Edge { grade, ..e });
         }
     }
     Ok(())

@@ -68,6 +68,8 @@ pub enum Invalid {
     Duplicate,
     #[error("must name points and edges of the same piece's outline")]
     NotJoined,
+    #[error("is graded by formulas: change them, or the sizes")]
+    GradedByFormula,
 }
 
 impl Invalid {
@@ -104,6 +106,7 @@ impl Invalid {
             Invalid::NotDimension => "invalid.not_dimension",
             Invalid::Duplicate => "invalid.duplicate",
             Invalid::NotJoined => "invalid.not_joined",
+            Invalid::GradedByFormula => "invalid.graded_by_formula",
         }
     }
 }
@@ -126,6 +129,12 @@ pub enum CommandError {
         "{id} follows other geometry (a linked mirror copy or the reflected half of a symmetric piece): edit what it follows"
     )]
     Derived { id: AnyId },
+    #[error("{} ({})", .error, .of)]
+    Formula {
+        /// The constraint or the variable whose formula it is.
+        of: String,
+        error: r3d_core::formula::FormulaError,
+    },
     #[error("the constraints cannot all hold ({}): nothing was changed", list(.constraints))]
     Unsolvable { constraints: Vec<AnyId> },
     #[error("{edge} is sewn ({seam}): remove the seam first")]
@@ -194,6 +203,12 @@ impl Localizable for CommandError {
             }
             Self::LinkedMirror { panel } => Message::new("linked_mirror", text).arg("panel", panel),
             Self::Derived { id } => Message::new("derived", text).arg("id", id),
+            Self::Formula { of, error } => {
+                let mut m = error.message();
+                m.args.insert("of", of.clone());
+                m.text = text;
+                m
+            }
             Self::Unsolvable { constraints } => {
                 Message::new("constraints_unsolvable", text).arg("constraints", list(constraints))
             }

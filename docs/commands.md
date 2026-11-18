@@ -2931,7 +2931,7 @@ Add pattern pieces in one step: for each, its sewing line (as in panel.create_pa
 
 ### `constraint.add`
 
-Add a constraint (fixed, coincident, horizontal, vertical, parallel, perpendicular, tangent, equal_length, on_edge) or a dimension (distance, length, angle) on contour points and edges. The drawing is solved at once: the geometry moves as little as possible so that every constraint holds; constraints that cannot all hold are refused (`constraints_unsolvable`). With `measure`, a dimension keeps the value it has now. Returns the constraint; `constraint.list` shows them with the freedom left.
+Add a constraint (fixed, coincident, horizontal, vertical, parallel, perpendicular, tangent, equal_length, on_edge) or a dimension (distance, length, angle) on contour points and edges. A dimension with a `formula` (e.g. "waist / 4 + 10 mm") takes its value from the body's measurements and the variables, now and whenever they change, and in every size of the range. The drawing is solved at once: the geometry moves as little as possible so that every constraint holds; constraints that cannot all hold are refused (`constraints_unsolvable`). With `measure`, a dimension keeps the value it has now. Returns the constraint; `constraint.list` shows them with the freedom left.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -3157,6 +3157,13 @@ Add a constraint (fixed, coincident, horizontal, vertical, parallel, perpendicul
             "b": {
               "$ref": "#/$defs/PointId"
             },
+            "formula": {
+              "description": "Computes `mm` from the body and the variables (a length).",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "kind": {
               "const": "distance",
               "type": "string"
@@ -3181,6 +3188,13 @@ Add a constraint (fixed, coincident, horizontal, vertical, parallel, perpendicul
           "properties": {
             "edge": {
               "$ref": "#/$defs/EdgeId"
+            },
+            "formula": {
+              "description": "Computes `mm` from the body and the variables (a length).",
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "kind": {
               "const": "length",
@@ -3213,6 +3227,13 @@ Add a constraint (fixed, coincident, horizontal, vertical, parallel, perpendicul
               "description": "Degrees, 0–180.",
               "format": "double",
               "type": "number"
+            },
+            "formula": {
+              "description": "Computes `deg` from the body and the variables (a plain\nnumber).",
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "kind": {
               "const": "angle",
@@ -3711,6 +3732,104 @@ Make an edge a circular arc through its two ends, bulging `bulge_mm` from the st
 
 </details>
 
+### `constraint.set_formula`
+
+Give a dimension a formula of the body's measurements and the variables (e.g. "waist / 4 + 10 mm"): its value follows them, the drawing is redrawn when the body changes, and each size of the range is drafted with its own measurements (the points the formulas move are graded by them). Without `formula`, the dimension keeps its value. Errors say what is wrong: formula.syntax, formula.unknown_name, formula.cycle, formula.unit, formula.no_body, formula.domain, formula.range.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "ConstraintId": {
+      "description": "Identifier of a constraint, e.g. `constraint:1`.",
+      "pattern": "^constraint:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Give a dimension a formula, or take it away.",
+  "properties": {
+    "constraint": {
+      "$ref": "#/$defs/ConstraintId"
+    },
+    "formula": {
+      "description": "E.g. \"waist / 4 + 10 mm\", \"bust / 2 + ease\": arithmetic (+ - * /,\nparentheses, min, max, abs, sqrt) on numbers with units (mm, cm, m,\nin, deg), the body's measurements (height, bust, waist, hips) and\nvariables. A length for a distance or a length, a plain number\n(degrees) for an angle. Omitted: the dimension keeps its value and\nno longer follows the body.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "constraint"
+  ],
+  "title": "ConstraintSetFormula",
+  "type": "object"
+}
+```
+
+</details>
+
+### `variable.set`
+
+Set a named variable that formulas can use (e.g. ease = "2 cm", dart = "(hips - waist) / 8"): created, or changed, and every formula using it follows.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Set a named variable for formulas.",
+  "properties": {
+    "formula": {
+      "description": "Its formula, e.g. \"2 cm\" or \"bust / 20 + 5 mm\".",
+      "type": "string"
+    },
+    "name": {
+      "description": "A letter or _, then letters, digits or _ (not a body measurement,\na function or a unit).",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "formula"
+  ],
+  "title": "VariableSet",
+  "type": "object"
+}
+```
+
+</details>
+
+### `variable.remove`
+
+Remove a named variable; refused while a formula uses it (formula.unknown_name).
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Remove a named variable.",
+  "properties": {
+    "name": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "VariableRemove",
+  "type": "object"
+}
+```
+
+</details>
+
 ## Queries
 
 Read-only. Lengths in mm, areas in mm², rounded to 0.001.
@@ -4108,6 +4227,24 @@ List the construction lines: each with its ends `a` and `b` (mm).
   "additionalProperties": false,
   "description": "The construction lines.",
   "title": "GuideList",
+  "type": "object"
+}
+```
+
+</details>
+
+### `variable.list`
+
+List the named variables, each with its formula and its value in the size drawn (`mm` for a length, `number` otherwise; none while it needs a body the project does not have), and the body's measurements formulas can use (mm).
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The named variables, with their values.",
+  "title": "VariableList",
   "type": "object"
 }
 ```

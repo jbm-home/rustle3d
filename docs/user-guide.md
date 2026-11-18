@@ -14,7 +14,8 @@ draping on the graphics card; M18, shirt and trousers templates, pieces
 placed on a leg; M19, several garments in layers; M22, sizes and
 grading; M25, maximized views; M26, history, copy and paste, progress of long steps;
 GPL licence, donations; M27, constraints, dimensions, half pieces,
-construction lines, snapping, ellipses, circle skirts and arcs).
+construction lines, snapping, ellipses, circle skirts and arcs; M28,
+formulas and variables).
 -->
 
 Rustle3D is a free, open-source desktop app for making clothes: draw the
@@ -189,6 +190,23 @@ that does not hold shows in red. The inspector also says how many ways
 the piece can still move (moving or turning it as a whole counts,
 unless a corner is fixed), and warns when some constraints repeat
 others.
+
+### Formulas: patterns made to measure
+A distance, a length or an angle can follow the body: click **ƒ** next
+to its value and type a formula, like `waist / 4 + 10 mm` or
+`hips / 4 + ease`. Formulas use the body's measurements (`height`,
+`bust`, `waist`, `hips`), numbers with their unit (`mm`, `cm`, `in`),
+`+ − * /`, parentheses, `min` and `max`, and your own **variables**
+(nothing selected: the **Variables** section of the inspector; **+**
+adds one, like `ease = 2 cm`, click one to change it). A length needs a
+unit: `waist / 4 + 10` is refused, `waist / 4 + 10 mm` is fine; the
+message says what is wrong.
+
+When you change the body's measurements or a variable, every piece with
+formulas is drawn again for it. With **sizes**, each size is drafted
+with its own measurements: the corners the formulas move are graded by
+them (and cannot be graded by hand); the rest keeps its grade rules.
+Empty the formula to keep the value as it is.
 
 ### Cutting a piece
 With **Cut** (K), draw a line across one piece, starting and ending

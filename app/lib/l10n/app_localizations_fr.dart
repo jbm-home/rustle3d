@@ -1641,6 +1641,9 @@ class LFr extends L {
       'panel_create_ellipse': 'Ajouter une ellipse',
       'panel_create_sector': 'Ajouter une jupe cercle',
       'edge_set_arc': 'Faire un arc',
+      'constraint_set_formula': 'Formule de cote',
+      'variable_set': 'Modifier une variable',
+      'variable_remove': 'Retirer une variable',
       'other': '$step',
     });
     return '$_temp0';
@@ -1940,4 +1943,73 @@ class LFr extends L {
 
   @override
   String get errDuplicate => 'Déjà contraint de cette façon.';
+
+  @override
+  String get formulaTip =>
+      'Formule : calculer cette valeur d’après les mesures du corps';
+
+  @override
+  String get formulaTitle => 'Formule';
+
+  @override
+  String get formulaHelp =>
+      'Mesures : height (stature), bust (poitrine), waist (taille), hips (hanches). Unités : mm, cm, in. + − × ÷, min, max. Vos variables aussi. Vide : la valeur reste telle quelle.';
+
+  @override
+  String get variables => 'Variables';
+
+  @override
+  String get variablesHint =>
+      'Des noms pour les formules, comme ease = 2 cm. Les pièces à formules se redessinent pour un nouveau corps et dans chaque taille.';
+
+  @override
+  String get variable => 'Variable';
+
+  @override
+  String get variableName => 'Nom';
+
+  @override
+  String get variableAdd => 'Ajouter une variable';
+
+  @override
+  String get errGradedByFormula =>
+      'Ce point est gradué par des formules : modifiez-les plutôt.';
+
+  @override
+  String errFormulaSyntax(String at) {
+    return 'La formule est illisible au caractère $at.';
+  }
+
+  @override
+  String errFormulaUnknown(String name) {
+    return '« $name » n’est ni une mesure ni une variable.';
+  }
+
+  @override
+  String errFormulaNoBody(String name) {
+    return '« $name » demande les mesures du corps : saisissez-les d’abord.';
+  }
+
+  @override
+  String errFormulaCycle(String name) {
+    return '« $name » se calcule à partir de lui-même.';
+  }
+
+  @override
+  String get errFormulaUnit =>
+      'Les unités ne correspondent pas (une longueur prend une unité, comme 10 mm).';
+
+  @override
+  String get errFormulaDomain =>
+      'La formule n’a pas de valeur (une division par zéro ?).';
+
+  @override
+  String errFormulaRange(String value) {
+    return 'La formule donne $value : trop petit pour cette cote.';
+  }
+
+  @override
+  String errFormulaBadName(String name) {
+    return '« $name » ne peut pas nommer une variable : une lettre, puis des lettres, chiffres ou _.';
+  }
 }

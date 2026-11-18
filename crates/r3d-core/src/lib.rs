@@ -11,6 +11,7 @@
 pub mod constraints;
 pub mod edit;
 pub mod file;
+pub mod formula;
 pub mod grading;
 pub mod id;
 pub mod integrity;

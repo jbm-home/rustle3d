@@ -1,6 +1,6 @@
 # Rustle3D architecture
 
-Status: living document, last updated 2026-11-18 (M27).
+Status: living document, last updated 2026-11-18 (M28).
 
 Every choice here is the **current best guess**, not a rule. Each one says
 why it was made and what was considered, so it can be challenged and changed
@@ -101,6 +101,7 @@ Project                                        (✓ = implemented in M1)
  ├─ grading: Option<Grading>                   ✓ (M22: sizes with body differences, base, shown)
  ├─ constraints: IdMap<ConstraintId, Constraint> ✓ (M27: geometric constraints and dimensions)
  ├─ guides: IdMap<GuideId, Guide>              ✓ (M27: construction lines)
+ ├─ variables: name → formula                  ✓ (M28: named variables for formulas)
  ├─ arrangement_points: from the avatar, editable
  └─ drape:   Option<DrapeSnapshot>             (last saved simulated positions)
 ```
@@ -123,6 +124,13 @@ Project                                        (✓ = implemented in M1)
   (`Panel::symmetry`) is drawn as a half: the reflected half's points
   and edges are derived, paired with the drawn ones so their IDs (and
   the seams on them) survive edits.
+- **Formulas (M28)**: a dimension may carry a formula of the body's
+  measurements and named variables (`r3d_core::formula`, units checked
+  as computed). The stored value is derived from it after every step.
+  With a size range, the pieces the formulas drive are solved again in
+  every size (that size's body) and the result written as their points'
+  grades: derived data in the existing grading model, so `at_size`, the
+  graded nest, the exports and the per-size drape need no change.
 
 - **IDs** are typed newtypes (`PanelId(u64)`, …) allocated from one monotonic
   counter per document, shared by every entity kind. They serialize as
@@ -248,7 +256,10 @@ Validation lives at the start of `apply` rather than in a separate
   dropped, then the solver moves the geometry so that every constraint
   holds again, holding first what the step itself moved (read from the
   transaction's changes). A step whose constraints cannot all hold is
-  refused (`constraints_unsolvable`) and rolled back. Symmetric pieces'
+  refused (`constraints_unsolvable`) and rolled back. Formulas are
+  computed first (the body or a variable may have changed), and with a
+  size range the formula-driven pieces are graded after the solve.
+  Symmetric pieces'
   reflected halves are then recomputed, then linked mirror copies.
 - **Linked mirror copies** are derived data. After every step, the session
   recomputes each copy from its source (reflection across an axis, then an
@@ -575,4 +586,6 @@ code stays **i18n-ready** for more:
 | 2026-11-18 | M27: constraints as document entities (schema v11), solved after every step inside the step's transaction, the edited points held first | One undo step per edit, whatever the solver moves; agents and the app share the behaviour; a drawing can never be saved with a constraint broken |
 | 2026-11-18 | M27: symmetric pieces as a half plus a derived reflection paired point for point and edge for edge (`Symmetry`), not a "cut on fold" flag read by the drape and the exports | The pattern stays a whole piece for every consumer (meshing, seams, exports, grading); pairing keeps the reflection's IDs, so seams on it survive edits of the drawn half |
 | 2026-11-18 | M27: board snapping in the bridge (`r3d-ffi/src/snap.rs`), not a query | It depends on the zoom and on what is being drawn; agents send exact coordinates |
+| 2026-11-18 | M28: a parametric piece grades itself by writing its points' grades (solved per size with that size's body), not by solving inside `Project::at_size` | Every consumer of sizes (board nest, exports, drape, mirrors, symmetric halves) already reads grades; `at_size` stays a cheap pure function; grade rules and formulas live in one model |
+| 2026-11-18 | M28: formulas in our own small parser with dimensional analysis (length powers), not an expression crate | The grammar is tiny; units must be checked (a length plus a number is an error), which general evaluators do not do |
 | 2026-11-18 | Licence changed from MIT to GPL-3.0-or-later before the repository goes public; dependencies must be GPL-3.0-compatible, permissive preferred (MPL-2.0, LGPL-3.0, GPL-3.0 with a justification) | Keeps Rustle3D and its derivatives free software, as Blender, Krita and Inkscape do: a fork or a closed product built on it must publish its changes. All dependencies so far (MIT, Apache-2.0, BSD, Zlib, OFL font, CC0 body) are compatible with GPLv3. Possible while every commit has a single author |

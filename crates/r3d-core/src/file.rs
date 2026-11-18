@@ -20,7 +20,7 @@ use crate::model::Project;
 /// Identifies a Rustle3D project file.
 pub const FORMAT: &str = "rustle3d.project";
 /// Version written by this build.
-pub const SCHEMA_VERSION: u32 = 11;
+pub const SCHEMA_VERSION: u32 = 12;
 
 type Migration = fn(Value) -> Result<Value, FileError>;
 
@@ -36,6 +36,7 @@ const MIGRATIONS: &[Migration] = &[
     migrate_v8_to_v9,
     migrate_v9_to_v10,
     migrate_v10_to_v11,
+    migrate_v11_to_v12,
 ];
 
 fn object<'a>(
@@ -45,6 +46,13 @@ fn object<'a>(
     value.as_object_mut().ok_or_else(|| FileError::Json {
         detail: format!("{what} is not an object"),
     })
+}
+
+/// v12 adds named variables for formulas (dimensions' formulas are
+/// optional fields).
+fn migrate_v11_to_v12(mut project: Value) -> Result<Value, FileError> {
+    object(&mut project, "project")?.insert("variables".into(), Value::Object(Default::default()));
+    Ok(project)
 }
 
 /// v11 adds constraints and dimensions, construction lines, and symmetric

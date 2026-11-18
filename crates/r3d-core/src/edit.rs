@@ -5,6 +5,7 @@
 //! undone and redone generically; dropping an uncommitted transaction rolls
 //! it back, so a failing command can never leave a half-applied document.
 
+use std::collections::BTreeMap;
 use std::mem;
 
 use crate::id::{
@@ -54,6 +55,10 @@ pub enum Change {
         before: Option<Grading>,
         after: Option<Grading>,
     },
+    Variables {
+        before: BTreeMap<String, String>,
+        after: BTreeMap<String, String>,
+    },
 }
 
 fn set<K: Ord + Copy, V: Clone>(map: &mut IdMap<K, V>, id: K, value: &Option<V>) {
@@ -97,6 +102,9 @@ impl Change {
             Change::Grading { before, after } => {
                 p.grading = if forward { after } else { before }.clone();
             }
+            Change::Variables { before, after } => {
+                p.variables = if forward { after } else { before }.clone();
+            }
         }
     }
 
@@ -124,6 +132,9 @@ impl Change {
                 *after = *b
             }
             (Change::Grading { after, .. }, Change::Grading { after: b, .. }) => *after = b.clone(),
+            (Change::Variables { after, .. }, Change::Variables { after: b, .. }) => {
+                *after = b.clone()
+            }
             _ => return false,
         }
         true
@@ -202,7 +213,8 @@ impl ChangeSet {
                 | Change::Avatar { .. }
                 | Change::Name { .. }
                 | Change::DisplayUnit { .. }
-                | Change::Grading { .. } => {}
+                | Change::Grading { .. }
+                | Change::Variables { .. } => {}
             }
         }
         out
@@ -408,6 +420,14 @@ impl<'a> Transaction<'a> {
         self.changes.push(Change::Grading {
             before,
             after: grading,
+        });
+    }
+
+    pub fn set_variables(&mut self, variables: BTreeMap<String, String>) {
+        let before = mem::replace(&mut self.project.variables, variables.clone());
+        self.changes.push(Change::Variables {
+            before,
+            after: variables,
         });
     }
 

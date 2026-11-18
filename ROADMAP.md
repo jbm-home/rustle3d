@@ -36,7 +36,7 @@ can be tested through MCP as soon as they exist.
 | M25 | Maximized views ✅ | < 1 wk | The board fills the window, the drape pauses; one click brings both views back |
 | M26 | History, editing comfort, feedback on long steps ✅ | 2–3 wk | Jump back ten steps from the history panel; paste two sewn pieces with their seam; a graded template shows its progress |
 | M27 | Sketching 2: constraints and symmetry ✅ | 4–5 wk | Draw a half bodice against a symmetry axis with fixed dimensions; change one, the shape follows |
-| M28 | Parametric patterns | 2–3 wk | A skirt whose waist is `waist / 4 + 10 mm` redrafts itself on another body |
+| M28 | Parametric patterns ✅ | 2–3 wk | A skirt whose waist is `waist / 4 + 10 mm` redrafts itself on another body |
 | M29 | Construction details | 3–4 wk | A skirt with darts, a pleat and a patch pocket sewn on an internal line |
 | M20 | Trims: buttons and zippers | 2–3 wk | A shirt that buttons and trousers with a fly zipper, draped closed |
 | M21 | Textures and prints | 2–3 wk | A striped shirt whose stripes follow the grainline on every piece |
@@ -652,7 +652,7 @@ Built (2026-11-18), demo `./demos/m27/demo.sh`, spec 19:
   dragging a dimension on the board; dragging a point's handles with
   Select (Bend does it, and a smooth point keeps them aligned).
 
-## M28 — Parametric patterns
+## M28 — Parametric patterns ✅ (2026-11-18)
 - A dimension (M27) can be a **formula** of the body's measurements and
   named variables: `bust / 4 + 20 mm`. Formulas are checked (unknown
   name, cycle, bad unit) and errors reported with codes.
@@ -668,6 +668,22 @@ Built (2026-11-18), demo `./demos/m27/demo.sh`, spec 19:
   no code taken from those GPL projects.
 - **Demo**: a skirt with `waist / 4 + 10 mm` redrafts itself on another
   body and in every size.
+
+Built (2026-11-18), demo `./demos/m28/demo.sh`, spec 20:
+- Formulas on dimensions (`constraint.set_formula`, or `formula` when
+  adding one) and named variables (`variable.set` / `remove` / `list`;
+  schema v12): arithmetic with units checked as it is computed, body
+  measurements height, bust, waist, hips; errors with codes
+  (`formula.syntax`, `unknown_name`, `cycle`, `unit`, `no_body`, `domain`,
+  `range`, `bad_name`).
+- Redrafted after every step (a new body, a changed variable); with a
+  size range, every size is drafted with its own body and the points the
+  formulas move get their grades from it, so the graded nest, exports and
+  per-size drape follow; grade rules stay for the rest.
+- The app: a formula button on each dimension, a Variables section.
+- Open: more body measurements (neck, shoulder, arm…); Seamly2D/Valentina
+  import (left for later: the formulas work, the format is a separate
+  piece of work); formulas typed directly in a value field.
 
 ## M29 — Construction details
 - Seams on part of an edge and on a chain of edges, with an adjustable

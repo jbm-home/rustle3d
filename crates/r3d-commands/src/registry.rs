@@ -181,6 +181,9 @@ command_registry! {
     "panel.create_ellipse" => PanelCreateEllipse,
     "panel.create_sector" => PanelCreateSector,
     "edge.set_arc" => EdgeSetArc,
+    "constraint.set_formula" => ConstraintSetFormula,
+    "variable.set" => VariableSet,
+    "variable.remove" => VariableRemove,
 }
 
 query_registry! {
@@ -200,6 +203,7 @@ query_registry! {
     "grading.charts" => GradingCharts,
     "constraint.list" => ConstraintList,
     "guide.list" => GuideList,
+    "variable.list" => VariableList,
 }
 
 action_registry! {

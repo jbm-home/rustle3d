@@ -144,6 +144,20 @@ void main() {
     );
     expect(edge['length_mm'], closeTo(120, 0.01));
 
+    // The same length from a formula of the body's waist.
+    await tester.tap(find.byKey(ValueKey('formula-${length['id']}')));
+    await frames();
+    await tester.enterText(find.byKey(const Key('formula')), 'waist / 6');
+    await tester.tap(find.widgetWithText(FilledButton, 'Apply'));
+    await frames();
+    final waist = (run({'type': 'variable.list'})['body']['waist'] as num)
+        .toDouble();
+    got = run({'type': 'panel.get', 'panel': piece['id']}) as Map;
+    final byFormula = (got['edges'] as List).firstWhere(
+      (e) => e['id'] == drawn[1]['id'],
+    );
+    expect(byFormula['length_mm'], closeTo(waist / 6, 0.01));
+
     // A construction line: G, two clicks (above the view's corner
     // buttons).
     board = tester.getRect(boardFinder);

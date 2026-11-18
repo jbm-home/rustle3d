@@ -202,16 +202,19 @@ fn sample() -> Project {
             b: pts[1],
             mm: 400.0,
             along: Along::Horizontal,
+            formula: Some("bust / 2 - ease".into()),
         },
         Constraint::Angle {
             a: contour[0],
             b: contour[1],
             deg: 92.0,
+            formula: None,
         },
     ] {
         let id = tx.new_constraint_id();
         tx.put_constraint(id, c);
     }
+    tx.set_variables([("ease".to_owned(), "5 cm".to_owned())].into());
     let guide = tx.new_guide_id();
     tx.put_guide(
         guide,

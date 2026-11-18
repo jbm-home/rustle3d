@@ -29,3 +29,4 @@ descriptions, public papers, open standards, general garment-making knowledge.
 | 17 | [Several garments and layers](17-garments-layers.md) | M19 |
 | 18 | [Grading and sizes](18-grading.md) | M22 |
 | 19 | [Sketching: constraints, dimensions and symmetry](19-constraints.md) | M27 |
+| 20 | [Parametric patterns](20-parametric.md) | M28 |

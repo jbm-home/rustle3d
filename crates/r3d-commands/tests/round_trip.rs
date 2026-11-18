@@ -191,7 +191,11 @@ fn every_command_round_trips() {
         "constraint": {"kind": "length", "edge": q_edges[0], "mm": 1}}));
     let len = len.created[0].to_string();
     h.round_trip(json!({"type": "constraint.set_value", "constraint": len, "value": 320}));
+    h.round_trip(json!({"type": "variable.set", "name": "ease", "formula": "2 cm"}));
+    h.round_trip(json!({"type": "constraint.set_formula", "constraint": len,
+        "formula": "ease * 15"}));
     h.round_trip(json!({"type": "constraint.remove", "constraint": len}));
+    h.round_trip(json!({"type": "variable.remove", "name": "ease"}));
     h.round_trip(json!({"type": "point.set_smooth", "point": q_pts[2], "smooth": true}));
     h.round_trip(json!({"type": "panel.unfold", "panel": quad.created[0], "edge": q_edges[3]}));
     h.round_trip(json!({"type": "panel.unlink", "panel": quad.created[0]}));

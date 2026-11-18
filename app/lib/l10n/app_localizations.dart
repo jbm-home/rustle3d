@@ -2800,7 +2800,7 @@ abstract class L {
   /// A step of the undo history, by its command name with dots as underscores.
   ///
   /// In en, this message translates to:
-  /// **'{step, select, project_rename{Rename project} project_set_display_unit{Change units} avatar_set{Change body} avatar_remove{Remove body} panel_create_rect{Add rectangle} panel_create_polygon{Add polygon} panel_create_path{Add curved piece} panel_rename{Rename piece} panel_translate{Move piece} panel_set_grain{Set grainline} panel_set_seam_allowance{Set seam allowance} panel_mirror{Mirror piece} panel_unlink{Unlink copy} panel_place{Place piece} panel_delete{Delete piece} panel_cut{Cut piece} panel_paste{Paste} point_move{Move point} point_set_distance{Set distance} point_remove{Remove point} edge_set_curve{Bend edge} edge_split{Add point} edge_move{Move edge} notch_add{Add notch} notch_move{Move notch} notch_remove{Remove notch} internal_line_add{Draw line} internal_line_remove{Remove line} seam_add{Sew} seam_remove{Unsew} seam_flip{Flip seam} seam_set_gathered{Gather seam} edge_lengthen{Lengthen} edge_set_length{Set length} seam_take_in{Take in} seam_match_length{Match lengths} pin_add{Pin} pin_remove{Unpin} garment_set_fabric{Change fabric} garment_arrange{Arrange pieces} garment_set_color{Change colour} garment_add{Add garment} garment_rename{Rename garment} garment_remove{Remove garment} garment_set_layer{Change layer} panel_set_garment{Move to garment} grading_set_sizes{Set sizes} grading_use_chart{Use size chart} grading_clear{Remove sizes} grading_show_size{Show size} point_set_grade{Grade point} template_apply{Add template} pattern_import{Import pattern} batch{Several changes} constraint_add{Add constraint} constraint_remove{Remove constraint} constraint_set_value{Change dimension} point_set_smooth{Smooth point} panel_unfold{Unfold piece} guide_add{Add construction line} guide_move{Move construction line} guide_remove{Remove construction line} panel_create_ellipse{Add ellipse} panel_create_sector{Add circle skirt} edge_set_arc{Make arc} other{{step}}}'**
+  /// **'{step, select, project_rename{Rename project} project_set_display_unit{Change units} avatar_set{Change body} avatar_remove{Remove body} panel_create_rect{Add rectangle} panel_create_polygon{Add polygon} panel_create_path{Add curved piece} panel_rename{Rename piece} panel_translate{Move piece} panel_set_grain{Set grainline} panel_set_seam_allowance{Set seam allowance} panel_mirror{Mirror piece} panel_unlink{Unlink copy} panel_place{Place piece} panel_delete{Delete piece} panel_cut{Cut piece} panel_paste{Paste} point_move{Move point} point_set_distance{Set distance} point_remove{Remove point} edge_set_curve{Bend edge} edge_split{Add point} edge_move{Move edge} notch_add{Add notch} notch_move{Move notch} notch_remove{Remove notch} internal_line_add{Draw line} internal_line_remove{Remove line} seam_add{Sew} seam_remove{Unsew} seam_flip{Flip seam} seam_set_gathered{Gather seam} edge_lengthen{Lengthen} edge_set_length{Set length} seam_take_in{Take in} seam_match_length{Match lengths} pin_add{Pin} pin_remove{Unpin} garment_set_fabric{Change fabric} garment_arrange{Arrange pieces} garment_set_color{Change colour} garment_add{Add garment} garment_rename{Rename garment} garment_remove{Remove garment} garment_set_layer{Change layer} panel_set_garment{Move to garment} grading_set_sizes{Set sizes} grading_use_chart{Use size chart} grading_clear{Remove sizes} grading_show_size{Show size} point_set_grade{Grade point} template_apply{Add template} pattern_import{Import pattern} batch{Several changes} constraint_add{Add constraint} constraint_remove{Remove constraint} constraint_set_value{Change dimension} point_set_smooth{Smooth point} panel_unfold{Unfold piece} guide_add{Add construction line} guide_move{Move construction line} guide_remove{Remove construction line} panel_create_ellipse{Add ellipse} panel_create_sector{Add circle skirt} edge_set_arc{Make arc} constraint_set_formula{Set formula} variable_set{Set variable} variable_remove{Remove variable} other{{step}}}'**
   String stepName(String step);
 
   /// No description provided for @undoStep.
@@ -3240,6 +3240,108 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Already constrained this way.'**
   String get errDuplicate;
+
+  /// No description provided for @formulaTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Formula: compute this value from the body\'s measurements'**
+  String get formulaTip;
+
+  /// No description provided for @formulaTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Formula'**
+  String get formulaTitle;
+
+  /// No description provided for @formulaHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Measurements: height, bust, waist, hips. Units: mm, cm, in. + − × ÷, min, max. Your variables too. Empty: the value stays as it is.'**
+  String get formulaHelp;
+
+  /// No description provided for @variables.
+  ///
+  /// In en, this message translates to:
+  /// **'Variables'**
+  String get variables;
+
+  /// No description provided for @variablesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Names for formulas, like ease = 2 cm. Pieces with formulas redraw themselves for a new body and in every size.'**
+  String get variablesHint;
+
+  /// No description provided for @variable.
+  ///
+  /// In en, this message translates to:
+  /// **'Variable'**
+  String get variable;
+
+  /// No description provided for @variableName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get variableName;
+
+  /// No description provided for @variableAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a variable'**
+  String get variableAdd;
+
+  /// No description provided for @errGradedByFormula.
+  ///
+  /// In en, this message translates to:
+  /// **'This point is graded by formulas: change them instead.'**
+  String get errGradedByFormula;
+
+  /// No description provided for @errFormulaSyntax.
+  ///
+  /// In en, this message translates to:
+  /// **'The formula cannot be read at character {at}.'**
+  String errFormulaSyntax(String at);
+
+  /// No description provided for @errFormulaUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'“{name}” is neither a measurement nor a variable.'**
+  String errFormulaUnknown(String name);
+
+  /// No description provided for @errFormulaNoBody.
+  ///
+  /// In en, this message translates to:
+  /// **'“{name}” needs the body’s measurements: set them first.'**
+  String errFormulaNoBody(String name);
+
+  /// No description provided for @errFormulaCycle.
+  ///
+  /// In en, this message translates to:
+  /// **'“{name}” is computed from itself.'**
+  String errFormulaCycle(String name);
+
+  /// No description provided for @errFormulaUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'The units do not match (a length needs a unit, like 10 mm).'**
+  String get errFormulaUnit;
+
+  /// No description provided for @errFormulaDomain.
+  ///
+  /// In en, this message translates to:
+  /// **'The formula has no value (a division by zero?).'**
+  String get errFormulaDomain;
+
+  /// No description provided for @errFormulaRange.
+  ///
+  /// In en, this message translates to:
+  /// **'The formula gives {value}: too small for this dimension.'**
+  String errFormulaRange(String value);
+
+  /// No description provided for @errFormulaBadName.
+  ///
+  /// In en, this message translates to:
+  /// **'“{name}” cannot name a variable: a letter, then letters, digits or _.'**
+  String errFormulaBadName(String name);
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

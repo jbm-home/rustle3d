@@ -21,6 +21,7 @@ use glam::DVec2;
 use r3d_geom::CubicBez;
 use r3d_geom::solve::{Options, System, solve};
 
+use crate::formula::{FormulaError, Scope};
 use crate::id::{ConstraintId, EdgeId, PointId};
 use crate::model::{Along, Constraint, EdgeCurve, Project};
 
@@ -459,7 +460,9 @@ fn equations(project: &Project, c: &Constraint) -> Vec<Eq> {
             .collect(),
         Constraint::EqualLength { a, b } => vec![Eq::Equal(*a, *b)],
         Constraint::OnEdge { point, edge } => vec![Eq::OnEdge(*point, *edge)],
-        Constraint::Distance { a, b, mm, along } => {
+        Constraint::Distance {
+            a, b, mm, along, ..
+        } => {
             let d = match (project.point(*a), project.point(*b)) {
                 (Some(pa), Some(pb)) => pb.pos - pa.pos,
                 _ => DVec2::ZERO,
@@ -471,8 +474,8 @@ fn equations(project: &Project, c: &Constraint) -> Vec<Eq> {
             };
             vec![Eq::Distance(*a, *b, *mm, *along, sign)]
         }
-        Constraint::Length { edge, mm } => vec![Eq::Length(*edge, *mm)],
-        Constraint::Angle { a, b, deg } => vec![Eq::Angle(
+        Constraint::Length { edge, mm, .. } => vec![Eq::Length(*edge, *mm)],
+        Constraint::Angle { a, b, deg, .. } => vec![Eq::Angle(
             *a,
             *b,
             deg.to_radians(),
@@ -685,6 +688,183 @@ pub fn solve_project(project: &Project, touched: &Touched) -> Result<Vec<Update>
     Ok(out)
 }
 
+/// A dimension's value from its formula in `scope`, checked against the
+/// dimension's range (a positive length, an angle of 0–180°).
+pub fn formula_value(scope: &Scope<'_>, c: &Constraint) -> Option<Result<f64, FormulaError>> {
+    let formula = c.formula()?;
+    let power = c.value_power()?;
+    Some(scope.eval_as(formula, power).and_then(|v| {
+        let ok = match power {
+            0 => (0.0..=180.0).contains(&v),
+            _ => v > 0.0,
+        };
+        if ok {
+            Ok(v)
+        } else {
+            Err(FormulaError::Range {
+                value: format!("{v:.3}"),
+            })
+        }
+    }))
+}
+
+/// The dimensions whose formula gives another value than they have, in
+/// the size drawn, with that value. Formulas naming the body are left as
+/// they are while the project has none.
+pub fn formula_values(
+    project: &Project,
+) -> Result<Vec<(ConstraintId, f64)>, (ConstraintId, FormulaError)> {
+    let scope = project.formula_scope();
+    let mut out = Vec::new();
+    for (id, c) in project.constraints() {
+        match formula_value(&scope, c) {
+            Some(Ok(v)) if c.value() != Some(v) => out.push((*id, v)),
+            Some(Err(FormulaError::NoBody { .. })) | Some(Ok(_)) | None => {}
+            Some(Err(e)) => return Err((*id, e)),
+        }
+    }
+    Ok(out)
+}
+
+/// The groups of constraints that grade a piece: one of their formulas
+/// depends on the body. Each with the points and curves it moves.
+fn parametric_groups(
+    project: &Project,
+) -> Vec<(Vec<ConstraintId>, BTreeSet<PointId>, BTreeSet<EdgeId>)> {
+    let scope = project.formula_scope();
+    groups(project)
+        .into_iter()
+        .filter(|(ids, ..)| {
+            ids.iter().any(|id| {
+                project
+                    .constraint(*id)
+                    .and_then(Constraint::formula)
+                    .is_some_and(|f| scope.uses_body(f))
+            })
+        })
+        .collect()
+}
+
+/// The points whose grade the formulas compute (they cannot be graded by
+/// hand): those the parametric groups move.
+pub fn formula_graded_points(project: &Project) -> BTreeSet<PointId> {
+    if project.grading().is_none() {
+        return BTreeSet::new();
+    }
+    let mut out = BTreeSet::new();
+    for (ids, points, _) in parametric_groups(project) {
+        let fixed: BTreeSet<PointId> = ids
+            .iter()
+            .filter_map(|id| match project.constraint(*id) {
+                Some(Constraint::Fixed { point }) => Some(*point),
+                _ => None,
+            })
+            .collect();
+        out.extend(points.difference(&fixed).copied());
+    }
+    out
+}
+
+/// Grades computed from the formulas: in each size of the range, every
+/// formula is computed with that size's body and the piece solved again
+/// from the size drawn; a point's grade is where it lands, a curve's
+/// (whose handles a smooth point turns) where its handles land.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct FormulaGrades {
+    pub points: Vec<(PointId, Vec<DVec2>)>,
+    pub curves: Vec<(EdgeId, Vec<[DVec2; 2]>)>,
+}
+
+/// See [`FormulaGrades`]. Empty without a size range or formulas on the
+/// body. Fails when the constraints cannot all hold in a size.
+pub fn formula_grades(project: &Project) -> Result<FormulaGrades, Unsolvable> {
+    let Some(grading) = project.grading() else {
+        return Ok(FormulaGrades::default());
+    };
+    let groups = parametric_groups(project);
+    if groups.is_empty() || project.avatar().is_none() {
+        return Ok(FormulaGrades::default());
+    }
+    let graded = formula_graded_points(project);
+    let curves: BTreeSet<EdgeId> = groups.iter().flat_map(|g| g.2.iter().copied()).collect();
+    // Solved from the size drawn: the grades the formulas made before do
+    // not count.
+    let mut start = project.clone();
+    for p in &graded {
+        if let Some(pt) = start.points.get_mut(p) {
+            pt.grade.clear();
+        }
+    }
+    for e in &curves {
+        if let Some(edge) = start.edges.get_mut(e) {
+            edge.grade.clear();
+        }
+    }
+    let n = grading.sizes.len();
+    let mut points: BTreeMap<PointId, Vec<DVec2>> =
+        graded.iter().map(|p| (*p, vec![DVec2::ZERO; n])).collect();
+    let mut handles: BTreeMap<EdgeId, Vec<[DVec2; 2]>> = curves
+        .iter()
+        .map(|e| (*e, vec![[DVec2::ZERO; 2]; n]))
+        .collect();
+    for i in (0..n).filter(|i| *i != grading.base) {
+        let mut sized = start.at_size(i);
+        let scope_body = sized.avatar.as_ref().map(|a| a.body);
+        let values: Vec<(ConstraintId, f64)> = {
+            let scope = Scope {
+                body: scope_body.as_ref(),
+                variables: &sized.variables,
+            };
+            sized
+                .constraints
+                .iter()
+                .filter_map(|(id, c)| Some((*id, formula_value(&scope, c)?.ok()?)))
+                .collect()
+        };
+        for (id, v) in values {
+            if let Some(c) = sized.constraints.get(&id).and_then(|c| c.with_value(v)) {
+                sized.constraints.insert(id, c);
+            }
+        }
+        for (ids, pts, cs) in &groups {
+            let s = sketch(&sized, ids, pts, cs, &BTreeSet::new(), &BTreeSet::new());
+            let sol = solve(&s, &s.x0(), &[], &opts());
+            if !sol.converged {
+                let mut constraints: Vec<ConstraintId> = (0..s.equations())
+                    .filter(|k| s.residual(*k, &sol.x).abs() > TOLERANCE_MM)
+                    .filter_map(|k| s.eqs.get(k).and_then(|(id, _, _)| *id))
+                    .collect();
+                constraints.dedup();
+                return Err(Unsolvable { constraints });
+            }
+            for (p, grade) in points.iter_mut() {
+                if let (Some(base), true) = (project.point(*p), s.points.contains_key(p))
+                    && let Some(slot) = grade.get_mut(i)
+                {
+                    *slot = s.pos(*p, &sol.x) - base.pos;
+                }
+            }
+            for (e, grade) in handles.iter_mut() {
+                let base = match project.edge(*e).map(|e| &e.curve) {
+                    Some(EdgeCurve::Cubic { c1, c2 }) => (*c1, *c2),
+                    _ => continue,
+                };
+                if let (Some((h1, h2)), true, Some(slot)) = (
+                    s.shape(*e, &sol.x).handles,
+                    s.handles.contains_key(e),
+                    grade.get_mut(i),
+                ) {
+                    *slot = [h1 - base.0, h2 - base.1];
+                }
+            }
+        }
+    }
+    Ok(FormulaGrades {
+        points: points.into_iter().collect(),
+        curves: handles.into_iter().collect(),
+    })
+}
+
 /// How constrained each group of constraints is, as the geometry is now.
 pub fn status(project: &Project) -> Vec<GroupStatus> {
     groups(project)
@@ -829,6 +1009,7 @@ mod tests {
             Constraint::Length {
                 edge: edges[0],
                 mm: 120.0,
+                formula: None,
             },
         );
         apply(&mut p, &Touched::default());
@@ -888,6 +1069,7 @@ mod tests {
             Constraint::Length {
                 edge: edges[0],
                 mm: 50.0,
+                formula: None,
             },
         );
         let err = solve_project(&p, &Touched::default()).unwrap_err();
@@ -960,12 +1142,14 @@ mod tests {
             b: pts[2],
             mm: 1.0,
             along: Along::Direct,
+            formula: None,
         };
         assert!((measure(&p, &d).unwrap() - 50.0).abs() < 1e-9);
         let a = Constraint::Angle {
             a: edges[0],
             b: edges[1],
             deg: 1.0,
+            formula: None,
         };
         assert!((measure(&p, &a).unwrap() - 90.0).abs() < 1e-9);
         let h = Constraint::Distance {
@@ -973,6 +1157,7 @@ mod tests {
             b: pts[0],
             mm: 1.0,
             along: Along::Horizontal,
+            formula: None,
         };
         assert!((measure(&p, &h).unwrap() - 30.0).abs() < 1e-9);
     }

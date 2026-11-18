@@ -222,7 +222,7 @@ class _ConstraintsCard extends StatelessWidget {
               style: ts(fontSize: 12.5, color: p.danger),
             ),
           ),
-        for (final c in constraints.cast<Map<String, dynamic>>())
+        for (final c in constraints.cast<Map<String, dynamic>>()) ...[
           Padding(
             padding: const EdgeInsets.only(top: Space.s),
             child: Row(
@@ -251,7 +251,7 @@ class _ConstraintsCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (c['kind'] case 'distance' || 'length' || 'angle')
+                if (c['kind'] case 'distance' || 'length' || 'angle') ...[
                   SizedBox(
                     width: 84,
                     child: _DimensionField(
@@ -260,6 +260,24 @@ class _ConstraintsCard extends StatelessWidget {
                       run: run,
                     ),
                   ),
+                  _IconAction(
+                    key: ValueKey('formula-${c['id']}'),
+                    icon: Icons.functions_rounded,
+                    tip: l.formulaTip,
+                    onTap: () async {
+                      final f = await _askFormula(
+                        context,
+                        c['formula'] as String? ?? '',
+                      );
+                      if (f == null) return;
+                      run({
+                        'type': 'constraint.set_formula',
+                        'constraint': c['id'],
+                        if (f.isNotEmpty) 'formula': f,
+                      });
+                    },
+                  ),
+                ],
                 _IconAction(
                   icon: Icons.close_rounded,
                   tip: l.removeConstraint,
@@ -269,6 +287,16 @@ class _ConstraintsCard extends StatelessWidget {
               ],
             ),
           ),
+          if (c['formula'] case final String f)
+            Padding(
+              padding: const EdgeInsets.only(left: 30),
+              child: Text(
+                '= $f',
+                style: ts(fontSize: 12, color: p.textMuted),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+        ],
       ],
     );
   }
@@ -642,4 +670,210 @@ Future<(List<double>, int)?> _askNumbers(
       },
     ),
   );
+}
+
+/// Ask for a dimension's formula (empty: no formula). Returns it, or null
+/// when cancelled.
+Future<String?> _askFormula(BuildContext context, String current) {
+  final text = TextEditingController(text: current);
+  return showDialog<String>(
+    context: context,
+    builder: (context) {
+      final l = context.l;
+      final p = Tokens.of(context);
+      return AlertDialog(
+        title: Text(l.formulaTitle),
+        content: SizedBox(
+          width: 360,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                key: const Key('formula'),
+                controller: text,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'waist / 4 + 10 mm',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                onSubmitted: (v) => Navigator.pop(context, v.trim()),
+              ),
+              const SizedBox(height: Space.s),
+              Text(
+                l.formulaHelp,
+                style: ts(fontSize: 12.5, height: 1.45, color: p.textMuted),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, text.text.trim()),
+            child: Text(l.apply),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+/// The project's named variables for formulas: each with its formula and
+/// value, editable.
+class _VariablesCard extends StatelessWidget {
+  const _VariablesCard({required this.query, required this.run});
+
+  final dynamic Function(Map<String, Object?>) query;
+  final ValueChanged<Map<String, Object?>> run;
+
+  /// Ask for a variable's name and formula.
+  Future<(String, String)?> _ask(
+    BuildContext context, {
+    String name = '',
+    String formula = '',
+  }) {
+    final n = TextEditingController(text: name);
+    final f = TextEditingController(text: formula);
+    return showDialog<(String, String)>(
+      context: context,
+      builder: (context) {
+        final l = context.l;
+        void done() => Navigator.pop(context, (n.text.trim(), f.text.trim()));
+        return AlertDialog(
+          title: Text(l.variable),
+          content: SizedBox(
+            width: 340,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  key: const Key('variable-name'),
+                  controller: n,
+                  autofocus: name.isEmpty,
+                  decoration: InputDecoration(
+                    labelText: l.variableName,
+                    hintText: 'ease',
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: Space.s),
+                TextField(
+                  key: const Key('variable-formula'),
+                  controller: f,
+                  autofocus: name.isNotEmpty,
+                  decoration: InputDecoration(
+                    labelText: l.formulaTitle,
+                    hintText: '2 cm',
+                    isDense: true,
+                  ),
+                  onSubmitted: (_) => done(),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(l.cancel),
+            ),
+            FilledButton(onPressed: done, child: Text(l.apply)),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final l = context.l;
+    final list = query({'type': 'variable.list'}) as Map<String, dynamic>?;
+    final variables = (list?['variables'] as List?) ?? const [];
+    Future<void> edit({String name = '', String formula = ''}) async {
+      final got = await _ask(context, name: name, formula: formula);
+      if (got == null || got.$1.isEmpty || got.$2.isEmpty) return;
+      run({'type': 'variable.set', 'name': got.$1, 'formula': got.$2});
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                l.variables,
+                style: ts(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: p.text,
+                ),
+              ),
+            ),
+            _IconAction(
+              key: const Key('add-variable'),
+              icon: Icons.add_rounded,
+              tip: l.variableAdd,
+              onTap: edit,
+            ),
+          ],
+        ),
+        const SizedBox(height: Space.xs),
+        Text(
+          l.variablesHint,
+          style: ts(fontSize: 12.5, height: 1.45, color: p.textMuted),
+        ),
+        for (final v in variables.cast<Map<String, dynamic>>())
+          Padding(
+            padding: const EdgeInsets.only(top: Space.s),
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () => edit(
+                      name: v['name'] as String,
+                      formula: v['formula'] as String,
+                    ),
+                    child: Text(
+                      '${v['name']} = ${v['formula']}',
+                      style: ts(fontSize: 13, color: p.text),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+                if (v['mm'] case final num mm)
+                  Text(
+                    '${context.number(mm / 10, 1)} ${l.cm}',
+                    style: ts(
+                      fontSize: 12.5,
+                      color: p.textMuted,
+                      tabular: true,
+                    ),
+                  )
+                else if (v['number'] case final num n)
+                  Text(
+                    context.number(n, 2),
+                    style: ts(
+                      fontSize: 12.5,
+                      color: p.textMuted,
+                      tabular: true,
+                    ),
+                  ),
+                _IconAction(
+                  icon: Icons.close_rounded,
+                  tip: l.removeConstraint,
+                  onTap: () =>
+                      run({'type': 'variable.remove', 'name': v['name']}),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
 }

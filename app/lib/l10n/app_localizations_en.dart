@@ -1624,6 +1624,9 @@ class LEn extends L {
       'panel_create_ellipse': 'Add ellipse',
       'panel_create_sector': 'Add circle skirt',
       'edge_set_arc': 'Make arc',
+      'constraint_set_formula': 'Set formula',
+      'variable_set': 'Set variable',
+      'variable_remove': 'Remove variable',
       'other': '$step',
     });
     return '$_temp0';
@@ -1920,4 +1923,73 @@ class LEn extends L {
 
   @override
   String get errDuplicate => 'Already constrained this way.';
+
+  @override
+  String get formulaTip =>
+      'Formula: compute this value from the body\'s measurements';
+
+  @override
+  String get formulaTitle => 'Formula';
+
+  @override
+  String get formulaHelp =>
+      'Measurements: height, bust, waist, hips. Units: mm, cm, in. + − × ÷, min, max. Your variables too. Empty: the value stays as it is.';
+
+  @override
+  String get variables => 'Variables';
+
+  @override
+  String get variablesHint =>
+      'Names for formulas, like ease = 2 cm. Pieces with formulas redraw themselves for a new body and in every size.';
+
+  @override
+  String get variable => 'Variable';
+
+  @override
+  String get variableName => 'Name';
+
+  @override
+  String get variableAdd => 'Add a variable';
+
+  @override
+  String get errGradedByFormula =>
+      'This point is graded by formulas: change them instead.';
+
+  @override
+  String errFormulaSyntax(String at) {
+    return 'The formula cannot be read at character $at.';
+  }
+
+  @override
+  String errFormulaUnknown(String name) {
+    return '“$name” is neither a measurement nor a variable.';
+  }
+
+  @override
+  String errFormulaNoBody(String name) {
+    return '“$name” needs the body’s measurements: set them first.';
+  }
+
+  @override
+  String errFormulaCycle(String name) {
+    return '“$name” is computed from itself.';
+  }
+
+  @override
+  String get errFormulaUnit =>
+      'The units do not match (a length needs a unit, like 10 mm).';
+
+  @override
+  String get errFormulaDomain =>
+      'The formula has no value (a division by zero?).';
+
+  @override
+  String errFormulaRange(String value) {
+    return 'The formula gives $value: too small for this dimension.';
+  }
+
+  @override
+  String errFormulaBadName(String name) {
+    return '“$name” cannot name a variable: a letter, then letters, digits or _.';
+  }
 }

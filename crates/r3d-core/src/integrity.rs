@@ -42,6 +42,8 @@ pub enum IntegrityError {
     BadGrading,
     #[error("{entity} has a grade that does not match the size range")]
     BadGrade { entity: AnyId },
+    #[error("a variable has an invalid name or an empty formula")]
+    BadVariables,
 }
 
 impl Localizable for IntegrityError {
@@ -81,6 +83,7 @@ impl Localizable for IntegrityError {
                 Message::new("integrity.bad_value", text).arg("entity", entity)
             }
             Self::BadGrading => Message::new("integrity.bad_grading", text),
+            Self::BadVariables => Message::new("integrity.bad_variables", text),
             Self::BadGrade { entity } => {
                 Message::new("integrity.bad_grade", text).arg("entity", entity)
             }
@@ -400,6 +403,14 @@ impl Project {
             }
         }
 
+        if self
+            .variables
+            .keys()
+            .any(|n| !crate::formula::valid_name(n))
+            || self.variables.values().any(|f| f.trim().is_empty())
+        {
+            return Err(E::BadVariables);
+        }
         for (id, g) in &self.guides {
             if !(g.a.is_finite() && g.b.is_finite()) || g.a == g.b {
                 return Err(E::BadValue {
