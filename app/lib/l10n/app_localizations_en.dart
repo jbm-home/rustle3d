@@ -714,7 +714,7 @@ class LEn extends L {
 
   @override
   String get pointPicked =>
-      'Corner picked. ⇧-click another corner to measure the distance between them.';
+      'Corner picked. ⌘-click another corner to measure the distance between them.';
 
   @override
   String get pointsPicked =>
@@ -1829,7 +1829,7 @@ class LEn extends L {
 
   @override
   String get constraintsEmpty =>
-      'Pick a corner or an edge on the board (⇧-click a second one) to constrain it.';
+      'Pick a corner or an edge on the board (⌘-click a second one) to constrain it.';
 
   @override
   String constraintsFreedom(int count) {

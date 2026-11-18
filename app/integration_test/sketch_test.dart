@@ -85,7 +85,8 @@ void main() {
       for (final e in got['edges'] as List)
         if (e['derived'] != true) e as Map,
     ];
-    Future<void> clickEdge(Map e, {bool shift = false}) async {
+    // [extend]: Ctrl-click (⌘ on macOS), adding to the selection.
+    Future<void> clickEdge(Map e, {bool extend = false}) async {
       final a = e['start']['pos'] as List;
       final b = e['end']['pos'] as List;
       final mid = [
@@ -101,16 +102,17 @@ void main() {
         if (px == null) continue;
         final p = board.topLeft + Offset(px[0], px[1]) / ratio;
         if (!board.contains(p)) continue;
-        if (shift) await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+        final ctrl = LogicalKeyboardKey.controlLeft;
+        if (extend) await tester.sendKeyDownEvent(ctrl);
         await tester.tapAt(p);
-        if (shift) await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+        if (extend) await tester.sendKeyUpEvent(ctrl);
         await frames(4);
         if (engine.selectedEdges().contains(e['id'])) return;
       }
     }
 
     await clickEdge(drawn[0]);
-    await clickEdge(drawn[2], shift: true);
+    await clickEdge(drawn[2], extend: true);
     expect(engine.selectedEdges(), [drawn[0]['id'], drawn[2]['id']]);
     await tester.tap(find.widgetWithText(ActionChip, 'Parallel'));
     await frames();

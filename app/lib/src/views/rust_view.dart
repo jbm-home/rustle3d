@@ -476,12 +476,17 @@ class _RustViewState extends State<RustView>
             }
             final view = _viewId;
             if (view == null || _dragged) return;
+            final keys = HardwareKeyboard.instance;
             final selection = widget.engine.click(
               view: view,
               x: e.localPosition.dx * _ratio,
               y: e.localPosition.dy * _ratio,
-              // ⇧-click a second corner to measure between them.
-              extend: HardwareKeyboard.instance.isShiftPressed,
+              // ⇧- or Ctrl-click (⌘ on macOS) adds a corner or an edge:
+              // to measure between them or constrain them together.
+              extend:
+                  keys.isShiftPressed ||
+                  keys.isControlPressed ||
+                  keys.isMetaPressed,
             );
             widget.onSelection?.call(selection);
           },

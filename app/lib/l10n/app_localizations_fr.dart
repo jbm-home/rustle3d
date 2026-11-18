@@ -722,7 +722,7 @@ class LFr extends L {
 
   @override
   String get pointPicked =>
-      'Coin choisi. ⇧-cliquez un autre coin pour mesurer la distance entre eux.';
+      'Coin choisi. ⌘-cliquez un autre coin pour mesurer la distance entre eux.';
 
   @override
   String get pointsPicked =>
@@ -1848,7 +1848,7 @@ class LFr extends L {
 
   @override
   String get constraintsEmpty =>
-      'Choisissez un coin ou une arête sur le patron (⇧-clic pour un second) pour les contraindre.';
+      'Choisissez un coin ou une arête sur le patron (⌘-clic pour un second) pour les contraindre.';
 
   @override
   String constraintsFreedom(int count) {

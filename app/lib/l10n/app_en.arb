@@ -373,7 +373,7 @@
   "toastCut": "Cut in two pieces, sewn together.",
   "toastPointAdded": "Point added.",
   "distance": "Distance",
-  "pointPicked": "Corner picked. ⇧-click another corner to measure the distance between them.",
+  "pointPicked": "Corner picked. ⌘-click another corner to measure the distance between them.",
   "pointsPicked": "Between the two corners. The second one moves along the line.",
   "straighten": "Straighten",
   "hintSewFirst": "Sew: click the first edge on the pattern · V to stop",
@@ -923,7 +923,7 @@
   "arcBulge": "Bulge",
   "arcHint": "How far the middle of the arc is from the straight line; negative curves inward.",
   "constraints": "Constraints",
-  "constraintsEmpty": "Pick a corner or an edge on the board (⇧-click a second one) to constrain it.",
+  "constraintsEmpty": "Pick a corner or an edge on the board (⌘-click a second one) to constrain it.",
   "constraintsFreedom": "{count, plural, =0{Fully constrained} =1{1 degree of freedom left} other{{count} degrees of freedom left}}",
   "@constraintsFreedom": {
     "placeholders": {

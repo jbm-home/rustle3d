@@ -7,7 +7,8 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-18 (M14; long sleeves, mirrored seams, agent status;
+Last updated: 2026-11-18 (⌘-click to pick a second corner or edge,
+rail tips beside the rail; M14; long sleeves, mirrored seams, agent status;
 rename, delete, export and import projects; smooth views on Windows;
 cloth comes to rest; pieces arranged side by side by width; M17,
 draping on the graphics card; M18, shirt and trousers templates, pieces
@@ -84,7 +85,7 @@ of related tools (the last one used stays on the button).
 
 | Tool | Key | What it does |
 |---|---|---|
-| Select | V | Click a piece, a corner or an edge (⇧-click a second corner or edge); drag a corner or an edge to reshape the piece |
+| Select | V | Click a piece, a corner or an edge (⌘-click or ⇧-click a second corner or edge); drag a corner or an edge to reshape the piece |
 | Shapes → Rectangle | R | Adds a rectangular piece |
 | Shapes → Ellipse | E | Adds a circle or an ellipse of the width and height you type |
 | Shapes → Circle skirt | | Adds the pieces of a full, half or quarter circle skirt from the waist and the skirt's length |
@@ -163,7 +164,7 @@ something else); click **Opened** to go back to the start.
 - Click an edge: the inspector shows its **length**. Type a new one (or
   drag the slider); a sewn edge's partner follows so the seam stays
   matched. **Match length** makes both sides of a seam equal.
-- Click a corner, then **⇧-click** another: the inspector shows the
+- Click a corner, then **⌘-click** another: the inspector shows the
   distance between them. Type a new distance: the second corner moves
   along the line.
 - A curved edge can be made straight again with **Straighten** in its
@@ -171,7 +172,7 @@ something else); click **Opened** to go back to the start.
 
 ### Constraints and dimensions
 Constraints keep a piece the way you want it while you change the rest.
-Pick what to constrain on the board: a corner or an edge, and ⇧-click a
+Pick what to constrain on the board: a corner or an edge, and ⌘-click (or ⇧-click) a
 second one. The inspector offers what fits:
 - one edge: **Horizontal**, **Vertical**, **Length** (keeps the length it
   has now);

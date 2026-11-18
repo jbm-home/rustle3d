@@ -1583,7 +1583,7 @@ impl Engine {
         *self.selected_guide.lock().map_err(|_| poisoned())? = guide;
         let mut points = self.selected_points.lock().map_err(|_| poisoned())?;
         let mut edges = self.selected_edges.lock().map_err(|_| poisoned())?;
-        // ⇧-click adds a second corner or edge (to measure or constrain
+        // ⇧- or ⌘/Ctrl-click adds a second corner or edge (to measure or constrain
         // them together): two picks at most, the oldest dropped.
         match (corner, edge) {
             (Some((_, point, _)), _) if extend => {
@@ -2118,8 +2118,9 @@ impl Engine {
             return Ok(false);
         };
         if v.kind == ViewKind::Board {
-            // ⇧ adds to the selection on the board: nothing is held.
-            if adjust {
+            // ⇧ and ⌘/Ctrl add to the selection on the board: nothing is
+            // held.
+            if gesture != Gesture::Pull {
                 return Ok(false);
             }
             let (board_view, width, height) = (v.board_view, v.width, v.height);

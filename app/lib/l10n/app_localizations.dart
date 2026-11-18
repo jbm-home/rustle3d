@@ -1330,7 +1330,7 @@ abstract class L {
   /// No description provided for @pointPicked.
   ///
   /// In en, this message translates to:
-  /// **'Corner picked. ⇧-click another corner to measure the distance between them.'**
+  /// **'Corner picked. ⌘-click another corner to measure the distance between them.'**
   String get pointPicked;
 
   /// No description provided for @pointsPicked.
@@ -3124,7 +3124,7 @@ abstract class L {
   /// No description provided for @constraintsEmpty.
   ///
   /// In en, this message translates to:
-  /// **'Pick a corner or an edge on the board (⇧-click a second one) to constrain it.'**
+  /// **'Pick a corner or an edge on the board (⌘-click a second one) to constrain it.'**
   String get constraintsEmpty;
 
   /// No description provided for @constraintsFreedom.

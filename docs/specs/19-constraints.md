@@ -14,7 +14,7 @@ smooth and corner points (`point.set_smooth`); symmetric pieces
 (`panel.create_ellipse`), arc sectors (`panel.create_sector`) and
 circular arcs on an edge (`edge.set_arc`). Project files: schema v11.
 The app: the constraints of the selected piece over the board and in the
-inspector, constraint chips for what is picked (⇧-click a second corner
+inspector, constraint chips for what is picked (Ctrl-click, ⌘ on macOS, or ⇧-click a second corner
 or edge), the Half piece option of Polygon and Curve, the Construction
 line tool (G), the Shapes group (rectangle, ellipse, circle skirt), the
 Arc tool, snapping with a hint while drawing and dragging corners.
@@ -92,8 +92,8 @@ previous point.
   point or edge they name (red when one does not hold), dimensions with
   their value, a dashed line for a distance. Symmetry axes are drawn
   dash-dotted, construction lines dashed across the board.
-- Picking: click a corner or an edge; ⇧-click adds a second one (two at
-  most). The inspector then offers the constraints that fit what is
+- Picking: click a corner or an edge; ⌘-click (Ctrl-click on Windows
+  and Linux) or ⇧-click adds a second one (two at most). The inspector then offers the constraints that fit what is
   picked, and lists the piece's constraints with their values (typed, in
   cm or degrees) and a remove button, and the degrees of freedom left.
 - Drawing tools snap within a few pixels to corners, middles of edges,

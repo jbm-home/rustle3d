@@ -2275,6 +2275,15 @@ class _Anchor {
   Offset? get handleIn => handle == null ? null : at * 2 - handle!;
 }
 
+/// A rail tool's tip: to the right of the button, centred on it, kept on
+/// screen.
+Offset _besideRail(TooltipPositionContext c) {
+  final x = c.target.dx + c.targetSize.width / 2 + 8;
+  final y = c.target.dy - c.tooltipSize.height / 2;
+  final bottom = c.overlaySize.height - c.tooltipSize.height;
+  return Offset(x, y.clamp(0, bottom < 0 ? 0 : bottom));
+}
+
 /// One rail tool: id, icon, name, key, hint.
 typedef _RailTool = (String, IconData, String, String, String);
 
@@ -2404,7 +2413,9 @@ class _ToolRail extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 2),
         child: Tooltip(
           richMessage: message,
-          preferBelow: false,
+          // Beside the rail, not over the next tool: the pointer can go
+          // up and down the rail without the tip in the way.
+          positionDelegate: _besideRail,
           child: Builder(
             builder: (context) => _RailButton(
               key: keys[id],
