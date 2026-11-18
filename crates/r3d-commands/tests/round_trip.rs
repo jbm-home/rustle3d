@@ -97,6 +97,7 @@ fn every_command_round_trips() {
     let seam = seam.created[0].to_string();
     h.round_trip(json!({"type": "seam.flip", "seam": seam}));
     h.round_trip(json!({"type": "seam.set_gathered", "seam": seam, "gathered": true}));
+    h.round_trip(json!({"type": "seam.set_ease", "seam": seam, "mm": 8}));
     h.round_trip(json!({"type": "seam.take_in", "seam": seam, "mm": 6}));
     h.round_trip(json!({"type": "seam.match_length", "seam": seam, "keep": poly_edge}));
     h.round_trip(json!({"type": "garment.arrange"}));
@@ -209,6 +210,29 @@ fn every_command_round_trips() {
     h.round_trip(
         json!({"type": "edge.set_arc", "edge": sector.created.last().unwrap(), "bulge_mm": 40}),
     );
+
+    // Construction details (spec 21).
+    let skirt = h.round_trip(json!({"type": "panel.create_rect", "origin": [9000, 0],
+        "width": 400, "height": 600}));
+    let top = skirt.created[7].to_string();
+    h.round_trip(
+        json!({"type": "dart.add", "edge": top, "at_mm": 300, "width_mm": 20,
+        "length_mm": 100}),
+    );
+    h.round_trip(
+        json!({"type": "pleat.add", "edge": top, "at_mm": 50, "depth_mm": 20,
+        "kind": "box", "stitched_mm": 50}),
+    );
+    let hole = h.round_trip(json!({"type": "panel.add_hole", "panel": skirt.created[0],
+        "start": [9100, 100], "segments": [{"kind": "line", "to": [9150, 100]},
+        {"kind": "line", "to": [9150, 150]}]}));
+    h.round_trip(json!({"type": "panel.remove_hole", "edge": hole.created[3]}));
+    let yoke = h.round_trip(json!({"type": "panel.create_rect", "origin": [10000, 0],
+        "width": 300, "height": 200}));
+    let patch = h.round_trip(json!({"type": "panel.create_rect", "origin": [10250, 50],
+        "width": 100, "height": 100}));
+    h.round_trip(json!({"type": "panel.boolean", "panel": yoke.created[0],
+        "with": patch.created[0], "op": "difference"}));
 
     let registered: BTreeSet<_> = Command::registry().iter().map(|i| i.name).collect();
     let missing: Vec<_> = registered.difference(&h.covered).collect();

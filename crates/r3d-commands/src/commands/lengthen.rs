@@ -40,22 +40,18 @@ fn neighbour(p: &Project, panel: PanelId, point: PointId, not: EdgeId) -> Option
 /// the other edge, and that edge.
 fn across(p: &Project, side: EdgeId, point: PointId) -> Option<(PointId, EdgeId)> {
     let seam = p.seams().values().find(|s| s.touches(side))?;
-    let (mine, other) = if seam.a.edge == side {
-        (seam.a, seam.b)
-    } else {
-        (seam.b, seam.a)
-    };
+    let ((_, mine_reversed), (other, other_reversed)) = seam.across(side)?;
     let edge = p.edge(side)?;
     // Seams pair the two sides walked from their starts (or ends if
     // reversed): the k-th point of one matches the k-th of the other.
-    let first = (edge.start == point) != mine.reversed;
-    let o = p.edge(other.edge)?;
-    let matched = if first != other.reversed {
+    let first = (edge.start == point) != mine_reversed;
+    let o = p.edge(other)?;
+    let matched = if first != other_reversed {
         o.start
     } else {
         o.end
     };
-    Some((matched, other.edge))
+    Some((matched, other))
 }
 
 /// From `current` at its end `point`: the edge the line continues into

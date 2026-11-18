@@ -75,7 +75,7 @@ fn two_sewn_pieces_paste_with_their_seam() {
         .seams()
         .values()
         .filter(|sm| {
-            [sm.a.edge, sm.b.edge].iter().all(|e| {
+            [sm.a.edges[0], sm.b.edges[0]].iter().all(|e| {
                 let p = before.edge(*e).unwrap().panel.to_string();
                 p == a || p == b
             })

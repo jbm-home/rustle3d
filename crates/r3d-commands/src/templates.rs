@@ -404,13 +404,15 @@ impl Draft<'_, '_> {
     fn sew_walking(&mut self, a: EdgeId, b: EdgeId, reversed: bool) -> Result<(), CommandError> {
         let out = SeamAdd {
             a: SeamSideSpec {
-                edge: a,
-                reversed: None,
+                edge: Some(a),
+                ..SeamSideSpec::default()
             },
             b: SeamSideSpec {
-                edge: b,
+                edge: Some(b),
                 reversed: Some(reversed),
+                ..SeamSideSpec::default()
             },
+            ease_mm: None,
         }
         .apply(self.tx)?;
         self.created.extend(out.created);

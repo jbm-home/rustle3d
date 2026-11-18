@@ -3,7 +3,7 @@
 
 use bytemuck::{Pod, Zeroable};
 use glam::camera::rh::proj::directx;
-use r3d_core::{EdgeId, PanelId, Project, SeamId};
+use r3d_core::{EdgeId, PanelId, Project};
 use r3d_geom::{Aabb, DVec2, polygon};
 use wgpu::util::DeviceExt;
 
@@ -24,7 +24,11 @@ pub struct BoardPanel {
     pub color: usize,
     /// Flattened contour, counter-clockwise.
     pub outline: Vec<DVec2>,
-    pub triangles: Vec<[usize; 3]>,
+    /// Flattened holes.
+    pub holes: Vec<Vec<DVec2>>,
+    /// The fill: points and triangles over them.
+    pub fill: Vec<DVec2>,
+    pub triangles: Vec<[u32; 3]>,
     pub internal_lines: Vec<Vec<DVec2>>,
     /// Notch position and outward normal.
     pub notches: Vec<(DVec2, DVec2)>,
@@ -38,8 +42,10 @@ pub struct BoardPanel {
 pub struct BoardScene {
     pub panels: Vec<BoardPanel>,
     pub selected: Vec<PanelId>,
-    /// Every contour edge, for picking and drawing seams.
+    /// Every contour and hole edge, for picking.
     pub edges: Vec<BoardEdge>,
+    /// Every seam side, to draw.
+    pub seam_sides: Vec<BoardSeamSide>,
     /// Edges picked (one, or two to constrain together).
     pub selected_edges: Vec<EdgeId>,
     /// Construction lines: each the line through two points, drawn across
@@ -56,18 +62,17 @@ pub struct BoardEdge {
     pub panel: PanelId,
     /// From its start to its end (mm).
     pub points: Vec<DVec2>,
-    /// Its seam, if sewn.
-    pub seam: Option<BoardSeam>,
 }
 
-/// How an edge is sewn.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct BoardSeam {
+/// One side of a seam on the board.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BoardSeamSide {
     /// Index of the seam (both sides share one colour).
     pub index: usize,
-    /// The seam walks this edge from its end to its start.
-    pub reversed: bool,
-    /// The two sides differ in length by more than [`SEAM_TOLERANCE_MM`].
+    /// Where it runs, in the direction the seam walks it (mm).
+    pub points: Vec<DVec2>,
+    /// The two sides differ in length by more than [`SEAM_TOLERANCE_MM`]
+    /// beyond the seam's ease.
     pub mismatch: bool,
 }
 
@@ -99,10 +104,14 @@ impl BoardScene {
                     .filter(|(_, l)| l.panel == *id)
                     .filter_map(|(lid, _)| project.internal_line_polyline(*lid))
                     .collect();
+                let holes = project.hole_outlines(*id);
+                let (fill, triangles) = r3d_geom::mesh::fill(&outline, &holes)?;
                 Some(BoardPanel {
                     id: *id,
                     color: color_of(*id, panel),
-                    triangles: polygon::triangulate(&outline),
+                    holes,
+                    fill,
+                    triangles,
                     outline,
                     internal_lines,
                     notches,
@@ -110,30 +119,43 @@ impl BoardScene {
                 })
             })
             .collect();
-        let seams: Vec<SeamId> = project.seams().keys().copied().collect();
         let edges = project
             .panels()
             .iter()
-            .flat_map(|(id, panel)| panel.contour.iter().map(move |e| (*id, *e)))
+            .flat_map(|(id, panel)| {
+                panel
+                    .contour
+                    .iter()
+                    .chain(panel.holes.iter().flatten())
+                    .map(move |e| (*id, *e))
+            })
             .filter_map(|(panel, e)| {
                 Some(BoardEdge {
                     id: e,
                     panel,
                     points: project.edge_polyline(e)?,
-                    seam: project.seam_of(e).and_then(|s| {
-                        let seam = project.seams().get(&s)?;
-                        let side = if seam.a.edge == e { seam.a } else { seam.b };
-                        let length = |x: EdgeId| project.edge_length(x).unwrap_or_default();
-                        Some(BoardSeam {
-                            index: seams.iter().position(|x| *x == s)?,
-                            reversed: side.reversed,
-                            // A gathered seam's sides differ on purpose.
-                            mismatch: !seam.gathered
-                                && (length(seam.a.edge) - length(seam.b.edge)).abs()
-                                    > SEAM_TOLERANCE_MM,
-                        })
-                    }),
                 })
+            })
+            .collect();
+        let seam_sides = project
+            .seams()
+            .values()
+            .enumerate()
+            .flat_map(|(index, seam)| {
+                let length = |s| project.side_length(s).unwrap_or_default();
+                // A gathered seam's sides differ on purpose.
+                let mismatch = !seam.gathered
+                    && (length(&seam.a) - length(&seam.b) - seam.ease_mm).abs() > SEAM_TOLERANCE_MM;
+                [&seam.a, &seam.b]
+                    .into_iter()
+                    .filter_map(move |side| {
+                        Some(BoardSeamSide {
+                            index,
+                            points: project.side_polyline(side)?,
+                            mismatch,
+                        })
+                    })
+                    .collect::<Vec<_>>()
             })
             .collect();
         let pos = |p| project.point(p).map(|p| p.pos);
@@ -149,6 +171,7 @@ impl BoardScene {
             panels,
             selected: selected.to_vec(),
             edges,
+            seam_sides,
             selected_edges: Vec::new(),
             guides: project.guides().values().map(|g| [g.a, g.b]).collect(),
             axes,
@@ -526,12 +549,9 @@ impl BoardRenderer {
                 base
             };
             for t in &panel.triangles {
-                batch.tri(
-                    panel.outline[t[0]],
-                    panel.outline[t[1]],
-                    panel.outline[t[2]],
-                    fill,
-                );
+                if let [Some(a), Some(b), Some(c)] = t.map(|i| panel.fill.get(i as usize)) {
+                    batch.tri(*a, *b, *c, fill);
+                }
             }
             let mut faint = theme.panel_line;
             faint[3] *= 0.45;
@@ -554,24 +574,25 @@ impl BoardRenderer {
                 (theme.panel_line, 1.5 * px)
             };
             batch.polyline(&panel.outline, true, width, line_color);
+            for hole in &panel.holes {
+                batch.polyline(hole, true, width, line_color);
+            }
             for (pos, outward) in &panel.notches {
                 batch.segment(*pos, *pos - *outward * NOTCH_MM, width, line_color);
             }
         }
         // Seams: both sides in the same colour, over the outlines, with a
-        // chevron at the middle pointing the way the seam walks the edge
+        // chevron at the middle pointing the way the seam walks the side
         // (matching sides point alike when the pieces lie side by side).
         // Sides of different lengths are red, with a dot.
-        for edge in &scene.edges {
-            let Some(seam) = edge.seam else { continue };
+        for seam in &scene.seam_sides {
             let color = if seam.mismatch {
                 WARNING
             } else {
                 SEAM_COLORS[seam.index % SEAM_COLORS.len()]
             };
-            batch.polyline(&edge.points, false, 2.5 * px, color);
-            if let Some((mid, dir)) = midpoint(&edge.points) {
-                let dir = if seam.reversed { -dir } else { dir };
+            batch.polyline(&seam.points, false, 2.5 * px, color);
+            if let Some((mid, dir)) = midpoint(&seam.points) {
                 let side = DVec2::new(-dir.y, dir.x);
                 let size = 7.0 * px;
                 let tip = mid + dir * size * 0.5;

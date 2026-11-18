@@ -88,7 +88,7 @@ fn every_seam_and_end_stays_matched() {
         for seam in seams {
             let ends = {
                 let p = s0.project();
-                let e = p.edge(p.seams()[&seam].a.edge).unwrap();
+                let e = p.edge(p.seams()[&seam].a.edges[0]).unwrap();
                 [None, Some(e.start), Some(e.end)]
             };
             for at in ends {

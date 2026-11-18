@@ -172,6 +172,14 @@ fn draw(project: &Project, title: &str, nest: &[Nested]) -> Drawing {
                 stroke: Stroke::Cut,
             });
         }
+        // Holes are cut on their line.
+        for hole in project.hole_outlines(*id) {
+            d.lines.push(Polyline {
+                points: hole,
+                closed: true,
+                stroke: Stroke::Cut,
+            });
+        }
         // Notches: a tick cut inward from the cutting line.
         for (nid, notch) in project.notches() {
             if !panel.contour.contains(&notch.edge) {

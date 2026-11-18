@@ -35,11 +35,7 @@ fn source(p: &Project, edge: EdgeId) -> EdgeId {
 /// The other side of the seam `edge` is on, if it is sewn.
 fn partner(p: &Project, edge: EdgeId) -> Option<EdgeId> {
     let seam = p.seams().get(&p.seam_of(edge)?)?;
-    Some(if seam.a.edge == edge {
-        seam.b.edge
-    } else {
-        seam.a.edge
-    })
+    seam.across(edge).map(|(_, (other, _))| other)
 }
 
 /// The source edges to scale with `start` so that every seam stays
@@ -148,13 +144,9 @@ impl CommandSpec for SeamMatchLength {
             .seams()
             .get(&self.seam)
             .ok_or_else(|| CommandError::not_found(self.seam))?;
-        let other = if seam.a.edge == self.keep {
-            seam.b.edge
-        } else if seam.b.edge == self.keep {
-            seam.a.edge
-        } else {
-            return Err(CommandError::invalid("keep", Invalid::NotSeamSide));
-        };
+        let (_, (other, _)) = seam
+            .across(self.keep)
+            .ok_or_else(|| CommandError::invalid("keep", Invalid::NotSeamSide))?;
         let other = source(p, other);
         let (Some(target), Some(current)) = (p.edge_length(self.keep), p.edge_length(other)) else {
             return Err(CommandError::not_found(other));

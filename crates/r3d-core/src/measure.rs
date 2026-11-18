@@ -153,9 +153,34 @@ impl Project {
         Some(out)
     }
 
+    /// A piece's holes, each a closed polyline (clockwise).
+    pub fn hole_outlines(&self, id: PanelId) -> Vec<Vec<DVec2>> {
+        let Some(panel) = self.panel(id) else {
+            return Vec::new();
+        };
+        panel
+            .holes
+            .iter()
+            .filter_map(|h| {
+                let mut ring = Vec::new();
+                for e in h {
+                    let line = self.edge_polyline(*e)?;
+                    ring.extend(line.iter().take(line.len().saturating_sub(1)));
+                }
+                Some(ring)
+            })
+            .collect()
+    }
+
+    /// The area of a piece's cloth: its outline's, less its holes'.
     pub fn panel_area(&self, id: PanelId) -> Option<f64> {
-        self.panel_outline(id)
-            .map(|o| polygon::signed_area(&o).abs())
+        let outer = polygon::signed_area(&self.panel_outline(id)?).abs();
+        let holes: f64 = self
+            .hole_outlines(id)
+            .iter()
+            .map(|h| polygon::signed_area(h).abs())
+            .sum();
+        Some(outer - holes)
     }
 
     pub fn panel_perimeter(&self, id: PanelId) -> Option<f64> {

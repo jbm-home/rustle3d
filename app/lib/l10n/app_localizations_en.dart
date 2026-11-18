@@ -1627,6 +1627,12 @@ class LEn extends L {
       'constraint_set_formula': 'Set formula',
       'variable_set': 'Set variable',
       'variable_remove': 'Remove variable',
+      'seam_set_ease': 'Set ease',
+      'dart_add': 'Add dart',
+      'pleat_add': 'Add pleat',
+      'panel_add_hole': 'Cut hole',
+      'panel_remove_hole': 'Fill hole',
+      'panel_boolean': 'Join or cut pieces',
       'other': '$step',
     });
     return '$_temp0';
@@ -1992,4 +1998,93 @@ class LEn extends L {
   String errFormulaBadName(String name) {
     return '“$name” cannot name a variable: a letter, then letters, digits or _.';
   }
+
+  @override
+  String get toolDetails => 'Details';
+
+  @override
+  String get toolDart => 'Dart';
+
+  @override
+  String get toolDartHint =>
+      'Click an edge where the dart goes: drawn, folded and sewn';
+
+  @override
+  String get toolPleat => 'Pleat';
+
+  @override
+  String get toolPleatHint =>
+      'Click an edge where the pleat starts: folded and sewn';
+
+  @override
+  String get toolHole => 'Hole';
+
+  @override
+  String get toolHoleHint =>
+      'Select a piece, then click the corners of a hole inside it';
+
+  @override
+  String get hintDart => 'Dart: click an edge where it goes · V to stop';
+
+  @override
+  String get hintPleat => 'Pleat: click an edge where it starts · V to stop';
+
+  @override
+  String get hintHole =>
+      'Hole: click its corners inside the selected piece, Enter to cut it · Esc cancels';
+
+  @override
+  String get toastHoleAdded => 'Hole cut.';
+
+  @override
+  String get holeSelectFirst => 'Select the piece to cut the hole in first.';
+
+  @override
+  String get dartWidth => 'Width at the edge';
+
+  @override
+  String get dartLength => 'Length';
+
+  @override
+  String get pleatDepth => 'Depth';
+
+  @override
+  String get pleatStitched => 'Stitched down';
+
+  @override
+  String get pleatKnife => 'Knife';
+
+  @override
+  String get pleatBox => 'Box';
+
+  @override
+  String get combine => 'Join or cut';
+
+  @override
+  String get combineWith => 'With the piece';
+
+  @override
+  String get join => 'Join';
+
+  @override
+  String get cutOut => 'Cut out';
+
+  @override
+  String get ease => 'Ease';
+
+  @override
+  String get errOverlaps => 'This stretch is already sewn.';
+
+  @override
+  String get errNotWholeEdges => 'This works on seams between two whole edges.';
+
+  @override
+  String get errApart => 'The result would be several pieces, or nothing.';
+
+  @override
+  String get errHasHoles => 'This piece has holes: fill them first.';
+
+  @override
+  String get errNotJoined =>
+      'These edges do not follow each other on one piece.';
 }

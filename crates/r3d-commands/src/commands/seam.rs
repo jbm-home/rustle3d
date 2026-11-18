@@ -1,83 +1,198 @@
-use r3d_core::{EdgeId, Seam, SeamId, SeamSide, Transaction};
+use r3d_core::seam::{Span, Track};
+use r3d_core::{EdgeId, InternalLineId, Project, Seam, SeamId, SeamSide, Transaction};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::mirror::mirror_twin;
-use super::not_sewn;
-use crate::error::{CommandError, Invalid};
+use crate::error::{CommandError, Invalid, finite};
 use crate::spec::{CommandOutput, CommandSpec, Described};
 
-/// One side of a new seam.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+/// One side of a new seam: a whole edge, a run of edges, or an internal
+/// line; all of it or part of it.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SeamSideSpec {
-    pub edge: EdgeId,
-    /// Walk this edge from its end point instead of its start. Omitted:
-    /// `false` for side `a`; for side `b`, an edge sewn to its linked
-    /// mirror image meets it mirrored point to mirrored point (a centre
-    /// seam), other edges are walked both the same way on the pattern
-    /// (what sewing two panels laid side by side needs).
+    /// One edge.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub edge: Option<EdgeId>,
+    /// Or consecutive outline edges of one piece, in their order around it
+    /// (e.g. a pocket's sides and bottom).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub edges: Vec<EdgeId>,
+    /// Or an internal line (a pocket's placement line, a tuck's line).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub line: Option<InternalLineId>,
+    /// Only from here along the path (mm from its start). Omitted: its
+    /// start.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from_mm: Option<f64>,
+    /// Only to here (mm from the path's start). Omitted: its end.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to_mm: Option<f64>,
+    /// Walk the side from its end instead of its start. Omitted: `false`
+    /// for side `a`; for side `b`, an edge sewn to its linked mirror image
+    /// meets it mirrored point to mirrored point (a centre seam), other
+    /// sides are walked both the same way on the pattern (what sewing two
+    /// panels laid side by side needs).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reversed: Option<bool>,
 }
 
-/// Sew two edges together.
+impl SeamSideSpec {
+    /// The side it names (walked forward), checked: one path, existing,
+    /// its edges consecutive on one piece's outline, its range inside it.
+    fn side(&self, field: &'static str, p: &Project) -> Result<SeamSide, CommandError> {
+        let edges = match (self.edge, self.edges.is_empty(), self.line) {
+            (Some(e), true, None) => vec![e],
+            (None, false, None) => self.edges.clone(),
+            (None, true, Some(_)) => Vec::new(),
+            _ => return Err(CommandError::invalid(field, Invalid::Format)),
+        };
+        for e in &edges {
+            p.edge(*e).ok_or_else(|| CommandError::not_found(*e))?;
+        }
+        if let Some(l) = self.line {
+            p.internal_line(l)
+                .ok_or_else(|| CommandError::not_found(l))?;
+        }
+        finite(field, &[self.from_mm, self.to_mm].map(|v| v.unwrap_or(0.0)))?;
+        let side = SeamSide {
+            edges,
+            line: self.line,
+            from_mm: self.from_mm,
+            to_mm: self.to_mm,
+            reversed: false,
+        };
+        // Joined edges of one piece, a range within the path.
+        let spans = p
+            .side_spans(&side)
+            .ok_or_else(|| CommandError::invalid(field, Invalid::NotJoined))?;
+        let joined = side.edges.windows(2).all(|w| match w {
+            [a, b] => p
+                .edge(*a)
+                .zip(p.edge(*b))
+                .is_some_and(|(a, b)| a.end == b.start && a.panel == b.panel),
+            _ => true,
+        });
+        if !joined {
+            return Err(CommandError::invalid(field, Invalid::NotJoined));
+        }
+        let total: f64 = match side.line {
+            Some(l) => p.track_length(Track::Line(l)).unwrap_or_default(),
+            None => side
+                .edges
+                .iter()
+                .map(|e| p.edge_length(*e).unwrap_or_default())
+                .sum(),
+        };
+        let from = self.from_mm.unwrap_or(0.0);
+        let to = self.to_mm.unwrap_or(total);
+        if !(from >= 0.0 && from < to && to <= total + 1e-6) {
+            return Err(CommandError::invalid(
+                field,
+                Invalid::Range(0.0, (total * 1000.0).round() / 1000.0),
+            ));
+        }
+        if spans.iter().all(|s| s.length() <= 0.0) {
+            return Err(CommandError::invalid(field, Invalid::Empty));
+        }
+        Ok(side)
+    }
+}
+
+/// Whether two stretches of the same track overlap (more than touching).
+fn overlap(a: &Span, b: &Span) -> bool {
+    a.track == b.track && a.from.max(b.from) < a.to.min(b.to) - 1e-6
+}
+
+/// The direction a side runs on the pattern: from its first point to its
+/// last.
+fn heading(p: &Project, side: &SeamSide) -> r3d_geom::DVec2 {
+    p.side_polyline(side)
+        .and_then(|pts| Some(*pts.last()? - *pts.first()?))
+        .unwrap_or_default()
+}
+
+/// Sew two sides together.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SeamAdd {
     pub a: SeamSideSpec,
     pub b: SeamSideSpec,
+    /// How much longer side `a` is meant to be than `b` (mm, negative:
+    /// shorter), eased in: not reported as a mismatch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ease_mm: Option<f64>,
 }
 
 impl Described for SeamAdd {
-    const SUMMARY: &'static str = "Sew two whole edges together. Points are matched along the edges, start to start unless a side is reversed; leave b.reversed out to have it chosen (an edge and its linked mirror image meet mirrored point to mirrored point; other edges are walked both the same way on the pattern), and use seam.flip if the seam looks twisted. An edge can be in one seam only. Returns the seam.";
+    const SUMMARY: &'static str = "Sew two sides together. A side is a whole `edge`, a run of consecutive outline `edges` of one piece (in order around it), or an internal `line`, each optionally only `from_mm`/`to_mm` along it (a seam between two notches, a pocket sewn on its placement line, the two halves of a pleat on one edge). Points are matched along the sides, start to start unless a side is reversed; leave b.reversed out to have it chosen (an edge and its linked mirror image meet mirrored point to mirrored point; other sides are walked both the same way on the pattern), and use seam.flip if the seam looks twisted. Stretches already sewn cannot be sewn again (invalid.overlaps). `ease_mm` is how much longer side a is meant to be. Returns the seam.";
 }
 
 impl CommandSpec for SeamAdd {
     fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
-        for side in [&self.a, &self.b] {
-            if tx.project().edge(side.edge).is_none() {
-                return Err(CommandError::not_found(side.edge));
-            }
-            not_sewn(tx, side.edge)?;
-        }
-        if self.a.edge == self.b.edge {
-            return Err(CommandError::invalid("b", Invalid::SamePoint));
-        }
-        let a_reversed = self.a.reversed.unwrap_or(false);
-        let b_reversed = match self.b.reversed {
-            Some(r) => r,
-            None => {
-                let p = tx.project();
-                let twins = |x: EdgeId, y: EdgeId| mirror_twin(p, x).is_some_and(|(t, _)| t == y);
-                if twins(self.a.edge, self.b.edge) || twins(self.b.edge, self.a.edge) {
-                    // A reflection reverses a contour: an edge's start
-                    // mirrors its twin's end.
-                    !a_reversed
-                } else {
-                    let chord = |e: EdgeId| -> Option<r3d_geom::DVec2> {
-                        let edge = p.edge(e)?;
-                        Some(p.point(edge.end)?.pos - p.point(edge.start)?.pos)
-                    };
-                    let walked_a = chord(self.a.edge).unwrap_or_default()
-                        * if a_reversed { -1.0 } else { 1.0 };
-                    chord(self.b.edge).unwrap_or_default().dot(walked_a) < 0.0
+        let p = tx.project();
+        let mut a = self.a.side("a", p)?;
+        let mut b = self.b.side("b", p)?;
+        let ease = self.ease_mm.unwrap_or(0.0);
+        finite("ease_mm", &[ease])?;
+        // Nothing sewn twice: not against another seam, nor a side on
+        // itself.
+        let (sa, sb) = (
+            p.side_spans(&a).unwrap_or_default(),
+            p.side_spans(&b).unwrap_or_default(),
+        );
+        let taken: Vec<(SeamId, Span)> = p
+            .seams()
+            .iter()
+            .flat_map(|(id, s)| [(*id, &s.a), (*id, &s.b)])
+            .flat_map(|(id, s)| {
+                p.side_spans(s)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(move |span| (id, span))
+            })
+            .collect();
+        for (field, mine) in [("a", &sa), ("b", &sb)] {
+            for x in mine.iter() {
+                if let Some((seam, y)) = taken.iter().find(|(_, y)| overlap(x, y)) {
+                    // An edge already sewn there: say by which seam.
+                    return Err(match y.track {
+                        Track::Edge(edge) => CommandError::Sewn {
+                            edge: edge.into(),
+                            seam: (*seam).into(),
+                        },
+                        Track::Line(_) => CommandError::invalid(field, Invalid::Overlaps),
+                    });
                 }
             }
+        }
+        if sa.iter().any(|x| sb.iter().any(|y| overlap(x, y))) {
+            return Err(CommandError::invalid("b", Invalid::SamePoint));
+        }
+        a.reversed = self.a.reversed.unwrap_or(false);
+        b.reversed = match self.b.reversed {
+            Some(r) => r,
+            None => match (a.whole_edge(), b.whole_edge()) {
+                (Some(ea), Some(eb))
+                    if mirror_twin(p, ea).is_some_and(|(t, _)| t == eb)
+                        || mirror_twin(p, eb).is_some_and(|(t, _)| t == ea) =>
+                {
+                    // A reflection reverses a contour: an edge's start
+                    // mirrors its twin's end.
+                    !a.reversed
+                }
+                _ => heading(p, &b).dot(heading(p, &a)) < 0.0,
+            },
         };
         let id = tx.new_seam_id();
         tx.put_seam(
             id,
             Seam {
-                a: SeamSide {
-                    edge: self.a.edge,
-                    reversed: a_reversed,
-                },
-                b: SeamSide {
-                    edge: self.b.edge,
-                    reversed: b_reversed,
-                },
+                a,
+                b,
                 gathered: false,
+                ease_mm: ease,
             },
         );
         Ok(CommandOutput {
@@ -90,8 +205,42 @@ fn get_seam(tx: &Transaction<'_>, id: SeamId) -> Result<Seam, CommandError> {
     tx.project()
         .seams()
         .get(&id)
-        .copied()
+        .cloned()
         .ok_or_else(|| CommandError::not_found(id))
+}
+
+/// Set how much longer one side of a seam is meant to be.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SeamSetEase {
+    pub seam: SeamId,
+    /// How much longer side `a` is meant to be than side `b` (mm;
+    /// negative, shorter): eased in along the seam (a sleeve cap, a back
+    /// shoulder), not reported as a mismatch.
+    pub mm: f64,
+}
+
+impl Described for SeamSetEase {
+    const SUMMARY: &'static str = "Set a seam's ease: how much longer its side a is meant to be than side b (mm; negative, shorter). The extra length is eased in along the seam when it drapes; only the difference beyond the ease is reported as a mismatch.";
+}
+
+impl CommandSpec for SeamSetEase {
+    fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        finite("mm", &[self.mm])?;
+        let seam = get_seam(tx, self.seam)?;
+        tx.put_seam(
+            self.seam,
+            Seam {
+                ease_mm: self.mm,
+                ..seam
+            },
+        );
+        Ok(CommandOutput::default())
+    }
+
+    fn merge_key(&self) -> Option<String> {
+        Some(format!("seam.set_ease:{}", self.seam))
+    }
 }
 
 /// Unpick a seam.

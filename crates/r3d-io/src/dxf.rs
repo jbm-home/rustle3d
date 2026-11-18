@@ -208,6 +208,10 @@ fn write_dxf(project: &Project, sized: &[(Project, Option<String>)]) -> String {
                     w.point(NOTCH, at.pos + outward * sa);
                 }
             }
+            // Holes: internal cut-outs.
+            for hole in project.hole_outlines(*id) {
+                w.polyline(CUTOUT, &hole, true);
+            }
             if let Some((a, b)) = crate::drawing::grainline(&flat, panel.grain_angle_deg) {
                 w.line(GRAIN, a, b);
                 let side = (a + b) * 0.5 + (b - a).normalize_or_zero().perp() * 15.0;

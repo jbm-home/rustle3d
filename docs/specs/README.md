@@ -30,3 +30,4 @@ descriptions, public papers, open standards, general garment-making knowledge.
 | 18 | [Grading and sizes](18-grading.md) | M22 |
 | 19 | [Sketching: constraints, dimensions and symmetry](19-constraints.md) | M27 |
 | 20 | [Parametric patterns](20-parametric.md) | M28 |
+| 21 | [Construction details](21-construction-details.md) | M29 |

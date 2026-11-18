@@ -138,6 +138,7 @@ pub(crate) fn create_panel(
             mirror_of: None,
             placement: None,
             symmetry: None,
+            holes: Vec::new(),
         },
     );
     let mut created: Vec<AnyId> = vec![panel.into()];

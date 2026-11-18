@@ -959,6 +959,7 @@ mod tests {
                 mirror_of: None,
                 placement: None,
                 symmetry: None,
+                holes: Vec::new(),
             },
         );
         tx.commit();

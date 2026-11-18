@@ -50,6 +50,7 @@ fn project(w: f64, h: f64, allowance: f64) -> Project {
             mirror_of: None,
             placement: None,
             symmetry: None,
+            holes: Vec::new(),
         },
     );
     tx.commit();

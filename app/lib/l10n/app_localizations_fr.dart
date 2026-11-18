@@ -1644,6 +1644,12 @@ class LFr extends L {
       'constraint_set_formula': 'Formule de cote',
       'variable_set': 'Modifier une variable',
       'variable_remove': 'Retirer une variable',
+      'seam_set_ease': 'Régler l’embu',
+      'dart_add': 'Ajouter une pince',
+      'pleat_add': 'Ajouter un pli',
+      'panel_add_hole': 'Découper un trou',
+      'panel_remove_hole': 'Boucher un trou',
+      'panel_boolean': 'Joindre ou découper',
       'other': '$step',
     });
     return '$_temp0';
@@ -2012,4 +2018,95 @@ class LFr extends L {
   String errFormulaBadName(String name) {
     return '« $name » ne peut pas nommer une variable : une lettre, puis des lettres, chiffres ou _.';
   }
+
+  @override
+  String get toolDetails => 'Détails';
+
+  @override
+  String get toolDart => 'Pince';
+
+  @override
+  String get toolDartHint =>
+      'Cliquez une arête à l’endroit de la pince : tracée, pliée et cousue';
+
+  @override
+  String get toolPleat => 'Pli';
+
+  @override
+  String get toolPleatHint =>
+      'Cliquez une arête là où commence le pli : plié et cousu';
+
+  @override
+  String get toolHole => 'Trou';
+
+  @override
+  String get toolHoleHint =>
+      'Sélectionnez une pièce, puis cliquez les coins d’un trou à l’intérieur';
+
+  @override
+  String get hintDart =>
+      'Pince : cliquez une arête à son emplacement · V pour arrêter';
+
+  @override
+  String get hintPleat =>
+      'Pli : cliquez une arête là où il commence · V pour arrêter';
+
+  @override
+  String get hintHole =>
+      'Trou : cliquez ses coins dans la pièce sélectionnée, Entrée pour le découper · Échap annule';
+
+  @override
+  String get toastHoleAdded => 'Trou découpé.';
+
+  @override
+  String get holeSelectFirst => 'Sélectionnez d’abord la pièce à trouer.';
+
+  @override
+  String get dartWidth => 'Largeur au bord';
+
+  @override
+  String get dartLength => 'Longueur';
+
+  @override
+  String get pleatDepth => 'Profondeur';
+
+  @override
+  String get pleatStitched => 'Piqué sur';
+
+  @override
+  String get pleatKnife => 'Plat';
+
+  @override
+  String get pleatBox => 'Creux';
+
+  @override
+  String get combine => 'Joindre ou découper';
+
+  @override
+  String get combineWith => 'Avec la pièce';
+
+  @override
+  String get join => 'Joindre';
+
+  @override
+  String get cutOut => 'Découper';
+
+  @override
+  String get ease => 'Embu';
+
+  @override
+  String get errOverlaps => 'Ce tronçon est déjà cousu.';
+
+  @override
+  String get errNotWholeEdges =>
+      'Cela marche sur les coutures entre deux arêtes entières.';
+
+  @override
+  String get errApart => 'Le résultat ferait plusieurs pièces, ou rien.';
+
+  @override
+  String get errHasHoles => 'Cette pièce a des trous : bouchez-les d’abord.';
+
+  @override
+  String get errNotJoined => 'Ces arêtes ne se suivent pas sur une même pièce.';
 }

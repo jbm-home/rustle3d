@@ -530,20 +530,40 @@ impl QuerySpec for AvatarPresets {
 pub struct SeamList {}
 
 impl Described for SeamList {
-    const SUMMARY: &'static str = "Every seam: its two edges (with their panels and lengths in mm, and direction), the length mismatch in mm, whether it is gathered and its gathering ratio (longer side / shorter side).";
+    const SUMMARY: &'static str = "Every seam: its two sides (an `edge`, or `edges` / a `line` with `from_mm` and `to_mm` for part of a path; with their panels, lengths in mm and direction), the length mismatch in mm beyond its ease, its ease, whether it is gathered and its gathering ratio (longer side / shorter side).";
 }
 
 impl QuerySpec for SeamList {
     fn run(&self, p: &Project) -> Result<Value, CommandError> {
         let side = |s: &r3d_core::SeamSide| -> Result<Value, CommandError> {
-            let edge = p.edge(s.edge).ok_or_else(|| missing(s.edge))?;
-            Ok(serde_json::json!({
-                "edge": s.edge,
-                "panel": edge.panel,
-                "panel_name": p.panel(edge.panel).map(|panel| panel.name.clone()),
+            let panel = p.side_panel(s).ok_or_else(|| CommandError::Internal {
+                detail: "a seam side names nothing".into(),
+            })?;
+            let mut out = serde_json::json!({
+                "panel": panel,
+                "panel_name": p.panel(panel).map(|panel| panel.name.clone()),
                 "reversed": s.reversed,
-                "length_mm": r3(p.edge_length(s.edge).unwrap_or_default()),
-            }))
+                "length_mm": r3(p.side_length(s).unwrap_or_default()),
+            });
+            // A whole edge is named as before; other paths as stored.
+            match s.whole_edge() {
+                Some(e) => out["edge"] = serde_json::json!(e),
+                None => {
+                    if !s.edges.is_empty() {
+                        out["edges"] = serde_json::json!(s.edges);
+                    }
+                    if let Some(l) = s.line {
+                        out["line"] = serde_json::json!(l);
+                    }
+                    if let Some(f) = s.from_mm {
+                        out["from_mm"] = serde_json::json!(f);
+                    }
+                    if let Some(t) = s.to_mm {
+                        out["to_mm"] = serde_json::json!(t);
+                    }
+                }
+            }
+            Ok(out)
         };
         let seams = p
             .seams()
@@ -561,7 +581,8 @@ impl QuerySpec for SeamList {
                 };
                 Ok(serde_json::json!({
                     "id": id, "a": a, "b": b,
-                    "mismatch_mm": r3((la - lb).abs()),
+                    "mismatch_mm": r3((la - lb - s.ease_mm).abs()),
+                    "ease_mm": s.ease_mm,
                     "gathered": s.gathered,
                     "gathering_ratio": r3(ratio),
                 }))
@@ -686,11 +707,12 @@ impl QuerySpec for GradingCheck {
                     .iter()
                     .filter(|(_, s)| !s.gathered)
                     .filter_map(|(id, s)| {
-                        let (a, b) = (q.edge_length(s.a.edge)?, q.edge_length(s.b.edge)?);
-                        ((a - b).abs() > tolerance).then(|| {
+                        let (a, b) = (q.side_length(&s.a)?, q.side_length(&s.b)?);
+                        let mismatch = (a - b - s.ease_mm).abs();
+                        (mismatch > tolerance).then(|| {
                             serde_json::json!({
                                 "seam": id, "a_mm": r3(a), "b_mm": r3(b),
-                                "mismatch_mm": r3((a - b).abs()),
+                                "mismatch_mm": r3(mismatch),
                             })
                         })
                     })

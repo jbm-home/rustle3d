@@ -15,7 +15,8 @@ placed on a leg; M19, several garments in layers; M22, sizes and
 grading; M25, maximized views; M26, history, copy and paste, progress of long steps;
 GPL licence, donations; M27, constraints, dimensions, half pieces,
 construction lines, snapping, ellipses, circle skirts and arcs; M28,
-formulas and variables).
+formulas and variables; M29, darts, pleats, holes, joining and cutting
+pieces, seam ease, partial seams and patch pockets).
 -->
 
 Rustle3D is a free, open-source desktop app for making clothes: draw the
@@ -94,6 +95,9 @@ of related tools (the last one used stays on the button).
 | Edit curves → Add point | A | Click an edge to add a point there (the curve keeps its shape) |
 | Edit curves → Arc | | Click an edge, type how far it bulges: it becomes a circular arc |
 | Construction line | G | Click two points: a line across the board to draw against (never cut or sewn); click it and press Delete to remove it |
+| Details → Dart | | Click an edge where the dart goes, type its width and length: it is drawn, folded and sewn |
+| Details → Pleat | | Click an edge where the pleat starts, type its depth (and how far it is stitched down), knife or box: it is folded and sewn |
+| Details → Hole | | Select a piece, click the corners of a hole inside it, Enter: the hole is cut out of the cloth |
 | Cut | K | Click (or drag, for curves) a line across a piece, from outside to outside, then Enter: the piece becomes two pieces sewn together along the line |
 | Draw on garment | D | Drag across the 3D garment: the line lands on the pattern |
 | Notch | N | Click an edge where the notch goes |
@@ -190,6 +194,31 @@ that does not hold shows in red. The inspector also says how many ways
 the piece can still move (moving or turning it as a whole counts,
 unless a corner is fixed), and warns when some constraints repeat
 others.
+
+### Darts, pleats, holes, joining pieces
+- **Dart** (Details group): click the edge where the dart goes and type
+  its width at the edge and its length. It is drawn, folded and sewn in
+  one step: when the garment drapes, the dart closes.
+- **Pleat**: click the edge where it starts, type its depth and choose
+  knife (one fold) or box (two folds facing away). A knife pleat takes up
+  twice its depth along the edge. With "Stitched down", the folds are also
+  sewn that far into the piece. Notches mark the fold lines.
+- **Hole**: select a piece, then click the corners of the hole inside it
+  and press Enter. There is no cloth in a hole; its edges can be sewn
+  (a facing) like any other.
+- **Join or cut**: with a piece selected, the inspector's **Join or cut**
+  takes another piece: **Join** makes one piece of the two (they must
+  overlap), **Cut out** cuts the other piece out of this one (a bite out
+  of its edge, or a hole when it lies inside). The other piece goes. A
+  piece that is sewn, mirrored or symmetric must be unpicked or unlinked
+  first.
+- **Ease**: a seam's card (click a sewn edge) has an **Ease** setting:
+  how much longer one side is meant to be, eased in (a sleeve cap). Only
+  a difference beyond the ease is flagged.
+- Seams on part of an edge, on several edges in a row (a pocket's sides
+  and bottom) or on an internal line (a patch pocket on its placement
+  line, a tuck) are made by an AI agent or a script for now
+  (`seam.add`); the Sew tool sews whole edges.
 
 ### Formulas: patterns made to measure
 A distance, a length or an angle can follow the body: click **ƒ** next
@@ -401,6 +430,10 @@ DXF-AAMA; garments go out as glTF and OBJ: open formats only.
   cloth keep about 2 cm apart in the simulation.
 - A point's handles cannot be dragged with Select yet; use Bend on the
   edge (a smooth point keeps its two handles lined up).
+- Not yet in the simulation: elastic and shirring, visible topstitching,
+  interfacing, quilting and padding. Holes are cut on their line (no seam
+  allowance inside them), and a mirrored or symmetric piece cannot have
+  holes.
 - Constraints apply to corners and edges of the outline, not to internal
   lines, notches or construction lines; dimensions are typed in the
   inspector, not dragged on the board. A symmetric piece's axis is

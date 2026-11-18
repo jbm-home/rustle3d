@@ -1,6 +1,6 @@
 # Rustle3D architecture
 
-Status: living document, last updated 2026-11-18 (M28).
+Status: living document, last updated 2026-11-18 (M29).
 
 Every choice here is the **current best guess**, not a rule. Each one says
 why it was made and what was considered, so it can be challenged and changed
@@ -95,7 +95,7 @@ Project                                        (✓ = implemented in M1)
  │            grain_angle, particle_spacing, placement: Placement3d }
  ├─ points:  IdMap<PointId, Point2>            (shared by edges, mm)
  ├─ edges:   IdMap<EdgeId, Edge>               (line or cubic Bézier between two PointIds)
- ├─ seams:   IdMap<SeamId, Seam>               (two edge chains + direction flags)
+ ├─ seams:   IdMap<SeamId, Seam>               (two sides: edges or an internal line, a stretch, a direction; ease)
  ├─ materials: IdMap<MaterialId, FabricMaterial>
  ├─ avatar:  Option<AvatarRef>                 (path inside the project folder + landmarks)
  ├─ grading: Option<Grading>                   ✓ (M22: sizes with body differences, base, shown)
@@ -588,4 +588,8 @@ code stays **i18n-ready** for more:
 | 2026-11-18 | M27: board snapping in the bridge (`r3d-ffi/src/snap.rs`), not a query | It depends on the zoom and on what is being drawn; agents send exact coordinates |
 | 2026-11-18 | M28: a parametric piece grades itself by writing its points' grades (solved per size with that size's body), not by solving inside `Project::at_size` | Every consumer of sizes (board nest, exports, drape, mirrors, symmetric halves) already reads grades; `at_size` stays a cheap pure function; grade rules and formulas live in one model |
 | 2026-11-18 | M28: formulas in our own small parser with dimensional analysis (length powers), not an expression crate | The grammar is tiny; units must be checked (a length plus a number is an error), which general evaluators do not do |
+| 2026-11-18 | M29: a seam side is a path (a run of outline edges or an internal line, all or a stretch), schema v13; tools that reshape seams keep working on whole-edge seams and refuse the others | One model for side seams, partial seams, pockets on placement lines and pleats sewn to themselves; the drape pairs sides by resampling each into the same number of segments |
+| 2026-11-18 | M29: one mesher for pieces with holes and sewn internal lines (`mesh_panel`): Ruppert refinement over the outline and holes, the lines inserted afterwards, triangles kept by centroid (flat slivers dropped) | A constraint that encloses nothing confuses `spade`'s inside/outside layers; inserting lines after refinement keeps triangle quality and the vertex order (the solver's results depend on it) |
+| 2026-11-18 | M29: region booleans on a constrained Delaunay triangulation of both pieces (`add_constraint_and_split`), boundary edges between kept and dropped triangles chained into loops, not a polygon-clipping algorithm | Exact handling of crossings and shared stretches by the triangulation already in the tree; no new dependency |
+| 2026-11-18 | M29: the board fills pieces from a constrained triangulation (`mesh::fill`) instead of ear clipping | Pieces may have holes; one triangulator for the board and the cloth |
 | 2026-11-18 | Licence changed from MIT to GPL-3.0-or-later before the repository goes public; dependencies must be GPL-3.0-compatible, permissive preferred (MPL-2.0, LGPL-3.0, GPL-3.0 with a justification) | Keeps Rustle3D and its derivatives free software, as Blender, Krita and Inkscape do: a fork or a closed product built on it must publish its changes. All dependencies so far (MIT, Apache-2.0, BSD, Zlib, OFL font, CC0 body) are compatible with GPLv3. Possible while every commit has a single author |

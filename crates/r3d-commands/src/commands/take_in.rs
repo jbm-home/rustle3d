@@ -34,17 +34,18 @@ impl Described for SeamTakeIn {
 /// At the seam end where `at` is: the end point of each side, [a, b].
 fn matched_ends(p: &Project, seam: SeamId, at: PointId) -> Option<[PointId; 2]> {
     let s = p.seams().get(&seam)?;
-    let (a, b) = (p.edge(s.a.edge)?, p.edge(s.b.edge)?);
+    let ((ea, ra), (eb, rb)) = s.across(s.a.whole_edge()?)?;
+    let (a, b) = (p.edge(ea)?, p.edge(eb)?);
     // Is `at` the first point of its side's walk (or the last)?
     let first = if at == a.start || at == a.end {
-        (at == a.start) != s.a.reversed
+        (at == a.start) != ra
     } else if at == b.start || at == b.end {
-        (at == b.start) != s.b.reversed
+        (at == b.start) != rb
     } else {
         return None;
     };
     let end = |e: &Edge, reversed: bool| if first != reversed { e.start } else { e.end };
-    Some([end(a, s.a.reversed), end(b, s.b.reversed)])
+    Some([end(a, ra), end(b, rb)])
 }
 
 /// Point offsets that take `seam` in by `mm` (at the end where `at` is,
@@ -59,8 +60,11 @@ fn seam_moves(
     let seam = p
         .seams()
         .get(&seam_id)
-        .copied()
         .ok_or_else(|| CommandError::not_found(seam_id))?;
+    let sides = [seam.a.whole_edge(), seam.b.whole_edge()];
+    let [Some(side_a), Some(side_b)] = sides else {
+        return Err(CommandError::invalid("seam", Invalid::NotWholeEdges));
+    };
     let ends = match at {
         Some(at) => Some(
             matched_ends(p, seam_id, at)
@@ -70,17 +74,15 @@ fn seam_moves(
     };
     let mut moves = BTreeMap::new();
     let mut panels = BTreeSet::new();
-    for (k, side) in [seam.a, seam.b].iter().enumerate() {
-        let (edge_id, point_map): (EdgeId, [(PointId, PointId); 2]) =
-            match mirrored_source(p, side.edge) {
-                Some(found) => found,
-                None => {
-                    let e = p
-                        .edge(side.edge)
-                        .ok_or_else(|| CommandError::not_found(side.edge))?;
-                    (side.edge, [(e.start, e.start), (e.end, e.end)])
-                }
-            };
+    for (k, side) in [side_a, side_b].into_iter().enumerate() {
+        let (edge_id, point_map): (EdgeId, [(PointId, PointId); 2]) = match mirrored_source(p, side)
+        {
+            Some(found) => found,
+            None => {
+                let e = p.edge(side).ok_or_else(|| CommandError::not_found(side))?;
+                (side, [(e.start, e.start), (e.end, e.end)])
+            }
+        };
         let edge = p
             .edge(edge_id)
             .ok_or_else(|| CommandError::not_found(edge_id))?;
@@ -108,8 +110,9 @@ fn mirror_seam(
     at: Option<PointId>,
 ) -> Option<(SeamId, Option<PointId>)> {
     let seam = p.seams().get(&seam_id)?;
-    for side in [seam.a, seam.b] {
-        let Some((twin, map)) = mirror_twin(p, side.edge) else {
+    let first = seam.a.whole_edge()?;
+    for side in [first, seam.b.whole_edge()?] {
+        let Some((twin, map)) = mirror_twin(p, side) else {
             continue;
         };
         let Some(other) = p.seam_of(twin) else {
@@ -124,7 +127,7 @@ fn mirror_seam(
                 // `at` may be on either side of the seam: bring it to this
                 // side first, then across the mirror.
                 let here = matched_ends(p, seam_id, at)?;
-                let k = usize::from(side.edge != seam.a.edge);
+                let k = usize::from(side != first);
                 map.iter().find(|(own, _)| *own == here[k]).map(|(_, m)| *m)
             }
         };

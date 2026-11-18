@@ -37,7 +37,7 @@ can be tested through MCP as soon as they exist.
 | M26 | History, editing comfort, feedback on long steps ✅ | 2–3 wk | Jump back ten steps from the history panel; paste two sewn pieces with their seam; a graded template shows its progress |
 | M27 | Sketching 2: constraints and symmetry ✅ | 4–5 wk | Draw a half bodice against a symmetry axis with fixed dimensions; change one, the shape follows |
 | M28 | Parametric patterns ✅ | 2–3 wk | A skirt whose waist is `waist / 4 + 10 mm` redrafts itself on another body |
-| M29 | Construction details | 3–4 wk | A skirt with darts, a pleat and a patch pocket sewn on an internal line |
+| M29 | Construction details ✅ | 3–4 wk | A skirt with darts, a pleat and a patch pocket sewn on an internal line |
 | M20 | Trims: buttons and zippers | 2–3 wk | A shirt that buttons and trousers with a fly zipper, draped closed |
 | M21 | Textures and prints | 2–3 wk | A striped shirt whose stripes follow the grainline on every piece |
 | M30 | Production: marker, yardage, tech pack, projector | 3–4 wk | A graded shirt nested on a 150 cm fabric, its yardage and cost, its tech pack PDF |
@@ -685,7 +685,7 @@ Built (2026-11-18), demo `./demos/m28/demo.sh`, spec 20:
   import (left for later: the formulas work, the format is a separate
   piece of work); formulas typed directly in a value field.
 
-## M29 — Construction details
+## M29 — Construction details ✅ (2026-11-18)
 - Seams on part of an edge and on a chain of edges, with an adjustable
   **ease** (spec 02's open point).
 - **Seams on internal lines**: a patch pocket sewn on its placement
@@ -699,6 +699,23 @@ Built (2026-11-18), demo `./demos/m28/demo.sh`, spec 20:
   padding.
 - **Demo**: a skirt with darts, a pleat and a patch pocket sewn on an
   internal line, draped.
+
+Built (2026-11-18), demo `./demos/m29/demo.sh`, spec 21:
+- Seam sides as paths (schema v13): a whole edge, a run of outline edges
+  or an internal line, all or a stretch; seam ease; overlapping stretches
+  refused. The drape cuts every seam side into as many segments as its
+  partner, spread over its stretches; sewn internal lines and holes are
+  part of the mesh (`r3d_geom::mesh::mesh_panel`).
+- `dart.add` (drawn, folded, sewn), `pleat.add` (knife or box, stitched
+  down along internal lines), `panel.add_hole` / `remove_hole`,
+  `panel.boolean` (union, difference; CDT-based region booleans in
+  `r3d_geom::boolean`, the result fitted to curves).
+- The app: Details tools (Dart, Pleat, Hole), Join or cut in the
+  inspector, a seam's Ease in the edge card.
+- Open: elastic and shirring, topstitching, interfacing, quilting and
+  padding (need solver work); partial and line seams from the app's Sew
+  tool; holes in mirror copies and symmetric pieces; seam allowance
+  inside holes.
 
 ## M30 — Production: marker, yardage, tech pack, projector
 - **Indicators per piece**: area, fabric mass; totals per garment.

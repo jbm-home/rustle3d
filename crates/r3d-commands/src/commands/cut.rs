@@ -95,6 +95,9 @@ impl CommandSpec for PanelCut {
                 if panel.symmetry.is_some() {
                     return Err(CommandError::invalid("panel", Invalid::Symmetric));
                 }
+                if !panel.holes.is_empty() {
+                    return Err(CommandError::invalid("panel", Invalid::HasHoles));
+                }
                 (id, crossings(tx, &panel, &path)?)
             }
             None => {
@@ -113,6 +116,9 @@ impl CommandSpec for PanelCut {
                         }
                         if panel.symmetry.is_some() {
                             return Err(CommandError::invalid("panel", Invalid::Symmetric));
+                        }
+                        if !panel.holes.is_empty() {
+                            return Err(CommandError::invalid("panel", Invalid::HasHoles));
                         }
                         (*id, *found)
                     }
@@ -260,17 +266,7 @@ impl CommandSpec for PanelCut {
             let seam = tx.new_seam_id();
             tx.put_seam(
                 seam,
-                Seam {
-                    a: SeamSide {
-                        edge: *e,
-                        reversed: false,
-                    },
-                    b: SeamSide {
-                        edge: *partner,
-                        reversed: true,
-                    },
-                    gathered: false,
-                },
+                Seam::whole(SeamSide::edge(*e, false), SeamSide::edge(*partner, true)),
             );
             created.push(seam.into());
         }
@@ -484,25 +480,28 @@ fn split_edge(tx: &mut Transaction<'_>, edge: EdgeId, t: f64) -> Result<PointId,
     let Some(seam_id) = tx.project().seam_of(edge) else {
         return Ok(point);
     };
-    let seam = *tx
+    let seam = tx
         .project()
         .seams()
         .get(&seam_id)
+        .cloned()
         .ok_or_else(|| CommandError::not_found(seam_id))?;
-    let (mine, theirs) = if seam.a.edge == edge {
-        (seam.a, seam.b)
-    } else {
-        (seam.b, seam.a)
+    // A seam on part of the edge, or on more than one, cannot follow a
+    // cut across it: unpick it first.
+    let Some(((_, mine_reversed), (partner, theirs_reversed))) = seam.across(edge) else {
+        return Err(CommandError::Sewn {
+            edge: edge.into(),
+            seam: seam_id.into(),
+        });
     };
     // How far along the seam the cut is, then where that is on the partner.
     let along = if len > 0.0 { first_len / len } else { 0.5 };
-    let walked = if mine.reversed { 1.0 - along } else { along };
-    let partner_frac = if theirs.reversed {
+    let walked = if mine_reversed { 1.0 - along } else { along };
+    let partner_frac = if theirs_reversed {
         1.0 - walked
     } else {
         walked
     };
-    let partner = theirs.edge;
     super::editable_edge_panel(tx, partner)?;
     let pg = geometry(tx, partner)?;
     let u = match pg {
@@ -514,32 +513,31 @@ fn split_edge(tx: &mut Transaction<'_>, edge: EdgeId, t: f64) -> Result<PointId,
     };
     let (_, partner_second, _) = split_at(tx, partner, u)?;
     // Each side's halves in walking order, then one seam per pair.
-    let walk = |side: SeamSide, first: EdgeId, second: EdgeId| {
-        if side.reversed {
+    let walk = |reversed: bool, first: EdgeId, second: EdgeId| {
+        if reversed {
             [second, first]
         } else {
             [first, second]
         }
     };
-    let m = walk(mine, edge, second);
-    let o = walk(theirs, partner, partner_second);
+    let m = walk(mine_reversed, edge, second);
+    let o = walk(theirs_reversed, partner, partner_second);
+    let mine_is_a = seam.a.whole_edge() == Some(edge);
     let make = |k: usize| {
-        let side = |s: SeamSide, e: EdgeId| SeamSide {
-            edge: e,
-            reversed: s.reversed,
-        };
-        if seam.a.edge == edge {
-            Seam {
-                a: side(mine, m[k]),
-                b: side(theirs, o[k]),
-                gathered: seam.gathered,
-            }
+        let (mine, theirs) = (
+            SeamSide::edge(m[k], mine_reversed),
+            SeamSide::edge(o[k], theirs_reversed),
+        );
+        let (a, b) = if mine_is_a {
+            (mine, theirs)
         } else {
-            Seam {
-                a: side(theirs, o[k]),
-                b: side(mine, m[k]),
-                gathered: seam.gathered,
-            }
+            (theirs, mine)
+        };
+        Seam {
+            a,
+            b,
+            gathered: seam.gathered,
+            ease_mm: seam.ease_mm / 2.0,
         }
     };
     tx.put_seam(seam_id, make(0));

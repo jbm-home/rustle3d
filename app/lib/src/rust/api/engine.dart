@@ -9,7 +9,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `cloth_hit`, `corner_at`, `corner_landing`, `edge_spot`, `edited`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form_now`, `form_soon`, `frozen_board`, `gpu_solver`, `graphics`, `import_from`, `long`, `new`, `new`, `offset_along`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `selected`, `set_busy`, `sim`, `solver`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`
 
 /// The GPU adapter the UI composites on (Windows: its LUID), so the views
 /// render on it and share their textures without a copy. Call it before
@@ -96,6 +96,15 @@ abstract class Engine implements RustOpaqueInterface {
   /// Where the corner being dragged on the board last landed, if it
   /// snapped to something.
   Snap? dragSnap();
+
+  /// The editable edge within `max_mm` of pattern point (`x_mm`, `y_mm`)
+  /// and how far along it that point is: where a dart or a pleat clicked
+  /// there goes. `None` off the edges.
+  EdgeSpot? edgeSpotNear({
+    required double xMm,
+    required double yMm,
+    required double maxMm,
+  });
 
   /// Write an export to `path`, a file the user chose (anywhere): the
   /// pattern (every size of a graded one, nested), or the garment as the
@@ -419,6 +428,31 @@ class CanvasColors {
           ground == other.ground &&
           avatar == other.avatar &&
           pieces == other.pieces;
+}
+
+/// A place on an edge: the edge, how far along it (mm), its length (mm).
+class EdgeSpot {
+  final String edge;
+  final double offsetMm;
+  final double lengthMm;
+
+  const EdgeSpot({
+    required this.edge,
+    required this.offsetMm,
+    required this.lengthMm,
+  });
+
+  @override
+  int get hashCode => edge.hashCode ^ offsetMm.hashCode ^ lengthMm.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EdgeSpot &&
+          runtimeType == other.runtimeType &&
+          edge == other.edge &&
+          offsetMm == other.offsetMm &&
+          lengthMm == other.lengthMm;
 }
 
 /// What to export, and how.

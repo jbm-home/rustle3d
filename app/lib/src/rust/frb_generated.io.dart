@@ -65,6 +65,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CanvasColors dco_decode_box_autoadd_canvas_colors(dynamic raw);
 
   @protected
+  EdgeSpot dco_decode_box_autoadd_edge_spot(dynamic raw);
+
+  @protected
   PatternChange dco_decode_box_autoadd_pattern_change(dynamic raw);
 
   @protected
@@ -90,6 +93,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   CanvasColors dco_decode_canvas_colors(dynamic raw);
+
+  @protected
+  EdgeSpot dco_decode_edge_spot(dynamic raw);
 
   @protected
   ExportFormat dco_decode_export_format(dynamic raw);
@@ -135,6 +141,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   String? dco_decode_opt_String(dynamic raw);
+
+  @protected
+  EdgeSpot? dco_decode_opt_box_autoadd_edge_spot(dynamic raw);
 
   @protected
   PatternChange? dco_decode_opt_box_autoadd_pattern_change(dynamic raw);
@@ -240,6 +249,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  EdgeSpot sse_decode_box_autoadd_edge_spot(SseDeserializer deserializer);
+
+  @protected
   PatternChange sse_decode_box_autoadd_pattern_change(
     SseDeserializer deserializer,
   );
@@ -271,6 +283,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   CanvasColors sse_decode_canvas_colors(SseDeserializer deserializer);
+
+  @protected
+  EdgeSpot sse_decode_edge_spot(SseDeserializer deserializer);
 
   @protected
   ExportFormat sse_decode_export_format(SseDeserializer deserializer);
@@ -320,6 +335,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
+
+  @protected
+  EdgeSpot? sse_decode_opt_box_autoadd_edge_spot(SseDeserializer deserializer);
 
   @protected
   PatternChange? sse_decode_opt_box_autoadd_pattern_change(
@@ -440,6 +458,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_edge_spot(
+    EdgeSpot self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_pattern_change(
     PatternChange self,
     SseSerializer serializer,
@@ -477,6 +501,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_canvas_colors(CanvasColors self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_edge_spot(EdgeSpot self, SseSerializer serializer);
 
   @protected
   void sse_encode_export_format(ExportFormat self, SseSerializer serializer);
@@ -543,6 +570,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_edge_spot(
+    EdgeSpot? self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_opt_box_autoadd_pattern_change(

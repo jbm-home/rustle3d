@@ -606,6 +606,84 @@ class _ShellState extends State<Shell> {
     if (out != null) _toast(context.l.toastGuideAdded);
   }
 
+  /// Hole: the corners clicked cut a hole in the selected piece.
+  void _finishHole() {
+    final l = context.l;
+    final pts = List.of(_polygon);
+    setState(_polygon.clear);
+    if (_selection.length != 1) return _toast(l.holeSelectFirst);
+    final [first, ...rest] = pts;
+    final out = _run({
+      'type': 'panel.add_hole',
+      'panel': _selection.first,
+      'start': [first.dx, first.dy],
+      'segments': [
+        for (final p in rest)
+          {
+            'kind': 'line',
+            'to': [p.dx, p.dy],
+          },
+      ],
+    });
+    _refresh();
+    if (out != null) _toast(l.toastHoleAdded);
+  }
+
+  /// Where on an edge a click landed, or null off the edges.
+  EdgeSpot? _spot(Offset mm, double mmPerPx) => _guard<EdgeSpot?>(
+    () => widget.engine.edgeSpotNear(
+      xMm: mm.dx,
+      yMm: mm.dy,
+      maxMm: _pickPx * mmPerPx,
+    ),
+  );
+
+  /// Dart: drawn, folded and sewn where the edge was clicked.
+  Future<void> _dartTap(Offset mm, double mmPerPx) async {
+    final spot = _spot(mm, mmPerPx);
+    if (spot == null) return;
+    final l = context.l;
+    final picked = await _askNumbers(
+      context,
+      title: l.toolDart,
+      fields: [(l.dartWidth, l.cm, 2), (l.dartLength, l.cm, 10)],
+    );
+    if (picked == null || !mounted) return;
+    final [w, len] = picked.$1;
+    _run({
+      'type': 'dart.add',
+      'edge': spot.edge,
+      'at_mm': spot.offsetMm,
+      'width_mm': w * 10,
+      'length_mm': len * 10,
+    });
+    _refresh();
+  }
+
+  /// Pleat: folded and sewn from where the edge was clicked.
+  Future<void> _pleatTap(Offset mm, double mmPerPx) async {
+    final spot = _spot(mm, mmPerPx);
+    if (spot == null) return;
+    final l = context.l;
+    final picked = await _askNumbers(
+      context,
+      title: l.toolPleat,
+      fields: [(l.pleatDepth, l.cm, 3), (l.pleatStitched, l.cm, 0)],
+      choices: [l.pleatKnife, l.pleatBox],
+    );
+    if (picked == null || !mounted) return;
+    final ([depth, stitched], choice) = picked;
+    _run({
+      'type': 'pleat.add',
+      'edge': spot.edge,
+      'at_mm': spot.offsetMm,
+      'depth_mm': depth * 10,
+      'kind': choice == 0 ? 'knife' : 'box',
+      if (stitched > 0) 'stitched_mm': stitched * 10,
+    });
+    _refresh();
+  }
+
   /// Arc: an edge clicked becomes a circular arc, bulging as typed.
   Future<void> _arcTap(Offset mm, double mmPerPx) async {
     _guard(
@@ -728,6 +806,7 @@ class _ShellState extends State<Shell> {
 
   void _finishPolygon() {
     if (_polygon.length < 3) return;
+    if (_tool == 'hole') return _finishHole();
     final panels = (_summary['panels'] as List<dynamic>? ?? const []);
     final out = _run({
       'type': 'panel.create_polygon',
@@ -810,7 +889,7 @@ class _ShellState extends State<Shell> {
 
   /// Enter: close the polygon or the curved piece, or make the cut.
   void _finish() {
-    if (_tool == 'polygon') return _finishPolygon();
+    if (_tool == 'polygon' || _tool == 'hole') return _finishPolygon();
     if (_tool == 'curve' || _tool == 'cut') return _finishPath();
   }
 
@@ -1486,6 +1565,16 @@ class _ShellState extends State<Shell> {
                                           'arc' => PatternPointer(
                                             onTap: _arcTap,
                                           ),
+                                          'dart' => PatternPointer(
+                                            onTap: _dartTap,
+                                          ),
+                                          'pleat' => PatternPointer(
+                                            onTap: _pleatTap,
+                                          ),
+                                          'hole' => PatternPointer(
+                                            onTap: _polygonTap,
+                                            onHover: _hoverAt,
+                                          ),
                                           'notch' => PatternPointer(
                                             onTap: _notchTap,
                                           ),
@@ -1699,6 +1788,9 @@ class _ShellState extends State<Shell> {
                   'straighten' => l.hintStraighten,
                   'addPoint' => l.hintAddPoint,
                   'arc' => l.hintArc,
+                  'dart' => l.hintDart,
+                  'pleat' => l.hintPleat,
+                  'hole' => l.hintHole,
                   'guide' => l.hintGuide,
                   'cut' => l.hintCut,
                   'notch' => l.hintNotch,
@@ -2211,6 +2303,19 @@ class _ToolRail extends StatelessWidget {
   static const groups = [
     ('shapes', ['rectangle', 'ellipse', 'sector']),
     ('curves', ['bend', 'straighten', 'addPoint', 'arc']),
+    ('details', ['dart', 'pleat', 'hole']),
+  ];
+
+  static List<_RailTool> _details(L l) => [
+    ('dart', Icons.change_history_rounded, l.toolDart, '', l.toolDartHint),
+    ('pleat', Icons.view_week_outlined, l.toolPleat, '', l.toolPleatHint),
+    (
+      'hole',
+      Icons.radio_button_unchecked_rounded,
+      l.toolHole,
+      '',
+      l.toolHoleHint,
+    ),
   ];
 
   static List<_RailTool> _shapes(L l) => [
@@ -2253,6 +2358,7 @@ class _ToolRail extends StatelessWidget {
     ('curves', l.toolEditCurve, _curveEdits(l)),
     ('guide', Icons.straighten_rounded, l.toolGuide, 'G', l.toolGuideHint),
     ('cut', Icons.content_cut_rounded, l.toolCut, 'K', l.toolCutHint),
+    ('details', l.toolDetails, _details(l)),
     ('draw', Icons.brush_rounded, l.toolDraw, 'D', l.toolDrawHint),
     (
       'notch',
@@ -2706,6 +2812,11 @@ class _Inspector extends StatelessWidget {
               seams: seams,
               run: run,
               onDelete: onDelete,
+              // The other pieces, to join or cut this one with.
+              others: [
+                for (final p in (summary['panels'] as List? ?? const []))
+                  if (p is Map<String, dynamic> && p['id'] != panel!['id']) p,
+              ],
             ),
             _ => _MultiInspector(count: selection.length),
           },
@@ -2903,7 +3014,11 @@ class _PanelInspector extends StatelessWidget {
     required this.seams,
     required this.run,
     required this.onDelete,
+    required this.others,
   });
+
+  /// The other pieces, as the project summary lists them.
+  final List<Map<String, dynamic>> others;
 
   final Map<String, dynamic> panel;
 
@@ -3002,6 +3117,10 @@ class _PanelInspector extends StatelessWidget {
             grading: linked ? null : grading,
             panel: panel,
           ),
+        ],
+        if (!linked && others.isNotEmpty) ...[
+          const SizedBox(height: Space.l),
+          _CombineCard(panel: id, others: others, run: run),
         ],
         if (!linked) ...[
           const SizedBox(height: Space.l),
@@ -4009,6 +4128,21 @@ class _EdgeCard extends StatelessWidget {
                 icon: const Icon(Icons.straighten_rounded, size: 16),
                 label: Text(l.matchOtherSide),
               ),
+            ),
+          if (seam != null)
+            _SliderRow(
+              label: l.ease,
+              value: ((seam['ease_mm'] as num?) ?? 0).toDouble() / 10,
+              min: -5,
+              max: 5,
+              unit: l.cm,
+              digits: 1,
+              enabled: true,
+              onChanged: (cm) => run({
+                'type': 'seam.set_ease',
+                'seam': seam['id'],
+                'mm': (cm * 100).roundToDouble() / 10,
+              }),
             ),
           if (seam != null)
             Wrap(

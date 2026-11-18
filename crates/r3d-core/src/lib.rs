@@ -19,6 +19,7 @@ pub mod measure;
 pub mod message;
 pub mod model;
 pub mod project_dir;
+pub mod seam;
 
 pub use edit::{ChangeSet, Transaction};
 pub use id::{

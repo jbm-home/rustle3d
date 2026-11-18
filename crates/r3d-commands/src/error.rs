@@ -70,6 +70,14 @@ pub enum Invalid {
     NotJoined,
     #[error("is graded by formulas: change them, or the sizes")]
     GradedByFormula,
+    #[error("works on seams between two whole edges")]
+    NotWholeEdges,
+    #[error("overlaps a stretch already sewn")]
+    Overlaps,
+    #[error("would leave several pieces, or nothing")]
+    Apart,
+    #[error("has holes: fill them first (panel.remove_hole)")]
+    HasHoles,
 }
 
 impl Invalid {
@@ -107,6 +115,10 @@ impl Invalid {
             Invalid::Duplicate => "invalid.duplicate",
             Invalid::NotJoined => "invalid.not_joined",
             Invalid::GradedByFormula => "invalid.graded_by_formula",
+            Invalid::NotWholeEdges => "invalid.not_whole_edges",
+            Invalid::Overlaps => "invalid.overlaps",
+            Invalid::Apart => "invalid.apart",
+            Invalid::HasHoles => "invalid.has_holes",
         }
     }
 }

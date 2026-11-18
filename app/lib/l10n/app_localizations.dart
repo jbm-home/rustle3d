@@ -2800,7 +2800,7 @@ abstract class L {
   /// A step of the undo history, by its command name with dots as underscores.
   ///
   /// In en, this message translates to:
-  /// **'{step, select, project_rename{Rename project} project_set_display_unit{Change units} avatar_set{Change body} avatar_remove{Remove body} panel_create_rect{Add rectangle} panel_create_polygon{Add polygon} panel_create_path{Add curved piece} panel_rename{Rename piece} panel_translate{Move piece} panel_set_grain{Set grainline} panel_set_seam_allowance{Set seam allowance} panel_mirror{Mirror piece} panel_unlink{Unlink copy} panel_place{Place piece} panel_delete{Delete piece} panel_cut{Cut piece} panel_paste{Paste} point_move{Move point} point_set_distance{Set distance} point_remove{Remove point} edge_set_curve{Bend edge} edge_split{Add point} edge_move{Move edge} notch_add{Add notch} notch_move{Move notch} notch_remove{Remove notch} internal_line_add{Draw line} internal_line_remove{Remove line} seam_add{Sew} seam_remove{Unsew} seam_flip{Flip seam} seam_set_gathered{Gather seam} edge_lengthen{Lengthen} edge_set_length{Set length} seam_take_in{Take in} seam_match_length{Match lengths} pin_add{Pin} pin_remove{Unpin} garment_set_fabric{Change fabric} garment_arrange{Arrange pieces} garment_set_color{Change colour} garment_add{Add garment} garment_rename{Rename garment} garment_remove{Remove garment} garment_set_layer{Change layer} panel_set_garment{Move to garment} grading_set_sizes{Set sizes} grading_use_chart{Use size chart} grading_clear{Remove sizes} grading_show_size{Show size} point_set_grade{Grade point} template_apply{Add template} pattern_import{Import pattern} batch{Several changes} constraint_add{Add constraint} constraint_remove{Remove constraint} constraint_set_value{Change dimension} point_set_smooth{Smooth point} panel_unfold{Unfold piece} guide_add{Add construction line} guide_move{Move construction line} guide_remove{Remove construction line} panel_create_ellipse{Add ellipse} panel_create_sector{Add circle skirt} edge_set_arc{Make arc} constraint_set_formula{Set formula} variable_set{Set variable} variable_remove{Remove variable} other{{step}}}'**
+  /// **'{step, select, project_rename{Rename project} project_set_display_unit{Change units} avatar_set{Change body} avatar_remove{Remove body} panel_create_rect{Add rectangle} panel_create_polygon{Add polygon} panel_create_path{Add curved piece} panel_rename{Rename piece} panel_translate{Move piece} panel_set_grain{Set grainline} panel_set_seam_allowance{Set seam allowance} panel_mirror{Mirror piece} panel_unlink{Unlink copy} panel_place{Place piece} panel_delete{Delete piece} panel_cut{Cut piece} panel_paste{Paste} point_move{Move point} point_set_distance{Set distance} point_remove{Remove point} edge_set_curve{Bend edge} edge_split{Add point} edge_move{Move edge} notch_add{Add notch} notch_move{Move notch} notch_remove{Remove notch} internal_line_add{Draw line} internal_line_remove{Remove line} seam_add{Sew} seam_remove{Unsew} seam_flip{Flip seam} seam_set_gathered{Gather seam} edge_lengthen{Lengthen} edge_set_length{Set length} seam_take_in{Take in} seam_match_length{Match lengths} pin_add{Pin} pin_remove{Unpin} garment_set_fabric{Change fabric} garment_arrange{Arrange pieces} garment_set_color{Change colour} garment_add{Add garment} garment_rename{Rename garment} garment_remove{Remove garment} garment_set_layer{Change layer} panel_set_garment{Move to garment} grading_set_sizes{Set sizes} grading_use_chart{Use size chart} grading_clear{Remove sizes} grading_show_size{Show size} point_set_grade{Grade point} template_apply{Add template} pattern_import{Import pattern} batch{Several changes} constraint_add{Add constraint} constraint_remove{Remove constraint} constraint_set_value{Change dimension} point_set_smooth{Smooth point} panel_unfold{Unfold piece} guide_add{Add construction line} guide_move{Move construction line} guide_remove{Remove construction line} panel_create_ellipse{Add ellipse} panel_create_sector{Add circle skirt} edge_set_arc{Make arc} constraint_set_formula{Set formula} variable_set{Set variable} variable_remove{Remove variable} seam_set_ease{Set ease} dart_add{Add dart} pleat_add{Add pleat} panel_add_hole{Cut hole} panel_remove_hole{Fill hole} panel_boolean{Join or cut pieces} other{{step}}}'**
   String stepName(String step);
 
   /// No description provided for @undoStep.
@@ -3342,6 +3342,174 @@ abstract class L {
   /// In en, this message translates to:
   /// **'“{name}” cannot name a variable: a letter, then letters, digits or _.'**
   String errFormulaBadName(String name);
+
+  /// No description provided for @toolDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get toolDetails;
+
+  /// No description provided for @toolDart.
+  ///
+  /// In en, this message translates to:
+  /// **'Dart'**
+  String get toolDart;
+
+  /// No description provided for @toolDartHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Click an edge where the dart goes: drawn, folded and sewn'**
+  String get toolDartHint;
+
+  /// No description provided for @toolPleat.
+  ///
+  /// In en, this message translates to:
+  /// **'Pleat'**
+  String get toolPleat;
+
+  /// No description provided for @toolPleatHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Click an edge where the pleat starts: folded and sewn'**
+  String get toolPleatHint;
+
+  /// No description provided for @toolHole.
+  ///
+  /// In en, this message translates to:
+  /// **'Hole'**
+  String get toolHole;
+
+  /// No description provided for @toolHoleHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a piece, then click the corners of a hole inside it'**
+  String get toolHoleHint;
+
+  /// No description provided for @hintDart.
+  ///
+  /// In en, this message translates to:
+  /// **'Dart: click an edge where it goes · V to stop'**
+  String get hintDart;
+
+  /// No description provided for @hintPleat.
+  ///
+  /// In en, this message translates to:
+  /// **'Pleat: click an edge where it starts · V to stop'**
+  String get hintPleat;
+
+  /// No description provided for @hintHole.
+  ///
+  /// In en, this message translates to:
+  /// **'Hole: click its corners inside the selected piece, Enter to cut it · Esc cancels'**
+  String get hintHole;
+
+  /// No description provided for @toastHoleAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Hole cut.'**
+  String get toastHoleAdded;
+
+  /// No description provided for @holeSelectFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the piece to cut the hole in first.'**
+  String get holeSelectFirst;
+
+  /// No description provided for @dartWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Width at the edge'**
+  String get dartWidth;
+
+  /// No description provided for @dartLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Length'**
+  String get dartLength;
+
+  /// No description provided for @pleatDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'Depth'**
+  String get pleatDepth;
+
+  /// No description provided for @pleatStitched.
+  ///
+  /// In en, this message translates to:
+  /// **'Stitched down'**
+  String get pleatStitched;
+
+  /// No description provided for @pleatKnife.
+  ///
+  /// In en, this message translates to:
+  /// **'Knife'**
+  String get pleatKnife;
+
+  /// No description provided for @pleatBox.
+  ///
+  /// In en, this message translates to:
+  /// **'Box'**
+  String get pleatBox;
+
+  /// No description provided for @combine.
+  ///
+  /// In en, this message translates to:
+  /// **'Join or cut'**
+  String get combine;
+
+  /// No description provided for @combineWith.
+  ///
+  /// In en, this message translates to:
+  /// **'With the piece'**
+  String get combineWith;
+
+  /// No description provided for @join.
+  ///
+  /// In en, this message translates to:
+  /// **'Join'**
+  String get join;
+
+  /// No description provided for @cutOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Cut out'**
+  String get cutOut;
+
+  /// No description provided for @ease.
+  ///
+  /// In en, this message translates to:
+  /// **'Ease'**
+  String get ease;
+
+  /// No description provided for @errOverlaps.
+  ///
+  /// In en, this message translates to:
+  /// **'This stretch is already sewn.'**
+  String get errOverlaps;
+
+  /// No description provided for @errNotWholeEdges.
+  ///
+  /// In en, this message translates to:
+  /// **'This works on seams between two whole edges.'**
+  String get errNotWholeEdges;
+
+  /// No description provided for @errApart.
+  ///
+  /// In en, this message translates to:
+  /// **'The result would be several pieces, or nothing.'**
+  String get errApart;
+
+  /// No description provided for @errHasHoles.
+  ///
+  /// In en, this message translates to:
+  /// **'This piece has holes: fill them first.'**
+  String get errHasHoles;
+
+  /// No description provided for @errNotJoined.
+  ///
+  /// In en, this message translates to:
+  /// **'These edges do not follow each other on one piece.'**
+  String get errNotJoined;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

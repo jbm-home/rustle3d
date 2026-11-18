@@ -117,7 +117,7 @@ impl Change {
             (Change::Point(a), Change::Point(b)) if a.id == b.id => a.after = b.after.clone(),
             (Change::Edge(a), Change::Edge(b)) if a.id == b.id => a.after = b.after.clone(),
             (Change::Notch(a), Change::Notch(b)) if a.id == b.id => a.after = b.after.clone(),
-            (Change::Seam(a), Change::Seam(b)) if a.id == b.id => a.after = b.after,
+            (Change::Seam(a), Change::Seam(b)) if a.id == b.id => a.after = b.after.clone(),
             (Change::Pin(a), Change::Pin(b)) if a.id == b.id => a.after = b.after,
             (Change::Constraint(a), Change::Constraint(b)) if a.id == b.id => {
                 a.after = b.after.clone()
@@ -203,7 +203,10 @@ impl ChangeSet {
                 Change::Pin(c) => each!(c, |v: &Pin| [Some(v.panel)]),
                 Change::Notch(c) => each!(c, |v: &Notch| [edge_panel(v.edge)]),
                 Change::Seam(c) => {
-                    each!(c, |v: &Seam| [edge_panel(v.a.edge), edge_panel(v.b.edge)])
+                    each!(c, |v: &Seam| [
+                        project.side_panel(&v.a),
+                        project.side_panel(&v.b)
+                    ])
                 }
                 Change::Constraint(c) => {
                     each!(c, |v: &Constraint| [project.constraint_panel(v)])

@@ -32,7 +32,7 @@ pub enum IntegrityError {
     BadMirror { panel: AnyId },
     #[error("the avatar has invalid measurements")]
     BadAvatar,
-    #[error("{seam} is invalid (missing edge, same edge twice, or an edge sewn twice)")]
+    #[error("{seam} is invalid (missing or unjoined edges, a bad range, or an edge sewn twice)")]
     BadSeam { seam: AnyId },
     #[error("{entity} has an invalid value")]
     BadValue { entity: AnyId },
@@ -95,6 +95,37 @@ impl Localizable for IntegrityError {
 }
 
 impl Project {
+    /// A seam side names existing geometry: consecutive contour (or hole)
+    /// edges of one piece, or an internal line; a range within it.
+    fn side_ok(&self, side: &crate::model::SeamSide) -> bool {
+        let range_ok = [side.from_mm, side.to_mm]
+            .iter()
+            .flatten()
+            .all(|v| v.is_finite() && *v >= 0.0)
+            && match (side.from_mm, side.to_mm) {
+                (Some(a), Some(b)) => a < b,
+                _ => true,
+            };
+        let path_ok = match (side.edges.as_slice(), side.line) {
+            ([], Some(line)) => self.internal_lines.contains_key(&line),
+            ([first, ..], None) => {
+                let edges: Vec<_> = side.edges.iter().map(|e| self.edges.get(e)).collect();
+                let panel = self.edges.get(first).map(|e| e.panel);
+                let mut seen = std::collections::BTreeSet::new();
+                edges
+                    .iter()
+                    .all(|e| e.is_some_and(|e| Some(e.panel) == panel))
+                    && side.edges.iter().all(|e| seen.insert(*e))
+                    && edges.windows(2).all(|w| match w {
+                        [Some(a), Some(b)] => a.end == b.start,
+                        _ => false,
+                    })
+            }
+            _ => false,
+        };
+        range_ok && path_ok
+    }
+
     /// Check every structural invariant.
     pub fn check_integrity(&self) -> Result<(), IntegrityError> {
         use IntegrityError as E;
@@ -111,13 +142,18 @@ impl Project {
                 });
             }
         }
+        // Whole edges sewn twice; partial sides may share an edge (a pleat
+        // sews one edge to itself), seam.add checks they do not overlap.
         let mut sewn = std::collections::BTreeSet::new();
         for (id, seam) in &self.seams {
-            let ok = seam.a.edge != seam.b.edge
-                && self.edges.contains_key(&seam.a.edge)
-                && self.edges.contains_key(&seam.b.edge)
-                && sewn.insert(seam.a.edge)
-                && sewn.insert(seam.b.edge);
+            let ok = self.side_ok(&seam.a)
+                && self.side_ok(&seam.b)
+                && seam.a != seam.b
+                && seam.ease_mm.is_finite()
+                && [&seam.a, &seam.b]
+                    .iter()
+                    .filter_map(|s| s.whole_edge())
+                    .all(|e| sewn.insert(e));
             if !ok {
                 return Err(E::BadSeam { seam: (*id).into() });
             }
@@ -324,6 +360,27 @@ impl Project {
             let n = edges.len();
             for i in 0..n {
                 if edges[i].end != edges[(i + 1) % n].start {
+                    return Err(E::OpenContour { panel: pid });
+                }
+            }
+            for hole in &panel.holes {
+                let mut loop_edges = Vec::with_capacity(hole.len());
+                for eid in hole {
+                    let Some(edge) = self.edges.get(eid).filter(|e| e.panel == *id) else {
+                        return Err(E::OpenContour { panel: pid });
+                    };
+                    *usage.entry(*eid).or_insert(0usize) += 1;
+                    loop_edges.push(edge);
+                }
+                let m = loop_edges.len();
+                let closed = m >= 2
+                    && (0..m).all(|i| {
+                        loop_edges
+                            .get(i)
+                            .zip(loop_edges.get((i + 1) % m))
+                            .is_some_and(|(a, b)| a.end == b.start)
+                    });
+                if !closed {
                     return Err(E::OpenContour { panel: pid });
                 }
             }

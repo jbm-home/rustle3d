@@ -8,8 +8,8 @@ use std::collections::BTreeMap;
 
 use r3d_core::file::SCHEMA_VERSION;
 use r3d_core::{
-    Constraint, Edge, EdgeCurve, EdgeId, GarmentId, InternalLine, Notch, Panel, PanelId,
-    PathSegment, Pin, Point, PointId, Project, Seam, SeamSide, Symmetry, Transaction,
+    Constraint, Edge, EdgeCurve, EdgeId, GarmentId, InternalLine, InternalLineId, Notch, Panel,
+    PanelId, PathSegment, Pin, Point, PointId, Project, Seam, SeamSide, Symmetry, Transaction,
 };
 use r3d_geom::DVec2;
 use schemars::JsonSchema;
@@ -41,7 +41,7 @@ struct Clip {
     points: BTreeMap<PointId, Point>,
     edges: BTreeMap<EdgeId, Edge>,
     notches: Vec<Notch>,
-    internal_lines: Vec<InternalLine>,
+    internal_lines: BTreeMap<InternalLineId, InternalLine>,
     seams: Vec<Seam>,
     pins: Vec<Pin>,
     /// Constraints whose points and edges are all in the clip.
@@ -94,15 +94,23 @@ impl QuerySpec for PanelCopy {
                 .collect(),
             internal_lines: p
                 .internal_lines()
-                .values()
-                .filter(|l| panels.contains_key(&l.panel))
-                .cloned()
+                .iter()
+                .filter(|(_, l)| panels.contains_key(&l.panel))
+                .map(|(id, l)| (*id, l.clone()))
                 .collect(),
             seams: p
                 .seams()
                 .values()
-                .filter(|s| edges.contains_key(&s.a.edge) && edges.contains_key(&s.b.edge))
-                .copied()
+                .filter(|s| {
+                    [&s.a, &s.b].iter().all(|side| {
+                        side.edges.iter().all(|e| edges.contains_key(e))
+                            && side.line.is_none_or(|l| {
+                                p.internal_line(l)
+                                    .is_some_and(|l| panels.contains_key(&l.panel))
+                            })
+                    })
+                })
+                .cloned()
                 .collect(),
             pins: p
                 .pins()
@@ -288,6 +296,11 @@ impl CommandSpec for PanelPaste {
                 .iter()
                 .map(|e| edges.get(*e))
                 .collect::<Result<_, _>>()?;
+            let holes = panel
+                .holes
+                .iter()
+                .map(|h| h.iter().map(|e| edges.get(*e)).collect())
+                .collect::<Result<_, _>>()?;
             let symmetry = match &panel.symmetry {
                 Some(sym) => Some(Symmetry {
                     origin: sym.origin + d,
@@ -316,6 +329,7 @@ impl CommandSpec for PanelPaste {
                     mirror_of,
                     placement,
                     symmetry,
+                    holes,
                     ..panel.clone()
                 },
             );
@@ -360,10 +374,15 @@ impl CommandSpec for PanelPaste {
                 },
             );
         }
-        for line in &clip.internal_lines {
-            let id = tx.new_internal_line_id();
+        let lines = Fresh(
+            clip.internal_lines
+                .keys()
+                .map(|id| (*id, tx.new_internal_line_id()))
+                .collect(),
+        );
+        for (old, line) in &clip.internal_lines {
             tx.put_internal_line(
-                id,
+                lines.get(*old)?,
                 InternalLine {
                     panel: panels.get(line.panel)?,
                     start: line.start + d,
@@ -388,19 +407,24 @@ impl CommandSpec for PanelPaste {
         }
         let mut created: Vec<r3d_core::AnyId> = panels.0.values().map(|id| (*id).into()).collect();
         for seam in &clip.seams {
-            let side = |s: SeamSide| -> Result<SeamSide, CommandError> {
+            let side = |s: &SeamSide| -> Result<SeamSide, CommandError> {
                 Ok(SeamSide {
-                    edge: edges.get(s.edge)?,
-                    ..s
+                    edges: s
+                        .edges
+                        .iter()
+                        .map(|e| edges.get(*e))
+                        .collect::<Result<_, _>>()?,
+                    line: s.line.map(|l| lines.get(l)).transpose()?,
+                    ..s.clone()
                 })
             };
             let id = tx.new_seam_id();
             tx.put_seam(
                 id,
                 Seam {
-                    a: side(seam.a)?,
-                    b: side(seam.b)?,
-                    ..*seam
+                    a: side(&seam.a)?,
+                    b: side(&seam.b)?,
+                    ..seam.clone()
                 },
             );
             created.push(id.into());

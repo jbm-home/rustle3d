@@ -204,6 +204,14 @@ impl From<crate::snap::Landing> for Snap {
     }
 }
 
+/// A place on an edge: the edge, how far along it (mm), its length (mm).
+#[derive(Debug, Clone)]
+pub struct EdgeSpot {
+    pub edge: String,
+    pub offset_mm: f64,
+    pub length_mm: f64,
+}
+
 /// A corner picked on the board, and where it is (mm).
 #[derive(Debug, Clone)]
 pub struct PickedPoint {
@@ -1723,10 +1731,30 @@ impl Engine {
                 project
                     .panel(e.panel)
                     .is_some_and(|p| p.mirror_of.is_none())
+                    && !project.is_derived_edge(e.id)
             })
             .map(|e| {
                 let length = project.edge_length(e.id).unwrap_or_default();
                 (e.id, offset_along(&e.points, at), length)
+            }))
+    }
+
+    /// The editable edge within `max_mm` of pattern point (`x_mm`, `y_mm`)
+    /// and how far along it that point is: where a dart or a pleat clicked
+    /// there goes. `None` off the edges.
+    #[frb(sync)]
+    pub fn edge_spot_near(
+        &self,
+        x_mm: f64,
+        y_mm: f64,
+        max_mm: f64,
+    ) -> Result<Option<EdgeSpot>, ApiError> {
+        Ok(self
+            .edge_spot(r3d_geom::DVec2::new(x_mm, y_mm), max_mm)?
+            .map(|(edge, offset_mm, length_mm)| EdgeSpot {
+                edge: edge.to_string(),
+                offset_mm,
+                length_mm,
             }))
     }
 

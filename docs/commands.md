@@ -1584,7 +1584,7 @@ Remove an internal line.
 
 ### `seam.add`
 
-Sew two whole edges together. Points are matched along the edges, start to start unless a side is reversed; leave b.reversed out to have it chosen (an edge and its linked mirror image meet mirrored point to mirrored point; other edges are walked both the same way on the pattern), and use seam.flip if the seam looks twisted. An edge can be in one seam only. Returns the seam.
+Sew two sides together. A side is a whole `edge`, a run of consecutive outline `edges` of one piece (in order around it), or an internal `line`, each optionally only `from_mm`/`to_mm` along it (a seam between two notches, a pocket sewn on its placement line, the two halves of a pleat on one edge). Points are matched along the sides, start to start unless a side is reversed; leave b.reversed out to have it chosen (an edge and its linked mirror image meet mirrored point to mirrored point; other sides are walked both the same way on the pattern), and use seam.flip if the seam looks twisted. Stretches already sewn cannot be sewn again (invalid.overlaps). `ease_mm` is how much longer side a is meant to be. Returns the seam.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -1596,36 +1596,88 @@ Sew two whole edges together. Points are matched along the edges, start to start
       "pattern": "^edge:[1-9][0-9]*$",
       "type": "string"
     },
+    "InternalLineId": {
+      "description": "Identifier of a line, e.g. `line:1`.",
+      "pattern": "^line:[1-9][0-9]*$",
+      "type": "string"
+    },
     "SeamSideSpec": {
       "additionalProperties": false,
-      "description": "One side of a new seam.",
+      "description": "One side of a new seam: a whole edge, a run of edges, or an internal\nline; all of it or part of it.",
       "properties": {
         "edge": {
-          "$ref": "#/$defs/EdgeId"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EdgeId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "One edge."
+        },
+        "edges": {
+          "description": "Or consecutive outline edges of one piece, in their order around it\n(e.g. a pocket's sides and bottom).",
+          "items": {
+            "$ref": "#/$defs/EdgeId"
+          },
+          "type": "array"
+        },
+        "from_mm": {
+          "description": "Only from here along the path (mm from its start). Omitted: its\nstart.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "line": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InternalLineId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Or an internal line (a pocket's placement line, a tuck's line)."
         },
         "reversed": {
-          "description": "Walk this edge from its end point instead of its start. Omitted:\n`false` for side `a`; for side `b`, an edge sewn to its linked\nmirror image meets it mirrored point to mirrored point (a centre\nseam), other edges are walked both the same way on the pattern\n(what sewing two panels laid side by side needs).",
+          "description": "Walk the side from its end instead of its start. Omitted: `false`\nfor side `a`; for side `b`, an edge sewn to its linked mirror image\nmeets it mirrored point to mirrored point (a centre seam), other\nsides are walked both the same way on the pattern (what sewing two\npanels laid side by side needs).",
           "type": [
             "boolean",
             "null"
           ]
+        },
+        "to_mm": {
+          "description": "Only to here (mm from the path's start). Omitted: its end.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         }
       },
-      "required": [
-        "edge"
-      ],
       "type": "object"
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "Sew two edges together.",
+  "description": "Sew two sides together.",
   "properties": {
     "a": {
       "$ref": "#/$defs/SeamSideSpec"
     },
     "b": {
       "$ref": "#/$defs/SeamSideSpec"
+    },
+    "ease_mm": {
+      "description": "How much longer side `a` is meant to be than `b` (mm, negative:\nshorter), eased in: not reported as a mismatch.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
     }
   },
   "required": [
@@ -1736,6 +1788,386 @@ Mark a seam as gathered (or not): its longer side is gathered evenly onto the sh
     "gathered"
   ],
   "title": "SeamSetGathered",
+  "type": "object"
+}
+```
+
+</details>
+
+### `seam.set_ease`
+
+Set a seam's ease: how much longer its side a is meant to be than side b (mm; negative, shorter). The extra length is eased in along the seam when it drapes; only the difference beyond the ease is reported as a mismatch.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "SeamId": {
+      "description": "Identifier of a seam, e.g. `seam:1`.",
+      "pattern": "^seam:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Set how much longer one side of a seam is meant to be.",
+  "properties": {
+    "mm": {
+      "description": "How much longer side `a` is meant to be than side `b` (mm;\nnegative, shorter): eased in along the seam (a sleeve cap, a back\nshoulder), not reported as a mismatch.",
+      "format": "double",
+      "type": "number"
+    },
+    "seam": {
+      "$ref": "#/$defs/SeamId"
+    }
+  },
+  "required": [
+    "seam",
+    "mm"
+  ],
+  "title": "SeamSetEase",
+  "type": "object"
+}
+```
+
+</details>
+
+### `dart.add`
+
+Draw a dart on an outline edge, fold it and sew it, in one step: the edge is opened `width_mm` wide around `at_mm`, the dart's point goes `length_mm` into the piece, and its two legs are sewn together (the cloth closes when it drapes). Returns the dart's point, its two legs and the seam. Constraints on the edge are removed.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "EdgeId": {
+      "description": "Identifier of a edge, e.g. `edge:1`.",
+      "pattern": "^edge:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Add a dart on an edge.",
+  "properties": {
+    "at_mm": {
+      "description": "Where the dart's middle is along the edge (mm from its start).",
+      "format": "double",
+      "type": "number"
+    },
+    "edge": {
+      "$ref": "#/$defs/EdgeId"
+    },
+    "length_mm": {
+      "description": "How far into the piece its point is (mm, > 0).",
+      "format": "double",
+      "type": "number"
+    },
+    "width_mm": {
+      "description": "How much the dart takes in at the edge (mm, > 0).",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "edge",
+    "at_mm",
+    "width_mm",
+    "length_mm"
+  ],
+  "title": "DartAdd",
+  "type": "object"
+}
+```
+
+</details>
+
+### `pleat.add`
+
+Fold and sew a pleat on an outline edge (a skirt's waist): from `at_mm`, a knife pleat folds `depth_mm` of cloth under (the edge's stretch of 2 × depth is sewn to itself, folded in the middle), a box pleat two such folds facing away from each other; with `stitched_mm`, the folds are also stitched down that far into the piece (along internal lines). Notches mark the fold lines. Returns the seams, then the lines and notches.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "EdgeId": {
+      "description": "Identifier of a edge, e.g. `edge:1`.",
+      "pattern": "^edge:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "PleatKind": {
+      "description": "How a pleat folds.",
+      "oneOf": [
+        {
+          "const": "knife",
+          "description": "One fold, all the same way.",
+          "type": "string"
+        },
+        {
+          "const": "box",
+          "description": "Two folds facing away from each other.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Add a pleat on an edge.",
+  "properties": {
+    "at_mm": {
+      "description": "Where the pleat starts along the edge (mm from its start).",
+      "format": "double",
+      "type": "number"
+    },
+    "depth_mm": {
+      "description": "How deep each fold is (mm, > 0): a knife pleat takes up twice that\nalong the edge, a box pleat four times.",
+      "format": "double",
+      "type": "number"
+    },
+    "edge": {
+      "$ref": "#/$defs/EdgeId"
+    },
+    "kind": {
+      "$ref": "#/$defs/PleatKind",
+      "default": "knife"
+    },
+    "stitched_mm": {
+      "description": "Stitched down this far into the piece (mm); 0 or omitted: held at\nthe edge only.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "edge",
+    "at_mm",
+    "depth_mm"
+  ],
+  "title": "PleatAdd",
+  "type": "object"
+}
+```
+
+</details>
+
+### `panel.add_hole`
+
+Cut a hole in a piece (a buttonhole opening, a cut-out): a closed path of straight and cubic edges (mm) inside the piece, not crossing its outline or its other holes. The hole is left out of the cloth; its edges can be sewn and notched like the outline's. Returns the hole's points, then its edges.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "PanelId": {
+      "description": "Identifier of a panel, e.g. `panel:1`.",
+      "pattern": "^panel:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "SegmentSpec": {
+      "description": "One segment of an internal line, starting where the previous one ended.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "line",
+              "type": "string"
+            },
+            "to": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "to"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "c1": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "c2": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "kind": {
+              "const": "cubic",
+              "type": "string"
+            },
+            "to": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "c1",
+            "c2",
+            "to"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Cut a hole in a piece.",
+  "properties": {
+    "panel": {
+      "$ref": "#/$defs/PanelId"
+    },
+    "segments": {
+      "description": "Its edges in order (straight or cubic), back to `start` (a straight\nedge closes it otherwise).",
+      "items": {
+        "$ref": "#/$defs/SegmentSpec"
+      },
+      "type": "array"
+    },
+    "start": {
+      "description": "First point of the hole's outline (mm).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+    }
+  },
+  "required": [
+    "panel",
+    "start",
+    "segments"
+  ],
+  "title": "PanelAddHole",
+  "type": "object"
+}
+```
+
+</details>
+
+### `panel.remove_hole`
+
+Fill a hole of a piece again: its points and edges go, with the notches and seams on them.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "EdgeId": {
+      "description": "Identifier of a edge, e.g. `edge:1`.",
+      "pattern": "^edge:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Remove a hole from a piece.",
+  "properties": {
+    "edge": {
+      "$ref": "#/$defs/EdgeId",
+      "description": "Any edge of the hole."
+    }
+  },
+  "required": [
+    "edge"
+  ],
+  "title": "PanelRemoveHole",
+  "type": "object"
+}
+```
+
+</details>
+
+### `panel.boolean`
+
+Join two overlapping pieces into one (`union`), or cut a piece with another (`difference`: a bite out of its outline, or a hole when the other lies inside it). The result is fitted with straight and curved edges; the other piece is removed unless `keep`. Pieces that are sewn, symmetric or mirrored must be unpicked or unlinked first; notches on the changed outline go. Fails if the result would be several pieces or nothing.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "BooleanOp": {
+      "description": "What a boolean keeps.",
+      "oneOf": [
+        {
+          "const": "union",
+          "description": "Both pieces' cloth: one piece (they must overlap or touch).",
+          "type": "string"
+        },
+        {
+          "const": "difference",
+          "description": "The first piece without the second: a notch cut in its outline, or\na hole when the second lies inside.",
+          "type": "string"
+        }
+      ]
+    },
+    "PanelId": {
+      "description": "Identifier of a panel, e.g. `panel:1`.",
+      "pattern": "^panel:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Join two pieces into one, or cut one with another.",
+  "properties": {
+    "keep": {
+      "type": "boolean"
+    },
+    "op": {
+      "$ref": "#/$defs/BooleanOp"
+    },
+    "panel": {
+      "$ref": "#/$defs/PanelId",
+      "description": "The piece changed."
+    },
+    "with": {
+      "$ref": "#/$defs/PanelId",
+      "description": "The other piece: joined to `panel` (`union`), or cut out of it\n(`difference`). It goes, unless `keep`."
+    }
+  },
+  "required": [
+    "panel",
+    "with",
+    "op"
+  ],
+  "title": "PanelBoolean",
   "type": "object"
 }
 ```
@@ -4061,7 +4493,7 @@ Built-in body presets: standard women's and men's sizes, as {name, body} pairs u
 
 ### `seam.list`
 
-Every seam: its two edges (with their panels and lengths in mm, and direction), the length mismatch in mm, whether it is gathered and its gathering ratio (longer side / shorter side).
+Every seam: its two sides (an `edge`, or `edges` / a `line` with `from_mm` and `to_mm` for part of a path; with their panels, lengths in mm and direction), the length mismatch in mm beyond its ease, its ease, whether it is gathered and its gathering ratio (longer side / shorter side).
 
 <details><summary>Parameters (JSON schema)</summary>
 

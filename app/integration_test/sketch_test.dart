@@ -169,6 +169,39 @@ void main() {
     await frames();
     expect((run({'type': 'guide.list'}) as List).length, 1);
 
+    // A dart, from the Details group: click the half piece's side.
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyV);
+    await frames(2);
+    await tester.tap(find.bySemanticsLabel('Details'));
+    await frames();
+    await tester.tap(find.text('Dart').last);
+    await frames();
+    final seams = (run({'type': 'seam.list'}) as List).length;
+    final side = (run({
+      'type': 'panel.get',
+      'panel': piece['id'],
+    }) as Map)['edges'].firstWhere((e) => e['id'] == drawn[1]['id']) as Map;
+    final a = side['start']['pos'] as List;
+    final b = side['end']['pos'] as List;
+    for (var view = 0; view < 8; view++) {
+      final px = engine.toView(
+        view: view,
+        xMm: ((a[0] as num) + (b[0] as num)) / 2,
+        yMm: ((a[1] as num) + (b[1] as num)) / 2,
+      );
+      if (px == null) continue;
+      final p = board.topLeft + Offset(px[0], px[1]) / ratio;
+      if (!board.contains(p)) continue;
+      await tester.tapAt(p);
+      await frames();
+      if (find.widgetWithText(FilledButton, 'Create').evaluate().isNotEmpty) {
+        break;
+      }
+    }
+    await tester.tap(find.widgetWithText(FilledButton, 'Create'));
+    await frames();
+    expect((run({'type': 'seam.list'}) as List).length, seams + 1);
+
     // An ellipse: E, the dialog's defaults.
     await tester.sendKeyEvent(LogicalKeyboardKey.keyE);
     await frames();

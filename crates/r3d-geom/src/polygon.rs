@@ -130,52 +130,6 @@ pub fn convex_hull(pts: &[DVec2]) -> Vec<DVec2> {
     hull
 }
 
-/// Triangulate a simple **counter-clockwise** polygon by ear clipping, for
-/// display (filled panels). Returns index triples into `pts`. `O(n²)`, fine
-/// for pattern outlines. Collinear vertices are handled; a polygon that is
-/// not simple may come back partially triangulated rather than looping.
-pub fn triangulate(pts: &[DVec2]) -> Vec<[usize; 3]> {
-    let mut idx: Vec<usize> = (0..pts.len()).collect();
-    let mut out = Vec::with_capacity(pts.len().saturating_sub(2));
-    let mut guard = 0;
-    while idx.len() > 3 && guard < pts.len() * pts.len() {
-        guard += 1;
-        let n = idx.len();
-        let ear = (0..n).find(|&i| {
-            let (a, b, c) = (idx[(i + n - 1) % n], idx[i], idx[(i + 1) % n]);
-            let (pa, pb, pc) = (pts[a], pts[b], pts[c]);
-            if orient(pa, pb, pc) <= 0.0 {
-                return false; // reflex or collinear corner
-            }
-            idx.iter()
-                .all(|&j| j == a || j == b || j == c || !point_in_triangle(pts[j], pa, pb, pc))
-        });
-        match ear {
-            Some(i) => {
-                out.push([idx[(i + n - 1) % n], idx[i], idx[(i + 1) % n]]);
-                idx.remove(i);
-            }
-            None => {
-                // Only collinear corners left: drop one and continue.
-                let flat = (0..n).find(|&i| {
-                    let (a, b, c) = (idx[(i + n - 1) % n], idx[i], idx[(i + 1) % n]);
-                    orient(pts[a], pts[b], pts[c]) == 0.0
-                });
-                match flat {
-                    Some(i) => {
-                        idx.remove(i);
-                    }
-                    None => break,
-                }
-            }
-        }
-    }
-    if idx.len() == 3 && orient(pts[idx[0]], pts[idx[1]], pts[idx[2]]) > 0.0 {
-        out.push([idx[0], idx[1], idx[2]]);
-    }
-    out
-}
-
 /// Whether `p` lies inside the closed polygon (even-odd rule; points on
 /// the boundary may go either way).
 pub fn contains(pts: &[DVec2], p: DVec2) -> bool {
@@ -191,10 +145,6 @@ pub fn contains(pts: &[DVec2], p: DVec2) -> bool {
         }
     }
     inside
-}
-
-fn point_in_triangle(p: DVec2, a: DVec2, b: DVec2, c: DVec2) -> bool {
-    orient(a, b, p) >= 0.0 && orient(b, c, p) >= 0.0 && orient(c, a, p) >= 0.0
 }
 
 /// Corners sharper than this miter ratio are beveled.
@@ -306,13 +256,6 @@ mod tests {
         assert_eq!(bounding_box(&[]), None);
     }
 
-    fn triangulated_area(pts: &[DVec2]) -> f64 {
-        triangulate(pts)
-            .iter()
-            .map(|t| signed_area(&[pts[t[0]], pts[t[1]], pts[t[2]]]))
-            .sum()
-    }
-
     #[test]
     fn convex_hull_of_square_with_inner_points() {
         let mut pts = square();
@@ -329,26 +272,6 @@ mod tests {
         assert!(contains(&square(), DVec2::new(50.0, 50.0)));
         assert!(!contains(&square(), DVec2::new(150.0, 50.0)));
         assert!(!contains(&square(), DVec2::new(-1.0, 50.0)));
-    }
-
-    #[test]
-    fn triangulation_covers_convex_and_concave_shapes() {
-        assert_eq!(triangulate(&square()).len(), 2);
-        assert!((triangulated_area(&square()) - 10_000.0).abs() < 1e-9);
-        // An L shape (concave) with a collinear vertex on its long side.
-        let l = [
-            DVec2::new(0.0, 0.0),
-            DVec2::new(50.0, 0.0),
-            DVec2::new(100.0, 0.0),
-            DVec2::new(100.0, 50.0),
-            DVec2::new(50.0, 50.0),
-            DVec2::new(50.0, 100.0),
-            DVec2::new(0.0, 100.0),
-        ];
-        assert!((triangulated_area(&l) - signed_area(&l)).abs() < 1e-9);
-        for t in triangulate(&l) {
-            assert!(signed_area(&[l[t[0]], l[t[1]], l[t[2]]]) > 0.0);
-        }
     }
 
     #[test]
@@ -373,15 +296,6 @@ mod tests {
             let moved: Vec<_> = square().iter().map(|p| *p + DVec2::new(dx, dy)).collect();
             prop_assert!((signed_area(&moved) - 10_000.0).abs() < 1e-6);
             prop_assert!(is_simple(&moved));
-        }
-
-        #[test]
-        fn triangulation_preserves_area_of_regular_polygons(n in 3usize..64, r in 1.0..1000.0f64) {
-            let pts: Vec<_> = (0..n)
-                .map(|i| DVec2::from_angle(i as f64 / n as f64 * std::f64::consts::TAU) * r)
-                .collect();
-            prop_assert_eq!(triangulate(&pts).len(), n - 2);
-            prop_assert!((triangulated_area(&pts) - signed_area(&pts)).abs() < 1e-6 * r * r);
         }
 
         #[test]

@@ -58,11 +58,7 @@ fn ring(p: &Project) -> Vec<PanelId> {
         let right_neighbour = p.panel(panel).and_then(|pn| {
             pn.contour.iter().find_map(|e| {
                 let seam = p.seams().get(&p.seam_of(*e)?)?;
-                let other = if seam.a.edge == *e {
-                    seam.b.edge
-                } else {
-                    seam.a.edge
-                };
+                let (_, (other, _)) = seam.across(*e)?;
                 let other_panel = p.edge(other)?.panel;
                 let line = p.edge_polyline(*e)?;
                 let x = line.iter().map(|v| v.x).sum::<f64>() / line.len().max(1) as f64;

@@ -447,13 +447,57 @@ pub struct Placement {
     pub centre_x_mm: Option<f64>,
 }
 
-/// One side of a seam: a whole edge, walked from its start point unless
-/// `reversed`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+/// One side of a seam: a stretch of outline (one or more consecutive
+/// contour edges of a piece, in contour order) or an internal line, all of
+/// it or part of it, walked from its start unless `reversed`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SeamSide {
-    pub edge: EdgeId,
+    /// Consecutive contour edges of one piece, in contour order; empty
+    /// when the side is on an internal line.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub edges: Vec<EdgeId>,
+    /// The internal line the side runs along, instead of edges.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub line: Option<InternalLineId>,
+    /// Where the side starts along that path (mm from its start); omitted:
+    /// at its start.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from_mm: Option<f64>,
+    /// Where it ends (mm from the path's start); omitted: at its end.
+    /// Past the path's end, it ends there.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to_mm: Option<f64>,
     pub reversed: bool,
+}
+
+impl SeamSide {
+    /// A whole edge, walked from its start unless `reversed`.
+    pub fn edge(edge: EdgeId, reversed: bool) -> Self {
+        Self {
+            edges: vec![edge],
+            line: None,
+            from_mm: None,
+            to_mm: None,
+            reversed,
+        }
+    }
+
+    /// The edge, when the side is exactly one whole edge.
+    pub fn whole_edge(&self) -> Option<EdgeId> {
+        match (self.edges.as_slice(), self.line, self.from_mm, self.to_mm) {
+            ([e], None, None, None) => Some(*e),
+            _ => None,
+        }
+    }
+
+    /// The same side walked the other way.
+    pub fn flipped(&self) -> Self {
+        Self {
+            reversed: !self.reversed,
+            ..self.clone()
+        }
+    }
 }
 
 /// A pin: the cloth around a point of a panel is held at a place in 3D.
@@ -467,8 +511,8 @@ pub struct Pin {
     pub position: DVec3,
 }
 
-/// Two edges sewn together, point for point along their lengths.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+/// Two sides sewn together, point for point along their lengths.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Seam {
     pub a: SeamSide,
@@ -477,11 +521,51 @@ pub struct Seam {
     /// gathered skirt into a waistband, a sleeve cap): their difference
     /// is not a mismatch.
     pub gathered: bool,
+    /// Ease: how much longer side `a` is meant to be than side `b` (mm;
+    /// negative, shorter), eased in along the seam (a sleeve cap, a back
+    /// shoulder). Only the difference beyond it is a mismatch.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub ease_mm: f64,
+}
+
+fn is_zero(v: &f64) -> bool {
+    *v == 0.0
 }
 
 impl Seam {
+    /// Whether the seam runs along `edge` (all of it or part).
     pub fn touches(&self, edge: EdgeId) -> bool {
-        self.a.edge == edge || self.b.edge == edge
+        self.a.edges.contains(&edge) || self.b.edges.contains(&edge)
+    }
+
+    /// Whether the seam runs along internal line `line`.
+    pub fn touches_line(&self, line: InternalLineId) -> bool {
+        self.a.line == Some(line) || self.b.line == Some(line)
+    }
+
+    /// From whole edge `edge`: its side and the other side, each as an
+    /// edge and whether it is walked reversed, when both sides are whole
+    /// edges (what the tools reshaping seams work on).
+    pub fn across(&self, edge: EdgeId) -> Option<((EdgeId, bool), (EdgeId, bool))> {
+        let (a, b) = (self.a.whole_edge()?, self.b.whole_edge()?);
+        let (sa, sb) = ((a, self.a.reversed), (b, self.b.reversed));
+        if a == edge {
+            Some((sa, sb))
+        } else if b == edge {
+            Some((sb, sa))
+        } else {
+            None
+        }
+    }
+
+    /// A seam of two whole edges.
+    pub fn whole(a: SeamSide, b: SeamSide) -> Self {
+        Self {
+            a,
+            b,
+            gathered: false,
+            ease_mm: 0.0,
+        }
     }
 }
 
@@ -508,6 +592,10 @@ pub struct Panel {
     /// the other half follows.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub symmetry: Option<Symmetry>,
+    /// Holes cut in the piece: closed loops of edges inside the contour,
+    /// each walked clockwise.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub holes: Vec<Vec<EdgeId>>,
 }
 
 /// A piece drawn as a half against an axis (a centre front on the fold).

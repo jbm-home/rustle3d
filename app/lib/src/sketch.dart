@@ -877,3 +877,81 @@ class _VariablesCard extends StatelessWidget {
     );
   }
 }
+
+/// Join this piece with another, or cut the other out of it.
+class _CombineCard extends StatefulWidget {
+  const _CombineCard({
+    required this.panel,
+    required this.others,
+    required this.run,
+  });
+
+  final String panel;
+  final List<Map<String, dynamic>> others;
+  final ValueChanged<Map<String, Object?>> run;
+
+  @override
+  State<_CombineCard> createState() => _CombineCardState();
+}
+
+class _CombineCardState extends State<_CombineCard> {
+  String? _with;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final l = context.l;
+    final picked = widget.others.any((o) => o['id'] == _with) ? _with : null;
+    void apply(String op) => widget.run({
+      'type': 'panel.boolean',
+      'panel': widget.panel,
+      'with': picked,
+      'op': op,
+    });
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l.combine,
+          style: ts(fontSize: 14, fontWeight: FontWeight.w600, color: p.text),
+        ),
+        const SizedBox(height: Space.s),
+        DropdownButtonFormField<String>(
+          key: const Key('combine-with'),
+          initialValue: picked,
+          isExpanded: true,
+          decoration: InputDecoration(labelText: l.combineWith, isDense: true),
+          items: [
+            for (final o in widget.others)
+              DropdownMenuItem(
+                value: o['id'] as String,
+                child: Text(
+                  o['name'] as String,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+          ],
+          onChanged: (v) => setState(() => _with = v),
+        ),
+        const SizedBox(height: Space.s),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: picked == null ? null : () => apply('union'),
+                child: Text(l.join),
+              ),
+            ),
+            const SizedBox(width: Space.s),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: picked == null ? null : () => apply('difference'),
+                child: Text(l.cutOut),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}

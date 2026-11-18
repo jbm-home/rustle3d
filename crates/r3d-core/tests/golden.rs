@@ -106,6 +106,7 @@ fn sample() -> Project {
                 points: vec![[pts[1], pts[3]]],
                 edges: vec![[contour[0], contour[3]], [contour[1], contour[2]]],
             }),
+            holes: Vec::new(),
         },
     );
     let outer = tx.new_garment_id();
@@ -135,17 +136,40 @@ fn sample() -> Project {
     tx.put_seam(
         seam,
         Seam {
-            a: SeamSide {
-                edge: contour[1],
-                reversed: false,
-            },
+            a: SeamSide::edge(contour[1], false),
             b: SeamSide {
-                edge: contour[3],
+                edges: vec![contour[2], contour[3]],
+                line: None,
+                from_mm: Some(20.0),
+                to_mm: Some(500.0),
                 reversed: true,
             },
             gathered: true,
+            ease_mm: 6.0,
         },
     );
+    // A hole (clockwise), and a seam along an internal line below.
+    let hole_pts: Vec<_> = [(150.0, 300.0), (170.0, 330.0), (190.0, 300.0)]
+        .iter()
+        .map(|&(x, y)| {
+            let id = tx.new_point_id();
+            tx.put_point(id, Point::new(panel, DVec2::new(x, y)));
+            id
+        })
+        .collect();
+    let hole: Vec<_> = (0..3)
+        .map(|i| {
+            let id = tx.new_edge_id();
+            tx.put_edge(
+                id,
+                Edge::new(panel, hole_pts[i], hole_pts[(i + 1) % 3], EdgeCurve::Line),
+            );
+            id
+        })
+        .collect();
+    let mut with_hole = tx.project().panel(panel).unwrap().clone();
+    with_hole.holes = vec![hole];
+    tx.put_panel(panel, with_hole);
     let notch = tx.new_notch_id();
     tx.put_notch(
         notch,
@@ -170,6 +194,28 @@ fn sample() -> Project {
                     to: DVec2::new(160.0, 300.0),
                 },
             ],
+        },
+    );
+    let pocket_seam = tx.new_seam_id();
+    tx.put_seam(
+        pocket_seam,
+        Seam {
+            a: SeamSide {
+                edges: Vec::new(),
+                line: Some(line),
+                from_mm: None,
+                to_mm: Some(100.0),
+                reversed: false,
+            },
+            b: SeamSide {
+                edges: vec![contour[0]],
+                line: None,
+                from_mm: Some(50.0),
+                to_mm: Some(150.0),
+                reversed: true,
+            },
+            gathered: false,
+            ease_mm: 0.0,
         },
     );
     tx.set_avatar(Some(Avatar {

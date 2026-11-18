@@ -36,6 +36,9 @@ impl CommandSpec for PanelUnfold {
         if panel.symmetry.is_some() {
             return Err(CommandError::invalid("panel", Invalid::Symmetric));
         }
+        if !panel.holes.is_empty() {
+            return Err(CommandError::invalid("panel", Invalid::HasHoles));
+        }
         let k = panel
             .contour
             .iter()

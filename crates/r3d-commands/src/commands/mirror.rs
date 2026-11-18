@@ -45,6 +45,10 @@ impl Described for PanelMirror {
 impl CommandSpec for PanelMirror {
     fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
         let source = editable_panel(tx, self.panel)?;
+        // A copy follows its source's outline; holes are not mirrored.
+        if !source.holes.is_empty() {
+            return Err(CommandError::invalid("panel", Invalid::HasHoles));
+        }
         if let Some(n) = &self.name {
             non_blank("name", n)?;
         }

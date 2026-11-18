@@ -6,6 +6,14 @@ Provenance: maintainer's functional brief (2026-11-14, gathers 2026-11-16); gene
 As a designer, I tell the software which edges are sewn together, and I see
 immediately whether the seam is consistent.
 
+## Status (2026-11-18, M29)
+
+M29 made a seam side a whole edge, a run of consecutive outline edges or
+an internal line, all of it or a stretch (`from_mm`, `to_mm`), and added
+ease (`ease_mm`, `seam.set_ease`): see
+[21-construction-details](21-construction-details.md). The Sew tool in
+the app still sews whole edges; the rest of this status is M6's.
+
 ## Status (2026-11-15)
 
 Implemented: whole-edge seams (`seam.add` / `remove` / `flip`, and

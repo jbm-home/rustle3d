@@ -17,9 +17,10 @@ use std::time::Instant;
 
 use glam::{Vec2, Vec3};
 use r3d_avatar::fit::fitted_positions;
-use r3d_core::{Around, EdgeId, Fabric, GarmentId, PanelId, PinId, Project};
+use r3d_core::seam::{Span, Track};
+use r3d_core::{Around, EdgeId, Fabric, GarmentId, PanelId, PinId, Project, SeamSide};
 use r3d_geom::DVec2;
-use r3d_geom::mesh::mesh_polygon;
+use r3d_geom::mesh::mesh_panel;
 use r3d_sim::collide::StaticMesh;
 use r3d_sim::scene::{Particle, Triangle};
 use r3d_sim::{CpuSolver, FabricPreset, SUBSTEPS, SimScene, Solver, StepStats};
@@ -569,8 +570,9 @@ struct Laid {
     layer: usize,
     place: r3d_core::Placement,
     boundary: Vec<DVec2>,
-    /// Index in `boundary` of each contour edge's first sample.
-    starts: Vec<usize>,
+    /// The mesh vertices along each track of the panel (contour and hole
+    /// edges, sewn internal lines), at its samples.
+    tracks: BTreeMap<Track, Vec<u32>>,
     mesh: r3d_geom::mesh::PanelMesh,
     /// Pattern height of the panel's top (mm).
     top: f64,
@@ -816,24 +818,123 @@ fn internal(detail: impl Into<String>) -> CommandError {
     }
 }
 
-/// Number of boundary segments for each edge of the placed panels.
-fn segment_counts(project: &Project, spacing: f64) -> BTreeMap<EdgeId, usize> {
+/// `n` segments shared among a seam side's stretches by their lengths,
+/// at least one each (largest remainders).
+fn split(n: usize, spans: &[Span]) -> Vec<usize> {
+    let total: f64 = spans.iter().map(Span::length).sum();
+    let spare = n.saturating_sub(spans.len());
+    let share: Vec<f64> = spans
+        .iter()
+        .map(|s| {
+            if total > 0.0 {
+                spare as f64 * s.length() / total
+            } else {
+                0.0
+            }
+        })
+        .collect();
+    let mut out: Vec<usize> = share.iter().map(|x| 1 + x.floor() as usize).collect();
+    let mut left = n.saturating_sub(out.iter().sum::<usize>());
+    let mut order: Vec<usize> = (0..spans.len()).collect();
+    order.sort_by(|a, b| {
+        let frac = |i: &usize| share.get(*i).map_or(0.0, |x| x - x.floor());
+        frac(b).total_cmp(&frac(a))
+    });
+    for i in order {
+        if left == 0 {
+            break;
+        }
+        if let Some(slot) = out.get_mut(i) {
+            *slot += 1;
+            left -= 1;
+        }
+    }
+    out
+}
+
+/// A seam side's stretches with some length.
+fn spans(project: &Project, side: &SeamSide) -> Option<Vec<Span>> {
+    let spans: Vec<Span> = project
+        .side_spans(side)?
+        .into_iter()
+        .filter(|s| s.length() > 1e-9)
+        .collect();
+    (!spans.is_empty()).then_some(spans)
+}
+
+/// Where each track of the placed panels is sampled for the mesh: arc
+/// lengths from its start, both ends included. The two sides of a seam get
+/// the same number of segments (the larger of what each needs), shared
+/// among their stretches by length; the rest is cut at about `spacing`.
+/// Contour and hole edges are tracks; internal lines are when sewn.
+fn sample_tracks(project: &Project, spacing: f64) -> BTreeMap<Track, Vec<f64>> {
     let count = |len: f64| ((len / spacing).ceil() as usize).max(1);
-    let mut counts = BTreeMap::new();
-    for panel in project.panels().values().filter(|p| p.placement.is_some()) {
-        for e in &panel.contour {
-            counts.insert(*e, count(project.edge_length(*e).unwrap_or_default()));
-        }
-    }
-    // Both sides of a seam share the larger count.
+    let placed = |panel: Option<PanelId>| {
+        panel
+            .and_then(|p| project.panel(p))
+            .is_some_and(|p| p.placement.is_some())
+    };
+    let mut fixed: BTreeMap<Track, Vec<(f64, f64, usize)>> = BTreeMap::new();
     for seam in project.seams().values() {
-        if let (Some(a), Some(b)) = (counts.get(&seam.a.edge), counts.get(&seam.b.edge)) {
-            let n = (*a).max(*b);
-            counts.insert(seam.a.edge, n);
-            counts.insert(seam.b.edge, n);
+        if !(placed(project.side_panel(&seam.a)) && placed(project.side_panel(&seam.b))) {
+            continue;
+        }
+        let (Some(a), Some(b)) = (spans(project, &seam.a), spans(project, &seam.b)) else {
+            continue;
+        };
+        let need = |side: &[Span]| side.iter().map(|s| count(s.length())).sum::<usize>();
+        let n = need(&a).max(need(&b));
+        for side in [&a, &b] {
+            for (span, k) in side.iter().zip(split(n, side)) {
+                fixed
+                    .entry(span.track)
+                    .or_default()
+                    .push((span.from, span.to, k));
+            }
         }
     }
-    counts
+    let mut tracks: Vec<Track> = Vec::new();
+    for panel in project.panels().values().filter(|p| p.placement.is_some()) {
+        for e in panel.contour.iter().chain(panel.holes.iter().flatten()) {
+            tracks.push(Track::Edge(*e));
+        }
+    }
+    tracks.extend(fixed.keys().filter(|t| matches!(t, Track::Line(_))));
+    let mut out = BTreeMap::new();
+    for track in tracks {
+        let len = project.track_length(track).unwrap_or_default();
+        let mut intervals = fixed.get(&track).cloned().unwrap_or_default();
+        intervals.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let mut positions = vec![0.0];
+        let mut cursor = 0.0;
+        let walk = |to: f64, n: usize, positions: &mut Vec<f64>, cursor: &mut f64| {
+            let from = *cursor;
+            for i in 1..=n {
+                positions.push(from + (to - from) * i as f64 / n as f64);
+            }
+            *cursor = to;
+        };
+        for (from, to, k) in intervals {
+            let from = from.max(cursor);
+            if to <= from {
+                continue;
+            }
+            if from - cursor > 1e-9 {
+                walk(from, count(from - cursor), &mut positions, &mut cursor);
+            }
+            walk(to, k, &mut positions, &mut cursor);
+        }
+        if len - cursor > 1e-9 {
+            walk(len, count(len - cursor), &mut positions, &mut cursor);
+        }
+        out.insert(track, positions);
+    }
+    out
+}
+
+/// The index of `s` among sorted sample positions.
+fn sample_index(positions: &[f64], s: f64) -> Option<usize> {
+    positions.iter().position(|p| (p - s).abs() < 1e-6)
 }
 
 /// Build the scene, in the project's shown size. Panels without a
@@ -845,7 +946,7 @@ pub fn build(
 ) -> Result<Drape, CommandError> {
     let project = &*project.as_shown();
     let spacing = spacing_mm.max(2.0);
-    let counts = segment_counts(project, spacing);
+    let samples = sample_tracks(project, spacing);
     // One fabric per garment, and the garments simulated (those with a
     // placed panel) in their layers.
     let garments = project.garments_by_layer();
@@ -875,6 +976,8 @@ pub fn build(
     let mut pieces = Vec::new();
     // Particle indices along each edge, start to end inclusive.
     let mut edge_vertices: BTreeMap<EdgeId, Vec<u32>> = BTreeMap::new();
+    // Particle indices along each track, at its samples.
+    let mut track_particles: BTreeMap<Track, Vec<u32>> = BTreeMap::new();
 
     // Mesh every placed panel first: the starting radius depends on the
     // width of all of them.
@@ -883,28 +986,76 @@ pub fn build(
         let Some(place) = panel.placement else {
             continue;
         };
-        let mut boundary: Vec<DVec2> = Vec::new();
-        let mut starts = Vec::with_capacity(panel.contour.len());
-        for e in &panel.contour {
-            let geom = project
-                .edge_geometry(*e)
-                .ok_or_else(|| internal(format!("{e} has no geometry")))?;
-            let len = geom.length();
-            let n = counts.get(e).copied().unwrap_or(1);
-            starts.push(boundary.len());
-            for k in 0..n {
-                boundary.push(geom.point_at_length(len * k as f64 / n as f64).0);
+        // A loop of edges sampled: its points (each edge's but its last),
+        // and where each edge starts among them.
+        let sampled_loop = |edges: &[EdgeId]| -> Result<(Vec<DVec2>, Vec<usize>), CommandError> {
+            let mut pts = Vec::new();
+            let mut starts = Vec::with_capacity(edges.len());
+            for e in edges {
+                let at = samples
+                    .get(&Track::Edge(*e))
+                    .ok_or_else(|| internal(format!("{e} is not sampled")))?;
+                starts.push(pts.len());
+                for s in at.iter().take(at.len().saturating_sub(1)) {
+                    let (p, _) = project
+                        .track_point(Track::Edge(*e), *s)
+                        .ok_or_else(|| internal(format!("{e} has no geometry")))?;
+                    pts.push(p);
+                }
             }
+            Ok((pts, starts))
+        };
+        let (boundary, starts) = sampled_loop(&panel.contour)?;
+        let holes: Vec<(Vec<DVec2>, Vec<usize>)> = panel
+            .holes
+            .iter()
+            .map(|h| sampled_loop(h))
+            .collect::<Result<_, _>>()?;
+        let lines: Vec<(Track, Vec<DVec2>)> = samples
+            .iter()
+            .filter(|(t, _)| project.track_panel(**t) == Some(*panel_id))
+            .filter(|(t, _)| matches!(t, Track::Line(_)))
+            .map(|(t, at)| {
+                let pts = at
+                    .iter()
+                    .filter_map(|s| project.track_point(*t, *s).map(|(p, _)| p))
+                    .collect();
+                (*t, pts)
+            })
+            .collect();
+        let hole_pts: Vec<Vec<DVec2>> = holes.iter().map(|(p, _)| p.clone()).collect();
+        let line_pts: Vec<Vec<DVec2>> = lines.iter().map(|(_, p)| p.clone()).collect();
+        let mesh = mesh_panel(&boundary, &hole_pts, &line_pts, spacing)
+            .map_err(|e| internal(format!("{panel_id}: {e}")))?;
+        // Each track's mesh vertices, at its samples.
+        let mut tracks: BTreeMap<Track, Vec<u32>> = BTreeMap::new();
+        let mut put_loop = |edges: &[EdgeId], starts: &[usize], indices: &[u32]| {
+            let total = indices.len().max(1);
+            for (e, start) in edges.iter().zip(starts) {
+                let n = samples
+                    .get(&Track::Edge(*e))
+                    .map_or(1, |s| s.len().saturating_sub(1));
+                let verts = (0..=n)
+                    .filter_map(|k| indices.get((start + k) % total))
+                    .copied()
+                    .collect();
+                tracks.insert(Track::Edge(*e), verts);
+            }
+        };
+        put_loop(&panel.contour, &starts, &mesh.boundary);
+        for ((hole, (_, starts)), indices) in panel.holes.iter().zip(&holes).zip(&mesh.holes) {
+            put_loop(hole, starts, indices);
         }
-        let mesh =
-            mesh_polygon(&boundary, spacing).map_err(|e| internal(format!("{panel_id}: {e}")))?;
+        for ((track, _), indices) in lines.iter().zip(&mesh.lines) {
+            tracks.insert(*track, indices.clone());
+        }
         let top = mesh.vertices.iter().fold(f64::MIN, |m, v| m.max(v.y));
         laid.push(Laid {
             panel: *panel_id,
             layer: worn.iter().position(|g| *g == panel.garment).unwrap_or(0),
             place,
             boundary,
-            starts,
+            tracks,
             mesh,
             top,
         });
@@ -970,14 +1121,12 @@ pub fn build(
         };
         let mesh = &l.mesh;
         let offset = scene.particles.len() as u32;
-        let total = l.boundary.len();
-        for (e, start) in panel.contour.iter().zip(&l.starts) {
-            let n = counts.get(e).copied().unwrap_or(1);
-            let verts = (0..=n)
-                .filter_map(|k| mesh.boundary.get((start + k) % total))
-                .map(|b| offset + b)
-                .collect();
-            edge_vertices.insert(*e, verts);
+        for (track, verts) in &l.tracks {
+            let verts: Vec<u32> = verts.iter().map(|v| offset + v).collect();
+            if let Track::Edge(e) = track {
+                edge_vertices.insert(*e, verts.clone());
+            }
+            track_particles.insert(*track, verts);
         }
 
         scene.particles.extend(
@@ -1011,17 +1160,28 @@ pub fn build(
             }));
     }
 
-    for seam in project.seams().values() {
-        let side = |s: &r3d_core::SeamSide| {
-            edge_vertices.get(&s.edge).map(|v| {
-                let mut v = v.clone();
-                if s.reversed {
-                    v.reverse();
+    // A seam side's particles, in the order it is walked: its stretches'
+    // samples one after the other (a corner between two edges once).
+    let side_particles = |s: &SeamSide| -> Option<Vec<u32>> {
+        let mut out: Vec<u32> = Vec::new();
+        for span in spans(project, s)? {
+            let at = samples.get(&span.track)?;
+            let parts = track_particles.get(&span.track)?;
+            let (i0, i1) = (sample_index(at, span.from)?, sample_index(at, span.to)?);
+            for k in i0..=i1 {
+                let v = *parts.get(k)?;
+                if out.last() != Some(&v) {
+                    out.push(v);
                 }
-                v
-            })
-        };
-        if let (Some(a), Some(b)) = (side(&seam.a), side(&seam.b)) {
+            }
+        }
+        if s.reversed {
+            out.reverse();
+        }
+        Some(out)
+    };
+    for seam in project.seams().values() {
+        if let (Some(a), Some(b)) = (side_particles(&seam.a), side_particles(&seam.b)) {
             scene.seams.extend(
                 a.iter()
                     .zip(&b)

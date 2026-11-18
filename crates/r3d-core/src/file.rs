@@ -20,7 +20,7 @@ use crate::model::Project;
 /// Identifies a Rustle3D project file.
 pub const FORMAT: &str = "rustle3d.project";
 /// Version written by this build.
-pub const SCHEMA_VERSION: u32 = 12;
+pub const SCHEMA_VERSION: u32 = 13;
 
 type Migration = fn(Value) -> Result<Value, FileError>;
 
@@ -37,6 +37,7 @@ const MIGRATIONS: &[Migration] = &[
     migrate_v9_to_v10,
     migrate_v10_to_v11,
     migrate_v11_to_v12,
+    migrate_v12_to_v13,
 ];
 
 fn object<'a>(
@@ -46,6 +47,25 @@ fn object<'a>(
     value.as_object_mut().ok_or_else(|| FileError::Json {
         detail: format!("{what} is not an object"),
     })
+}
+
+/// v13 makes a seam side a path (`edges`, or an internal `line`, maybe
+/// only part of it) instead of one whole `edge`, and adds holes to pieces
+/// (absent: none) and ease to seams (absent: none).
+fn migrate_v12_to_v13(mut project: Value) -> Result<Value, FileError> {
+    if let Some(seams) = object(&mut project, "project")?.get_mut("seams") {
+        for seam in object(seams, "seams")?.values_mut() {
+            for side in ["a", "b"] {
+                if let Some(side) = object(seam, "seam")?.get_mut(side) {
+                    let side = object(side, "seam side")?;
+                    if let Some(edge) = side.remove("edge") {
+                        side.insert("edges".into(), Value::Array(vec![edge]));
+                    }
+                }
+            }
+        }
+    }
+    Ok(project)
 }
 
 /// v12 adds named variables for formulas (dimensions' formulas are
