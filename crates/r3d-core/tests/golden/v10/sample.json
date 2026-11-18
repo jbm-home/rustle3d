@@ -16,7 +16,13 @@
         "name": "Jacket",
         "fabric": "wool",
         "color": "#334455",
-        "layer": 1
+        "layer": 1,
+        "template": {
+          "name": "shirt",
+          "sizes": {
+            "length_cm": 70.0
+          }
+        }
       }
     },
     "panels": {

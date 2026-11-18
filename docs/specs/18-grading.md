@@ -12,7 +12,8 @@ graded to every size, the size draped and shown in 3D on its own body
 and DXF-AAMA exports, `grading.check` for seams that stop matching in a
 size. The app: a Sizes section in the inspector (chart, range, base,
 size shown in 3D), a grade step on a selected point. Project files:
-schema v10 (`grading`, `grade` on points and curved edges).
+schema v10 (`grading`, `grade` on points and curved edges, a garment's
+`template`).
 
 Not yet: grade rules read from imported files (they come in at the size
 drawn), an ASTM rule table (`.rul`) next to the DXF, notches graded on
@@ -49,12 +50,21 @@ the seams still match in every size, and print or send the graded nest.
   Internal lines and pins move like the piece's points around them
   (inverse squared distance). Notches keep their distance along their
   edge. Linked mirror copies take their source's grades, mirrored.
-- **Templates.** A template added to a project with a size range is
-  drafted for every size's body and its points and curves graded to
-  match: each size is exactly the template drafted for that body. The
+- **Templates.** A garment remembers the template it was drafted from
+  and the measurements given (`Garment.template`). Added to a project
+  with a size range, or when a range is set on a project whose template
+  garments are not graded yet, the template is drafted for every size's
+  body (each on a project of its own, in parallel) and the garment's
+  points and curves graded by drafting order and contour position: each
+  point moves as it does between the base size's draft and that size's,
+  so edits to the pieces are kept and an unedited piece is exactly the
+  template drafted for that body. A garment with a piece added or
+  deleted is not graded; a piece whose outline gained or lost points is
+  skipped. The
   pieces of every size share the draft's origin (a centre line on most
-  pieces), and each piece takes the room of its largest size on the
-  board, so the sizes nest without touching the next piece.
+  pieces); added to a ranged project, each piece takes the room of its
+  largest size on the board, so the sizes nest without touching the next
+  piece (graded later, the pieces stay where they are).
 - **Changing the range.** Points keep their grade in the sizes that stay
   (by name); new sizes are inter- or extrapolated. A new base size
   redraws the pattern in that size (points, curves, internal lines,

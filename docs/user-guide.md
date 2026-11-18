@@ -130,9 +130,12 @@ size to size (its grade), and the other sizes follow.
   the right: pick a chart (women's 32 to 56 or men's 44 to 60, European
   sizes), the smallest and largest size, and the base size. Each size has
   a body with its measurements, built from your avatar.
-- Add a template **after** setting the sizes: it is drafted for every
-  size's body, so every size fits. A template added before stays in one
-  size until you grade its points.
+- A garment started from a template, before or after setting the sizes,
+  is drafted again for every size's body, so every size fits; the
+  changes you made to its pieces are kept. (Not when you have added or
+  deleted a piece, or points on a piece's outline: grade those points
+  yourself.) Garments you drew yourself stay in one size until you grade
+  their points.
 - On the board, each piece shows the other sizes' outlines around it.
 - **Shown in 3D** picks the size the garment is draped in, on a body
   with that size's measurements; the drape starts again. The pattern
@@ -283,6 +286,8 @@ DXF-AAMA; garments go out as glTF and OBJ: open formats only.
 - Sizes: notches keep their distance along the edge in every size, and
   a grade is set per point, not per edge, in the app. The shirt template
   drapes with folds at the sides in the largest sizes (from about 48).
+  A template's pieces graded after they were laid out keep their place
+  on the board: the largest sizes of neighbouring pieces can touch.
 - Photos: the fabric has no visible weave or print yet, and the cloth
   is a single thin layer (no thickness at the hem). Your own studio
   lighting (an HDRI image) cannot be loaded yet.

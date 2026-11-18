@@ -2279,7 +2279,7 @@ Move a piece to another garment; its linked mirror copies (and the piece it mirr
 
 ### `grading.set_sizes`
 
-Set the project's size range: the sizes from smallest to largest, each with how its body differs from the base size's (the avatar; cm), and the base size the pattern is drawn in. Points keep their grade in the sizes that stay (by name); new sizes are inter- or extrapolated. Changing the base redraws the pattern in that size. See grading.use_chart for standard sizes.
+Set the project's size range: the sizes from smallest to largest, each with how its body differs from the base size's (the avatar; cm), and the base size the pattern is drawn in. Garments drafted from a template and not graded yet are graded by drafting the template for every size's body. Points keep their grade in the sizes that stay (by name); new sizes are inter- or extrapolated. Changing the base redraws the pattern in that size. See grading.use_chart for standard sizes.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -2351,7 +2351,7 @@ Set the project's size range: the sizes from smallest to largest, each with how 
 
 ### `grading.use_chart`
 
-Set the project's size range from a built-in European chart (`women` 32–56, `men` 44–60, every second size): the sizes from `from` to `to`, drawn in `base`. Each size's body differs from the avatar as the chart's sizes differ from its base size; without an avatar, the chart's base body becomes the avatar. Then grade the points (point.set_grade), or add a template, which is graded to every size.
+Set the project's size range from a built-in European chart (`women` 32–56, `men` 44–60, every second size): the sizes from `from` to `to`, drawn in `base`. Each size's body differs from the avatar as the chart's sizes differ from its base size; without an avatar, the chart's base body becomes the avatar. Garments drafted from a template, before or after, are graded to every size; grade other points with point.set_grade.
 
 <details><summary>Parameters (JSON schema)</summary>
 

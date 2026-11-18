@@ -108,6 +108,19 @@ pub struct Garment {
     /// over it (a shirt tucked into trousers is below them). Garments
     /// with the same layer are ordered by id.
     pub layer: u32,
+    /// The template it was drafted from, so it can be drafted again for
+    /// other sizes; `None` for a garment drawn by hand.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub template: Option<TemplateRef>,
+}
+
+/// A template and the measurements it was given (cm, by name; the others
+/// came from the body).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TemplateRef {
+    pub name: String,
+    pub sizes: BTreeMap<String, f64>,
 }
 
 /// The built-in fabrics (physical and visual presets).
@@ -413,6 +426,7 @@ impl Project {
                 fabric: Fabric::default(),
                 color: None,
                 layer: 0,
+                template: None,
             },
         );
         Self {

@@ -132,6 +132,7 @@ impl CommandSpec for GarmentAdd {
                 fabric: self.fabric,
                 color: self.color.clone(),
                 layer,
+                template: None,
             },
         );
         Ok(CommandOutput {

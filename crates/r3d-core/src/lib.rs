@@ -24,5 +24,5 @@ pub use message::{Localizable, Message};
 pub use model::{
     Around, Avatar, Body, DisplayUnit, Edge, EdgeCurve, Fabric, FabricLook, Garment, Grading,
     InternalLine, MirrorLink, Notch, Panel, PathSegment, Pin, Placement, Point, Project, Seam,
-    SeamSide, Size,
+    SeamSide, Size, TemplateRef,
 };

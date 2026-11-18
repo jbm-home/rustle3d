@@ -345,3 +345,55 @@ fn the_graded_nest_is_exported() {
         .unwrap_err();
     assert!(err.to_string().contains("not a size"), "{err}");
 }
+
+#[test]
+fn a_template_drafted_before_the_sizes_is_graded_when_they_are_set() {
+    // Sizes first, then the shirt; and the shirt first, then the sizes.
+    let mut first = ranged();
+    ok(
+        &mut first,
+        json!({"type": "template.apply", "template": "shirt"}),
+    );
+    let mut later = Session::new(Project::new("Untitled"));
+    common::women_m(&mut later);
+    ok(
+        &mut later,
+        json!({"type": "template.apply", "template": "shirt"}),
+    );
+    ok(
+        &mut later,
+        json!({"type": "grading.use_chart", "chart": "women", "from": "36", "to": "52", "base": "40"}),
+    );
+    let (a, b) = (first.project().at_size(8), later.project().at_size(8));
+    // The same pieces in size 52, wherever they sit on the board.
+    let mut shifts: std::collections::BTreeMap<_, DVec2> = Default::default();
+    for (id, point) in a.points() {
+        let other = b.point(*id).unwrap();
+        let shift = *shifts.entry(point.panel).or_insert(other.pos - point.pos);
+        assert!((other.pos - point.pos).distance(shift) < 1e-6, "{id}");
+    }
+    for (id, edge) in a.edges() {
+        if let (r3d_core::EdgeCurve::Cubic { c1, .. }, r3d_core::EdgeCurve::Cubic { c1: o1, .. }) =
+            (&edge.curve, &b.edge(*id).unwrap().curve)
+        {
+            assert!((*o1 - *c1).distance(shifts[&edge.panel]) < 1e-6, "{id}");
+        }
+    }
+    // A garment drawn by hand stays ungraded.
+    let mut plain = Session::new(Project::new("Untitled"));
+    ok(
+        &mut plain,
+        json!({"type": "panel.create_rect", "origin": [0, 0], "width": 100, "height": 100}),
+    );
+    ok(
+        &mut plain,
+        json!({"type": "grading.use_chart", "chart": "women", "from": "36", "to": "40", "base": "38"}),
+    );
+    assert!(
+        plain
+            .project()
+            .points()
+            .values()
+            .all(|p| p.grade.is_empty())
+    );
+}

@@ -13,7 +13,7 @@ use glam::DVec2;
 use r3d_core::file::{self, SCHEMA_VERSION};
 use r3d_core::{
     Around, Avatar, Body, Edge, EdgeCurve, Fabric, Garment, Grading, InternalLine, Notch, Panel,
-    PathSegment, Pin, Placement, Point, Project, Seam, SeamSide, Size, Transaction,
+    PathSegment, Pin, Placement, Point, Project, Seam, SeamSide, Size, TemplateRef, Transaction,
 };
 
 fn golden_dir(version: u32) -> PathBuf {
@@ -107,6 +107,10 @@ fn sample() -> Project {
             fabric: Fabric::Wool,
             color: Some("#334455".into()),
             layer: 1,
+            template: Some(TemplateRef {
+                name: "shirt".into(),
+                sizes: [("length_cm".to_owned(), 70.0)].into(),
+            }),
         },
     );
     let pin = tx.new_pin_id();

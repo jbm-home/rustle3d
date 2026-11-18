@@ -12,8 +12,8 @@ use std::collections::BTreeMap;
 use rayon::prelude::*;
 
 use r3d_core::{
-    AnyId, Around, Avatar, Body, Edge, EdgeCurve, EdgeId, Fabric, PanelId, Point, PointId, Project,
-    Transaction,
+    AnyId, Around, Avatar, Body, Edge, EdgeCurve, EdgeId, Fabric, Garment, GarmentId, PanelId,
+    Point, Project, TemplateRef, Transaction,
 };
 use r3d_geom::{CubicBez, DVec2};
 use schemars::JsonSchema;
@@ -466,20 +466,14 @@ pub fn draft(
     template: Template,
     sizes: Sizes,
 ) -> Result<Vec<AnyId>, CommandError> {
-    let Some(g) = tx.project().grading().cloned() else {
-        return Ok(draft_in(tx, template, sizes, &[])?.0);
+    let drafts = match tx.project().grading() {
+        Some(_) => Some(every_size(tx.project(), template, sizes)?),
+        None => None,
     };
-    // Every size first, each on a copy of the project as it is: the same
-    // steps allocate the same ids.
-    let before = tx.project().clone();
-    let drafts = (0..g.sizes.len())
-        .into_par_iter()
-        .map(|i| draft_size(&before, i, template, sizes))
-        .collect::<Result<Vec<_>, _>>()?;
     // Each piece takes the room of its widest size on the board, so the
     // sizes nest without running into the next piece.
     let mut room: Vec<(f64, f64)> = Vec::new();
-    for d in &drafts {
+    for d in drafts.iter().flatten() {
         for (k, (id, origin)) in d.origins.iter().enumerate() {
             let Some(b) = d.project.panel_bounding_box(*id) else {
                 continue;
@@ -492,34 +486,111 @@ pub fn draft(
         }
     }
     let (created, origins) = draft_in(tx, template, sizes, &room)?;
-    grade(tx, &origins, &drafts, g.base)?;
+    // The garment remembers its template, to be drafted again in sizes
+    // set later.
+    let garment = origins
+        .keys()
+        .next()
+        .and_then(|p| tx.project().panel(*p))
+        .map(|p| p.garment);
+    if let Some(id) = garment
+        && let Some(g) = tx.project().garments().get(&id).cloned()
+    {
+        tx.put_garment(
+            id,
+            Garment {
+                template: Some(template_ref(template, sizes)),
+                ..g
+            },
+        );
+    }
+    if let (Some(drafts), Some(g)) = (drafts, tx.project().grading().cloned()) {
+        let panels: Vec<PanelId> = origins.keys().copied().collect();
+        grade(tx, &panels, &drafts, g.base);
+    }
     Ok(created)
 }
 
-/// A template drafted in one size.
+/// How a garment remembers its template: its id and the sizes given.
+fn template_ref(template: Template, sizes: Sizes) -> TemplateRef {
+    let sizes = serde_json::to_value(sizes)
+        .ok()
+        .and_then(|v| serde_json::from_value(v).ok())
+        .unwrap_or_default();
+    TemplateRef {
+        name: template.id().to_owned(),
+        sizes,
+    }
+}
+
+/// Grade the pieces of `garment`, drafted from a template and not graded
+/// yet, by drafting that template for every size of the project's range.
+/// The garment keeps the pieces' shapes as edited; each size moves them
+/// as the template moves between sizes. Left as it is when a piece was
+/// added or deleted; a piece whose outline gained or lost points is
+/// skipped. Returns whether anything was graded.
+pub fn grade_garment(tx: &mut Transaction<'_>, garment: GarmentId) -> Result<bool, CommandError> {
+    let p = tx.project();
+    let (Some(g), Some(reference)) = (
+        p.grading().cloned(),
+        p.garments().get(&garment).and_then(|g| g.template.clone()),
+    ) else {
+        return Ok(false);
+    };
+    let panels: Vec<PanelId> = p
+        .panels()
+        .iter()
+        .filter(|(_, pn)| pn.garment == garment)
+        .map(|(id, _)| *id)
+        .collect();
+    let graded = panels.iter().any(|id| {
+        p.points()
+            .values()
+            .any(|pt| pt.panel == *id && !pt.grade.is_empty())
+    });
+    let template =
+        serde_json::from_value::<Template>(serde_json::Value::String(reference.name.clone()));
+    let sizes = serde_json::to_value(&reference.sizes).and_then(serde_json::from_value::<Sizes>);
+    let (Ok(template), Ok(sizes)) = (template, sizes) else {
+        return Ok(false);
+    };
+    if graded || panels.is_empty() {
+        return Ok(false);
+    }
+    let drafts = every_size(p, template, sizes)?;
+    // A piece added or deleted since: the pieces cannot be matched.
+    if drafts.iter().any(|d| d.origins.len() != panels.len()) {
+        return Ok(false);
+    }
+    Ok(grade(tx, &panels, &drafts, g.base))
+}
+
+/// A template drafted in one size, on a project of its own.
 struct Drafted {
-    /// Where each piece's draft x = 0 lies on the board (mm).
+    /// Where each piece's draft x = 0 lies on the board (mm), in drafting
+    /// order.
     origins: BTreeMap<PanelId, f64>,
-    /// The project with it.
     project: Project,
 }
 
-/// Draft `template` on a copy of `before`, in the body of size `i`.
-fn draft_size(
-    before: &Project,
-    i: usize,
-    template: Template,
-    sizes: Sizes,
-) -> Result<Drafted, CommandError> {
-    let body = size_body(before, i).ok_or_else(|| internal(format!("no size {i}")))?;
-    let mut copy = before.clone();
-    let mut tx = Transaction::begin(&mut copy);
-    tx.set_avatar(Some(Avatar { body, preset: None }));
-    let (_, origins) = draft_in(&mut tx, template, sizes, &[])?;
-    Ok(Drafted {
-        origins,
-        project: tx.project().clone(),
-    })
+/// `template` drafted for the body of every size of `p`'s range, in
+/// parallel.
+fn every_size(p: &Project, template: Template, sizes: Sizes) -> Result<Vec<Drafted>, CommandError> {
+    let n = p.grading().map_or(0, |g| g.sizes.len());
+    (0..n)
+        .into_par_iter()
+        .map(|i| {
+            let body = size_body(p, i).ok_or_else(|| internal(format!("no size {i}")))?;
+            let mut project = Project::new("");
+            let mut tx = Transaction::begin(&mut project);
+            tx.set_avatar(Some(Avatar { body, preset: None }));
+            let (_, origins) = draft_in(&mut tx, template, sizes, &[])?;
+            Ok(Drafted {
+                origins,
+                project: tx.project().clone(),
+            })
+        })
+        .collect()
 }
 
 /// The body a template is drafted for in size `i`: the avatar's (or a
@@ -536,70 +607,95 @@ fn size_body(p: &Project, i: usize) -> Option<Body> {
     })
 }
 
-/// Grade the points and curves of the pieces just drafted (`origins`:
-/// each piece's draft origin on the board) from the drafts of every size:
-/// where each point lands from its piece's origin. The pieces of every
-/// size share their origin (on most a centre line), so they nest.
-fn grade(
-    tx: &mut Transaction<'_>,
-    origins: &BTreeMap<PanelId, f64>,
-    drafts: &[Drafted],
-    base: usize,
-) -> Result<(), CommandError> {
+/// One drafted piece: its contour edges and its draft origin on the board.
+type DraftedPiece = (Vec<EdgeId>, DVec2);
+
+/// Grade `panels` (a template's pieces, in drafting order) from its
+/// drafts in every size: each contour point (and curve handle) moves as
+/// it does between the base size's draft and that size's, measured from
+/// the piece's draft origin (on most pieces a centre line), so the sizes
+/// nest. Pieces whose outline does not match the draft's are skipped.
+/// Returns whether any piece was graded.
+fn grade(tx: &mut Transaction<'_>, panels: &[PanelId], drafts: &[Drafted], base: usize) -> bool {
     let n = drafts.len();
-    let from_origin = |d: &BTreeMap<PanelId, f64>, panel: PanelId| {
-        DVec2::new(d.get(&panel).copied().unwrap_or_default(), 0.0)
+    let piece = |d: &Drafted, k: usize| -> Option<DraftedPiece> {
+        let (id, origin) = d.origins.iter().nth(k)?;
+        Some((
+            d.project.panel(*id)?.contour.clone(),
+            DVec2::new(*origin, 0.0),
+        ))
     };
-    let points: Vec<(PointId, Point)> = tx
-        .project()
-        .points()
-        .iter()
-        .filter(|(_, p)| origins.contains_key(&p.panel))
-        .map(|(id, p)| (*id, p.clone()))
-        .collect();
-    for (id, point) in points {
-        let mut grade = vec![DVec2::ZERO; n];
-        for (i, d) in drafts.iter().enumerate().filter(|(i, _)| *i != base) {
-            let at = d
-                .project
-                .point(id)
-                .filter(|p| p.panel == point.panel)
-                .ok_or_else(|| internal(format!("{id} not drafted in size {i}")))?;
-            if let Some(slot) = grade.get_mut(i) {
-                *slot = (at.pos - from_origin(&d.origins, point.panel))
-                    - (point.pos - from_origin(origins, point.panel));
-            }
-        }
-        if grade.iter().any(|g| *g != DVec2::ZERO) {
-            tx.put_point(id, Point { grade, ..point });
-        }
-    }
-    let edges: Vec<(EdgeId, Edge)> = tx
-        .project()
-        .edges()
-        .iter()
-        .filter(|(_, e)| origins.contains_key(&e.panel))
-        .map(|(id, e)| (*id, e.clone()))
-        .collect();
-    for (id, edge) in edges {
-        let EdgeCurve::Cubic { c1, c2 } = edge.curve else {
+    let mut any = false;
+    for (k, panel) in panels.iter().enumerate() {
+        let Some(own) = tx.project().panel(*panel).map(|p| p.contour.clone()) else {
             continue;
         };
-        let here = from_origin(origins, edge.panel);
-        let mut grade = vec![[DVec2::ZERO; 2]; n];
-        for (i, d) in drafts.iter().enumerate().filter(|(i, _)| *i != base) {
-            let there = from_origin(&d.origins, edge.panel);
-            if let Some(EdgeCurve::Cubic { c1: s1, c2: s2 }) = d.project.edge(id).map(|e| &e.curve)
-                && let Some(slot) = grade.get_mut(i)
+        let Some(drafted) = drafts
+            .iter()
+            .map(|d| piece(d, k))
+            .collect::<Option<Vec<DraftedPiece>>>()
+        else {
+            continue;
+        };
+        if drafted.iter().any(|(c, _)| c.len() != own.len()) {
+            continue;
+        }
+        // Edge `j` of the piece in size `i`, its start point and the
+        // piece's origin.
+        let at = |i: usize, j: usize| -> Option<(&Edge, DVec2, DVec2)> {
+            let (c, origin) = drafted.get(i)?;
+            let project = &drafts.get(i)?.project;
+            let edge = project.edge(*c.get(j)?)?;
+            Some((edge, project.point(edge.start)?.pos, *origin))
+        };
+        for (j, edge_id) in own.iter().enumerate() {
+            let Some(edge) = tx.project().edge(*edge_id).cloned() else {
+                continue;
+            };
+            let Some((base_edge, base_start, base_origin)) = at(base, j) else {
+                continue;
+            };
+            let mut grade = vec![DVec2::ZERO; n];
+            let mut handles = vec![[DVec2::ZERO; 2]; n];
+            for i in (0..n).filter(|i| *i != base) {
+                let Some((e, start, origin)) = at(i, j) else {
+                    continue;
+                };
+                if let Some(slot) = grade.get_mut(i) {
+                    *slot = (start - origin) - (base_start - base_origin);
+                }
+                if let (
+                    EdgeCurve::Cubic { c1, c2 },
+                    EdgeCurve::Cubic { c1: b1, c2: b2 },
+                    Some(slot),
+                ) = (&e.curve, &base_edge.curve, handles.get_mut(i))
+                {
+                    *slot = [
+                        (*c1 - origin) - (*b1 - base_origin),
+                        (*c2 - origin) - (*b2 - base_origin),
+                    ];
+                }
+            }
+            if let Some(point) = tx.project().point(edge.start).cloned()
+                && grade.iter().any(|g| *g != DVec2::ZERO)
             {
-                *slot = [(*s1 - there) - (c1 - here), (*s2 - there) - (c2 - here)];
+                tx.put_point(edge.start, Point { grade, ..point });
+                any = true;
+            }
+            if matches!(edge.curve, EdgeCurve::Cubic { .. })
+                && handles.iter().flatten().any(|g| *g != DVec2::ZERO)
+            {
+                tx.put_edge(
+                    *edge_id,
+                    Edge {
+                        grade: handles,
+                        ..edge
+                    },
+                );
             }
         }
-        if grade.iter().flatten().any(|g| *g != DVec2::ZERO) {
-            tx.put_edge(id, Edge { grade, ..edge });
-        }
     }
-    Ok(())
+    any
 }
 
 /// Draft `template` in the avatar's body, ungraded; piece `k` takes at

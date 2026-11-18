@@ -491,7 +491,8 @@ instead of 46.
   curves, internal lines, pins and mirror copies following; every size
   derived from the base (`Project::at_size`), the board, the drape and
   the exports reading it; schema v10 (spec 18).
-- Templates added to a ranged project are drafted for every size's body:
+- Template garments (added before or after the sizes are set) are
+  drafted for every size's body:
   a shirt graded 36–52 is, in every size, exactly the shirt drafted for
   that body, its seams matching (`grading.check`), the sizes nested on
   the board without touching the next piece.
