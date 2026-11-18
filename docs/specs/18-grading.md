@@ -57,7 +57,10 @@ the seams still match in every size, and print or send the graded nest.
   body (each on a project of its own, in parallel) and the garment's
   points and curves graded by drafting order and contour position: each
   point moves as it does between the base size's draft and that size's,
-  so edits to the pieces are kept and an unedited piece is exactly the
+  so edits to the pieces are kept. Body measurements given to the
+  template (chest, waist, hips, as the start screen's form gives them)
+  are the base size's and change with each size's body; lengths and
+  ease stay as given and an unedited piece is exactly the
   template drafted for that body. A garment with a piece added or
   deleted is not graded; a piece whose outline gained or lost points is
   skipped. The

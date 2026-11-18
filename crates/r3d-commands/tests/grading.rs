@@ -397,3 +397,29 @@ fn a_template_drafted_before_the_sizes_is_graded_when_they_are_set() {
             .all(|p| p.grade.is_empty())
     );
 }
+
+#[test]
+fn measurements_given_to_a_template_follow_the_sizes() {
+    // As the app's start screen does: every size of the form given.
+    let mut s = Session::new(Project::new("Untitled"));
+    common::women_m(&mut s);
+    ok(
+        &mut s,
+        json!({"type": "template.apply", "template": "shirt", "sizes":
+            {"chest_cm": 90, "length_cm": 72, "sleeve_cm": 49, "ease_cm": 12}}),
+    );
+    ok(
+        &mut s,
+        json!({"type": "grading.use_chart", "chart": "women", "from": "36", "to": "52", "base": "40"}),
+    );
+    let p = s.project();
+    let backs: Vec<f64> = (0..9).map(|i| width(&p.at_size(i), "Back")).collect();
+    assert!(backs.windows(2).all(|w| w[1] > w[0]), "{backs:?}");
+    // Lengths stay as given.
+    let height = |q: &Project| {
+        let (id, _) = q.panels().iter().find(|(_, pn)| pn.name == "Back").unwrap();
+        let b = q.panel_bounding_box(*id).unwrap();
+        b.max.y - b.min.y
+    };
+    assert!((height(&p.at_size(0)) - height(&p.at_size(8))).abs() < 40.0);
+}

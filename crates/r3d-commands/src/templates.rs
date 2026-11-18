@@ -574,13 +574,25 @@ struct Drafted {
 }
 
 /// `template` drafted for the body of every size of `p`'s range, in
-/// parallel.
+/// parallel. Body measurements given (chest, waist, hips) were taken in
+/// the base size: each size changes them as its body differs; lengths
+/// and ease stay as given.
 fn every_size(p: &Project, template: Template, sizes: Sizes) -> Result<Vec<Drafted>, CommandError> {
     let n = p.grading().map_or(0, |g| g.sizes.len());
     (0..n)
         .into_par_iter()
         .map(|i| {
             let body = size_body(p, i).ok_or_else(|| internal(format!("no size {i}")))?;
+            let size = p
+                .grading()
+                .and_then(|g| g.sizes.get(i))
+                .ok_or_else(|| internal(format!("no size {i}")))?;
+            let sizes = Sizes {
+                chest_cm: sizes.chest_cm.map(|v| v + size.bust_cm),
+                waist_cm: sizes.waist_cm.map(|v| v + size.waist_cm),
+                hips_cm: sizes.hips_cm.map(|v| v + size.hips_cm),
+                ..sizes
+            };
             let mut project = Project::new("");
             let mut tx = Transaction::begin(&mut project);
             tx.set_avatar(Some(Avatar { body, preset: None }));

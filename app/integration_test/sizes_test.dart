@@ -19,14 +19,24 @@ void main() {
 
   testWidgets('a size range, the size shown, a graded point', (tester) async {
     final dir = Directory.systemTemp.createTempSync('r3d').path;
-    final engine = Engine.open(path: '$dir/Skirt.r3d');
+    // As the start screen makes it: the body, then the template with every
+    // measurement of its form.
+    final store = ProjectStore(projectsDir: dir, libraryDir: dir);
+    final engine = Engine.open(
+      path: store.create(
+        name: 'Skirt',
+        body: store.standardBody(),
+        template: 'straight_skirt',
+        sizes: const {
+          'waist_cm': 73,
+          'hips_cm': 98,
+          'length_cm': 60,
+          'ease_cm': 2,
+        },
+      ),
+    );
     dynamic run(Map<String, Object?> step) =>
         jsonDecode(engine.run(stepJson: jsonEncode(step)));
-    run({
-      'type': 'template.apply',
-      'template': 'straight_skirt',
-      'sizes': {'length_cm': 60},
-    });
     // The views draw every frame: pump a while instead of settling.
     Future<void> settle() async {
       for (var i = 0; i < 12; i++) {
@@ -35,12 +45,7 @@ void main() {
     }
 
     File('$dir/tour-seen').createSync();
-    await tester.pumpWidget(
-      Rustle3dApp(
-        store: ProjectStore(projectsDir: dir, libraryDir: dir),
-        engine: engine,
-      ),
-    );
+    await tester.pumpWidget(Rustle3dApp(store: store, engine: engine));
     await settle();
 
     // Nothing selected: the inspector offers a size range.
@@ -59,6 +64,8 @@ void main() {
     final sizes = [for (final s in grading['sizes'] as List) s['name']];
     expect(sizes.length, greaterThan(2));
     expect(sizes, contains(grading['base']));
+    // The skirt, drafted before the sizes, is graded to every size.
+    expect(grading['graded_points'] as int, greaterThan(0));
 
     // Another size on its own body.
     final shown = sizes.last as String;
