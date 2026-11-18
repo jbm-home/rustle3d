@@ -32,11 +32,18 @@ can be tested through MCP as soon as they exist.
 | M17 | GPU cloth solver ✅ | 3–4 wk | A T-shirt drapes at 60 fps; a dress stays interactive |
 | M18 | Trousers and shirt templates ✅ | 1–2 wk | A first-time user makes trousers and a shirt from templates |
 | M19 | Layers and multiple garments (tucked in: open) | 3–4 wk | A shirt tucked into trousers, each in its own fabric and colour |
+| M22 | Grading and sizes ✅ | 2–3 wk | A shirt graded from 36 to 52, each size draped on a matching avatar |
+| M25 | Maximized views | < 1 wk | The board fills the window, the drape pauses; one click brings both views back |
+| M26 | History and editing comfort | 1–2 wk | Jump back ten steps from the history panel; paste two sewn pieces with their seam |
+| M27 | Sketching 2: constraints and symmetry | 4–5 wk | Draw a half bodice against a symmetry axis with fixed dimensions; change one, the shape follows |
+| M28 | Parametric patterns | 2–3 wk | A skirt whose waist is `waist / 4 + 10 mm` redrafts itself on another body |
+| M29 | Construction details | 3–4 wk | A skirt with darts, a pleat and a patch pocket sewn on an internal line |
 | M20 | Trims: buttons and zippers | 2–3 wk | A shirt that buttons and trousers with a fly zipper, draped closed |
 | M21 | Textures and prints | 2–3 wk | A striped shirt whose stripes follow the grainline on every piece |
-| M22 | Grading and sizes ✅ | 2–3 wk | A shirt graded from 36 to 52, each size draped on a matching avatar |
+| M30 | Production: marker, yardage, tech pack, projector | 3–4 wk | A graded shirt nested on a 150 cm fabric, its yardage and cost, its tech pack PDF |
+| M24 | Fit maps and virtual tape measure | 2 wk | Tight spots show in colour; the ease at the chest is read on the drape |
+| M31 | Imported avatars | 2–3 wk | A body scan in OBJ/glTF is checked, the pieces placed around it and draped |
 | M23 | Animated avatars | 3–4 wk | The avatar walks and the garment follows |
-| M24 | Fit maps | 1–2 wk | Tight spots on a garment show in colour on the avatar |
 | M15 | Game-ready export | 3–4 wk | LODs + baked wrinkle normal maps + skinning, imported in Godot/Unity/Unreal |
 
 M10 came before M9: the first-time user test, not the export, decided
@@ -50,6 +57,16 @@ garment features they lead to come first, and the export then ships them
 with skinning to an animated avatar. The GPU solver leads because every
 later milestone adds cloth to simulate (physics.md §7: the T-shirt is at
 70 ms per frame against a 33 ms target).
+
+The maintainer's review of 2026-11-18 put the editor first: M25–M29
+come before M20, M21, M24, M23 and M15. Drafting comfort (views,
+history, constraints) is what is felt every day, and every later
+feature is drawn with these tools. M25 is a quick win; M26 comes before
+M27 because constraints and formulas add steps that must undo cleanly;
+M28 builds on M27's dimensions (a formula is a computed dimension); M29
+gives the details that make a garment look real. M30 groups what a
+small brand needs to produce. M19's open point (close layers, a tucked
+in shirt) is hard physics: it is taken up after M29.
 
 ---
 
@@ -517,14 +534,122 @@ Plan as written:
 - Drape each size on an avatar with matching measurements; export the
   graded nest (DXF-AAMA, PDF).
 
+## M25 — Maximized views
+- A button on the board and on the 3D view makes it take the space of
+  both views (the inspector stays); a button, the same one or a
+  shortcut, brings back the default layout.
+- While the 3D view is hidden, a running drape pauses, and resumes when
+  the view comes back (the user's own pause is kept).
+- **Demo**: maximize the board while a shirt drapes, the drape pauses;
+  restore, it goes on.
+
+## M26 — History and editing comfort
+Spec 08 already plans most of it.
+- Undo/Redo labels naming the action ("Undo Move point") in the Edit
+  menu and their tooltips; steps grouped the way the user sees them (a
+  drag, a tool's whole gesture, a template added: one step each).
+- A history panel: the list of steps, a click jumps back or forward to
+  any of them.
+- Undo and redo restore the selection (and select what changed), so the
+  user sees what was undone.
+- Semantic copy and paste: pieces pasted with the seams between them,
+  their internal lines, notches, pins, grade rules and mirror links (in
+  the same project or another one). Needs a `panel.paste` command.
+- **Demo**: draw, sew and move pieces, jump back ten steps from the
+  panel, redo; copy two sewn pieces into a new project.
+
+## M27 — Sketching 2: constraints and symmetry
+From the maintainer (2026-11-18): drafting lacks ease. General CAD ideas
+(constraints, dimensions, symmetry), in our own UI and terms.
+- **Constraints** on points and edges: coincident, horizontal, vertical,
+  parallel, perpendicular, tangent (smooth joint between curves), equal
+  length, fixed point, point on an edge. Shown on the board, removable.
+- **Dimensions**: lengths, distances and angles that stay fixed (the
+  open point of M11); editing one value redraws the piece.
+- A geometric constraint solver (least squares with Newton steps,
+  under-/over-constrained states reported, never a crash), from the
+  published literature, cited in the code and the docs. Every solve is
+  one command, one undo step.
+- **Symmetry axis** while drawing: draw half a piece against an axis,
+  the other half follows (unfolded on the fold, or kept as a linked
+  mirror).
+- **Snapping and inference**: to points, midpoints, edges, the axis,
+  horizontal/vertical, with a visible hint.
+- **Construction lines** (not cut, not sewn) to draft against.
+- New primitives: arc, **arc sector** (circle skirts, collars, given a
+  waist length and a skirt length), ellipse.
+- Editing what M12 left open: handles of a drawn point afterwards,
+  smooth/corner toggle, removing a point.
+- **Demo**: draw a half bodice against an axis with fixed dimensions;
+  change the bust dimension, the piece and its other half follow; draw
+  a circle skirt from an arc sector.
+
+## M28 — Parametric patterns
+- A dimension (M27) can be a **formula** of the body's measurements and
+  named variables: `bust / 4 + 20 mm`. Formulas are checked (unknown
+  name, cycle, bad unit) and errors reported with codes.
+- The pattern redrafts when the body changes. With sizes (M22), a
+  formula is evaluated with each size's measurements, so a parametric
+  piece grades itself; grade rules stay for pieces without formulas
+  (imported patterns). Formulas do not replace grade rules: they are
+  kept only if they fit that model simply.
+- Agents get the formulas through commands ("make this pattern to my
+  measurements").
+- Then, if worth it: import Seamly2D/Valentina patterns and measurement
+  files (open XML formats, formulas kept). Implemented from the format,
+  no code taken from those GPL projects.
+- **Demo**: a skirt with `waist / 4 + 10 mm` redrafts itself on another
+  body and in every size.
+
+## M29 — Construction details
+- Seams on part of an edge and on a chain of edges, with an adjustable
+  **ease** (spec 02's open point).
+- **Seams on internal lines**: a patch pocket sewn on its placement
+  line, a pin tuck.
+- **Darts** (drawn, folded and sewn in one tool), **pleats** and knife or
+  box pleating.
+- **Holes** in a piece, **booleans** between two pieces (union,
+  difference).
+- Later in the milestone if the solver allows: elastic and shirring,
+  visible topstitching, interfacing (local stiffening), quilting and
+  padding.
+- **Demo**: a skirt with darts, a pleat and a patch pocket sewn on an
+  internal line, draped.
+
+## M30 — Production: marker, yardage, tech pack, projector
+- **Indicators per piece**: area, fabric mass; totals per garment.
+- **Marker (nesting)**: the pieces of one or several sizes laid out
+  automatically on a given fabric width, grainline respected, to reduce
+  waste; yardage and cost from the fabric's price. Algorithm from the
+  open literature.
+- **Projector export**: the pattern at 1:1 on a projector over the
+  fabric (full-screen calibrated view, high contrast, mirror option),
+  without printing.
+- **Tech pack**: a PDF with views of the garment, the measurement table,
+  the bill of materials (fabrics, trims), colourways and sewing notes.
+- **Demo**: a graded shirt nested on a 150 cm fabric with its yardage
+  and cost; its tech pack; the back piece projected at 1:1.
+
+## M31 — Imported avatars
+- Import a body in OBJ, glTF or GLB (a scan, a game character); the
+  user owns its licence.
+- A check of the collision mesh (closed, scale, orientation, holes)
+  shown before draping; the arrangement points placed with help and
+  checked before the simulation starts.
+- Later: automatic fit of the arrangement points to the body.
+- **Demo**: a scanned body is checked, a shirt placed around it and
+  draped.
+
 ## M23 — Animated avatars
 - A skeleton for the avatar and a few motions (walk, turn, raise arms);
   the cloth follows the moving body. Animation assets under a
   redistributable licence only (CLAUDE.md §1).
 
-## M24 — Fit maps
+## M24 — Fit maps and virtual tape measure
 - Stress and strain shown in colour on the draped garment, to find
   where it is tight or loose.
+- A tape measure on the drape: circumferences of the garment and ease
+  (the gap between body and garment) read where the user clicks.
 
 ## M15 — Game-ready export
 - Decimated LODs, wrinkle detail baked into normal maps, back faces or
@@ -532,7 +657,12 @@ Plan as written:
   Unity and Unreal.
 
 ## Later (architecture kept ready, not scheduled)
-Material calibration from measurements · OpenUSD
+Material calibration from measurements (a home protocol: a strip
+hanging over an edge for bending, a weight and a ruler for stretch; a
+community fabric library under CC0; only data whose licence allows
+commercial use) · turntable video of the photo render (a runway walk
+after M23) · step-by-step sewing instructions generated from the seams
+(needs a sewing order) · OpenUSD
 export · finer cloth mesh with a strain limit (smaller folds;
 physics.md §7) · picking points and notches in 3D · signed packages ·
 a loading indicator while a project opens (opening runs on the UI
