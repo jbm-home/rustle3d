@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `adjust_by`, `cloth_hit`, `corner_at`, `edge_spot`, `edited`, `err`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form`, `frozen_board`, `gpu_solver`, `graphics`, `new`, `new`, `offset_along`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `resync_if_due`, `rgba`, `run_created`, `selected`, `sim`, `solver`, `to_theme`, `workspace`
+// These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `cloth_hit`, `corner_at`, `edge_spot`, `edited`, `err`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form`, `frozen_board`, `gpu_solver`, `graphics`, `new`, `new`, `offset_along`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `resync_if_due`, `rgba`, `run_created`, `selected`, `sim`, `solver`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
 
@@ -213,6 +213,12 @@ abstract class Engine implements RustOpaqueInterface {
   /// Set the canvas colours from the UI design system, so the board and
   /// the 3D view match the app theme.
   void setCanvas({required CanvasColors colors});
+
+  /// Whether the board shows the other sizes' outlines around each piece
+  /// (a view setting, not saved in the project).
+  void setShowSizes({required bool show_});
+
+  bool showSizes();
 
   /// The latest simulation state.
   SimStatus simulationStatus();

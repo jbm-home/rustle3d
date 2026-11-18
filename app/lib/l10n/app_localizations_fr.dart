@@ -1544,4 +1544,7 @@ class LFr extends L {
   @override
   String get errBaseOffset =>
       'La taille de base ne bouge pas : c\'est le patron tel qu\'il est tracé.';
+
+  @override
+  String get sizesOnBoard => 'Afficher les tailles sur le plateau';
 }

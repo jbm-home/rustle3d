@@ -71,16 +71,6 @@ pub const SEAM_TOLERANCE_MM: f64 = 2.0;
 impl BoardScene {
     pub fn from_project(project: &Project, selected: &[PanelId]) -> Self {
         let order: Vec<PanelId> = project.panels().keys().copied().collect();
-        // The other sizes of the range, for the graded nest.
-        let sized: Vec<(Project, bool)> = project
-            .grading()
-            .map(|g| {
-                (0..g.sizes.len())
-                    .filter(|k| *k != g.base)
-                    .map(|k| (project.at_size(k), k == g.shown))
-                    .collect()
-            })
-            .unwrap_or_default();
         let color_of = |id: PanelId, panel: &r3d_core::Panel| {
             let owner = panel.mirror_of.as_ref().map_or(id, |l| l.source);
             order.iter().position(|p| *p == owner).unwrap_or_default() % PIECE_COLORS
@@ -103,10 +93,6 @@ impl BoardScene {
                     .filter(|(_, l)| l.panel == *id)
                     .filter_map(|(lid, _)| project.internal_line_polyline(*lid))
                     .collect();
-                let sizes = sized
-                    .iter()
-                    .filter_map(|(p, shown)| Some((p.panel_outline(*id)?, *shown)))
-                    .collect();
                 Some(BoardPanel {
                     id: *id,
                     color: color_of(*id, panel),
@@ -114,7 +100,7 @@ impl BoardScene {
                     outline,
                     internal_lines,
                     notches,
-                    sizes,
+                    sizes: Vec::new(),
                 })
             })
             .collect();
@@ -150,6 +136,23 @@ impl BoardScene {
             edges,
             selected_edge: None,
         }
+    }
+
+    /// The same scene with the graded nest: each piece's outline in the
+    /// other sizes of `project`'s range.
+    pub fn with_sizes(mut self, project: &Project) -> Self {
+        let Some(g) = project.grading() else {
+            return self;
+        };
+        for k in (0..g.sizes.len()).filter(|k| *k != g.base) {
+            let sized = project.at_size(k);
+            for panel in &mut self.panels {
+                if let Some(outline) = sized.panel_outline(panel.id) {
+                    panel.sizes.push((outline, k == g.shown));
+                }
+            }
+        }
+        self
     }
 
     /// The same scene with `edge` highlighted.

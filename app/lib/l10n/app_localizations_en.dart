@@ -1527,4 +1527,7 @@ class LEn extends L {
   @override
   String get errBaseOffset =>
       'The base size cannot move: it is the pattern as drawn.';
+
+  @override
+  String get sizesOnBoard => 'Show the sizes on the board';
 }

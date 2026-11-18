@@ -1128,6 +1128,10 @@ class _ShellState extends State<Shell> {
                             }
                           },
                           query: _run,
+                          showSizes: widget.engine.showSizes(),
+                          onShowSizes: (show) => setState(
+                            () => widget.engine.setShowSizes(show_: show),
+                          ),
                           onDelete: _deleteSelected,
                         ),
                       ),
@@ -1899,6 +1903,8 @@ class _Inspector extends StatelessWidget {
     required this.onUnpin,
     required this.run,
     required this.query,
+    required this.showSizes,
+    required this.onShowSizes,
     required this.onDelete,
   });
 
@@ -1914,6 +1920,10 @@ class _Inspector extends StatelessWidget {
 
   /// Run a query and return its result (null on error).
   final dynamic Function(Map<String, Object?>) query;
+
+  /// Whether the board shows the other sizes' outlines.
+  final bool showSizes;
+  final ValueChanged<bool> onShowSizes;
   final VoidCallback onDelete;
 
   @override
@@ -1937,6 +1947,8 @@ class _Inspector extends StatelessWidget {
               summary: summary,
               run: run,
               query: query,
+              showSizes: showSizes,
+              onShowSizes: onShowSizes,
               onArrange: () => run({'type': 'garment.arrange'}),
               pins: pins,
               onUnpin: onUnpin,
@@ -1964,6 +1976,8 @@ class _EmptyInspector extends StatelessWidget {
     required this.summary,
     required this.run,
     required this.query,
+    required this.showSizes,
+    required this.onShowSizes,
     required this.onArrange,
     required this.pins,
     required this.onUnpin,
@@ -1972,6 +1986,8 @@ class _EmptyInspector extends StatelessWidget {
   final Map<String, dynamic> summary;
   final ValueChanged<Map<String, Object?>> run;
   final dynamic Function(Map<String, Object?>) query;
+  final bool showSizes;
+  final ValueChanged<bool> onShowSizes;
   final VoidCallback onArrange;
   final List<dynamic> pins;
   final ValueChanged<String> onUnpin;
@@ -2028,6 +2044,8 @@ class _EmptyInspector extends StatelessWidget {
           grading: summary['grading'] as Map<String, dynamic>?,
           run: run,
           query: query,
+          showOnBoard: showSizes,
+          onShowOnBoard: onShowSizes,
         ),
         const SizedBox(height: Space.l),
         OutlinedButton.icon(
@@ -3394,12 +3412,18 @@ class _SizeRange extends StatelessWidget {
     required this.grading,
     required this.run,
     required this.query,
+    required this.showOnBoard,
+    required this.onShowOnBoard,
   });
 
   /// As `project.summary` gives it: `sizes`, `base`, `shown`; or null.
   final Map<String, dynamic>? grading;
   final ValueChanged<Map<String, Object?>> run;
   final dynamic Function(Map<String, Object?>) query;
+
+  /// Whether the board shows the other sizes' outlines around each piece.
+  final bool showOnBoard;
+  final ValueChanged<bool> onShowOnBoard;
 
   Future<void> _pick(BuildContext context) async {
     final charts = query({'type': 'grading.charts'}) as List<dynamic>?;
@@ -3468,7 +3492,23 @@ class _SizeRange extends StatelessWidget {
           ],
           onChanged: (to) => run({'type': 'grading.show_size', 'size': to}),
         ),
-        const SizedBox(height: Space.m),
+        const SizedBox(height: Space.s),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                l.sizesOnBoard,
+                style: ts(fontSize: 13, color: p.text),
+              ),
+            ),
+            Switch(
+              key: const Key('sizes-on-board'),
+              value: showOnBoard,
+              onChanged: onShowOnBoard,
+            ),
+          ],
+        ),
+        const SizedBox(height: Space.s),
         Row(
           children: [
             Expanded(

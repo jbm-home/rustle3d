@@ -99,7 +99,9 @@ the seams still match in every size, and print or send the graded nest.
   one marked), **Shown in 3D** (a menu of the sizes), **Change** (the
   same dialog) and a delete button.
 - The board draws the other sizes' outlines around each piece, faint;
-  the size shown in 3D a little stronger.
+  the size shown in 3D a little stronger. **Show the sizes on the board**
+  (a switch in the Sizes section) hides them: a view setting of the
+  open project, not saved and not undoable.
 - With one point of a piece selected (not on a linked mirror copy):
   **Grade per size**, x and y in mm, the step from each size to the next.
   When the point's grade is not one step (set by a template or an

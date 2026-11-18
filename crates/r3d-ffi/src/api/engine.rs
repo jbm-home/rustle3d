@@ -388,6 +388,8 @@ pub struct Engine {
     /// Simulate on the CPU only: asked for (`R3D_SOLVER=cpu`), or the
     /// GPU solver failed in this session.
     cpu_only: AtomicBool,
+    /// The board draws the other sizes' outlines (the graded nest).
+    show_sizes: AtomicBool,
     /// The GPU solver's kernels, compiled on the first drape.
     sim_gpu: Mutex<Option<GpuContext>>,
     /// The dress form for the current measurements.
@@ -440,6 +442,7 @@ impl Engine {
             selected_points: Mutex::new(Vec::new()),
             sim: Mutex::new(None),
             cloth: Mutex::new(None),
+            show_sizes: AtomicBool::new(true),
             cpu_only: AtomicBool::new(
                 std::env::var("R3D_SOLVER").is_ok_and(|v| v.eq_ignore_ascii_case("cpu")),
             ),
@@ -744,6 +747,32 @@ impl Engine {
         Ok(changes)
     }
 
+    /// Whether the board shows the other sizes' outlines around each piece
+    /// (a view setting, not saved in the project).
+    #[frb(sync)]
+    pub fn set_show_sizes(&self, show: bool) {
+        self.show_sizes.store(show, Ordering::Relaxed);
+    }
+
+    #[frb(sync)]
+    pub fn show_sizes(&self) -> bool {
+        self.show_sizes.load(Ordering::Relaxed)
+    }
+
+    /// The board's scene, with the graded nest when it is shown.
+    fn board_scene(
+        &self,
+        project: &r3d_core::Project,
+        selected: &[r3d_core::PanelId],
+    ) -> BoardScene {
+        let scene = BoardScene::from_project(project, selected);
+        if self.show_sizes.load(Ordering::Relaxed) {
+            scene.with_sizes(project)
+        } else {
+            scene
+        }
+    }
+
     /// Write an export to `path`, a file the user chose (anywhere): the
     /// pattern (every size of a graded one, nested), or the garment as the
     /// 3D view shows it now (the running drape, or its starting positions),
@@ -981,7 +1010,9 @@ impl Engine {
         match v.kind {
             ViewKind::Board => {
                 let edge = *self.selected_edge.lock().map_err(|_| poisoned())?;
-                let scene = BoardScene::from_project(project, &selected).with_selected_edge(edge);
+                let scene = self
+                    .board_scene(project, &selected)
+                    .with_selected_edge(edge);
                 let board_view = v
                     .board_view
                     .unwrap_or_else(|| BoardView::fit(scene.bounds(), v.width, v.height));
@@ -1392,7 +1423,9 @@ impl Engine {
         if let Some(bv) = board_view {
             return Ok(Some((bv, w, h)));
         }
-        let bounds = BoardScene::from_project(self.workspace()?.session().project(), &[]).bounds();
+        let bounds = self
+            .board_scene(self.workspace()?.session().project(), &[])
+            .bounds();
         let bv = BoardView::fit(bounds, w, h);
         if let Some(v) = self
             .graphics()?
@@ -2123,7 +2156,7 @@ impl Engine {
         match v.kind {
             ViewKind::Garment => g.camera.orbit(dx as f32, dy as f32),
             ViewKind::Board => {
-                let scene = BoardScene::from_project(ws.session().project(), &[]);
+                let scene = self.board_scene(ws.session().project(), &[]);
                 let mut bv = v
                     .board_view
                     .unwrap_or_else(|| BoardView::fit(scene.bounds(), v.width, v.height));
@@ -2148,7 +2181,7 @@ impl Engine {
         match v.kind {
             ViewKind::Garment => g.camera.zoom(amount as f32),
             ViewKind::Board => {
-                let scene = BoardScene::from_project(ws.session().project(), &[]);
+                let scene = self.board_scene(ws.session().project(), &[]);
                 let mut bv = v
                     .board_view
                     .unwrap_or_else(|| BoardView::fit(scene.bounds(), v.width, v.height));

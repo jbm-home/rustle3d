@@ -2742,6 +2742,12 @@ abstract class L {
   /// In en, this message translates to:
   /// **'The base size cannot move: it is the pattern as drawn.'**
   String get errBaseOffset;
+
+  /// No description provided for @sizesOnBoard.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the sizes on the board'**
+  String get sizesOnBoard;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

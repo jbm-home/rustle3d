@@ -136,7 +136,8 @@ size to size (its grade), and the other sizes follow.
   deleted a piece, or points on a piece's outline: grade those points
   yourself.) Garments you drew yourself stay in one size until you grade
   their points.
-- On the board, each piece shows the other sizes' outlines around it.
+- On the board, each piece shows the other sizes' outlines around it;
+  **Show the sizes on the board** hides or shows them.
 - **Shown in 3D** picks the size the garment is draped in, on a body
   with that size's measurements; the drape starts again. The pattern
   you edit stays in the base size.

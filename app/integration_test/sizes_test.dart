@@ -75,6 +75,12 @@ void main() {
     await settle();
     expect((run({'type': 'grading.get'}) as Map)['shown'], shown);
 
+    // The other sizes' outlines can be hidden on the board.
+    expect(engine.showSizes(), isTrue);
+    await tester.tap(find.byKey(const Key('sizes-on-board')));
+    await settle();
+    expect(engine.showSizes(), isFalse);
+
     // A grade typed on one corner of the front: click the corner on the
     // board (its view id is found by trying the few there are).
     final summary = run({'type': 'project.summary'}) as Map<String, dynamic>;

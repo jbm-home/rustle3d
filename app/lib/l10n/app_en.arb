@@ -803,5 +803,6 @@
   "errTooFewSizes": "A size range needs at least two sizes.",
   "errDuplicateName": "Two sizes have the same name.",
   "errBodyOutOfRange": "A size of this range would give the avatar measurements outside what it accepts.",
-  "errBaseOffset": "The base size cannot move: it is the pattern as drawn."
+  "errBaseOffset": "The base size cannot move: it is the pattern as drawn.",
+  "sizesOnBoard": "Show the sizes on the board"
 }

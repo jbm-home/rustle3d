@@ -440,5 +440,6 @@
   "errTooFewSizes": "Une gamme compte au moins deux tailles.",
   "errDuplicateName": "Deux tailles portent le même nom.",
   "errBodyOutOfRange": "Une taille de cette gamme donnerait à l'avatar des mesures hors des limites acceptées.",
-  "errBaseOffset": "La taille de base ne bouge pas : c'est le patron tel qu'il est tracé."
+  "errBaseOffset": "La taille de base ne bouge pas : c'est le patron tel qu'il est tracé.",
+  "sizesOnBoard": "Afficher les tailles sur le plateau"
 }

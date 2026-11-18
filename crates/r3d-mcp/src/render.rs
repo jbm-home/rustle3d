@@ -283,7 +283,8 @@ pub fn render(
     let theme = Theme::LIGHT;
     match view {
         View::Board => {
-            let scene = BoardScene::from_project(ws.session().project(), &[]);
+            let project = ws.session().project();
+            let scene = BoardScene::from_project(project, &[]).with_sizes(project);
             let board_view = BoardView::fit(scene.bounds(), width, height);
             let mut renderer = BoardRenderer::new(gpu, PNG_FORMAT);
             let png = render_png(gpu, width, height, |view| {
