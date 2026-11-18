@@ -226,6 +226,8 @@
   "simulateTip": "Faire tomber le vêtement  Espace",
   "pauseTip": "Pause  Espace",
   "restartTip": "Recommencer depuis le patron",
+  "maximizeViewTip": "Agrandir à la place des deux vues  M",
+  "restoreViewsTip": "Revenir aux deux vues  M",
   "inspector": "Inspecteur",
   "selectPanel": "Sélectionnez une pièce",
   "selectPanelHint": "Cliquez une pièce sur le patron ou le vêtement\npour la régler ici. {count, plural, =0{Aucune pièce} =1{1 pièce} other{{count} pièces}} dans ce projet.",

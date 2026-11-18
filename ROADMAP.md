@@ -33,7 +33,7 @@ can be tested through MCP as soon as they exist.
 | M18 | Trousers and shirt templates ✅ | 1–2 wk | A first-time user makes trousers and a shirt from templates |
 | M19 | Layers and multiple garments (tucked in: open) | 3–4 wk | A shirt tucked into trousers, each in its own fabric and colour |
 | M22 | Grading and sizes ✅ | 2–3 wk | A shirt graded from 36 to 52, each size draped on a matching avatar |
-| M25 | Maximized views | < 1 wk | The board fills the window, the drape pauses; one click brings both views back |
+| M25 | Maximized views ✅ | < 1 wk | The board fills the window, the drape pauses; one click brings both views back |
 | M26 | History and editing comfort | 1–2 wk | Jump back ten steps from the history panel; paste two sewn pieces with their seam |
 | M27 | Sketching 2: constraints and symmetry | 4–5 wk | Draw a half bodice against a symmetry axis with fixed dimensions; change one, the shape follows |
 | M28 | Parametric patterns | 2–3 wk | A skirt whose waist is `waist / 4 + 10 mm` redrafts itself on another body |
@@ -534,7 +534,7 @@ Plan as written:
 - Drape each size on an avatar with matching measurements; export the
   graded nest (DXF-AAMA, PDF).
 
-## M25 — Maximized views
+## M25 — Maximized views ✅ (2026-11-18)
 - A button on the board and on the 3D view makes it take the space of
   both views (the inspector stays); a button, the same one or a
   shortcut, brings back the default layout.
@@ -542,6 +542,14 @@ Plan as written:
   the view comes back (the user's own pause is kept).
 - **Demo**: maximize the board while a shirt drapes, the drape pauses;
   restore, it goes on.
+
+Built (2026-11-18), UI only (no command; the layout is not saved):
+- The button at the top right of each view and **M** over a view; the
+  board keeps its pan and zoom when its view is recreated (also on a
+  window resize, which used to fit it again).
+- A drape running while the board is maximized (an agent's too) is
+  paused and resumes on restore; Space or the guide's Drape brings the
+  3D view back. Tested by `app/integration_test/views_test.dart`.
 
 ## M26 — History and editing comfort
 Spec 08 already plans most of it.

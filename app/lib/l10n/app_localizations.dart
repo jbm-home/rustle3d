@@ -1453,6 +1453,18 @@ abstract class L {
   /// **'Start again from the pattern'**
   String get restartTip;
 
+  /// No description provided for @maximizeViewTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the space of both views  M'**
+  String get maximizeViewTip;
+
+  /// No description provided for @restoreViewsTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Show both views again  M'**
+  String get restoreViewsTip;
+
   /// No description provided for @inspector.
   ///
   /// In en, this message translates to:

@@ -797,6 +797,12 @@ class LFr extends L {
   String get restartTip => 'Recommencer depuis le patron';
 
   @override
+  String get maximizeViewTip => 'Agrandir à la place des deux vues  M';
+
+  @override
+  String get restoreViewsTip => 'Revenir aux deux vues  M';
+
+  @override
   String get inspector => 'Inspecteur';
 
   @override

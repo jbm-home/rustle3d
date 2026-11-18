@@ -430,6 +430,8 @@
   "simulateTip": "Drape the garment  Space",
   "pauseTip": "Pause  Space",
   "restartTip": "Start again from the pattern",
+  "maximizeViewTip": "Use the space of both views  M",
+  "restoreViewsTip": "Show both views again  M",
   "inspector": "Inspector",
   "selectPanel": "Select a panel",
   "selectPanelHint": "Click a piece on the pattern or the garment\nto adjust it here. {count, plural, =1{1 piece} other{{count} pieces}} in this project.",

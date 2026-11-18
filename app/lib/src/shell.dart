@@ -85,6 +85,16 @@ class _ShellState extends State<Shell> {
   /// nothing redraws).
   Timer? _agentPoll;
 
+  /// The view taking the space of both views, if one does.
+  ViewKind? _maximized;
+
+  /// The drape was paused because the 3D view went out of sight: it goes
+  /// on when the view comes back.
+  bool _resumeDrape = false;
+
+  /// The view under the pointer, which the shortcut maximizes.
+  ViewKind _hovered = ViewKind.board;
+
   /// The guided flow's current step, and whether the guide is shown.
   late GuideStep _step;
   bool _guide = true;
@@ -123,6 +133,38 @@ class _ShellState extends State<Shell> {
     }
     final agent = _guard(widget.engine.agentStatus) ?? AgentStatus.off;
     if (agent != _agent) setState(() => _agent = agent);
+    // An agent may start the drape while the 3D view is out of sight.
+    if (_maximized == ViewKind.board) _pauseHidden();
+  }
+
+  /// Let `view` take the space of both views, or (`null`) show both.
+  void _maximize(ViewKind? view) {
+    if (view == _maximized) return;
+    setState(() => _maximized = view);
+    if (view == ViewKind.board) {
+      _pauseHidden();
+    } else if (_resumeDrape) {
+      _resumeDrape = false;
+      _setRunning(true);
+    }
+  }
+
+  void _toggleMaximized(ViewKind view) =>
+      _maximize(_maximized == null ? view : null);
+
+  /// Pause a running drape while the 3D view is hidden; it goes on when
+  /// the view comes back.
+  void _pauseHidden() {
+    final status = _guard(widget.engine.simulationStatus);
+    if (status == null) return;
+    if (status.running) {
+      _resumeDrape = true;
+      setState(
+        () => _sim = _guard(() => widget.engine.runSimulation(running: false)),
+      );
+    } else if (status != _sim) {
+      setState(() => _sim = status);
+    }
   }
 
   /// Go to a step of the guided flow: its tool becomes the active one.
@@ -182,6 +224,14 @@ class _ShellState extends State<Shell> {
     if (stops.any((s) => s.$1 == Spot.garmentInspector)) {
       _guard(() => widget.engine.select(panels: const []));
       _refresh();
+    }
+    // The marks point at both views.
+    if (_maximized != null) {
+      _maximize(null);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showLearn(stops);
+      });
+      return;
     }
     showTour(context, [
       for (final (spot, title, text) in stops)
@@ -293,9 +343,16 @@ class _ShellState extends State<Shell> {
     }
   }
 
-  void _setRunning(bool running) => setState(
-    () => _sim = _guard(() => widget.engine.runSimulation(running: running)),
-  );
+  /// Run or pause the drape; running it brings the 3D view back.
+  void _setRunning(bool running) {
+    if (running && _maximized == ViewKind.board) {
+      _resumeDrape = false;
+      setState(() => _maximized = null);
+    }
+    setState(
+      () => _sim = _guard(() => widget.engine.runSimulation(running: running)),
+    );
+  }
 
   /// Rebuild the simulation from the pattern, keeping it running if it was.
   void _restart() {
@@ -940,6 +997,8 @@ class _ShellState extends State<Shell> {
             _look(CameraSide.threeQuarter),
         const SingleActivator(LogicalKeyboardKey.space): () =>
             _setRunning(!(_sim?.running ?? false)),
+        const SingleActivator(LogicalKeyboardKey.keyM): () =>
+            _toggleMaximized(_hovered),
       },
       child: Focus(
         autofocus: true,
@@ -998,107 +1057,125 @@ class _ShellState extends State<Shell> {
                           }
                         },
                       ),
-                      Expanded(
-                        child: _ViewCard(
-                          key: _tourPattern,
-                          title: l.viewPattern,
-                          icon: Icons.architecture_outlined,
-                          child: RustView(
-                            engine: widget.engine,
-                            kind: ViewKind.board,
-                            // Corners and edges are dragged with Select.
-                            holding: _tool == 'select',
-                            pattern: switch (_tool) {
-                              'polygon' => PatternPointer(onTap: _polygonTap),
-                              'notch' => PatternPointer(onTap: _notchTap),
-                              'curve' || 'cut' => PatternPointer(
-                                onPress: _pathPress,
-                                onDrag: _pathDrag,
+                      if (_maximized != ViewKind.garment)
+                        Expanded(
+                          child: MouseRegion(
+                            onEnter: (_) => _hovered = ViewKind.board,
+                            child: _ViewCard(
+                              key: _tourPattern,
+                              title: l.viewPattern,
+                              icon: Icons.architecture_outlined,
+                              maximized: _maximized == ViewKind.board,
+                              onToggleSize: () =>
+                                  _toggleMaximized(ViewKind.board),
+                              child: RustView(
+                                engine: widget.engine,
+                                kind: ViewKind.board,
+                                // Corners and edges are dragged with Select.
+                                holding: _tool == 'select',
+                                pattern: switch (_tool) {
+                                  'polygon' => PatternPointer(
+                                    onTap: _polygonTap,
+                                  ),
+                                  'notch' => PatternPointer(onTap: _notchTap),
+                                  'curve' || 'cut' => PatternPointer(
+                                    onPress: _pathPress,
+                                    onDrag: _pathDrag,
+                                  ),
+                                  'bend' => PatternPointer(
+                                    onTap: _bendTap,
+                                    onPress: _bendPress,
+                                    onDrag: _bendDrag,
+                                    onRelease: () => _handle = null,
+                                  ),
+                                  'straighten' => PatternPointer(
+                                    onTap: _straightenTap,
+                                  ),
+                                  'addPoint' => PatternPointer(
+                                    onTap: _addPointTap,
+                                  ),
+                                  _ => null,
+                                },
+                                overlay: (canvas, toScreen) => _boardOverlay(
+                                  canvas,
+                                  toScreen,
+                                  Tokens.of(context),
+                                ),
+                                onSelection: (_) =>
+                                    _tool == 'sew' ? _sewClick() : _refresh(),
+                                onFrameTime: (ms) => _onFrame(true, ms),
                               ),
-                              'bend' => PatternPointer(
-                                onTap: _bendTap,
-                                onPress: _bendPress,
-                                onDrag: _bendDrag,
-                                onRelease: () => _handle = null,
-                              ),
-                              'straighten' => PatternPointer(
-                                onTap: _straightenTap,
-                              ),
-                              'addPoint' => PatternPointer(onTap: _addPointTap),
-                              _ => null,
-                            },
-                            overlay: (canvas, toScreen) => _boardOverlay(
-                              canvas,
-                              toScreen,
-                              Tokens.of(context),
                             ),
-                            onSelection: (_) =>
-                                _tool == 'sew' ? _sewClick() : _refresh(),
-                            onFrameTime: (ms) => _onFrame(true, ms),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: Space.m),
-                      Expanded(
-                        child: _ViewCard(
-                          key: _tourGarment,
-                          title: _photo == null ? '3D' : l.photo,
-                          icon: _photo == null
-                              ? Icons.view_in_ar_outlined
-                              : Icons.photo_camera_outlined,
-                          trailing: _photo != null
-                              ? null
-                              : Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    _CameraBar(
-                                      key: _spotCameras,
-                                      onLook: _look,
+                      if (_maximized == null) const SizedBox(width: Space.m),
+                      if (_maximized != ViewKind.board)
+                        Expanded(
+                          child: MouseRegion(
+                            onEnter: (_) => _hovered = ViewKind.garment,
+                            child: _ViewCard(
+                              key: _tourGarment,
+                              title: _photo == null ? '3D' : l.photo,
+                              maximized: _maximized == ViewKind.garment,
+                              onToggleSize: () =>
+                                  _toggleMaximized(ViewKind.garment),
+                              icon: _photo == null
+                                  ? Icons.view_in_ar_outlined
+                                  : Icons.photo_camera_outlined,
+                              trailing: _photo != null
+                                  ? null
+                                  : Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        _CameraBar(
+                                          key: _spotCameras,
+                                          onLook: _look,
+                                        ),
+                                        const SizedBox(width: Space.s),
+                                        _SimControls(
+                                          key: _spotSimulate,
+                                          status: _sim,
+                                          onRun: _setRunning,
+                                          onRestart: _restart,
+                                        ),
+                                        const SizedBox(width: Space.s),
+                                        _Pill(
+                                          key: _spotPhoto,
+                                          child: _IconAction(
+                                            key: const ValueKey('photoButton'),
+                                            icon: Icons.photo_camera_outlined,
+                                            tip: l.photoTip,
+                                            onTap: _askPhoto,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(width: Space.s),
-                                    _SimControls(
-                                      key: _spotSimulate,
-                                      status: _sim,
-                                      onRun: _setRunning,
-                                      onRestart: _restart,
+                              overlay: _photo == null
+                                  ? null
+                                  : PhotoBar(
+                                      status: _photo!,
+                                      onStop: _stopPhoto,
+                                      onSave: _savePhoto,
+                                      onClose: _closePhoto,
                                     ),
-                                    const SizedBox(width: Space.s),
-                                    _Pill(
-                                      key: _spotPhoto,
-                                      child: _IconAction(
-                                        key: const ValueKey('photoButton'),
-                                        icon: Icons.photo_camera_outlined,
-                                        tip: l.photoTip,
-                                        onTap: _askPhoto,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                          overlay: _photo == null
-                              ? null
-                              : PhotoBar(
-                                  status: _photo!,
-                                  onStop: _stopPhoto,
-                                  onSave: _savePhoto,
-                                  onClose: _closePhoto,
-                                ),
-                          child: RustView(
-                            engine: widget.engine,
-                            kind: ViewKind.garment,
-                            onSelection: (_) => _refresh(),
-                            onFrameTime: (ms) => _onFrame(false, ms),
-                            onPinned: (_) {
-                              _refresh();
-                              _toast(l.toastPinned);
-                            },
-                            drawing: _tool == 'draw',
-                            onDrawn: (_) {
-                              _refresh();
-                              _toast(l.toastLineAdded);
-                            },
+                              child: RustView(
+                                engine: widget.engine,
+                                kind: ViewKind.garment,
+                                onSelection: (_) => _refresh(),
+                                onFrameTime: (ms) => _onFrame(false, ms),
+                                onPinned: (_) {
+                                  _refresh();
+                                  _toast(l.toastPinned);
+                                },
+                                drawing: _tool == 'draw',
+                                onDrawn: (_) {
+                                  _refresh();
+                                  _toast(l.toastLineAdded);
+                                },
+                              ),
+                            ),
                           ),
                         ),
-                      ),
                       const SizedBox(width: Space.m),
                       SizedBox(
                         width: 264,
@@ -1814,6 +1891,8 @@ class _ViewCard extends StatelessWidget {
     required this.title,
     required this.icon,
     required this.child,
+    required this.maximized,
+    required this.onToggleSize,
     this.trailing,
     this.overlay,
   });
@@ -1822,6 +1901,10 @@ class _ViewCard extends StatelessWidget {
   final IconData icon;
   final Widget child;
   final Widget? trailing;
+
+  /// The view takes the space of both views; [onToggleSize] switches.
+  final bool maximized;
+  final VoidCallback onToggleSize;
 
   /// Shown along the bottom; while it is, the view takes no input.
   final Widget? overlay;
@@ -1848,13 +1931,35 @@ class _ViewCard extends StatelessWidget {
           Positioned.fill(
             child: AbsorbPointer(absorbing: overlay != null, child: child),
           ),
-          if (overlay != null)
-            Positioned(
-              left: Space.m,
-              right: Space.m,
-              bottom: Space.m,
-              child: overlay!,
+          // The size switch in the bottom corner (the top is full on the
+          // 3D view), over the overlay when there is one.
+          Positioned(
+            left: Space.m,
+            right: Space.m,
+            bottom: Space.m,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                _Pill(
+                  child: _IconAction(
+                    key: ValueKey(maximized ? 'restoreViews' : 'maximizeView'),
+                    icon: maximized
+                        ? Icons.close_fullscreen_rounded
+                        : Icons.open_in_full_rounded,
+                    tip: maximized
+                        ? context.l.restoreViewsTip
+                        : context.l.maximizeViewTip,
+                    onTap: onToggleSize,
+                  ),
+                ),
+                if (overlay != null) ...[
+                  const SizedBox(height: Space.s),
+                  overlay!,
+                ],
+              ],
             ),
+          ),
           Positioned(
             left: Space.m,
             top: Space.m,

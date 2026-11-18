@@ -12,7 +12,7 @@ rename, delete, export and import projects; smooth views on Windows;
 cloth comes to rest; pieces arranged side by side by width; M17,
 draping on the graphics card; M18, shirt and trousers templates, pieces
 placed on a leg; M19, several garments in layers; M22, sizes and
-grading).
+grading; M25, maximized views).
 -->
 
 Rustle3D is a free, open-source desktop app for making clothes: draw the
@@ -77,6 +77,13 @@ of related tools (the last one used stays on the button).
 | Draw on garment | D | Drag across the 3D garment: the line lands on the pattern |
 | Notch | N | Click an edge where the notch goes |
 | Sew | S | Click an edge, then the edge to sew it to |
+
+**Make a view bigger**: the button at the top right of the board or of
+the 3D view (or **M** with the pointer over it) lets that view take the
+space of both; the same button, or M again, brings both views back. While
+the 3D view is hidden, a running drape pauses and goes on when the view
+comes back (a drape you paused yourself stays paused); starting the drape
+(Space) brings the 3D view back. The board keeps its zoom.
 
 Other keys: **⌘Z** undo, **⇧⌘Z** redo (also Ctrl+Y on Windows and Linux),
 **Backspace/Delete** deletes the selection, **Esc** cancels a drawing.

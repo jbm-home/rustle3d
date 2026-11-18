@@ -251,6 +251,9 @@ struct Graphics {
     avatar: Option<(Body, Mesh)>,
     /// Draws the photo into the 3D view, made on first use.
     blit: Option<ImageBlit>,
+    /// The board's pan/zoom when its view went away (resized, or hidden
+    /// by the 3D view taking its space), for the next board view.
+    board_view: Option<BoardView>,
 }
 
 impl Graphics {
@@ -267,6 +270,7 @@ impl Graphics {
             theme: Theme::LIGHT,
             avatar: None,
             blit: None,
+            board_view: None,
         })
     }
 }
@@ -938,7 +942,10 @@ impl Engine {
                 width,
                 height,
                 shared: surface.is_some(),
-                board_view: None,
+                board_view: match kind {
+                    ViewKind::Board => g.board_view.take(),
+                    ViewKind::Garment => None,
+                },
             },
         );
         Ok(id)
@@ -963,7 +970,9 @@ impl Engine {
     #[frb(sync)]
     pub fn detach_view(&self, view: u32) -> Result<(), ApiError> {
         if let Some(g) = self.graphics()?.as_mut() {
-            g.views.remove(&view);
+            if let Some(kept) = g.views.remove(&view).and_then(|v| v.board_view) {
+                g.board_view = Some(kept);
+            }
         }
         Ok(())
     }

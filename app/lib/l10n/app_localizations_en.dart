@@ -788,6 +788,12 @@ class LEn extends L {
   String get restartTip => 'Start again from the pattern';
 
   @override
+  String get maximizeViewTip => 'Use the space of both views  M';
+
+  @override
+  String get restoreViewsTip => 'Show both views again  M';
+
+  @override
   String get inspector => 'Inspector';
 
   @override
