@@ -127,5 +127,9 @@ Bash). The manual GitHub workflow "Release builds" runs it on all three.
 
 ## License
 
-MIT, see [`LICENSE`](LICENSE) and
-[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+GNU General Public License v3.0 or later (GPL-3.0-or-later), see
+[`LICENSE`](LICENSE) and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+Rustle3D is free to use for any purpose, including commercial work; the
+garments, patterns and images you make with it are yours, under any terms
+you choose. If you distribute a modified version of Rustle3D, it must stay
+under the GPL with its source code available.

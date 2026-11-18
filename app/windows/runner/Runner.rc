@@ -93,7 +93,7 @@ BEGIN
             VALUE "FileDescription", "rustle3d" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "rustle3d" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 dev.rustle3d. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 the Rustle3D authors. GNU GPL v3 or later." "\0"
             VALUE "OriginalFilename", "rustle3d.exe" "\0"
             VALUE "ProductName", "rustle3d" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"

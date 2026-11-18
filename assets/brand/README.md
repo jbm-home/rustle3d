@@ -5,7 +5,7 @@ The Rustle3D mark: a piece of cloth hanging in folds, made of two panels
 draping (cloth under gravity), pattern pieces and sewing.
 
 Provenance: our own design (2026), drawn by hand in SVG for this project.
-Same license as the code (MIT). The wordmark is set in Manrope ExtraBold
+Same license as the code (GPL-3.0-or-later). The wordmark is set in Manrope ExtraBold
 (SIL OFL 1.1, see `THIRD_PARTY_NOTICES.md`), converted to outlines.
 
 ## Files

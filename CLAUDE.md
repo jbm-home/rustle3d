@@ -1,8 +1,8 @@
 # CLAUDE.md — rules for AI agents working on Rustle3D
 
-Rustle3D is an open-source (MIT) desktop application in Rust for 3D garment
-design: draft sewing patterns in 2D, sew them, drape them on an avatar with
-real-time cloth physics. It must stay simple to use and fully drivable by AI
+Rustle3D is an open-source (GPL-3.0-or-later) desktop application in Rust
+for 3D garment design: draft sewing patterns in 2D, sew them, drape them on
+an avatar with real-time cloth physics. It must stay simple to use and fully drivable by AI
 agents through its command layer (CLI and MCP).
 
 Read `docs/architecture.md` before touching code, `docs/physics.md` before
@@ -38,9 +38,11 @@ This is an independent, clean-room implementation.
 - Avatars: only assets whose license allows commercial redistribution (e.g.
   MakeHuman CC0). **Never** SMPL, SMPL-X or any non-commercial body model.
   Record provenance in `assets/avatars/README.md`.
-- Other permissively licensed projects may inspire design ideas. If code is
-  copied or closely adapted, keep the original copyright notice and add an
-  entry to `THIRD_PARTY_NOTICES.md`. Prefer reimplementing from papers.
+- Other open-source projects may inspire design ideas. Code may be copied
+  or closely adapted only from projects whose license is compatible with
+  GPL-3.0-or-later (MIT, Apache-2.0, BSD, Zlib, MPL-2.0, LGPL/GPL v3, …;
+  never GPL-2.0-only); keep the original copyright notice and add an entry
+  to `THIRD_PARTY_NOTICES.md`. Prefer reimplementing from papers.
 - Physics and rendering algorithms come from published papers; cite them in
   the doc comment of the implementing code and in `docs/physics.md` or
   `docs/rendering.md`.
@@ -71,8 +73,10 @@ If a request would break one of these rules, stop and say so.
   the core→sim boundary.
 - IDs are stable typed newtypes allocated by the document; never use
   indices into vectors as identity.
-- New dependencies: permissive licenses only (MIT, Apache-2.0, BSD, Zlib,
-  CC0, Unicode). Justify each new dependency in the PR.
+- New dependencies: licenses compatible with GPL-3.0-or-later. Prefer
+  permissive ones (MIT, Apache-2.0, BSD, Zlib, ISC, CC0, Unicode); MPL-2.0,
+  LGPL-3.0 and GPL-3.0 are acceptable with a justification. Never
+  GPL-2.0-only, non-commercial or proprietary. Justify each new dependency in the PR.
 - Keep the crates' dependency direction as documented in
   `docs/architecture.md`. `r3d-core`, `r3d-geom` and `r3d-sim` never depend
   on GUI or GPU crates.

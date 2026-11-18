@@ -1,7 +1,9 @@
 # Contributing to Rustle3D
 
-Thanks for your interest! Rustle3D is MIT-licensed. By contributing, you agree
-that your contributions are licensed under the MIT license.
+Thanks for your interest! Rustle3D is licensed under the GNU General Public
+License, version 3 or (at your option) any later version (GPL-3.0-or-later,
+see `LICENSE`). By contributing, you agree that your contributions are
+licensed under the same terms.
 
 ## Clean-room policy (please read first)
 
@@ -25,8 +27,9 @@ rules:
 5. Body models and other assets must have a license that allows commercial
    redistribution (e.g. CC0). SMPL/SMPL-X and other non-commercial models
    are not accepted.
-6. If you copy or closely adapt code from another permissively licensed
-   project, keep its copyright notice and add it to `THIRD_PARTY_NOTICES.md`.
+6. If you copy or closely adapt code from another project, its license must
+   be compatible with GPL-3.0-or-later (never GPL-2.0-only); keep its
+   copyright notice and add it to `THIRD_PARTY_NOTICES.md`.
    Prefer reimplementing from the original papers, and cite them.
 
 Pull requests that do not respect these rules will be closed.
@@ -51,8 +54,8 @@ Engineering rules (also in `CLAUDE.md`):
   validation, a JSON schema and an undo/redo test. No business logic in the UI.
 - Tests: unit tests, property tests for geometry, golden files for
   serialization, deterministic simulation regression tests.
-- New dependencies must be permissively licensed (MIT, Apache-2.0, BSD,
-  Zlib, CC0).
+- New dependencies must have a license compatible with GPL-3.0-or-later,
+  preferably a permissive one (MIT, Apache-2.0, BSD, Zlib, ISC, CC0).
 
 ## Pull requests
 
