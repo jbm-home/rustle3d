@@ -2063,6 +2063,7 @@ version = "0.1.0"
 dependencies = [
  "criterion",
  "glam",
+ "r3d-geom",
  "rayon",
  "serde",
  "thiserror",
@@ -2078,6 +2079,7 @@ dependencies = [
  "pollster",
  "r3d-commands",
  "r3d-core",
+ "r3d-geom",
  "r3d-sim",
  "serde_json",
  "thiserror",
@@ -3451,6 +3453,7 @@ dependencies = [
  "glam",
  "r3d-avatar",
  "r3d-commands",
+ "serde_json",
  "ureq",
 ]
 

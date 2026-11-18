@@ -9,7 +9,7 @@ use glam::Vec3;
 use r3d_core::Body;
 
 use crate::measure::{Measurements, measure};
-use crate::model::{BodyModel, BodyShape, MAX_EXTRAPOLATION};
+use crate::model::{BodyModel, BodyShape, MAX_EXTRAPOLATION, Shaped};
 
 /// A fitted body.
 #[derive(Debug, Clone, PartialEq)]
@@ -161,9 +161,14 @@ pub fn fit(model: &BodyModel, spec: &Body) -> Fit {
 
 /// Positions of a fitted body (metres, feet on the ground).
 pub fn fitted_positions(model: &BodyModel, fit: &Fit) -> Vec<Vec3> {
-    model
-        .positions(&fit.shape)
-        .into_iter()
-        .map(|p| p * fit.scale)
-        .collect()
+    fitted_body(model, fit).positions
+}
+
+/// Vertices and joints of a fitted body (metres, feet on the ground).
+pub fn fitted_body(model: &BodyModel, fit: &Fit) -> Shaped {
+    let mut shaped = model.shaped(&fit.shape);
+    for p in shaped.positions.iter_mut().chain(&mut shaped.joints) {
+        *p *= fit.scale;
+    }
+    shaped
 }

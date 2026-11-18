@@ -8,7 +8,9 @@ use r3d_sim_gpu::GpuContext;
 
 static CONTEXT: OnceLock<Option<GpuContext>> = OnceLock::new();
 
-/// The test context, or `None` on machines without any GPU adapter.
+/// The test context, or `None` on machines without any GPU adapter. A
+/// GPU that refuses the solver (a shader that does not compile, a limit
+/// exceeded) fails the tests rather than skipping them.
 pub fn context() -> Option<&'static GpuContext> {
     CONTEXT
         .get_or_init(|| {
@@ -23,7 +25,10 @@ pub fn context() -> Option<&'static GpuContext> {
             let (device, queue) =
                 pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default()))
                     .ok()?;
-            GpuContext::new(&device, &queue).ok()
+            match GpuContext::new(&device, &queue) {
+                Ok(context) => Some(context),
+                Err(e) => panic!("{e}"),
+            }
         })
         .as_ref()
 }

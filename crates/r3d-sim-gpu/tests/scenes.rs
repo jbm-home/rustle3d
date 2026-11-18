@@ -35,6 +35,11 @@ fn cloth_drapes_over_a_sphere_without_going_through() {
 }
 
 #[test]
+fn a_moving_body_carries_the_cloth() {
+    on_gpu(reference::a_moving_body_carries_the_cloth);
+}
+
+#[test]
 fn two_panels_sewn_into_a_tube_close_their_seams() {
     on_gpu(reference::two_panels_sewn_into_a_tube_close_their_seams);
 }

@@ -11,7 +11,8 @@
 struct Step {
     // xyz: gravity (m/s²), w: substep h (s).
     gravity_h: vec4f,
-    // x: seam compliance / h², y: grab compliance / h², z: 1 / h².
+    // x: seam compliance / h², y: grab compliance / h², z: 1 / h², w: the
+    // substep's index in the frame.
     params: vec4f,
     // xyz: where the grab pulls its particle.
     grab_target: vec4f,
@@ -35,6 +36,9 @@ struct Scene {
     // x: particles, y: hash table size (power of two), z: grabbed
     // particles.
     counts: vec4u,
+    // x: where the field's parts start in `sdf_values`, y: parts of a
+    // moving body (0: the body stands still).
+    body: vec4u,
 }
 
 struct Membrane {
@@ -70,6 +74,8 @@ struct Hinge {
 @group(1) @binding(10) var<storage, read> sewn_csr: array<u32>;
 @group(1) @binding(11) var<storage, read> excluded_csr: array<u32>;
 @group(1) @binding(12) var<storage, read> sdf_slots: array<u32>;
+// The field's values, then (from scene.body.x) its parts: per value, the
+// body parts of the closest surface, one bit each (as f32 bit patterns).
 @group(1) @binding(13) var<storage, read> sdf_values: array<f32>;
 // xyz: offset from the target, w: particle index (exact as a float).
 @group(1) @binding(14) var<storage, read> grab: array<vec4f>;
@@ -80,6 +86,11 @@ struct Hinge {
 @group(1) @binding(19) var<storage, read_write> neighbour_count: array<u32>;
 // Per particle: how many candidates it overlaps this substep.
 @group(1) @binding(20) var<storage, read_write> contacts: array<u32>;
+// Per part, the box (rest pose) its surface's nodes lie in: low, high.
+// Then per substep and part, three rigid motions (rotation quaternion,
+// then translation): the part's at the substep's end, its inverse, and
+// the part's at the substep's start.
+@group(1) @binding(21) var<storage, read> body: array<vec4f>;
 
 const WG: u32 = 64u;
 
@@ -317,6 +328,67 @@ fn sdf_sample(p: vec3f) -> vec4f {
     return vec4f(g / l, distance);
 }
 
+// The body parts the surface closest to `p` belongs to, at the nearest
+// node; 0 far from the surface.
+fn sdf_parts_at(p: vec3f) -> u32 {
+    let q = round((p - scene.sdf_origin.xyz) / scene.sdf_origin.w);
+    if min(q.x, min(q.y, q.z)) < 0.0 || max(q.x, max(q.y, q.z)) > 1e7 {
+        return 0u;
+    }
+    let c = vec3u(q);
+    let b = c / BRICK;
+    let dims = scene.sdf_dims.xyz;
+    if any(b >= dims) {
+        return 0u;
+    }
+    let slot = sdf_slots[(b.z * dims.y + b.y) * dims.x + b.x];
+    if slot == 0xffffffffu {
+        return 0u;
+    }
+    let l = c % BRICK;
+    let k = slot * BRICK * BRICK * BRICK + (l.z * BRICK + l.y) * BRICK + l.x;
+    return bitcast<u32>(sdf_values[scene.body.x + k]);
+}
+
+fn rotate(q: vec4f, v: vec3f) -> vec3f {
+    return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v);
+}
+
+// Rigid motion `k` of the body buffer applied to `p`.
+fn rigid(k: u32, p: vec3f) -> vec3f {
+    return rotate(body[k], p) + body[k + 1u].xyz;
+}
+
+// The body seen from `p` (r3d-sim `motion::touch`).
+struct Touch {
+    // xyz: outward normal, w: signed distance; w = BAND when out of the band.
+    c: vec4f,
+    // How far the body's surface there moved this substep.
+    moved: vec3f,
+}
+
+fn touch(p: vec3f) -> Touch {
+    let parts = scene.body.y;
+    if parts == 0u {
+        return Touch(sdf_sample(p), vec3f(0.0));
+    }
+    var best = Touch(vec4f(0.0, 0.0, 0.0, BAND), vec3f(0.0));
+    let base = 2u * parts + u32(step.params.w) * parts * 6u;
+    for (var part = 0u; part < parts; part++) {
+        let k = base + part * 6u;
+        let q = rigid(k + 2u, p);
+        if any(q < body[2u * part].xyz) || any(q > body[2u * part + 1u].xyz) {
+            continue;
+        }
+        let c = sdf_sample(q);
+        if c.w >= BAND || c.w >= best.c.w || (sdf_parts_at(q) & (1u << part)) == 0u {
+            continue;
+        }
+        best = Touch(vec4f(rotate(body[k], c.xyz), c.w), p - rigid(k + 4u, q));
+    }
+    return best;
+}
+
 // ---------------------------------------------------------------------------
 // Contacts with the body and the ground, with Coulomb friction in
 // positions (Macklin et al. 2014, §6.1)
@@ -336,14 +408,19 @@ fn collide(@builtin(global_invocation_id) id: vec3u) {
     var normal = vec3f(0.0);
     var depth = 0.0;
     var touching = false;
+    // How far the surface touched moved this substep: friction acts on
+    // the sliding relative to it.
+    var carried = vec3f(0.0);
     let distance = d.y + SKIN;
-    let c = sdf_sample(p);
+    let t = touch(p);
+    let c = t.c;
     if c.w < BAND && c.w < distance + NEAR {
         near[i] = 1u;
         if c.w < distance {
             depth = distance - c.w;
             p += c.xyz * depth;
             normal = c.xyz;
+            carried = t.moved;
             touching = true;
         }
     }
@@ -351,10 +428,11 @@ fn collide(@builtin(global_invocation_id) id: vec3u) {
         depth = d.y - p.y;
         p.y = d.y;
         normal = vec3f(0.0, 1.0, 0.0);
+        carried = vec3f(0.0);
         touching = true;
     }
     if touching {
-        let moved = p - prev[i].xyz;
+        let moved = p - prev[i].xyz - carried;
         let tangential = moved - normal * dot(moved, normal);
         let sliding = length(tangential);
         if sliding > 0.0 {
@@ -386,7 +464,7 @@ fn edges(@builtin(global_invocation_id) id: vec3u) {
             let wb = pdata[b].x;
             let middle = (xa + x[b].xyz) * 0.5;
             let distance = (pdata[a].y + pdata[b].y) * 0.5 + SKIN;
-            let c = sdf_sample(middle);
+            let c = touch(middle).c;
             if c.w < BAND && c.w < distance {
                 sum += c.xyz * (2.0 * (distance - c.w) / (wa + wb) * wa);
                 count += 1u;

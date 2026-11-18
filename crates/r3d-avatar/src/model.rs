@@ -3,7 +3,7 @@
 use glam::Vec3;
 
 use crate::measure::Landmarks;
-use crate::pack::{BodyPack, PackError, Target};
+use crate::pack::{BodyPack, Bone, Influences, PackError, Target};
 
 /// The built-in body pack (MakeHuman CC0 assets, see `assets/avatars/`).
 static BUILTIN_PACK: &[u8] = include_bytes!("../../../assets/avatars/makehuman-body.r3dbody");
@@ -150,6 +150,17 @@ impl BodyModel {
         &self.pack.triangles
     }
 
+    /// The skeleton's bones, parents first; their joints are in
+    /// [`Shaped::joints`].
+    pub fn bones(&self) -> &[Bone] {
+        &self.pack.bones
+    }
+
+    /// Each vertex's skin weights.
+    pub fn weights(&self) -> &[Influences] {
+        &self.pack.weights
+    }
+
     fn get(&self, name: &str) -> Option<&Target> {
         self.pack.target(name)
     }
@@ -186,10 +197,22 @@ impl BodyModel {
 
     /// Vertex positions for a shape, with the feet on the ground (y = 0).
     pub fn positions(&self, shape: &BodyShape) -> Vec<Vec3> {
+        self.shaped(shape).positions
+    }
+
+    /// Vertex and joint positions for a shape, with the feet on the
+    /// ground (y = 0).
+    pub fn shaped(&self, shape: &BodyShape) -> Shaped {
         let mut out = self.pack.positions.clone();
+        let mut joints = self.pack.joints.clone();
         for (t, w) in self.weighted_targets(shape) {
             for (v, o) in t.vertices.iter().zip(&t.offsets) {
                 if let Some(p) = out.get_mut(*v as usize) {
+                    *p += *o * w;
+                }
+            }
+            for (j, o) in t.joints.iter().zip(&t.joint_offsets) {
+                if let Some(p) = joints.get_mut(*j as usize) {
                     *p += *o * w;
                 }
             }
@@ -213,12 +236,22 @@ impl BodyModel {
         }
         let floor = out.iter().map(|p| p.y).fold(f32::MAX, f32::min);
         if floor.is_finite() {
-            for p in &mut out {
+            for p in out.iter_mut().chain(&mut joints) {
                 p.y -= floor;
             }
         }
-        out
+        Shaped {
+            positions: out,
+            joints,
+        }
     }
+}
+
+/// A shaped body: its vertices and its skeleton's joints (m).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Shaped {
+    pub positions: Vec<Vec3>,
+    pub joints: Vec<Vec3>,
 }
 
 /// The target a signed parameter selects, weighted by its magnitude.

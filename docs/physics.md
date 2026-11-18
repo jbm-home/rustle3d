@@ -1,6 +1,6 @@
 # Cloth physics
 
-Status: living document (2026-11-17); the solver choice is revisable (see
+Status: living document (2026-11-18, M23); the solver choice is revisable (see
 the alternatives below). All algorithms come from the
 published papers listed in §9. Code that implements a method cites the paper
 in its doc comment.
@@ -151,7 +151,7 @@ after 4 s; the skirt still holds at the waist.
 
 ## 5. Collisions
 
-### Avatar (static for the MVP)
+### Avatar
 
 - When the avatar is fitted, build a **narrow-band signed distance field**
   (`collide::StaticMesh`): nodes 5 mm apart, computed only within 2 cm of
@@ -164,8 +164,8 @@ after 4 s; the skirt still holds at the waist.
 - Particle vs SDF at every substep: trilinear distance and gradient,
   constant time. Penetrations up to the band (2 cm) are pushed back out,
   far more than a particle moves in a substep.
-- Later (animated avatars): a BVH over the moving mesh with continuous
-  vertex–triangle tests [6].
+- A moving avatar (M23) keeps this field, built once in its rest pose;
+  see "Moving body" below.
 - The cloth is kept at its thickness **plus a 2.5 mm skin margin** from the
   body: cloth triangles (~25 mm) and the avatar's are flat chords of curved
   surfaces, and without the margin the body shows through between cloth
@@ -197,6 +197,41 @@ after 4 s; the skirt still holds at the waist.
   back of the dress stayed crumpled; seen from the back only).
 - Without self-collision (below) a wide hem can fold through itself; this
   is visible on the A-line skirt and is the next physics item (M7).
+
+### Moving body (M23)
+
+The avatar moves by its skeleton (24 bones; its skin follows by linear
+blend skinning [19]). Rebuilding the distance field of the posed body
+every frame (0.16 s on the CPU) is too slow, and a BVH over the moving
+mesh with continuous tests [6] would replace the constant-time query
+the solver is built on. Instead (our own scheme, `r3d_sim::motion`):
+
+- The field of the **rest pose** also stores, per node, the bones the
+  closest surface belongs to: those weighing at least 0.1 in the skin of
+  the closest point's vertices (one bit per bone), and per bone the box
+  of its nodes.
+- For each particle and each bone, the particle is taken back to the
+  rest pose by the inverse of the bone's rigid motion; when it lands in
+  that bone's box, near a surface of that bone, the bone touches it at
+  the distance read there (a rigid motion keeps distances), along the
+  normal turned by the bone's motion. The deepest touching bone wins.
+- The body is thus the **union of its bones' rigid pieces**. Around a
+  bent joint the pieces overlap where skinning folds the skin, so the
+  cloth may stand a few millimetres off the skin there, never inside it.
+  A bone only counts where the closest rest surface is its own, so a
+  bone never collides with another's rest position (the arm hanging
+  where the torso used to be).
+- **Friction** cancels the sliding relative to the touched surface,
+  which moved by `p − motion_before(q)` during the substep (`q` the
+  rest-pose point): the cloth is carried along with the body.
+- The motion is sampled 60 times a second, interpolated per substep
+  (rotations by slerp), and on the GPU uploaded once per frame (per
+  substep and bone: the motion at its end, its inverse and the motion at
+  its start). Cost: about 24 inverse transforms and box tests per
+  particle and substep, then one or two field samples.
+- Checked by a reference scene on both backends: a sheet lying on a box
+  that moves 20 cm sideways and 5 cm up in a second goes along within
+  3 cm and never goes inside it (`a_moving_body_carries_the_cloth`).
 
 ### Starting positions
 
@@ -473,5 +508,6 @@ mm).
 16. S. Kawabata. *The Standardization and Analysis of Hand Evaluation.* Textile Machinery Society of Japan, 1980.
 17. J. A. Bærentzen, H. Aanæs. *Signed Distance Computation Using the Angle Weighted Pseudonormal.* IEEE TVCG 11(3), 2005.
 18. C. Ericson. *Real-Time Collision Detection*, §5.1.5 (closest point on a triangle). Morgan Kaufmann, 2004.
+19. N. Magnenat-Thalmann, R. Laperrière, D. Thalmann. *Joint-Dependent Local Deformations for Hand Animation and Object Grasping.* Graphics Interface 1988.
 
 Reading order for contributors: [1] → [2] → [3] → [4] → [5] → [7] → [8] → [6].

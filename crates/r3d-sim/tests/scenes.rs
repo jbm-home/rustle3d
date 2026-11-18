@@ -28,6 +28,11 @@ fn cloth_drapes_over_a_sphere_without_going_through() {
 }
 
 #[test]
+fn a_moving_body_carries_the_cloth() {
+    reference::a_moving_body_carries_the_cloth(&cpu);
+}
+
+#[test]
 fn two_panels_sewn_into_a_tube_close_their_seams() {
     reference::two_panels_sewn_into_a_tube_close_their_seams(&cpu);
 }

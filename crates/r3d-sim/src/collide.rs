@@ -7,6 +7,11 @@
 //! "Signed distance computation using the angle weighted pseudonormal",
 //! IEEE TVCG 2005), which is exact for closed manifold meshes such as the
 //! avatar. A query is a trilinear interpolation: constant time.
+//!
+//! A body that moves (an animated avatar) keeps the field of its rest
+//! pose: each node also records which body parts (bones) the closest
+//! surface belongs to, and [`crate::motion`] queries the field in the rest
+//! frame of each part.
 
 use std::collections::HashMap;
 
@@ -31,6 +36,11 @@ pub struct StaticMesh {
     /// the surface.
     slots: Vec<u32>,
     values: Vec<f32>,
+    /// Per node (as `values`), the parts of the body the closest surface
+    /// belongs to, one bit per part; empty for a body without parts.
+    parts: Vec<u32>,
+    /// Per part, the box (rest pose) holding the nodes near its surface.
+    part_boxes: Vec<(Vec3, Vec3)>,
 }
 
 /// The field's storage, for backends that sample it themselves (a node
@@ -49,6 +59,9 @@ pub struct Grid<'a> {
     pub slots: &'a [u32],
     /// `BRICK³` values per slot (x fastest); [`BAND`] far from the surface.
     pub values: &'a [f32],
+    /// Per value, the body parts of the closest surface (one bit each);
+    /// empty for a body without parts.
+    pub parts: &'a [u32],
 }
 
 /// The surface seen from a query point.
@@ -110,10 +123,25 @@ impl PseudoNormals {
     }
 }
 
+/// Most body parts a field can tell apart (one bit each in a `u32`).
+pub const MAX_PARTS: usize = 32;
+
 impl StaticMesh {
     /// Build the field of a closed mesh with nodes `voxel` metres apart.
     /// Triangles with out-of-range corners are ignored.
     pub fn new(positions: Vec<Vec3>, triangles: Vec<[u32; 3]>, voxel: f32) -> Self {
+        Self::with_parts(positions, triangles, voxel, &[])
+    }
+
+    /// The same, for a body made of parts that move: `vertex_parts` gives
+    /// each vertex's parts (one bit each, at most [`MAX_PARTS`]); a node
+    /// gets those of the closest point's vertices. Empty: no parts.
+    pub fn with_parts(
+        positions: Vec<Vec3>,
+        triangles: Vec<[u32; 3]>,
+        voxel: f32,
+        vertex_parts: &[u32],
+    ) -> Self {
         let voxel = voxel.max(1e-3);
         let n = positions.len();
         let triangles: Vec<[u32; 3]> = triangles
@@ -170,8 +198,10 @@ impl StaticMesh {
 
         // Each brick's nodes, from the triangles near it (in parallel; each
         // brick writes only its own values).
-        let mut values = vec![BAND; filled.len() * BRICK_NODES];
-        values
+        let with_parts = !vertex_parts.is_empty();
+        let part_of = |v: u32| vertex_parts.get(v as usize).copied().unwrap_or(0);
+        let mut nodes = vec![(BAND, 0u32); filled.len() * BRICK_NODES];
+        nodes
             .par_chunks_mut(BRICK_NODES)
             .zip(&filled)
             .for_each(|(out, id)| {
@@ -180,7 +210,7 @@ impl StaticMesh {
                     (id / dims[0]) % dims[1],
                     id / (dims[0] * dims[1]),
                 ];
-                for (k, value) in out.iter_mut().enumerate() {
+                for (k, (value, parts)) in out.iter_mut().enumerate() {
                     let local = [k % BRICK, (k / BRICK) % BRICK, k / (BRICK * BRICK)];
                     let node = Vec3::new(
                         (b[0] * BRICK + local[0]) as f32,
@@ -202,16 +232,39 @@ impl StaticMesh {
                         let pn = normals.at(ti, &triangles[ti], feature);
                         let sign = if (p - q).dot(pn) < 0.0 { -1.0 } else { 1.0 };
                         *value = sign * d2.sqrt();
+                        if with_parts {
+                            let t = &triangles[ti];
+                            *parts = match feature {
+                                Feature::Vertex(k) => part_of(t[k]),
+                                Feature::Edge(k) => part_of(t[k]) | part_of(t[(k + 1) % 3]),
+                                Feature::Face => t.iter().fold(0, |m, v| m | part_of(*v)),
+                            };
+                        }
                     }
                 }
             });
+        let (values, parts): (Vec<f32>, Vec<u32>) = nodes.into_iter().unzip();
+        let part_boxes = if with_parts {
+            boxes(&values, &parts, &filled, dims, origin, voxel)
+        } else {
+            Vec::new()
+        };
         Self {
             origin,
             voxel,
             dims,
             slots,
             values,
+            parts: if with_parts { parts } else { Vec::new() },
+            part_boxes,
         }
+    }
+
+    /// Per part, the box (rest pose) around the field's nodes near its
+    /// surface; a point outside it cannot touch that part. Empty for a
+    /// body without parts.
+    pub fn part_boxes(&self) -> &[(Vec3, Vec3)] {
+        &self.part_boxes
     }
 
     pub fn grid(&self) -> Grid<'_> {
@@ -221,24 +274,46 @@ impl StaticMesh {
             dims: self.dims,
             slots: &self.slots,
             values: &self.values,
+            parts: &self.parts,
         }
+    }
+
+    /// Index in `values` of grid node `(x, y, z)`, if its brick is near
+    /// the surface.
+    fn index(&self, x: usize, y: usize, z: usize) -> Option<usize> {
+        let b = [x / BRICK, y / BRICK, z / BRICK];
+        if b[0] >= self.dims[0] || b[1] >= self.dims[1] || b[2] >= self.dims[2] {
+            return None;
+        }
+        let id = (b[2] * self.dims[1] + b[1]) * self.dims[0] + b[0];
+        let slot = *self.slots.get(id)?;
+        if slot == u32::MAX {
+            return None;
+        }
+        let local = ((z % BRICK) * BRICK + y % BRICK) * BRICK + x % BRICK;
+        Some(slot as usize * BRICK_NODES + local)
     }
 
     /// Field value at grid node `(x, y, z)`; `BAND` far from the surface.
     fn node(&self, x: usize, y: usize, z: usize) -> f32 {
-        let b = [x / BRICK, y / BRICK, z / BRICK];
-        if b[0] >= self.dims[0] || b[1] >= self.dims[1] || b[2] >= self.dims[2] {
-            return BAND;
-        }
-        let id = (b[2] * self.dims[1] + b[1]) * self.dims[0] + b[0];
-        let Some(&slot) = self.slots.get(id) else {
-            return BAND;
-        };
-        let local = ((z % BRICK) * BRICK + y % BRICK) * BRICK + x % BRICK;
-        self.values
-            .get(slot as usize * BRICK_NODES + local)
+        self.index(x, y, z)
+            .and_then(|i| self.values.get(i))
             .copied()
             .unwrap_or(BAND)
+    }
+
+    /// The body parts the surface closest to `p` belongs to (one bit
+    /// each), read at the nearest node; 0 far from the surface or for a
+    /// body without parts.
+    pub fn parts_at(&self, p: Vec3) -> u32 {
+        let q = ((p - self.origin) / self.voxel).round();
+        if q.min_element() < 0.0 {
+            return 0;
+        }
+        self.index(q.x as usize, q.y as usize, q.z as usize)
+            .and_then(|i| self.parts.get(i))
+            .copied()
+            .unwrap_or(0)
     }
 
     /// Signed distance and outward direction at `p`, when `p` is within
@@ -281,6 +356,54 @@ impl StaticMesh {
         let normal = Vec3::new(dx, dy, dz).try_normalize()?;
         Some(Contact { distance, normal })
     }
+}
+
+/// Per part, the box around the nodes within the band whose parts include
+/// it, one node spacing wider.
+fn boxes(
+    values: &[f32],
+    parts: &[u32],
+    filled: &[usize],
+    dims: [usize; 3],
+    origin: Vec3,
+    voxel: f32,
+) -> Vec<(Vec3, Vec3)> {
+    let count = parts
+        .iter()
+        .map(|m| (u32::BITS - m.leading_zeros()) as usize)
+        .max()
+        .unwrap_or(0);
+    let mut out = vec![(Vec3::MAX, Vec3::MIN); count];
+    for (slot, id) in filled.iter().enumerate() {
+        let b = [
+            id % dims[0],
+            (id / dims[0]) % dims[1],
+            id / (dims[0] * dims[1]),
+        ];
+        for k in 0..BRICK_NODES {
+            let i = slot * BRICK_NODES + k;
+            let (Some(v), Some(m)) = (values.get(i), parts.get(i)) else {
+                continue;
+            };
+            if *v >= BAND || *m == 0 {
+                continue;
+            }
+            let local = [k % BRICK, (k / BRICK) % BRICK, k / (BRICK * BRICK)];
+            let p = origin
+                + Vec3::new(
+                    (b[0] * BRICK + local[0]) as f32,
+                    (b[1] * BRICK + local[1]) as f32,
+                    (b[2] * BRICK + local[2]) as f32,
+                ) * voxel;
+            for (part, (lo, hi)) in out.iter_mut().enumerate() {
+                if m & (1 << part) != 0 {
+                    *lo = lo.min(p - voxel);
+                    *hi = hi.max(p + voxel);
+                }
+            }
+        }
+    }
+    out
 }
 
 /// Closest point on triangle `abc` to `p`, and the feature it lies on

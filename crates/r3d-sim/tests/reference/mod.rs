@@ -3,7 +3,9 @@
 //! this module and runs them on the GPU.
 
 use glam::{Vec2, Vec3};
+use r3d_geom::Rigid;
 use r3d_sim::collide::StaticMesh;
+use r3d_sim::motion::BodyMotion;
 use r3d_sim::scene::{Particle, Triangle};
 use r3d_sim::{FabricPreset, SimScene, Solver};
 
@@ -153,6 +155,85 @@ pub fn cloth_drapes_over_a_sphere_without_going_through(make: Make) {
     assert!(inside > radius - 0.004, "penetrates the sphere: {inside}");
     // It draped: the corners fell below the sphere's top.
     assert!(min_y(&*s) < center.y);
+}
+
+/// A closed box from `lo` to `hi` as a body of one part, that can move.
+pub fn moving_box(lo: Vec3, hi: Vec3) -> StaticMesh {
+    let positions: Vec<Vec3> = (0..8)
+        .map(|i| {
+            Vec3::new(
+                if i & 1 == 0 { lo.x } else { hi.x },
+                if i & 2 == 0 { lo.y } else { hi.y },
+                if i & 4 == 0 { lo.z } else { hi.z },
+            )
+        })
+        .collect();
+    // Counter-clockwise seen from outside.
+    let quads = [
+        [0, 2, 3, 1],
+        [4, 5, 7, 6],
+        [0, 1, 5, 4],
+        [2, 6, 7, 3],
+        [0, 4, 6, 2],
+        [1, 3, 7, 5],
+    ];
+    let triangles = quads
+        .iter()
+        .flat_map(|[a, b, c, d]| [[*a, *b, *c], [*a, *c, *d]])
+        .collect();
+    StaticMesh::with_parts(positions, triangles, 0.005, &[1; 8])
+}
+
+/// A sheet lying on a table-like box; then the box moves 20 cm sideways
+/// and 5 cm up in a second. The cloth goes along and stays out of it.
+pub fn a_moving_body_carries_the_cloth(make: Make) {
+    let (lo, hi) = (Vec3::new(0.1, 0.1, 0.1), Vec3::new(0.4, 0.4, 0.4));
+    let shift = Vec3::new(0.2, 0.05, 0.0);
+    let mut scene = sheet(0.4, 0.4, 25, Vec2::Y, |r| {
+        Vec3::new(r.x + 0.05, 0.45, r.y + 0.05)
+    });
+    scene.collider = Some(moving_box(lo, hi));
+    scene.ground = true;
+    let ease = |x: f32| x * x * (3.0 - 2.0 * x);
+    let offset = |k: usize| shift * ease(k.min(60) as f32 / 60.0);
+    scene.motion = Some(BodyMotion {
+        start: 1.0,
+        fps: 60.0,
+        intro: (0..=60)
+            .map(|k| {
+                vec![Rigid {
+                    rotation: glam::Quat::IDENTITY,
+                    translation: offset(k),
+                }]
+            })
+            .collect(),
+        cycle: Vec::new(),
+    });
+    let mean_x = |s: &dyn Solver| {
+        s.positions().iter().map(|p| p.x).sum::<f32>() / s.positions().len() as f32
+    };
+    let mut s = run(make, scene, 1.0);
+    let before = mean_x(&*s);
+    for frame in 1..=90 {
+        s.step(1.0 / 60.0).unwrap();
+        // Inside the moved box by more than 4 mm.
+        let (a, b) = (lo + offset(frame), hi + offset(frame));
+        let inside = s.positions().iter().find(|p| {
+            p.cmpgt(a + Vec3::splat(0.004)).all() && p.cmplt(b - Vec3::splat(0.004)).all()
+        });
+        assert!(
+            inside.is_none(),
+            "frame {frame}: inside the box: {inside:?}"
+        );
+    }
+    assert!(s.positions().iter().all(|p| p.is_finite()));
+    let carried = mean_x(&*s) - before;
+    assert!(
+        (carried - shift.x).abs() < 0.03,
+        "the cloth did not go along: {carried} m"
+    );
+    let top = s.positions().iter().map(|p| p.y).fold(f32::MIN, f32::max);
+    assert!(top > hi.y + shift.y, "the cloth fell off: {top}");
 }
 
 pub fn two_panels_sewn_into_a_tube_close_their_seams(make: Make) {

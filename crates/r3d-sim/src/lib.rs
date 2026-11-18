@@ -14,6 +14,7 @@ pub mod collide;
 mod cpu;
 pub mod fabric;
 pub mod model;
+pub mod motion;
 pub mod scene;
 pub mod selfcollide;
 pub mod solver;

@@ -5,6 +5,7 @@ use glam::{Vec2, Vec3};
 
 use crate::collide::StaticMesh;
 use crate::fabric::FabricParams;
+use crate::motion::BodyMotion;
 
 /// A cloth vertex.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -37,6 +38,9 @@ pub struct SimScene {
     pub seams: Vec<[u32; 2]>,
     /// The body, if any.
     pub collider: Option<StaticMesh>,
+    /// How the body's parts move; `None`: it stands still. Needs a
+    /// collider built with its parts.
+    pub motion: Option<BodyMotion>,
     /// Collide with the ground plane y = 0.
     pub ground: bool,
 }

@@ -22,6 +22,7 @@ use glam::{Vec2, Vec3};
 use rayon::prelude::*;
 
 use crate::model::{Hinge, Membrane, Model};
+use crate::motion::{Posed, touch};
 use crate::scene::SimScene;
 use crate::solver::{
     GRAB_COMPLIANCE, NEAR, SKIN, SUBSTEPS, Solver, StepError, StepStats, dihedral, grabbed, sewing,
@@ -89,6 +90,13 @@ impl CpuSolver {
 
     fn substep(&mut self, h: f32) {
         let (gravity, seam_alpha) = sewing(self.time, !self.model.seams.is_empty());
+        // Where the body's parts are at the start and the end of the
+        // substep.
+        let posed = self
+            .model
+            .motion
+            .as_ref()
+            .map(|m| Posed::new(m.at(self.time), m.at(self.time + h)));
         let w = &self.model.inv_mass;
         for i in 0..self.x.len() {
             self.prev[i] = self.x[i];
@@ -123,18 +131,17 @@ impl CpuSolver {
                 self.x[*i] += pull;
             }
         }
-        self.collide();
+        self.collide(posed.as_ref());
         for i in 0..self.x.len() {
             self.v[i] = (self.x[i] - self.prev[i]) / h;
             self.v[i] *= (1.0 - self.model.damping[i] * h).max(0.0);
         }
     }
 
-    /// Contacts with the body and the ground. The most expensive part of a
-    /// substep (a closest-point search per particle), and independent per
-    /// particle: solved in parallel, with the same result for any number of
-    /// threads.
-    fn collide(&mut self) {
+    /// Contacts with the body and the ground. Independent per particle:
+    /// solved in parallel, with the same result for any number of threads.
+    /// `posed`: where a moving body's parts are this substep.
+    fn collide(&mut self, posed: Option<&Posed>) {
         let m = &self.model;
         let (w, thickness, friction) = (&m.inv_mass, &m.thickness, &m.friction);
         let (collider, ground) = (m.collider.as_ref(), m.ground);
@@ -154,34 +161,37 @@ impl CpuSolver {
                 if *w == 0.0 {
                     return;
                 }
-                // The contact's normal and how far the particle was pushed
-                // out along it (the normal force, in position terms).
-                let mut contact: Option<(Vec3, f32)> = None;
+                // The contact's normal, how far the particle was pushed
+                // out along it (the normal force, in position terms) and
+                // how far the surface it touches moved this substep.
+                let mut contact: Option<(Vec3, f32, Vec3)> = None;
                 // The body's distance field sees penetrations up to its band
                 // (2 cm) deep, far more than a particle moves in a substep.
                 let distance = thickness + SKIN;
                 if let Some(body) = collider
-                    && let Some(c) = body.sample(*x)
+                    && let Some((c, carried)) = touch(body, posed, *x)
                     && c.distance < distance + NEAR
                 {
                     *near = true;
                     if c.distance < distance {
                         let depth = distance - c.distance;
                         *x += c.normal * depth;
-                        contact = Some((c.normal, depth));
+                        contact = Some((c.normal, depth, carried));
                     }
                 }
                 if ground && x.y < *thickness {
                     let depth = *thickness - x.y;
                     x.y = *thickness;
-                    contact = Some((Vec3::Y, depth));
+                    contact = Some((Vec3::Y, depth, Vec3::ZERO));
                 }
-                if let Some((n, depth)) = contact {
+                if let Some((n, depth, carried)) = contact {
                     // Coulomb friction in positions (Macklin et al. 2014,
-                    // §6.1): the sliding this substep is cancelled up to
-                    // `friction` × the push out of the body, so the cloth
-                    // holds where it presses and slides where it only rests.
-                    let moved = *x - *prev;
+                    // §6.1): the sliding this substep, relative to the
+                    // surface touched, is cancelled up to `friction` × the
+                    // push out of it, so the cloth holds where it presses
+                    // (and goes along with a moving body) and slides where
+                    // it only rests.
+                    let moved = *x - *prev - carried;
                     let tangential = moved - n * moved.dot(n);
                     let sliding = tangential.length();
                     if sliding > 0.0 {
@@ -189,7 +199,7 @@ impl CpuSolver {
                     }
                 }
             });
-        self.collide_edges();
+        self.collide_edges(posed);
     }
 
     /// Edges whose two particles are near the body: keep their middle out
@@ -204,7 +214,7 @@ impl CpuSolver {
     /// substep, and the garment never came to rest. A particle ends about
     /// six edges: their pushes are averaged (constraint averaging, Macklin
     /// et al. 2014 §4.2), not summed.
-    fn collide_edges(&mut self) {
+    fn collide_edges(&mut self, posed: Option<&Posed>) {
         let m = &self.model;
         let Some(body) = m.collider.as_ref() else {
             return;
@@ -221,7 +231,7 @@ impl CpuSolver {
             }
             let middle = (self.x[a] + self.x[b]) / 2.0;
             let distance = (m.thickness[a] + m.thickness[b]) / 2.0 + SKIN;
-            if let Some(c) = body.sample(middle)
+            if let Some((c, _)) = touch(body, posed, middle)
                 && c.distance < distance
             {
                 // Moving a by 2δ·wa/(wa+wb) and b by 2δ·wb/(wa+wb) moves

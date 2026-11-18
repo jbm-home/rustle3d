@@ -10,9 +10,13 @@
 //! - [`measure`]: stature and girths, measured like a tailor would.
 //! - [`fit`]: the shape that matches given measurements.
 //! - [`presets`]: built-in sizes and the user's own presets.
+//! - [`skeleton`]: the body's bones, poses and skinning.
+//! - [`motion`]: walking, turning, raising the arms.
 
 pub mod fit;
 pub mod measure;
 pub mod model;
+pub mod motion;
 pub mod pack;
 pub mod presets;
+pub mod skeleton;

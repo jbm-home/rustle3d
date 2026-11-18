@@ -12,15 +12,21 @@
 //! kept sorted, so a run is deterministic on a given GPU.
 //!
 //! A frame is one command buffer (about thirty dispatches per substep);
-//! positions and velocities are read back at its end.
+//! positions and velocities are read back at its end. A moving body's
+//! parts (`r3d_sim::motion`) are uploaded with each frame, three rigid
+//! motions per part and substep. (Kernels may bind at most 8 storage
+//! buffers: the parts of the body's field follow its values in one
+//! buffer, and the parts' boxes lead the body's motions in another.)
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use bytemuck::{Pod, Zeroable};
 use glam::Vec3;
+use r3d_geom::Rigid;
 use r3d_sim::collide::{BAND, BRICK};
 use r3d_sim::model::Model;
+use r3d_sim::motion::BodyMotion;
 use r3d_sim::selfcollide::MARGIN;
 use r3d_sim::solver::{
     GRAB_COMPLIANCE, NEAR, SKIN, SUBSTEPS, StepError, StepStats, grabbed, sewing,
@@ -65,6 +71,9 @@ struct SceneUniform {
     sdf_dims: [u32; 4],
     contact: [f32; 4],
     counts: [u32; 4],
+    /// Where the field's parts start in its values; parts of a moving
+    /// body (0: it stands still).
+    body: [u32; 4],
 }
 
 #[repr(C)]
@@ -105,9 +114,11 @@ mod bind {
     pub const NEIGHBOURS: u32 = 18;
     pub const NEIGHBOUR_COUNT: u32 = 19;
     pub const CONTACTS: u32 = 20;
+    pub const BODY: u32 = 21;
     /// Bindings the kernels only read.
-    pub const READ_ONLY: [u32; 10] = [
+    pub const READ_ONLY: [u32; 11] = [
         PDATA, MEMBRANES, HINGES, SEAMS, EDGE_ROWS, SEWN, EXCLUDED, SDF_SLOTS, SDF_VALUES, GRAB,
+        BODY,
     ];
 }
 
@@ -140,10 +151,15 @@ mod kernel {
         ("hinge", &[X, PDATA, HINGES]),
         ("seam", &[X, PDATA, SEAMS]),
         ("pull", &[X, PDATA, GRAB]),
-        ("collide", &[X, PREV, PDATA, NEARBY, SDF_SLOTS, SDF_VALUES]),
+        (
+            "collide",
+            &[X, PREV, PDATA, NEARBY, SDF_SLOTS, SDF_VALUES, BODY],
+        ),
         (
             "edges",
-            &[X, PDATA, NEARBY, DELTA, EDGE_ROWS, SDF_SLOTS, SDF_VALUES],
+            &[
+                X, PDATA, NEARBY, DELTA, EDGE_ROWS, SDF_SLOTS, SDF_VALUES, BODY,
+            ],
         ),
         ("apply", &[X, DELTA]),
         ("velocity", &[X, PREV, VEL, PDATA]),
@@ -196,7 +212,9 @@ pub struct GpuContext {
 struct BodyBuffers {
     slots: Vec<u32>,
     values: Vec<f32>,
+    parts: Vec<u32>,
     slots_buffer: wgpu::Buffer,
+    /// The values, then the parts (as `f32` bit patterns).
     values_buffer: wgpu::Buffer,
 }
 
@@ -303,12 +321,21 @@ impl GpuContext {
         }
     }
 
-    /// The buffers of a body's field (`slots`, `values`): the last ones
-    /// if they hold the same field, new ones otherwise.
-    fn body_buffers(&self, slots: &[u32], values: &[f32]) -> (wgpu::Buffer, wgpu::Buffer) {
+    /// The buffers of a body's field: its `slots`, and its `values`
+    /// followed by its `parts`. The last ones if they hold the same
+    /// field, new ones otherwise.
+    fn body_buffers(
+        &self,
+        slots: &[u32],
+        values: &[f32],
+        parts: &[u32],
+    ) -> (wgpu::Buffer, wgpu::Buffer) {
+        let mut both: Vec<u32> = values.iter().map(|v| v.to_bits()).collect();
+        both.extend_from_slice(parts);
         let make = || BodyBuffers {
             slots: slots.to_vec(),
             values: values.to_vec(),
+            parts: parts.to_vec(),
             slots_buffer: storage(
                 &self.device,
                 "body slots",
@@ -318,7 +345,7 @@ impl GpuContext {
             values_buffer: storage(
                 &self.device,
                 "body values",
-                bytemuck::cast_slice(values),
+                bytemuck::cast_slice(&both),
                 wgpu::BufferUsages::empty(),
             ),
         };
@@ -327,7 +354,7 @@ impl GpuContext {
             return (b.slots_buffer, b.values_buffer);
         };
         let b = match cached.take() {
-            Some(b) if b.slots == slots && b.values == values => b,
+            Some(b) if b.slots == slots && b.values == values && b.parts == parts => b,
             _ => make(),
         };
         let out = (b.slots_buffer.clone(), b.values_buffer.clone());
@@ -371,6 +398,11 @@ pub struct GpuSolver {
     step_buffer: wgpu::Buffer,
     scene_buffer: wgpu::Buffer,
     grab_buffer: wgpu::Buffer,
+    /// Per part, its box (rest pose: low, high); then per substep and
+    /// part, the part's motion at the substep's end, its inverse and its
+    /// motion at the start (each a quaternion and a translation).
+    body_buffer: wgpu::Buffer,
+    motion: Option<BodyMotion>,
     x_buffer: wgpu::Buffer,
     vel_buffer: wgpu::Buffer,
     readback: wgpu::Buffer,
@@ -466,6 +498,36 @@ fn groups(count: u32) -> u32 {
     count.div_ceil(WORKGROUP)
 }
 
+/// Bytes per part and substep in the body buffer: three rigid motions of
+/// two `vec4f` each.
+const BODY_BYTES: u64 = 3 * 2 * 16;
+
+/// The body buffer's rows for a frame from `time` in substeps of `h`:
+/// per substep and part, its motion at the substep's end (quaternion,
+/// translation), the inverse of that, and its motion at the start.
+fn body_rows(motion: &BodyMotion, time: f32, h: f32, parts: usize) -> Vec<[f32; 4]> {
+    let rigid = |r: &Rigid| {
+        let t = r.translation;
+        [r.rotation.to_array(), [t.x, t.y, t.z, 0.0]]
+    };
+    let mut rows = Vec::with_capacity(SUBSTEPS as usize * parts * 6);
+    let mut before = motion.at(time);
+    for s in 1..=SUBSTEPS {
+        let now = motion.at(time + s as f32 * h);
+        for k in 0..parts {
+            let (Some(n), Some(b)) = (now.get(k), before.get(k)) else {
+                rows.extend([[0.0, 0.0, 0.0, 1.0], [0.0; 4]].repeat(3));
+                continue;
+            };
+            rows.extend(rigid(n));
+            rows.extend(rigid(&n.inverse()));
+            rows.extend(rigid(b));
+        }
+        before = now;
+    }
+    rows
+}
+
 fn vec4s(v: &[Vec3]) -> Vec<[f32; 4]> {
     v.iter().map(|p| [p.x, p.y, p.z, 0.0]).collect()
 }
@@ -536,8 +598,8 @@ impl GpuSolver {
             })
             .collect();
 
-        // The body's field.
-        let (sdf_origin, sdf_dims, sdf_slots, sdf_values) = match &model.collider {
+        // The body's field, and its parts if it moves.
+        let (sdf_origin, sdf_dims, sdf_slots, sdf_values, sdf_parts) = match &model.collider {
             Some(mesh) => {
                 let g = mesh.grid();
                 let d = g.dims.map(|d| d as u32);
@@ -546,9 +608,22 @@ impl GpuSolver {
                     [d[0], d[1], d[2], 1],
                     g.slots,
                     g.values,
+                    g.parts,
                 )
             }
-            None => ([0.0, 0.0, 0.0, 1.0], [0; 4], &[][..], &[][..]),
+            None => ([0.0, 0.0, 0.0, 1.0], [0; 4], &[][..], &[][..], &[][..]),
+        };
+        let part_boxes: Vec<[f32; 4]> = match (&model.collider, &model.motion) {
+            (Some(mesh), Some(_)) => mesh
+                .part_boxes()
+                .iter()
+                .flat_map(|(lo, hi)| [[lo.x, lo.y, lo.z, 0.0], [hi.x, hi.y, hi.z, 0.0]])
+                .collect(),
+            _ => Vec::new(),
+        };
+        let parts = match &model.motion {
+            Some(m) => (part_boxes.len() / 2).min(m.parts()) as u32,
+            None => 0,
         };
         let self_collision = contact.radius > 0.0 && n > 1;
         let reach = 2.0 * contact.radius + MARGIN;
@@ -563,12 +638,25 @@ impl GpuSolver {
                 reach,
             ],
             counts: [n32, table, 0, 0],
+            body: [sdf_values.len() as u32, parts, 0, 0],
         };
 
         // Buffers.
         use wgpu::BufferUsages as U;
         let storage = |label: &str, bytes: &[u8], extra: U| storage(device, label, bytes, extra);
-        let (sdf_slots_buffer, sdf_values_buffer) = context.body_buffers(sdf_slots, sdf_values);
+        let (sdf_slots_buffer, sdf_values_buffer) =
+            context.body_buffers(sdf_slots, sdf_values, sdf_parts);
+        let body_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("body motion"),
+            size: (16 * part_boxes.len() as u64
+                + BODY_BYTES * u64::from(SUBSTEPS) * u64::from(parts))
+            .max(16),
+            usage: U::STORAGE | U::COPY_DST,
+            mapped_at_creation: false,
+        });
+        if parts > 0 {
+            queue.write_buffer(&body_buffer, 0, bytemuck::cast_slice(&part_boxes));
+        }
         let zeroed = |label: &str, size: u64| {
             device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some(label),
@@ -726,6 +814,7 @@ impl GpuSolver {
             bind::PREV => Some(&prev_buffer),
             bind::VEL => Some(&vel_buffer),
             bind::GRAB => Some(&grab_buffer),
+            bind::BODY => Some(&body_buffer),
             other => buffers.get(&other),
         };
         let mut bind_groups = Vec::with_capacity(kernel::ALL.len());
@@ -802,6 +891,8 @@ impl GpuSolver {
             step_buffer,
             scene_buffer,
             grab_buffer,
+            body_buffer,
+            motion: model.motion.filter(|_| parts > 0),
             x_buffer,
             vel_buffer,
             readback,
@@ -922,7 +1013,7 @@ impl Solver for GpuSolver {
                     seam_alpha / (h * h),
                     GRAB_COMPLIANCE / (h * h),
                     1.0 / (h * h),
-                    0.0,
+                    s as f32,
                 ],
                 grab_target: [target.x, target.y, target.z, 0.0],
             };
@@ -933,6 +1024,15 @@ impl Solver for GpuSolver {
         self.context
             .queue
             .write_buffer(&self.step_buffer, 0, &bytes);
+        if let Some(motion) = &self.motion {
+            let parts = self.scene.body[1] as usize;
+            let body = body_rows(motion, self.time, h, parts);
+            // After the parts' boxes.
+            let at = 2 * 16 * parts as u64;
+            self.context
+                .queue
+                .write_buffer(&self.body_buffer, at, bytemuck::cast_slice(&body));
+        }
         let scope = self
             .context
             .device

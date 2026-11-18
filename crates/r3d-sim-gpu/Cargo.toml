@@ -9,6 +9,7 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
+r3d-geom.workspace = true
 r3d-sim.workspace = true
 bytemuck.workspace = true
 glam.workspace = true

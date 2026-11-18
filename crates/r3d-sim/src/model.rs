@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use glam::{Vec2, Vec3};
 
 use crate::collide::StaticMesh;
+use crate::motion::BodyMotion;
 use crate::scene::SimScene;
 use crate::selfcollide::SelfContact;
 
@@ -56,6 +57,8 @@ pub struct Model {
     pub edges: Vec<[u32; 2]>,
     pub self_contact: SelfContact,
     pub collider: Option<StaticMesh>,
+    /// How the body moves, if it does (only with a collider).
+    pub motion: Option<BodyMotion>,
     pub ground: bool,
 }
 
@@ -185,6 +188,7 @@ impl Model {
             seams,
             edges,
             self_contact,
+            motion: scene.motion.filter(|_| scene.collider.is_some()),
             collider: scene.collider,
             ground: scene.ground,
         }
