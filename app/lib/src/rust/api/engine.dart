@@ -9,7 +9,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `cloth_hit`, `corner_at`, `corner_landing`, `edge_spot`, `edited`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form_now`, `form_soon`, `frozen_board`, `gpu_solver`, `graphics`, `import_from`, `long`, `new`, `new`, `offset_along`, `parse_track`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `selected`, `set_busy`, `sim`, `solver`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`
 
 /// The GPU adapter the UI composites on (Windows: its LUID), so the views
 /// render on it and share their textures without a copy. Call it before
@@ -83,6 +83,15 @@ abstract class Engine implements RustOpaqueInterface {
 
   /// Put the photo away: the 3D view shows the live garment again.
   void closePhoto();
+
+  /// The corner within `max_mm` of pattern point (`x_mm`, `y_mm`), or
+  /// else the edge, without changing what is picked (the Dimension tool
+  /// measures them). `None` off both.
+  BoardPick? cornerOrEdgeNear({
+    required double xMm,
+    required double yMm,
+    required double maxMm,
+  });
 
   /// Stop rendering into a view (its UI texture is about to go away).
   void detachView({required int view});
@@ -381,6 +390,33 @@ class ApiError implements FrbException {
           code == other.code &&
           args == other.args &&
           text == other.text;
+}
+
+/// A corner or an edge under the pointer: its id (`point:N` or `edge:N`),
+/// its piece, and where it is on the board (`[x, y]` for a corner, the
+/// edge's polyline from its start, in mm).
+class BoardPick {
+  final String id;
+  final String panel;
+  final Float64List points;
+
+  const BoardPick({
+    required this.id,
+    required this.panel,
+    required this.points,
+  });
+
+  @override
+  int get hashCode => id.hashCode ^ panel.hashCode ^ points.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BoardPick &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          panel == other.panel &&
+          points == other.points;
 }
 
 /// Where the 3D view looks at the body from.

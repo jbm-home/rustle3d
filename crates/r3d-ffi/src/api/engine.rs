@@ -237,6 +237,16 @@ pub struct SewSpot {
     pub y_mm: f64,
 }
 
+/// A corner or an edge under the pointer: its id (`point:N` or `edge:N`),
+/// its piece, and where it is on the board (`[x, y]` for a corner, the
+/// edge's polyline from its start, in mm).
+#[derive(Debug, Clone)]
+pub struct BoardPick {
+    pub id: String,
+    pub panel: String,
+    pub points: Vec<f64>,
+}
+
 /// A corner picked on the board, and where it is (mm).
 #[derive(Debug, Clone)]
 pub struct PickedPoint {
@@ -1851,6 +1861,34 @@ impl Engine {
             .iter()
             .flat_map(|p| [p.x, p.y])
             .collect())
+    }
+
+    /// The corner within `max_mm` of pattern point (`x_mm`, `y_mm`), or
+    /// else the edge, without changing what is picked (the Dimension tool
+    /// measures them). `None` off both.
+    #[frb(sync)]
+    pub fn corner_or_edge_near(
+        &self,
+        x_mm: f64,
+        y_mm: f64,
+        max_mm: f64,
+    ) -> Result<Option<BoardPick>, ApiError> {
+        let ws = self.workspace()?;
+        let project = ws.session().project();
+        let at = r3d_geom::DVec2::new(x_mm, y_mm);
+        if let Some((panel, point, pos)) = corner_at(project, at, max_mm) {
+            return Ok(Some(BoardPick {
+                id: point.to_string(),
+                panel: panel.to_string(),
+                points: vec![pos.x, pos.y],
+            }));
+        }
+        let scene = BoardScene::from_project(project, &[]);
+        Ok(scene.edge_at(at, max_mm).map(|e| BoardPick {
+            id: e.id.to_string(),
+            panel: e.panel.to_string(),
+            points: e.points.iter().flat_map(|p| [p.x, p.y]).collect(),
+        }))
     }
 
     /// Run a step and return the first ID it created.

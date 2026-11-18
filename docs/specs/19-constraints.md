@@ -20,9 +20,16 @@ line tool (G), the Shapes group (rectangle, ellipse, circle skirt), the
 Arc tool, snapping with a hint while drawing and dragging corners.
 
 Not yet: constraints on internal lines and notches, construction lines
-in constraints (a point on a construction line), dimensions dragged on
-the board (they are typed in the inspector), snapping to the
-intersection of two lines, curved symmetry axes.
+in constraints (a point on a construction line), moving a dimension's
+label by hand, snapping to the intersection of two lines, curved
+symmetry axes.
+
+Since M32 (2026-11-18): the Dimension tool (T) puts a dimension on the
+board: an edge's length, the distance between two corners (direct,
+width or height, from where it is pulled out: above or below both
+corners, a width; beside both, a height) or the angle between two
+edges, measured as they are (`measure`), then its value (or a formula,
+spec 20) typed in a field where it was placed.
 
 ## User story
 As a designer, I draft a half bodice against its centre front with the

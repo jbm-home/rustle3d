@@ -3031,6 +3031,30 @@ abstract class L {
   /// **'Construction line: click two points · Esc cancels · V to stop'**
   String get hintGuide;
 
+  /// No description provided for @toolDimension.
+  ///
+  /// In en, this message translates to:
+  /// **'Dimension'**
+  String get toolDimension;
+
+  /// No description provided for @toolDimensionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Click an edge, two corners or two edges, then where the dimension goes; type its value or a formula'**
+  String get toolDimensionHint;
+
+  /// No description provided for @hintDimension.
+  ///
+  /// In en, this message translates to:
+  /// **'Dimension: click an edge (its length), a corner then another (the distance) or two edges (the angle) · V to stop'**
+  String get hintDimension;
+
+  /// No description provided for @hintDimensionPlace.
+  ///
+  /// In en, this message translates to:
+  /// **'Dimension: click where it goes (between two corners, pull it above or beside them for a width or a height), then type its value · Esc cancels'**
+  String get hintDimensionPlace;
+
   /// No description provided for @hintArc.
   ///
   /// In en, this message translates to:

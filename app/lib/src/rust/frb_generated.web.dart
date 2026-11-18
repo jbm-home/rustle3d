@@ -61,7 +61,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ApiError dco_decode_api_error(dynamic raw);
 
   @protected
+  BoardPick dco_decode_board_pick(dynamic raw);
+
+  @protected
   bool dco_decode_bool(dynamic raw);
+
+  @protected
+  BoardPick dco_decode_box_autoadd_board_pick(dynamic raw);
 
   @protected
   CanvasColors dco_decode_box_autoadd_canvas_colors(dynamic raw);
@@ -146,6 +152,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   String? dco_decode_opt_String(dynamic raw);
+
+  @protected
+  BoardPick? dco_decode_opt_box_autoadd_board_pick(dynamic raw);
 
   @protected
   EdgeSpot? dco_decode_opt_box_autoadd_edge_spot(dynamic raw);
@@ -252,7 +261,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ApiError sse_decode_api_error(SseDeserializer deserializer);
 
   @protected
+  BoardPick sse_decode_board_pick(SseDeserializer deserializer);
+
+  @protected
   bool sse_decode_bool(SseDeserializer deserializer);
+
+  @protected
+  BoardPick sse_decode_box_autoadd_board_pick(SseDeserializer deserializer);
 
   @protected
   CanvasColors sse_decode_box_autoadd_canvas_colors(
@@ -349,6 +364,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
+
+  @protected
+  BoardPick? sse_decode_opt_box_autoadd_board_pick(
+    SseDeserializer deserializer,
+  );
 
   @protected
   EdgeSpot? sse_decode_opt_box_autoadd_edge_spot(SseDeserializer deserializer);
@@ -469,7 +489,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_api_error(ApiError self, SseSerializer serializer);
 
   @protected
+  void sse_encode_board_pick(BoardPick self, SseSerializer serializer);
+
+  @protected
   void sse_encode_bool(bool self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_board_pick(
+    BoardPick self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_box_autoadd_canvas_colors(
@@ -593,6 +622,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_board_pick(
+    BoardPick? self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_opt_box_autoadd_edge_spot(

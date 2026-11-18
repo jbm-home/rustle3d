@@ -15,7 +15,9 @@ each dimension in the inspector, a Variables section (nothing selected).
 Not yet: other body measurements than height, bust, waist and hips
 (neck, shoulder, arm length…); importing Seamly2D/Valentina patterns and
 measurement files (open XML formats, their formulas); formulas on grade
-rules; formulas typed in place of a value in the dimension's field.
+rules. Since M32 (2026-11-18) a formula can also be typed in place of
+a value in the dimension's field (anything that is not a number is
+taken as a formula).
 
 ## User story
 As a designer, I draft a skirt whose waist is `waist / 4 + 10 mm` and

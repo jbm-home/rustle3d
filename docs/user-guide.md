@@ -7,8 +7,8 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-18 (Sew: part of an edge, several edges, internal
-lines; ⌘-click to pick a second corner or edge,
+Last updated: 2026-11-18 (Dimension tool, formulas typed in a value;
+Sew: part of an edge, several edges, internal lines; ⌘-click to pick a second corner or edge,
 rail tips beside the rail; M14; long sleeves, mirrored seams, agent status;
 rename, delete, export and import projects; smooth views on Windows;
 cloth comes to rest; pieces arranged side by side by width; M17,
@@ -97,6 +97,7 @@ of related tools (the last one used stays on the button).
 | Edit curves → Add point | A | Click an edge to add a point there (the curve keeps its shape) |
 | Edit curves → Arc | | Click an edge, type how far it bulges: it becomes a circular arc |
 | Construction line | G | Click two points: a line across the board to draw against (never cut or sewn); click it and press Delete to remove it |
+| Dimension | T | Click an edge, two corners or two edges, then where the dimension goes; type its value (or a formula) right there |
 | Details → Dart | | Click an edge where the dart goes, type its width and length: it is drawn, folded and sewn |
 | Details → Pleat | | Click an edge where the pleat starts, type its depth (and how far it is stitched down), knife or box: it is folded and sewn |
 | Details → Hole | | Select a piece, click the corners of a hole inside it, Enter: the hole is cut out of the cloth |
@@ -185,6 +186,15 @@ second one. The inspector offers what fits:
   down), **Joined** (at the same place, for corners of two pieces);
 - a corner and an edge: **On the edge**.
 
+With **Dimension** (T) you put a dimension straight on the pattern:
+click an edge (its length), a corner then another corner (the distance
+between them) or two edges (the angle between them), then click where
+the dimension goes. Between two corners, pulling it above or below them
+gives a **width**, beside them a **height**, in between the straight
+distance; the value follows the pointer. A field opens where you
+clicked: type the value (or a formula) and press Enter, or Esc to keep
+the value it has.
+
 The piece's constraints are listed under **Constraints** in the
 inspector and drawn on the board when it is selected. Type a new value
 for a distance, a length or an angle: the piece is redrawn so that this
@@ -222,8 +232,8 @@ others.
   line, a tuck) are made with **Sew**: see Sewing below.
 
 ### Formulas: patterns made to measure
-A distance, a length or an angle can follow the body: click **ƒ** next
-to its value and type a formula, like `waist / 4 + 10 mm` or
+A distance, a length or an angle can follow the body: type a formula
+in place of its value (or click **ƒ** next to it), like `waist / 4 + 10 mm` or
 `hips / 4 + ease`. Formulas use the body's measurements (`height`,
 `bust`, `waist`, `hips`), numbers with their unit (`mm`, `cm`, `in`),
 `+ − * /`, parentheses, `min` and `max`, and your own **variables**
@@ -445,9 +455,9 @@ DXF-AAMA; garments go out as glTF and OBJ: open formats only.
   allowance inside them), and a mirrored or symmetric piece cannot have
   holes.
 - Constraints apply to corners and edges of the outline, not to internal
-  lines, notches or construction lines; dimensions are typed in the
-  inspector, not dragged on the board. A symmetric piece's axis is
-  straight.
+  lines, notches or construction lines. A dimension stays where the
+  board draws it (it cannot be moved by hand). A symmetric piece's axis
+  is straight.
 - Sizes: notches keep their distance along the edge in every size, and
   a grade is set per point, not per edge, in the app. The shirt template
   drapes with folds at the sides in the largest sizes (from about 48).

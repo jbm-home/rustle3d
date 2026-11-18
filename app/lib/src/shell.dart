@@ -3,6 +3,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' show max, min;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
@@ -521,6 +522,20 @@ class _ShellState extends State<Shell> {
   /// Where the Sew tool would pick, under the pointer.
   SewSpot? _sewHover;
 
+  /// The Dimension tool: the corners or edges picked so far.
+  final List<BoardPick> _dimPicks = [];
+
+  /// The corner or edge under the pointer, and where the pointer is (mm).
+  BoardPick? _dimHover;
+  Offset? _dimPointer;
+
+  /// A dimension just placed, and where its value is typed (board
+  /// pixels).
+  (Map<String, dynamic>, Offset)? _dimField;
+
+  /// Where the pointer last went down on the board (board pixels).
+  Offset _boardDown = Offset.zero;
+
   /// The Polygon tool's corners so far (mm).
   final List<Offset> _polygon = [];
 
@@ -555,6 +570,9 @@ class _ShellState extends State<Shell> {
     _sewChain.clear();
     _sewDrag = null;
     _sewHover = null;
+    _dimPicks.clear();
+    _dimHover = null;
+    _dimPointer = null;
     _polygon.clear();
     _path.clear();
     _guideStart = null;
@@ -1047,6 +1065,7 @@ class _ShellState extends State<Shell> {
     }
 
     if (_tool == 'sew') _paintSew(canvas, toScreen, p);
+    if (_tool == 'dimension') _paintDimension(canvas, toScreen, p);
     if (_polygon.isNotEmpty) {
       final pts = [for (final q in _polygon) toScreen(q)];
       for (var i = 1; i < pts.length; i++) {
@@ -1141,6 +1160,165 @@ class _ShellState extends State<Shell> {
       for (final q in pts) {
         point(q, 5);
       }
+    }
+  }
+
+  /// The pick's points on the board (mm): a corner, or an edge's polyline.
+  static List<Offset> _pickPoints(BoardPick pick) => [
+    for (var i = 0; i + 1 < pick.points.length; i += 2)
+      Offset(pick.points[i], pick.points[i + 1]),
+  ];
+
+  static bool _isCorner(BoardPick pick) => pick.id.startsWith('point:');
+
+  void _dimHoverAt(Offset mm, double mmPerPx) => setState(() {
+    _dimPointer = mm;
+    _dimHover = _guard<BoardPick?>(
+      () => widget.engine.cornerOrEdgeNear(
+        xMm: mm.dx,
+        yMm: mm.dy,
+        maxMm: _pickPx * mmPerPx,
+      ),
+    );
+  });
+
+  /// A distance between two corners, pulled out to `mm`: a width when
+  /// pulled above or below both, a height when pulled beside both,
+  /// straight between them otherwise.
+  String _dimAlong(Offset a, Offset b, Offset mm) {
+    final inX = mm.dx > min(a.dx, b.dx) && mm.dx < max(a.dx, b.dx);
+    final inY = mm.dy > min(a.dy, b.dy) && mm.dy < max(a.dy, b.dy);
+    if (inX && !inY) return 'horizontal';
+    if (inY && !inX) return 'vertical';
+    return 'direct';
+  }
+
+  /// Dimension: click an edge (its length), two corners (the distance
+  /// between them) or two edges (the angle between them), then click where
+  /// the dimension goes; its value is typed there.
+  void _dimTap(Offset mm, double mmPerPx) {
+    final pick = _guard<BoardPick?>(
+      () => widget.engine.cornerOrEdgeNear(
+        xMm: mm.dx,
+        yMm: mm.dy,
+        maxMm: _pickPx * mmPerPx,
+      ),
+    );
+    final picks = _dimPicks;
+    if (picks.isEmpty) {
+      if (pick != null) setState(() => picks.add(pick));
+      return;
+    }
+    final first = picks.first;
+    final another = pick != null && pick.id != first.id;
+    if (picks.length == 1 && _isCorner(first)) {
+      // A corner is measured to a second corner.
+      if (another && _isCorner(pick)) setState(() => picks.add(pick));
+      return;
+    }
+    if (picks.length == 1 && another && !_isCorner(pick)) {
+      return setState(() => picks.add(pick));
+    }
+    final c = switch (picks) {
+      [final a, final b] when _isCorner(a) => {
+        'kind': 'distance',
+        'a': a.id,
+        'b': b.id,
+        'mm': 1,
+        'along': _dimAlong(_pickPoints(a).first, _pickPoints(b).first, mm),
+      },
+      [final a, final b] => {'kind': 'angle', 'a': a.id, 'b': b.id, 'deg': 90},
+      _ => {'kind': 'length', 'edge': first.id, 'mm': 1},
+    };
+    setState(picks.clear);
+    final out = _run({
+      'type': 'constraint.add',
+      'constraint': c,
+      'measure': true,
+    });
+    if (out == null) return;
+    final id = (out['created'] as List?)?.firstOrNull;
+    _guard(() => widget.engine.select(panels: [first.panel]));
+    _refresh();
+    final placed = _constraints.cast<Map<String, dynamic>>().where(
+      (c) => c['id'] == id,
+    );
+    if (placed.isNotEmpty) {
+      setState(() => _dimField = (placed.first, _boardDown));
+    }
+  }
+
+  /// The Dimension tool: what is under the pointer, what is picked, and
+  /// the dimension being pulled out with its value.
+  void _paintDimension(
+    Canvas canvas,
+    Offset Function(Offset mm) toScreen,
+    Palette p,
+  ) {
+    Paint pen(double alpha, double width) => Paint()
+      ..color = p.accent.withValues(alpha: alpha)
+      ..strokeWidth = width
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    void show(BoardPick pick, Paint paint) {
+      final pts = [for (final q in _pickPoints(pick)) toScreen(q)];
+      if (pts.length == 1) {
+        canvas.drawCircle(pts.first, 6, paint);
+        return;
+      }
+      for (var i = 1; i < pts.length; i++) {
+        canvas.drawLine(pts[i - 1], pts[i], paint);
+      }
+    }
+
+    if (_dimHover case final h?) show(h, pen(0.35, 5));
+    for (final pick in _dimPicks) {
+      show(pick, pen(1, 3));
+    }
+    final at = _dimPointer;
+    if (at == null) return;
+    final cm = context.l.cm;
+    switch (_dimPicks) {
+      case [final a, final b] when _isCorner(a):
+        final (pa, pb) = (_pickPoints(a).first, _pickPoints(b).first);
+        final along = _dimAlong(pa, pb, at);
+        final (s, e, mm) = switch (along) {
+          'horizontal' => (
+            Offset(pa.dx, at.dy),
+            Offset(pb.dx, at.dy),
+            (pb.dx - pa.dx).abs(),
+          ),
+          'vertical' => (
+            Offset(at.dx, pa.dy),
+            Offset(at.dx, pb.dy),
+            (pb.dy - pa.dy).abs(),
+          ),
+          _ => (pa, pb, (pb - pa).distance),
+        };
+        final dash = pen(0.7, 1);
+        canvas.drawLine(toScreen(pa), toScreen(s), dash);
+        canvas.drawLine(toScreen(pb), toScreen(e), dash);
+        canvas.drawLine(toScreen(s), toScreen(e), pen(1, 1.5));
+        _pill(
+          canvas,
+          Offset.lerp(toScreen(s), toScreen(e), 0.5)!,
+          '${context.number(mm / 10, 1)} $cm',
+          p.surface,
+          p.accent,
+        );
+      case [final a] when !_isCorner(a):
+        final pts = _pickPoints(a);
+        var mm = 0.0;
+        for (var i = 1; i < pts.length; i++) {
+          mm += (pts[i] - pts[i - 1]).distance;
+        }
+        _pill(
+          canvas,
+          toScreen(at) + const Offset(0, -18),
+          '${context.number(mm / 10, 1)} $cm',
+          p.surface,
+          p.accent,
+        );
     }
   }
 
@@ -1582,6 +1760,8 @@ class _ShellState extends State<Shell> {
             _setTool('addPoint'),
         const SingleActivator(LogicalKeyboardKey.keyK): () => _setTool('cut'),
         const SingleActivator(LogicalKeyboardKey.keyG): () => _setTool('guide'),
+        const SingleActivator(LogicalKeyboardKey.keyT): () =>
+            _setTool('dimension'),
         const SingleActivator(LogicalKeyboardKey.keyE): _addEllipse,
         const SingleActivator(LogicalKeyboardKey.enter): _finish,
         const SingleActivator(LogicalKeyboardKey.escape): () => setState(() {
@@ -1590,6 +1770,7 @@ class _ShellState extends State<Shell> {
           _guideStart = null;
           _sewFirst = null;
           _sewChain.clear();
+          _dimPicks.clear();
         }),
         const SingleActivator(LogicalKeyboardKey.backspace): _deleteSelected,
         const SingleActivator(LogicalKeyboardKey.delete): _deleteSelected,
@@ -1693,75 +1874,111 @@ class _ShellState extends State<Shell> {
                                 child: Stack(
                                   children: [
                                     Positioned.fill(
-                                      child: RustView(
-                                        engine: widget.engine,
-                                        kind: ViewKind.board,
-                                        // Corners and edges are dragged with Select.
-                                        holding: _tool == 'select',
-                                        pattern: switch (_tool) {
-                                          'polygon' => PatternPointer(
-                                            onTap: _polygonTap,
-                                            onHover: _hoverAt,
-                                          ),
-                                          'guide' => PatternPointer(
-                                            onTap: _guideTap,
-                                            onHover: _hoverAt,
-                                          ),
-                                          'arc' => PatternPointer(
-                                            onTap: _arcTap,
-                                          ),
-                                          'dart' => PatternPointer(
-                                            onTap: _dartTap,
-                                          ),
-                                          'pleat' => PatternPointer(
-                                            onTap: _pleatTap,
-                                          ),
-                                          'hole' => PatternPointer(
-                                            onTap: _polygonTap,
-                                            onHover: _hoverAt,
-                                          ),
-                                          'notch' => PatternPointer(
-                                            onTap: _notchTap,
-                                          ),
-                                          'curve' || 'cut' => PatternPointer(
-                                            onPress: _pathPress,
-                                            onDrag: _pathDrag,
-                                            onHover: _hoverAt,
-                                          ),
-                                          'bend' => PatternPointer(
-                                            onTap: _bendTap,
-                                            onPress: _bendPress,
-                                            onDrag: _bendDrag,
-                                            onRelease: () {
-                                              _handle = null;
-                                              // The bend is one undo step.
-                                              _guard(widget.engine.release);
-                                            },
-                                          ),
-                                          'straighten' => PatternPointer(
-                                            onTap: _straightenTap,
-                                          ),
-                                          'sew' => PatternPointer(
-                                            onPress: _sewPress,
-                                            onDrag: _sewDragTo,
-                                            onRelease: _sewRelease,
-                                            onHover: _sewHoverAt,
-                                          ),
-                                          'addPoint' => PatternPointer(
-                                            onTap: _addPointTap,
-                                          ),
-                                          _ => null,
-                                        },
-                                        overlay: (canvas, toScreen) =>
-                                            _boardOverlay(
-                                              canvas,
-                                              toScreen,
-                                              Tokens.of(context),
+                                      child: Listener(
+                                        // Where a dimension's value is typed.
+                                        onPointerDown: (e) =>
+                                            _boardDown = e.localPosition,
+                                        child: RustView(
+                                          engine: widget.engine,
+                                          kind: ViewKind.board,
+                                          // Corners and edges are dragged with Select.
+                                          holding: _tool == 'select',
+                                          pattern: switch (_tool) {
+                                            'polygon' => PatternPointer(
+                                              onTap: _polygonTap,
+                                              onHover: _hoverAt,
                                             ),
-                                        onSelection: (_) => _refresh(),
-                                        onFrameTime: (ms) => _onFrame(true, ms),
+                                            'guide' => PatternPointer(
+                                              onTap: _guideTap,
+                                              onHover: _hoverAt,
+                                            ),
+                                            'arc' => PatternPointer(
+                                              onTap: _arcTap,
+                                            ),
+                                            'dart' => PatternPointer(
+                                              onTap: _dartTap,
+                                            ),
+                                            'pleat' => PatternPointer(
+                                              onTap: _pleatTap,
+                                            ),
+                                            'hole' => PatternPointer(
+                                              onTap: _polygonTap,
+                                              onHover: _hoverAt,
+                                            ),
+                                            'notch' => PatternPointer(
+                                              onTap: _notchTap,
+                                            ),
+                                            'curve' || 'cut' => PatternPointer(
+                                              onPress: _pathPress,
+                                              onDrag: _pathDrag,
+                                              onHover: _hoverAt,
+                                            ),
+                                            'bend' => PatternPointer(
+                                              onTap: _bendTap,
+                                              onPress: _bendPress,
+                                              onDrag: _bendDrag,
+                                              onRelease: () {
+                                                _handle = null;
+                                                // The bend is one undo step.
+                                                _guard(widget.engine.release);
+                                              },
+                                            ),
+                                            'straighten' => PatternPointer(
+                                              onTap: _straightenTap,
+                                            ),
+                                            'dimension' => PatternPointer(
+                                              onTap: _dimTap,
+                                              onHover: _dimHoverAt,
+                                            ),
+                                            'sew' => PatternPointer(
+                                              onPress: _sewPress,
+                                              onDrag: _sewDragTo,
+                                              onRelease: _sewRelease,
+                                              onHover: _sewHoverAt,
+                                            ),
+                                            'addPoint' => PatternPointer(
+                                              onTap: _addPointTap,
+                                            ),
+                                            _ => null,
+                                          },
+                                          overlay: (canvas, toScreen) =>
+                                              _boardOverlay(
+                                                canvas,
+                                                toScreen,
+                                                Tokens.of(context),
+                                              ),
+                                          onSelection: (_) => _refresh(),
+                                          onFrameTime: (ms) =>
+                                              _onFrame(true, ms),
+                                        ),
                                       ),
                                     ),
+                                    if (_dimField case (final c, final at))
+                                      Positioned(
+                                        left: at.dx - 55,
+                                        top: at.dy + 12,
+                                        width: 110,
+                                        child: DecoratedBox(
+                                          decoration: BoxDecoration(
+                                            color: Tokens.of(context).surface,
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
+                                          ),
+                                          child: _DimensionField(
+                                            key: ValueKey('placed-${c['id']}'),
+                                            constraint: c,
+                                            autofocus: true,
+                                            run: (step) {
+                                              _run(step);
+                                              _refresh();
+                                            },
+                                            onDone: () => setState(
+                                              () => _dimField = null,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
                                     // Top right: the view's title is top left.
                                     if (_tool == 'polygon' || _tool == 'curve')
                                       Positioned(
@@ -1942,6 +2159,8 @@ class _ShellState extends State<Shell> {
                   'pleat' => l.hintPleat,
                   'hole' => l.hintHole,
                   'guide' => l.hintGuide,
+                  'dimension' when _dimPicks.isEmpty => l.hintDimension,
+                  'dimension' => l.hintDimensionPlace,
                   'cut' => l.hintCut,
                   'notch' => l.hintNotch,
                   _ when _selection.isEmpty => context.keys(l.hintIdle),
@@ -2516,6 +2735,13 @@ class _ToolRail extends StatelessWidget {
     ('curve', Icons.draw_outlined, l.toolCurve, 'C', l.toolCurveHint),
     ('curves', l.toolEditCurve, _curveEdits(l)),
     ('guide', Icons.straighten_rounded, l.toolGuide, 'G', l.toolGuideHint),
+    (
+      'dimension',
+      Icons.square_foot_rounded,
+      l.toolDimension,
+      'T',
+      l.toolDimensionHint,
+    ),
     ('cut', Icons.content_cut_rounded, l.toolCut, 'K', l.toolCutHint),
     ('details', l.toolDetails, _details(l)),
     ('draw', Icons.brush_rounded, l.toolDraw, 'D', l.toolDrawHint),
@@ -3667,6 +3893,8 @@ class _NumberField extends StatelessWidget {
     this.focus,
     this.enabled = true,
     this.signed = false,
+    this.formula = false,
+    this.autofocus = false,
   });
 
   final TextEditingController controller;
@@ -3674,9 +3902,13 @@ class _NumberField extends StatelessWidget {
   final String unit;
   final bool enabled;
   final VoidCallback? onSubmitted;
+  final bool autofocus;
 
   /// Negative numbers may be typed.
   final bool signed;
+
+  /// A formula may be typed instead of a number (`waist / 4 + 10 mm`).
+  final bool formula;
 
   /// Typed characters go to the field, not to the window's one-key
   /// shortcuts (1–4 would turn the camera, R add a piece).
@@ -3700,16 +3932,17 @@ class _NumberField extends StatelessWidget {
         controller: controller,
         focusNode: focus,
         enabled: enabled,
+        autofocus: autofocus,
         textAlign: TextAlign.right,
         style: ts(fontSize: 13, color: p.text, tabular: true),
-        keyboardType: TextInputType.numberWithOptions(
-          decimal: true,
-          signed: signed,
-        ),
+        keyboardType: formula
+            ? TextInputType.text
+            : TextInputType.numberWithOptions(decimal: true, signed: signed),
         inputFormatters: [
-          FilteringTextInputFormatter.allow(
-            RegExp(signed ? r'[-0-9.,]' : r'[0-9.,]'),
-          ),
+          if (!formula)
+            FilteringTextInputFormatter.allow(
+              RegExp(signed ? r'[-0-9.,]' : r'[0-9.,]'),
+            ),
         ],
         onSubmitted: (_) => onSubmitted?.call(),
         decoration: InputDecoration(

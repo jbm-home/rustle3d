@@ -1782,6 +1782,21 @@ class LEn extends L {
       'Construction line: click two points · Esc cancels · V to stop';
 
   @override
+  String get toolDimension => 'Dimension';
+
+  @override
+  String get toolDimensionHint =>
+      'Click an edge, two corners or two edges, then where the dimension goes; type its value or a formula';
+
+  @override
+  String get hintDimension =>
+      'Dimension: click an edge (its length), a corner then another (the distance) or two edges (the angle) · V to stop';
+
+  @override
+  String get hintDimensionPlace =>
+      'Dimension: click where it goes (between two corners, pull it above or beside them for a width or a height), then type its value · Esc cancels';
+
+  @override
   String get hintArc => 'Arc: click an edge · V to stop';
 
   @override

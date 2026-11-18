@@ -743,6 +743,12 @@ Built so far (2026-11-18):
   other seams' ends) or a run of edges (⌘-clicks in any order, put in
   contour order); the track under the pointer lights up
   (`r3d_ffi::sew`, `app/integration_test/sewing_test.dart`).
+- Step 2: the Dimension tool (T): an edge's length, two corners'
+  distance (direct, width or height from where it is pulled out) or two
+  edges' angle, measured, then its value typed where it was placed
+  (`app/integration_test/dimension_test.dart`).
+- Step 3, formulas: any dimension field takes a formula in place of a
+  number (on the board and in the inspector).
 
 ## M30 — Production: marker, yardage, tech pack, projector
 - **Indicators per piece**: area, fabric mass; totals per garment.

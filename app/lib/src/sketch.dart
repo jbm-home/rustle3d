@@ -302,16 +302,23 @@ class _ConstraintsCard extends StatelessWidget {
   }
 }
 
-/// A dimension's value, typed: cm for lengths, degrees for angles.
+/// A dimension's value, typed: cm for lengths, degrees for angles, or a
+/// formula (`waist / 4 + 1 cm`).
 class _DimensionField extends StatefulWidget {
   const _DimensionField({
     super.key,
     required this.constraint,
     required this.run,
+    this.autofocus = false,
+    this.onDone,
   });
 
   final Map<String, dynamic> constraint;
   final ValueChanged<Map<String, Object?>> run;
+  final bool autofocus;
+
+  /// Called once the field is left (the value applied, or Esc).
+  final VoidCallback? onDone;
 
   @override
   State<_DimensionField> createState() => _DimensionFieldState();
@@ -320,6 +327,9 @@ class _DimensionField extends StatefulWidget {
 class _DimensionFieldState extends State<_DimensionField> {
   late final _text = TextEditingController();
   final _focus = FocusNode();
+
+  /// Esc leaves the value as it was.
+  bool _cancelled = false;
 
   bool get _angle => widget.constraint['kind'] == 'angle';
 
@@ -332,7 +342,10 @@ class _DimensionFieldState extends State<_DimensionField> {
   void initState() {
     super.initState();
     _focus.addListener(() {
-      if (!_focus.hasFocus) _submit();
+      if (_focus.hasFocus) return;
+      if (!_cancelled) _submit();
+      _cancelled = false;
+      widget.onDone?.call();
     });
   }
 
@@ -350,7 +363,17 @@ class _DimensionFieldState extends State<_DimensionField> {
   }
 
   void _submit() {
-    final typed = _parseNumber(_text.text);
+    final text = _text.text.trim();
+    final typed = _parseNumber(text);
+    if (typed == null && text.isNotEmpty) {
+      // Not a number: a formula.
+      widget.run({
+        'type': 'constraint.set_formula',
+        'constraint': widget.constraint['id'],
+        'formula': text,
+      });
+      return;
+    }
     if (typed == null || typed <= 0 || typed == _value) {
       _text.text = context.decimal(_value, 1);
       return;
@@ -362,15 +385,27 @@ class _DimensionFieldState extends State<_DimensionField> {
     });
   }
 
+  void _leave() =>
+      _focus.unfocus(disposition: UnfocusDisposition.previouslyFocusedChild);
+
   @override
-  Widget build(BuildContext context) => _NumberField(
-    controller: _text,
-    focus: _focus,
-    unit: _angle ? '°' : context.l.cm,
-    // Leaving the field applies the value, and gives the keys back to
-    // the board's tools.
-    onSubmitted: () =>
-        _focus.unfocus(disposition: UnfocusDisposition.previouslyFocusedChild),
+  Widget build(BuildContext context) => CallbackShortcuts(
+    bindings: {
+      const SingleActivator(LogicalKeyboardKey.escape): () {
+        _cancelled = true;
+        _leave();
+      },
+    },
+    child: _NumberField(
+      controller: _text,
+      focus: _focus,
+      formula: true,
+      autofocus: widget.autofocus,
+      unit: _angle ? '°' : context.l.cm,
+      // Leaving the field applies the value, and gives the keys back to
+      // the board's tools.
+      onSubmitted: _leave,
+    ),
   );
 }
 

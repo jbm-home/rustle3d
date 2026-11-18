@@ -1801,6 +1801,21 @@ class LFr extends L {
       'Ligne de construction : cliquez deux points · Échap annule · V pour arrêter';
 
   @override
+  String get toolDimension => 'Cote';
+
+  @override
+  String get toolDimensionHint =>
+      'Cliquez un bord, deux coins ou deux bords, puis là où va la cote ; tapez sa valeur ou une formule';
+
+  @override
+  String get hintDimension =>
+      'Cote : cliquez un bord (sa longueur), un coin puis un autre (la distance) ou deux bords (l’angle) · V pour arrêter';
+
+  @override
+  String get hintDimensionPlace =>
+      'Cote : cliquez là où elle va (entre deux coins, tirez-la au-dessus ou à côté pour une largeur ou une hauteur), puis tapez sa valeur · Échap annule';
+
+  @override
   String get hintArc => 'Arc : cliquez une arête · V pour arrêter';
 
   @override
