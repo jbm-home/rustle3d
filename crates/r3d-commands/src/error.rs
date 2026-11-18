@@ -171,6 +171,8 @@ pub enum CommandError {
         reference: String,
         reason: &'static str,
     },
+    #[error("{panel} is wider than the fabric ({width_mm} mm) in every direction it may lie")]
+    MarkerTooNarrow { panel: AnyId, width_mm: f64 },
     #[error("nothing to simulate: place at least one panel around the body (panel.place)")]
     NothingToSimulate,
     #[error("stopped before the end: nothing was changed")]
@@ -230,6 +232,9 @@ impl Localizable for CommandError {
             Self::NothingToUndo => Message::new("nothing_to_undo", text),
             Self::NothingToRedo => Message::new("nothing_to_redo", text),
             Self::NothingToSimulate => Message::new("nothing_to_simulate", text),
+            Self::MarkerTooNarrow { panel, width_mm } => Message::new("marker_too_narrow", text)
+                .arg("panel", panel)
+                .arg("width_mm", width_mm),
             Self::UnknownType { name } => Message::new("unknown_type", text).arg("name", name),
             Self::Malformed { name, detail } => Message::new("malformed", text)
                 .arg("name", name)

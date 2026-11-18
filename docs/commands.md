@@ -2495,6 +2495,68 @@ Choose what the garment is made of: cotton, denim, jersey, silk or wool. Sets ho
 
 </details>
 
+### `garment.set_fabric_details`
+
+Set the garment's fabric as bought: its weight (g/m², also the cloth's mass in the drape), the width it is sold in (mm) and its price per metre. Sets all three: an omitted one goes back to its default (the fabric's usual weight, no width, no price). Used by production.indicators and marker.compute.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "GarmentId": {
+      "description": "Identifier of a garment, e.g. `garment:1`.",
+      "pattern": "^garment:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Set the garment's fabric as bought: weight, width, price.",
+  "properties": {
+    "garment": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/GarmentId"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Defaults to the project's garment."
+    },
+    "price_per_m": {
+      "description": "Price of one metre of length (any currency, ≥ 0); omitted: none.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "weight_gsm": {
+      "description": "Weight (g/m², 10–2000); omitted: the fabric's usual weight.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "width_mm": {
+      "description": "Width the fabric is sold in (mm, 100–5000); omitted: none (a\nmarker then takes 1500 mm).",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "title": "GarmentSetFabricDetails",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `garment.arrange`
 
 Place every panel around the body for the simulation, side by side in the order the seams join them (a panel's right side continues into the next panel; each takes a share of the turn in proportion to its width), tops at the avatar's waist (its narrowest girth) unless top_cm is given. Panels placed on an arm (sleeves) or flat keep their placement. Re-run it after adding panels or seams.
@@ -4683,6 +4745,156 @@ List the named variables, each with its formula and its value in the size drawn 
 
 </details>
 
+### `production.indicators`
+
+Production indicators, per garment (next to the body first): its fabric details (weight g/m², width mm, price per metre), each piece's area (sewing line, holes left out, mm²), cut area (with its seam allowance), perimeter (mm) and mass (cut area × weight, g), and the garment's totals. In one size of the range with `size`.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Area, cut area, mass of each piece and totals per garment.",
+  "properties": {
+    "size": {
+      "description": "A size of the range, by name; omitted: the pattern as drawn (the\nbase size).",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "title": "ProductionIndicators",
+  "type": "object"
+}
+```
+
+</details>
+
+### `marker.compute`
+
+Lay the pieces of a garment, in one or several sizes, out on a strip of fabric (a marker; raster bottom-left-fill, deterministic): each piece by its cutting line, its grainline along the fabric's length (0° or 180°; every 45° with free_grain), once per size unless `quantities` says otherwise. Returns the length (mm), efficiency (% of the fabric used), yardage (m), cost (from the garment's price per metre) and where each piece lies. Fails with marker_too_narrow when a piece is wider than the fabric.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "GarmentId": {
+      "description": "Identifier of a garment, e.g. `garment:1`.",
+      "pattern": "^garment:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "MarkerSpec": {
+      "additionalProperties": false,
+      "description": "What to lay out, and on what.",
+      "properties": {
+        "garment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GarmentId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The garment whose pieces are laid out; omitted: the project's only\ngarment (required when there are several)."
+        },
+        "quantities": {
+          "description": "Pieces cut another number of times than once, turned over in\npairs, or with a free grain.",
+          "items": {
+            "$ref": "#/$defs/PieceQuantity"
+          },
+          "type": "array"
+        },
+        "sizes": {
+          "description": "Sizes of the range to cut, by name (each piece once per size);\nomitted: the pattern as drawn (the base size).",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "step_mm": {
+          "description": "Raster cell of the nesting (mm, 2–20, default 5): smaller is\ntighter and slower.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "width_mm": {
+          "description": "Usable fabric width (mm, 300–3000); omitted: the garment's fabric\nwidth, else 1500.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "PanelId": {
+      "description": "Identifier of a panel, e.g. `panel:1`.",
+      "pattern": "^panel:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "PieceQuantity": {
+      "additionalProperties": false,
+      "description": "How many times a piece is cut in a marker, and how.",
+      "properties": {
+        "count": {
+          "default": 1,
+          "description": "Copies per size (0–50; 0 leaves the piece out). Default 1.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "free_grain": {
+          "default": false,
+          "description": "The piece has no grain to follow (felt, interfacing, a bias\npiece): it may lie at every 45°.",
+          "type": "boolean"
+        },
+        "pairs": {
+          "default": false,
+          "description": "Every second copy is turned over (a left and a right).",
+          "type": "boolean"
+        },
+        "panel": {
+          "$ref": "#/$defs/PanelId"
+        }
+      },
+      "required": [
+        "panel"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Lay out the pieces of a garment on the fabric (a marker).",
+  "properties": {
+    "marker": {
+      "$ref": "#/$defs/MarkerSpec",
+      "default": {},
+      "description": "What to lay out, and on what."
+    },
+    "outlines": {
+      "default": false,
+      "description": "Include each piece's outlines (cutting and sewing lines, holes, in\nmarker mm) in the result.",
+      "type": "boolean"
+    }
+  },
+  "title": "MarkerCompute",
+  "type": "object"
+}
+```
+
+</details>
+
 ## Actions
 
 Operations that write files (not undoable). Paths are relative to the project folder and cannot leave it.
@@ -5028,6 +5240,175 @@ Import the pieces of a pattern drawn elsewhere, from a DXF-AAMA (or plain DXF), 
     "path"
   ],
   "title": "ImportPattern",
+  "type": "object"
+}
+```
+
+</details>
+
+### `export.marker`
+
+Lay out a marker (as marker.compute) and write it at 1:1 as SVG or PDF: the fabric's edges, each piece's cutting and sewing lines, grainline, name and size, the width, length and efficiency, and the 100 mm test square. Returns the written path and the marker's length, efficiency, yardage and cost.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "GarmentId": {
+      "description": "Identifier of a garment, e.g. `garment:1`.",
+      "pattern": "^garment:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "MarkerFormat": {
+      "description": "File format of an exported marker.",
+      "enum": [
+        "svg",
+        "pdf"
+      ],
+      "type": "string"
+    },
+    "MarkerSpec": {
+      "additionalProperties": false,
+      "description": "What to lay out, and on what.",
+      "properties": {
+        "garment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GarmentId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The garment whose pieces are laid out; omitted: the project's only\ngarment (required when there are several)."
+        },
+        "quantities": {
+          "description": "Pieces cut another number of times than once, turned over in\npairs, or with a free grain.",
+          "items": {
+            "$ref": "#/$defs/PieceQuantity"
+          },
+          "type": "array"
+        },
+        "sizes": {
+          "description": "Sizes of the range to cut, by name (each piece once per size);\nomitted: the pattern as drawn (the base size).",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "step_mm": {
+          "description": "Raster cell of the nesting (mm, 2–20, default 5): smaller is\ntighter and slower.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "width_mm": {
+          "description": "Usable fabric width (mm, 300–3000); omitted: the garment's fabric\nwidth, else 1500.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "PanelId": {
+      "description": "Identifier of a panel, e.g. `panel:1`.",
+      "pattern": "^panel:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "PaperSpec": {
+      "description": "Page layout of a PDF export.",
+      "oneOf": [
+        {
+          "const": "a4",
+          "description": "A4 tiles to print at home.",
+          "type": "string"
+        },
+        {
+          "const": "letter",
+          "description": "US Letter tiles to print at home.",
+          "type": "string"
+        },
+        {
+          "const": "single",
+          "description": "One page as large as the pattern (plotter, print shop).",
+          "type": "string"
+        }
+      ]
+    },
+    "PieceQuantity": {
+      "additionalProperties": false,
+      "description": "How many times a piece is cut in a marker, and how.",
+      "properties": {
+        "count": {
+          "default": 1,
+          "description": "Copies per size (0–50; 0 leaves the piece out). Default 1.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "free_grain": {
+          "default": false,
+          "description": "The piece has no grain to follow (felt, interfacing, a bias\npiece): it may lie at every 45°.",
+          "type": "boolean"
+        },
+        "pairs": {
+          "default": false,
+          "description": "Every second copy is turned over (a left and a right).",
+          "type": "boolean"
+        },
+        "panel": {
+          "$ref": "#/$defs/PanelId"
+        }
+      },
+      "required": [
+        "panel"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Export a marker as SVG or PDF at 1:1.",
+  "properties": {
+    "format": {
+      "$ref": "#/$defs/MarkerFormat",
+      "default": "svg",
+      "description": "`svg` (default) or `pdf`."
+    },
+    "marker": {
+      "$ref": "#/$defs/MarkerSpec",
+      "default": {},
+      "description": "What to lay out, and on what (as in marker.compute)."
+    },
+    "paper": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PaperSpec"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "PDF pages: `single` (default, one page as long as the marker, for\na plotter), `a4` or `letter` tiles."
+    },
+    "path": {
+      "description": "Output path relative to the project folder. Defaults to\n`exports/<project name>-marker.<ext>`.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "title": "ExportMarker",
   "type": "object"
 }
 ```

@@ -1,9 +1,9 @@
-use r3d_core::{AnyId, Fabric, Garment, GarmentId, PanelId, Transaction};
+use r3d_core::{AnyId, Fabric, FabricDetails, Garment, GarmentId, PanelId, Transaction};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::PanelDelete;
-use crate::error::{CommandError, Invalid};
+use crate::error::{CommandError, Invalid, positive};
 use crate::spec::{CommandOutput, CommandSpec, Described};
 
 fn garment(
@@ -54,6 +54,68 @@ impl CommandSpec for GarmentSetFabric {
             },
         );
         Ok(CommandOutput::default())
+    }
+}
+
+/// Set the garment's fabric as bought: weight, width, price.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GarmentSetFabricDetails {
+    /// Defaults to the project's garment.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub garment: Option<GarmentId>,
+    /// Weight (g/m², 10–2000); omitted: the fabric's usual weight.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub weight_gsm: Option<f64>,
+    /// Width the fabric is sold in (mm, 100–5000); omitted: none (a
+    /// marker then takes 1500 mm).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width_mm: Option<f64>,
+    /// Price of one metre of length (any currency, ≥ 0); omitted: none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub price_per_m: Option<f64>,
+}
+
+impl Described for GarmentSetFabricDetails {
+    const SUMMARY: &'static str = "Set the garment's fabric as bought: its weight (g/m², also the cloth's mass in the drape), the width it is sold in (mm) and its price per metre. Sets all three: an omitted one goes back to its default (the fabric's usual weight, no width, no price). Used by production.indicators and marker.compute.";
+}
+
+impl CommandSpec for GarmentSetFabricDetails {
+    fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        let within = |field: &'static str, v: Option<f64>, min: f64, max: f64| {
+            if let Some(v) = v {
+                positive(field, v)?;
+                if !(min..=max).contains(&v) {
+                    return Err(CommandError::invalid(field, Invalid::Range(min, max)));
+                }
+            }
+            Ok(())
+        };
+        within("weight_gsm", self.weight_gsm, 10.0, 2000.0)?;
+        within("width_mm", self.width_mm, 100.0, 5000.0)?;
+        if let Some(price) = self.price_per_m {
+            crate::error::non_negative("price_per_m", price)?;
+        }
+        let (id, g) = garment(tx, self.garment)?;
+        tx.put_garment(
+            id,
+            Garment {
+                fabric_details: FabricDetails {
+                    weight_gsm: self.weight_gsm,
+                    width_mm: self.width_mm,
+                    price_per_m: self.price_per_m,
+                },
+                ..g
+            },
+        );
+        Ok(CommandOutput::default())
+    }
+
+    fn merge_key(&self) -> Option<String> {
+        Some(format!(
+            "garment.set_fabric_details:{}",
+            self.garment.map(|g| g.to_string()).unwrap_or_default()
+        ))
     }
 }
 
@@ -133,6 +195,7 @@ impl CommandSpec for GarmentAdd {
                 color: self.color.clone(),
                 layer,
                 template: None,
+                fabric_details: FabricDetails::default(),
             },
         );
         Ok(CommandOutput {

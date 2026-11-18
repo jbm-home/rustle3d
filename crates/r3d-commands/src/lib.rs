@@ -13,6 +13,7 @@
 //!   atomic batch.
 //! - [`Session`]: a project plus its history; executes all of the above.
 //! - [`projects`]: whole project folders: rename, delete, zip archives.
+//! - [`production`]: indicators per piece and the marker (M30).
 //!
 //! See `docs/architecture.md` §4 and the generated `docs/commands.md`.
 
@@ -22,6 +23,7 @@ pub mod docs;
 pub mod drape;
 pub mod error;
 pub mod history;
+pub mod production;
 pub mod progress;
 pub mod projects;
 pub mod queries;

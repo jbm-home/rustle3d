@@ -5,13 +5,15 @@
 //! so they always agree. M9: draped garments as glTF (GLB) and OBJ, from the
 //! same format-independent [`scene3d::Scene3d`]. M13: patterns as DXF-AAMA
 //! ([`dxf`], both ways), and pattern import from DXF, SVG and PDF
-//! ([`import`]). This crate does no file I/O: it takes and returns bytes,
+//! ([`import`]). M30: the marker, pieces laid out on the fabric
+//! ([`marker`]). This crate does no file I/O: it takes and returns bytes,
 //! and the caller decides where they come from and go.
 
 pub mod drawing;
 pub mod dxf;
 pub mod gltf;
 pub mod import;
+pub mod marker;
 pub mod obj;
 pub mod pdf;
 pub mod scene3d;

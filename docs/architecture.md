@@ -1,6 +1,6 @@
 # Rustle3D architecture
 
-Status: living document, last updated 2026-11-18 (M23).
+Status: living document, last updated 2026-11-18 (M30, marker).
 
 Every choice here is the **current best guess**, not a rule. Each one says
 why it was made and what was considered, so it can be challenged and changed
@@ -88,7 +88,7 @@ Changes to the split suggested in the brief:
 ```
 Project                                        (✓ = implemented in M1)
  ├─ name, display_unit, next_id                ✓
- ├─ garments: IdMap<GarmentId, Garment>        ✓
+ ├─ garments: IdMap<GarmentId, Garment>        ✓ (fabric, colour, layer; M30: fabric details, weight/width/price)
  ├─ panels: IdMap<PanelId, Panel>              ✓ (name, garment, contour, grain angle)
  │    Panel { name, contour: Vec<EdgeId>, internal_lines, notches,
  │            symmetry: Option<SymmetryLink>, material: MaterialId,
@@ -599,3 +599,5 @@ code stays **i18n-ready** for more:
 | 2026-11-18 | M23: contacts are pre-stabilised (the push gives the cloth no more normal speed than the surface touched has) | Where linear blend skinning folds the skin (a raised arm's armpit), cloth caught in the fold was squeezed out at 10–20 m/s |
 | 2026-11-18 | M23: the avatar's motion is app state (`Engine::set_motion`) and an argument of the headless `simulate` action, cached with the drape; not a document field | It does not change the garment, so it has no place in the undo history or the project file; agents reach it through `simulate`, and renders and exports read it from the cache |
 | 2026-11-18 | M23: `r3d-sim` (as the table above already allowed) and `r3d-sim-gpu` depend on `r3d-geom` for `Rigid`, the rigid motion of a bone | The avatar crate and the solver share one type; `r3d-geom` is the pure-math crate both already sit on |
+| 2026-11-18 | M30: the marker is nested by a raster bottom-left-fill of our own (`r3d_geom::nest`, Jakobs 1996, Burke et al. 2006, raster overlap after Bennell & Oliveira 2008), cells of 5 mm, largest piece first; computed on demand (`marker.compute`, `export.marker`), never stored | Deterministic, simple and fast enough for a garment in several sizes (a shirt in three sizes in well under a second), with no new dependency; a raster that marks every cell a piece touches can never overlap two pieces. No-fit polygons would be tighter (a cell of slack at most) and can replace it behind the same function. A marker is derived from the pattern and the fabric, so storing it would let it go stale |
+| 2026-11-18 | M30: a garment's fabric details (weight, width, price per metre) on `Garment`, schema v14; the weight also sets the drape's areal density when given | The fabric as bought belongs to the garment like its fabric preset; one weight for the indicators and the cloth's mass, so they cannot disagree. Unset, the drape is unchanged (the presets' weights) |

@@ -12,9 +12,9 @@ use std::path::PathBuf;
 use glam::DVec2;
 use r3d_core::file::{self, SCHEMA_VERSION};
 use r3d_core::{
-    Along, Around, Avatar, Body, Constraint, Edge, EdgeCurve, Fabric, Garment, Grading, Guide,
-    InternalLine, Notch, Panel, PathSegment, Pin, Placement, Point, Project, Seam, SeamSide, Size,
-    Symmetry, TemplateRef, Transaction,
+    Along, Around, Avatar, Body, Constraint, Edge, EdgeCurve, Fabric, FabricDetails, Garment,
+    Grading, Guide, InternalLine, Notch, Panel, PathSegment, Pin, Placement, Point, Project, Seam,
+    SeamSide, Size, Symmetry, TemplateRef, Transaction,
 };
 
 fn golden_dir(version: u32) -> PathBuf {
@@ -121,6 +121,11 @@ fn sample() -> Project {
                 name: "shirt".into(),
                 sizes: [("length_cm".to_owned(), 70.0)].into(),
             }),
+            fabric_details: FabricDetails {
+                weight_gsm: Some(310.0),
+                width_mm: Some(1450.0),
+                price_per_m: Some(18.5),
+            },
         },
     );
     let pin = tx.new_pin_id();

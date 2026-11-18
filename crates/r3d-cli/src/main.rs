@@ -45,6 +45,12 @@ enum Format {
 }
 
 #[derive(Clone, Copy, ValueEnum)]
+enum MarkerFormatArg {
+    Svg,
+    Pdf,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
 enum UnitArg {
     Mm,
     Cm,
@@ -232,6 +238,32 @@ enum Cmd {
         #[arg(long)]
         out: Option<String>,
     },
+    /// Lay a garment's pieces out on the fabric (a marker): length,
+    /// efficiency, yardage and cost; with --format, also write it at 1:1
+    /// into the project folder.
+    Marker {
+        project: PathBuf,
+        /// Sizes of the range, comma-separated, or `all` (default: the
+        /// pattern as drawn).
+        #[arg(long)]
+        sizes: Option<String>,
+        /// Usable fabric width in cm (default: the garment's, else 150).
+        #[arg(long)]
+        width_cm: Option<f64>,
+        /// The garment (default: the project's only one).
+        #[arg(long)]
+        garment: Option<String>,
+        /// Write the marker as svg or pdf.
+        #[arg(long, value_enum)]
+        format: Option<MarkerFormatArg>,
+        /// PDF page layout (default: one page).
+        #[arg(long, value_enum, default_value = "single")]
+        paper: PaperArg,
+        /// Output path relative to the project (default:
+        /// exports/<name>-marker.<ext>).
+        #[arg(long)]
+        out: Option<String>,
+    },
     /// Drape the placed, sewn garment on the avatar (deterministic) and
     /// cache the result in the project for `render --view 3d`.
     Simulate {
@@ -396,17 +428,68 @@ fn cmd_export(
     }
     let mut ws = Workspace::open(project)?;
     if let Some(sizes) = sizes {
-        let names: Vec<String> = if sizes.trim() == "all" {
-            ws.session()
-                .project()
-                .grading()
-                .map(|g| g.sizes.iter().map(|s| s.name.clone()).collect())
-                .unwrap_or_default()
-        } else {
-            sizes.split(',').map(|s| s.trim().to_owned()).collect()
-        };
-        step["sizes"] = json!(names);
+        step["sizes"] = json!(size_names(&ws, &sizes));
     }
+    let result = ws.run_step(&Step::from_value(step)?)?;
+    print_json(&result)
+}
+
+/// The size names given as `--sizes`: comma-separated, or `all`.
+fn size_names(ws: &Workspace, sizes: &str) -> Vec<String> {
+    if sizes.trim() == "all" {
+        ws.session()
+            .project()
+            .grading()
+            .map(|g| g.sizes.iter().map(|s| s.name.clone()).collect())
+            .unwrap_or_default()
+    } else {
+        sizes.split(',').map(|s| s.trim().to_owned()).collect()
+    }
+}
+
+struct MarkerArgs {
+    sizes: Option<String>,
+    width_cm: Option<f64>,
+    garment: Option<String>,
+    format: Option<MarkerFormatArg>,
+    paper: PaperArg,
+    out: Option<String>,
+}
+
+fn cmd_marker(project: &Path, a: MarkerArgs) -> Result<(), Failure> {
+    let mut ws = Workspace::open(project)?;
+    let mut spec = json!({});
+    if let Some(sizes) = &a.sizes {
+        spec["sizes"] = json!(size_names(&ws, sizes));
+    }
+    if let Some(cm) = a.width_cm {
+        spec["width_mm"] = json!(cm * 10.0);
+    }
+    if let Some(g) = a.garment {
+        spec["garment"] = json!(g);
+    }
+    let step = match a.format {
+        None => json!({ "type": "marker.compute", "marker": spec }),
+        Some(f) => {
+            let mut step = json!({
+                "type": "export.marker",
+                "marker": spec,
+                "format": match f {
+                    MarkerFormatArg::Svg => "svg",
+                    MarkerFormatArg::Pdf => "pdf",
+                },
+                "paper": match a.paper {
+                    PaperArg::A4 => "a4",
+                    PaperArg::Letter => "letter",
+                    PaperArg::Single => "single",
+                },
+            });
+            if let Some(path) = a.out {
+                step["path"] = Value::from(path);
+            }
+            step
+        }
+    };
     let result = ws.run_step(&Step::from_value(step)?)?;
     print_json(&result)
 }
@@ -587,6 +670,25 @@ fn main() -> ExitCode {
             scale,
             page,
         } => cmd_import(&project, &file, units, scale, page),
+        Cmd::Marker {
+            project,
+            sizes,
+            width_cm,
+            garment,
+            format,
+            paper,
+            out,
+        } => cmd_marker(
+            &project,
+            MarkerArgs {
+                sizes,
+                width_cm,
+                garment,
+                format,
+                paper,
+                out,
+            },
+        ),
         Cmd::Simulate {
             project,
             frames,

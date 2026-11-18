@@ -37,6 +37,12 @@ pub trait ActionSpec:
 
 /// Default export path: `exports/<project name>.<ext>`.
 fn default_path(ws: &Workspace, ext: &str) -> String {
+    format!("exports/{}.{ext}", export_stem(ws))
+}
+
+/// The project's name as a file name: characters other than letters,
+/// digits, `-`, `_` and spaces replaced, `pattern` when nothing is left.
+pub(crate) fn export_stem(ws: &Workspace) -> String {
     let name: String = ws
         .session()
         .project()
@@ -51,8 +57,11 @@ fn default_path(ws: &Workspace, ext: &str) -> String {
         })
         .collect();
     let name = name.trim();
-    let name = if name.is_empty() { "pattern" } else { name };
-    format!("exports/{name}.{ext}")
+    if name.is_empty() {
+        "pattern".to_owned()
+    } else {
+        name.to_owned()
+    }
 }
 
 /// Export the pattern as SVG at 1:1 scale.

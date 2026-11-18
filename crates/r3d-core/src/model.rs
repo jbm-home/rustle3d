@@ -320,6 +320,32 @@ pub struct Garment {
     /// other sizes; `None` for a garment drawn by hand.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub template: Option<TemplateRef>,
+    /// The fabric as bought: weight, width, price (production, M30).
+    #[serde(default, skip_serializing_if = "FabricDetails::is_empty")]
+    pub fabric_details: FabricDetails,
+}
+
+/// The fabric of a garment as bought: what it weighs, how wide it is sold
+/// and its price. Each is optional; see [`Garment::weight_gsm`] and
+/// `docs/specs/23-production.md` for the defaults.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct FabricDetails {
+    /// Weight (g/m²); none: the fabric's usual weight.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub weight_gsm: Option<f64>,
+    /// Width it is sold in (mm, selvedge to selvedge, usable).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width_mm: Option<f64>,
+    /// Price of one metre of length at that width (any currency).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub price_per_m: Option<f64>,
+}
+
+impl FabricDetails {
+    pub fn is_empty(&self) -> bool {
+        *self == Self::default()
+    }
 }
 
 /// A template and the measurements it was given (cm, by name; the others
@@ -367,6 +393,18 @@ pub struct FabricLook {
 }
 
 impl Fabric {
+    /// The fabric's usual weight (g/m²), general textile knowledge; the
+    /// drape's areal density unless a garment sets its own.
+    pub const fn weight_gsm(self) -> f64 {
+        match self {
+            Fabric::Cotton => 120.0,
+            Fabric::Denim => 400.0,
+            Fabric::Jersey => 180.0,
+            Fabric::Silk => 80.0,
+            Fabric::Wool => 260.0,
+        }
+    }
+
     /// The fabric's look.
     pub const fn look(self) -> FabricLook {
         let (rgb, sheen, sheen_roughness, roughness, specular, translucency) = match self {
@@ -388,6 +426,14 @@ impl Fabric {
 }
 
 impl Garment {
+    /// The weight of the garment's fabric (g/m²): its own, or the
+    /// fabric's usual one.
+    pub fn weight_gsm(&self) -> f64 {
+        self.fabric_details
+            .weight_gsm
+            .unwrap_or(self.fabric.weight_gsm())
+    }
+
     /// The garment's colour (sRGB, `0xRRGGBB`): its own if it has a valid
     /// one, otherwise its fabric's.
     pub fn rgb(&self) -> u32 {
@@ -749,6 +795,7 @@ impl Project {
                 color: None,
                 layer: 0,
                 template: None,
+                fabric_details: FabricDetails::default(),
             },
         );
         Self {

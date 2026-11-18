@@ -1131,8 +1131,13 @@ pub fn build(
     let fabrics = garments
         .iter()
         .map(|id| {
-            let fabric = project.garments().get(id).map(|g| g.fabric);
-            fabric_preset(fabric.unwrap_or_default()).params()
+            let garment = project.garments().get(id);
+            let mut params = fabric_preset(garment.map(|g| g.fabric).unwrap_or_default()).params();
+            // The garment's own weight, when set (g/m² to kg/m²).
+            if let Some(w) = garment.and_then(|g| g.fabric_details.weight_gsm) {
+                params.density = (w / 1000.0) as f32;
+            }
+            params
         })
         .collect();
     let worn: Vec<GarmentId> = garments

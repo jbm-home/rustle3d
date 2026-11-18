@@ -84,6 +84,10 @@ fn every_command_round_trips() {
     h.round_trip(json!({"type": "panel.place", "panel": panel, "angle_deg": 0, "top_cm": 104}));
     h.round_trip(json!({"type": "garment.set_fabric", "fabric": "denim"}));
     h.round_trip(json!({"type": "garment.set_color", "color": "#335577"}));
+    h.round_trip(
+        json!({"type": "garment.set_fabric_details", "weight_gsm": 210,
+        "width_mm": 1450, "price_per_m": 12.5}),
+    );
     let jacket = h.round_trip(json!({"type": "garment.add", "name": "Jacket",
         "fabric": "wool", "color": "#223344"}));
     let jacket = jacket.created[0].to_string();

@@ -4,7 +4,8 @@
 //! curves, curves fitted to digitised points ([`fit`]), polylines and
 //! polygon operations (offsets for seam allowances), and the conversion of
 //! a closed panel contour into a triangle mesh with controllable particle
-//! spacing (used by the simulation). [`rigid`] holds the one 3D type: the
+//! spacing (used by the simulation), and pieces nested on a strip of
+//! fabric ([`nest`], a marker). [`rigid`] holds the one 3D type: the
 //! rigid motion of a body's bone (metres, `f32`).
 //!
 //! Units: millimetres, `f64`. See `docs/architecture.md`.
@@ -13,6 +14,7 @@ pub mod bezier;
 pub mod boolean;
 pub mod fit;
 pub mod mesh;
+pub mod nest;
 pub mod polygon;
 pub mod rigid;
 pub mod solve;

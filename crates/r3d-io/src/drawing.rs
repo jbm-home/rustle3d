@@ -324,7 +324,7 @@ pub(crate) fn grainline(outline: &[DVec2], angle_deg: f64) -> Option<(DVec2, DVe
     ))
 }
 
-fn push_arrow(d: &mut Drawing, a: DVec2, b: DVec2) {
+pub(crate) fn push_arrow(d: &mut Drawing, a: DVec2, b: DVec2) {
     d.lines.push(Polyline {
         points: vec![a, b],
         closed: false,

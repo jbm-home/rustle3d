@@ -9,6 +9,7 @@ use serde_json::Value;
 use crate::actions::*;
 use crate::commands::*;
 use crate::error::CommandError;
+use crate::production::*;
 use crate::progress::Progress;
 use crate::queries::*;
 use crate::spec::{CommandOutput, CommandSpec, Info, Named, QuerySpec, schema_value};
@@ -162,6 +163,7 @@ command_registry! {
     "pin.add" => PinAdd,
     "pin.remove" => PinRemove,
     "garment.set_fabric" => GarmentSetFabric,
+    "garment.set_fabric_details" => GarmentSetFabricDetails,
     "garment.arrange" => GarmentArrange,
     "garment.set_color" => GarmentSetColor,
     "garment.add" => GarmentAdd,
@@ -210,6 +212,8 @@ query_registry! {
     "constraint.list" => ConstraintList,
     "guide.list" => GuideList,
     "variable.list" => VariableList,
+    "production.indicators" => ProductionIndicators,
+    "marker.compute" => MarkerCompute,
 }
 
 action_registry! {
@@ -220,4 +224,5 @@ action_registry! {
     "export.obj" => ExportObj,
     "export.dxf" => ExportDxf,
     "import.pattern" => ImportPattern,
+    "export.marker" => ExportMarker,
 }
