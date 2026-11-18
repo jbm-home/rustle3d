@@ -11,6 +11,7 @@ import 'src/rust/api/engine.dart';
 import 'src/rust/frb_generated.dart';
 import 'src/shell.dart';
 import 'src/start_screen.dart';
+import 'src/support.dart';
 import 'src/views/rust_view.dart';
 
 Future<void> main() async {
@@ -25,6 +26,11 @@ Future<void> main() async {
   const demo = String.fromEnvironment('R3D_DEMO');
   const open = String.fromEnvironment('R3D_OPEN');
   Engine? engine;
+  final support = SupportMemory(store.libraryDir);
+  // Review aids open a project at once: they are not real launches.
+  if (open.isEmpty && demo.isEmpty) {
+    support.launched(hasProjects: store.all().isNotEmpty);
+  }
   if (open.isNotEmpty) engine = Engine.open(path: open);
   if (demo.isNotEmpty) {
     final scratch = ProjectStore(
@@ -47,13 +53,22 @@ Future<void> main() async {
       await engine.runSimulation(running: true);
     }
   }
-  runApp(Rustle3dApp(store: store, engine: engine));
+  runApp(Rustle3dApp(store: store, support: support, engine: engine));
 }
 
 class Rustle3dApp extends StatefulWidget {
-  const Rustle3dApp({super.key, required this.store, this.engine});
+  const Rustle3dApp({
+    super.key,
+    required this.store,
+    this.support,
+    this.engine,
+  });
 
   final ProjectStore store;
+
+  /// The donation reminder's state, after counting this launch; none (no
+  /// reminder) in tests.
+  final SupportMemory? support;
 
   /// A project to open at once instead of the start screen.
   final Engine? engine;
@@ -66,6 +81,8 @@ class _Rustle3dAppState extends State<Rustle3dApp> {
   bool _dark = const bool.fromEnvironment('R3D_DARK');
   late Engine? _engine = widget.engine;
   late final _languageMemory = LanguageMemory(widget.store.libraryDir);
+  late final _support =
+      widget.support ?? SupportMemory(widget.store.libraryDir);
   late String _language = _languageMemory.code;
 
   void _setLanguage(String code) {
@@ -137,6 +154,7 @@ class _Rustle3dAppState extends State<Rustle3dApp> {
               ? StartScreen(
                   key: const ValueKey('start'),
                   store: widget.store,
+                  support: _support,
                   dark: _dark,
                   onToggleTheme: _toggleTheme,
                   language: _language,

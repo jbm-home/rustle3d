@@ -17,6 +17,7 @@ import 'projects.dart';
 import 'rust/api/engine.dart';
 import 'rust/api/library.dart';
 import 'rust/api/templates.dart';
+import 'support.dart';
 
 /// What the start screen offers, in order: the `template.apply` ids.
 const _templates = [
@@ -57,6 +58,7 @@ class StartScreen extends StatefulWidget {
   const StartScreen({
     super.key,
     required this.store,
+    required this.support,
     required this.dark,
     required this.onToggleTheme,
     required this.language,
@@ -65,6 +67,10 @@ class StartScreen extends StatefulWidget {
   });
 
   final ProjectStore store;
+
+  /// Whether this launch shows the donation card.
+  final SupportMemory support;
+
   final bool dark;
   final VoidCallback onToggleTheme;
 
@@ -300,6 +306,15 @@ class _StartScreenState extends State<StartScreen> {
                           letterSpacing: -0.5,
                         ),
                       ),
+                      if (widget.support.remindNow)
+                        SupportCard(
+                          onDonate: () {
+                            setState(widget.support.later);
+                            _launch(context, donateUrl);
+                          },
+                          onLater: () => setState(widget.support.later),
+                          onTurnOff: () => setState(widget.support.turnOff),
+                        ),
                       _SectionTitle(
                         l.recent,
                         actions: [
@@ -378,6 +393,14 @@ class _StartScreenState extends State<StartScreen> {
                               size: 16,
                             ),
                             label: Text(l.updatesLink),
+                          ),
+                          TextButton.icon(
+                            onPressed: () => _launch(context, donateUrl),
+                            icon: const Icon(
+                              Icons.favorite_border_rounded,
+                              size: 16,
+                            ),
+                            label: Text(l.supportLink),
                           ),
                           TextButton.icon(
                             onPressed: () => _launch(

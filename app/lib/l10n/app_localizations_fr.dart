@@ -189,6 +189,25 @@ class LFr extends L {
   String get updatesLink => 'Mises à jour et actualités sur rustle3d.com';
 
   @override
+  String get supportLink => 'Soutenir Rustle3D';
+
+  @override
+  String get supportTitle => 'Rustle3D est libre et gratuit';
+
+  @override
+  String get supportText =>
+      'S’il vous est utile, un don aide à couvrir ses frais : hébergement, matériel de test et temps de développement. Tout reste gratuit dans tous les cas.';
+
+  @override
+  String get supportDonate => 'Faire un don';
+
+  @override
+  String get supportLater => 'Pas maintenant';
+
+  @override
+  String get supportTurnOff => 'Ne plus afficher';
+
+  @override
   String cannotOpen(String target) {
     return 'Impossible d’ouvrir $target.';
   }

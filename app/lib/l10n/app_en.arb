@@ -91,6 +91,12 @@
     }
   },
   "updatesLink": "Updates and news on rustle3d.com",
+  "supportLink": "Support Rustle3D",
+  "supportTitle": "Rustle3D is free and open source",
+  "supportText": "If it is useful to you, a donation helps cover its costs: hosting, test hardware and development time. Everything stays free either way.",
+  "supportDonate": "Donate",
+  "supportLater": "Not now",
+  "supportTurnOff": "Don’t show again",
   "cannotOpen": "Could not open {target}.",
   "@cannotOpen": {
     "placeholders": {

@@ -12,7 +12,8 @@ rename, delete, export and import projects; smooth views on Windows;
 cloth comes to rest; pieces arranged side by side by width; M17,
 draping on the graphics card; M18, shirt and trousers templates, pieces
 placed on a leg; M19, several garments in layers; M22, sizes and
-grading; M25, maximized views; M26, history, copy and paste, progress of long steps).
+grading; M25, maximized views; M26, history, copy and paste, progress of long steps;
+GPL licence, donations).
 -->
 
 Rustle3D is a free, open-source desktop app for making clothes: draw the
@@ -37,7 +38,21 @@ and Linux, and an AI agent can drive it too.
   project folder is deleted for good, not moved to the trash.
 - **Import .zip…** adds a project someone sent you as a .zip file and
   opens it.
-- Links to rustle3d.com for news and updates.
+- Links to rustle3d.com for news and updates, and **Support Rustle3D**
+  to make a donation.
+
+### Free software, and supporting it
+Rustle3D is free and open source, under the GNU GPL (version 3 or later).
+You can use it for anything, including paid work, and what you make with
+it (patterns, garments, pictures) is yours. Donations help pay for its
+costs (hosting, test hardware, development time); nothing is locked
+behind them.
+
+After you have used the app for a while, the start screen sometimes shows
+a small card asking for support: at most once every three months, never
+while you work on a project. **Not now** hides it until then; **Don't
+show again** hides it for good. The **Support Rustle3D** link at the
+bottom of the start screen stays either way.
 
 ### The guided flow
 The bar at the top walks through five steps: **Measurements → Pattern →

@@ -187,6 +187,25 @@ class LEn extends L {
   String get updatesLink => 'Updates and news on rustle3d.com';
 
   @override
+  String get supportLink => 'Support Rustle3D';
+
+  @override
+  String get supportTitle => 'Rustle3D is free and open source';
+
+  @override
+  String get supportText =>
+      'If it is useful to you, a donation helps cover its costs: hosting, test hardware and development time. Everything stays free either way.';
+
+  @override
+  String get supportDonate => 'Donate';
+
+  @override
+  String get supportLater => 'Not now';
+
+  @override
+  String get supportTurnOff => 'Don’t show again';
+
+  @override
   String cannotOpen(String target) {
     return 'Could not open $target.';
   }

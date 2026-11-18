@@ -415,6 +415,42 @@ abstract class L {
   /// **'Updates and news on rustle3d.com'**
   String get updatesLink;
 
+  /// No description provided for @supportLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Support Rustle3D'**
+  String get supportLink;
+
+  /// No description provided for @supportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rustle3D is free and open source'**
+  String get supportTitle;
+
+  /// No description provided for @supportText.
+  ///
+  /// In en, this message translates to:
+  /// **'If it is useful to you, a donation helps cover its costs: hosting, test hardware and development time. Everything stays free either way.'**
+  String get supportText;
+
+  /// No description provided for @supportDonate.
+  ///
+  /// In en, this message translates to:
+  /// **'Donate'**
+  String get supportDonate;
+
+  /// No description provided for @supportLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get supportLater;
+
+  /// No description provided for @supportTurnOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Don’t show again'**
+  String get supportTurnOff;
+
   /// No description provided for @cannotOpen.
   ///
   /// In en, this message translates to:
