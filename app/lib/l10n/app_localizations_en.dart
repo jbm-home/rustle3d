@@ -2171,6 +2171,204 @@ class LEn extends L {
   String get markerSavePdf => 'Save PDF';
 
   @override
+  String get tpDecimal => '.';
+
+  @override
+  String get tpSizes => 'Sizes';
+
+  @override
+  String get tpSample => 'sample';
+
+  @override
+  String get tpViews => 'Views';
+
+  @override
+  String get tpFront => 'Front';
+
+  @override
+  String get tpBack => 'Back';
+
+  @override
+  String get tpColourways => 'Colourways';
+
+  @override
+  String get tpMaterials => 'Bill of materials';
+
+  @override
+  String get tpFabrics => 'Fabrics';
+
+  @override
+  String get tpGarment => 'Garment';
+
+  @override
+  String get tpFabric => 'Fabric';
+
+  @override
+  String get tpColour => 'Colour';
+
+  @override
+  String get tpWeight => 'Weight (g/m²)';
+
+  @override
+  String get tpWidth => 'Width (cm)';
+
+  @override
+  String get tpPrice => 'Price per metre';
+
+  @override
+  String get tpConsumption => 'Fabric per garment (m)';
+
+  @override
+  String get tpCost => 'Cost per garment';
+
+  @override
+  String get tpConsumptionBySize => 'Fabric per garment by size (m)';
+
+  @override
+  String get tpTrims => 'Trims';
+
+  @override
+  String get tpNoTrims => 'No trims yet.';
+
+  @override
+  String get tpMeasurements => 'Measurements';
+
+  @override
+  String get tpSizeChart => 'Size chart (body, cm)';
+
+  @override
+  String get tpSize => 'Size';
+
+  @override
+  String get tpHeight => 'Height';
+
+  @override
+  String get tpBust => 'Bust';
+
+  @override
+  String get tpWaist => 'Waist';
+
+  @override
+  String get tpHips => 'Hips';
+
+  @override
+  String get tpPieces => 'Pieces';
+
+  @override
+  String get tpPiece => 'Piece';
+
+  @override
+  String get tpLength => 'Length (cm)';
+
+  @override
+  String get tpPieceWidth => 'Width (cm)';
+
+  @override
+  String get tpPerimeter => 'Sewing line (cm)';
+
+  @override
+  String get tpArea => 'Area (cm²)';
+
+  @override
+  String get tpCutArea => 'Cut area (cm²)';
+
+  @override
+  String get tpAllowance => 'Allowance (mm)';
+
+  @override
+  String get tpMass => 'Mass (g)';
+
+  @override
+  String get tpPiecesBySize => 'Pieces by size: length x width (cm)';
+
+  @override
+  String get tpPattern => 'Pattern';
+
+  @override
+  String get tpSewing => 'Sewing notes';
+
+  @override
+  String get tpSeams => 'Seams';
+
+  @override
+  String get tpSideA => 'Side A';
+
+  @override
+  String get tpSideB => 'Side B';
+
+  @override
+  String get tpLengthA => 'Length A (mm)';
+
+  @override
+  String get tpLengthB => 'Length B (mm)';
+
+  @override
+  String get tpEase => 'Ease (mm)';
+
+  @override
+  String get tpGathered => 'Gathered';
+
+  @override
+  String get tpYes => 'yes';
+
+  @override
+  String get tpNoSeams => 'No seams yet.';
+
+  @override
+  String get tpNotes => 'Notes';
+
+  @override
+  String get exportTechpack => 'Tech pack (PDF)…';
+
+  @override
+  String get exportProjector => 'Projector: the pattern at 1:1…';
+
+  @override
+  String get techpackLetter => 'Letter pages';
+
+  @override
+  String get garmentNotes => 'Notes';
+
+  @override
+  String get garmentNotesHint =>
+      'Sewing and finishing notes, printed in the tech pack';
+
+  @override
+  String get projectorHelp =>
+      'Drag or use the arrow keys to bring the pattern under the projector (Shift: 10 cm). Home: back to the middle. M: mirror · R: turn · I: contrast · C: calibrate · Esc: close.';
+
+  @override
+  String get projectorCalibrate => 'Calibrate';
+
+  @override
+  String get projectorMirror => 'Mirror';
+
+  @override
+  String get projectorTurn => 'Turn';
+
+  @override
+  String get projectorContrast => 'Contrast';
+
+  @override
+  String get projectorCalibrateHint =>
+      'The square below should be 20 cm a side on the table. Measure its sides with a ruler and type them in.';
+
+  @override
+  String get projectorMeasuredWidth => 'Width measured';
+
+  @override
+  String get projectorMeasuredHeight => 'Height measured';
+
+  @override
+  String get projectorApply => 'Apply';
+
+  @override
+  String get projectorReset => 'Reset';
+
+  @override
+  String get projectorNothing => 'No piece to project.';
+
+  @override
   String get fabricBought => 'As bought';
 
   @override

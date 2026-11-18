@@ -1199,6 +1199,164 @@ impl Engine {
         })
     }
 
+    /// Write the tech pack (PDF, spec 23) to `path`, a file the user chose
+    /// (anywhere): the garment's front and back as the 3D view shows it
+    /// now (the running drape, or where it starts), then colourways, bill
+    /// of materials, measurements, pattern and sewing notes.
+    /// `labels_json` holds its words in the user's language, by key
+    /// (`r3d_commands::techpack::LABELS`); `letter`: US Letter pages, else
+    /// A4. Off the UI thread.
+    pub fn export_techpack(
+        &self,
+        path: String,
+        labels_json: String,
+        letter: bool,
+    ) -> Result<(), ApiError> {
+        use r3d_commands::techpack::{ExportTechPack, TechPackPaper, techpack};
+        self.long("export", |_| {
+            let labels = serde_json::from_str(&labels_json).map_err(|e| ApiError {
+                code: "malformed".into(),
+                args: HashMap::from([("detail".into(), e.to_string())]),
+                text: format!("malformed labels: {e}"),
+            })?;
+            let request = ExportTechPack {
+                labels,
+                paper: if letter {
+                    TechPackPaper::Letter
+                } else {
+                    TechPackPaper::A4
+                },
+                ..ExportTechPack::default()
+            };
+            let (project, dressed) = self.dressed_now()?;
+            let gpu = crate::surface::ui_gpu().map_err(|e| ApiError::new("gpu", e.to_string()))?;
+            let views = crate::techpack::views(&gpu, &dressed, &request)
+                .map_err(|e| ApiError::new("gpu", e))?;
+            let (bytes, _) =
+                techpack(&project, &request.labels, request.paper, views).map_err(err)?;
+            std::fs::write(&path, bytes).map_err(|e| {
+                ApiError::from(
+                    Message::new("write_failed", format!("cannot write {path}: {e}"))
+                        .arg("path", &path),
+                )
+            })
+        })
+    }
+
+    /// The pattern for the projector (spec 23), in the size shown in 3D:
+    /// the pieces `panels` (every piece when empty) with their cutting
+    /// and sewing lines, notches, internal lines and grainlines, as JSON:
+    /// `lines` (`points` as x, y pairs in mm, `closed`, `kind`: cut, sew,
+    /// internal, notch, grain or mark), `labels` (`x`, `y`, `text`,
+    /// `size_mm`, centred) and `bounds` (min x, min y, max x, max y).
+    #[frb(sync)]
+    pub fn projector_drawing(&self, panels: Vec<String>) -> Result<String, ApiError> {
+        use r3d_io::drawing::Stroke;
+        let ws = self.workspace()?;
+        let shown = ws.session().project().as_shown();
+        let ids: Vec<PanelId> = panels
+            .iter()
+            .filter_map(|p| p.parse::<PanelId>().ok())
+            .filter(|id| shown.panel(*id).is_some())
+            .collect();
+        let only = (!ids.is_empty()).then_some(ids.as_slice());
+        let d = r3d_io::pieces_drawing(&shown, &[], only);
+        let lines: Vec<serde_json::Value> = d
+            .lines
+            .iter()
+            .map(|l| {
+                let kind = match l.stroke {
+                    Stroke::Cut | Stroke::Size(_) => "cut",
+                    Stroke::Sew => "sew",
+                    Stroke::Internal => "internal",
+                    Stroke::Notch => "notch",
+                    Stroke::Grain => "grain",
+                    Stroke::Mark => "mark",
+                };
+                let points: Vec<f64> = l.points.iter().flat_map(|p| [p.x, p.y]).collect();
+                serde_json::json!({ "points": points, "closed": l.closed, "kind": kind })
+            })
+            .collect();
+        let labels: Vec<serde_json::Value> = d
+            .labels
+            .iter()
+            .map(|l| {
+                serde_json::json!({
+                    "x": l.pos.x, "y": l.pos.y, "text": l.text, "size_mm": l.size_mm,
+                })
+            })
+            .collect();
+        let b = d.bounds;
+        Ok(serde_json::json!({
+            "lines": lines,
+            "labels": labels,
+            "bounds": [b.min.x, b.min.y, b.max.x, b.max.y],
+        })
+        .to_string())
+    }
+
+    /// The project and the garment as the 3D view shows it now: the
+    /// running drape (or its starting positions) on the posed body.
+    fn dressed_now(&self) -> Result<(r3d_core::Project, crate::techpack::Dressed), ApiError> {
+        let ws = self.workspace()?;
+        let project = ws.session().project().clone();
+        drop(ws);
+        // Locks in the engine's usual order: the simulation before the
+        // cloth.
+        let live = self.sim()?.as_ref().map(|t| t.latest());
+        let form = self.form_now(project.shown_body())?;
+        let fresh;
+        let cloth = self.cloth.lock().map_err(|_| poisoned())?;
+        let drape = match cloth.as_ref() {
+            Some(d) => d,
+            None => {
+                fresh = drape::prepare(&project, form.as_deref()).map_err(err)?;
+                &fresh
+            }
+        };
+        let start: Vec<glam::Vec3> = drape.scene.particles.iter().map(|p| p.position).collect();
+        let time = live.as_ref().map_or(0.0, |now| now.time);
+        let positions = match live {
+            Some(now) if now.loaded && now.positions.len() == start.len() => now.positions,
+            _ => start,
+        };
+        let material = |panel: PanelId| {
+            let garment = project.garment_of(panel);
+            Material::fabric(
+                garment.map(|g| g.fabric).unwrap_or_default(),
+                garment.and_then(|g| g.color.as_deref()),
+            )
+        };
+        let cloth_meshes = piece_meshes(drape, &positions)
+            .into_iter()
+            .map(|(panel, mesh)| (mesh, material(panel)))
+            .collect();
+        let lines = drape::LinesOnCloth::new(drape, &positions)
+            .internal_lines(&project)
+            .iter()
+            .map(|l| Mesh::ribbon(l, LINE_WIDTH_M, LINE_LIFT_M))
+            .collect();
+        drop(cloth);
+        let animation = *self.animation.lock().map_err(|_| poisoned())?;
+        let body = form.as_deref().map(|f| {
+            let mut mesh = Mesh {
+                positions: f.posed(animation.as_ref(), time),
+                normals: Vec::new(),
+                indices: f.triangles.iter().flatten().copied().collect(),
+            };
+            mesh.recompute_normals();
+            mesh
+        });
+        Ok((
+            project,
+            crate::techpack::Dressed {
+                cloth: cloth_meshes,
+                lines,
+                body,
+            },
+        ))
+    }
+
     /// Import the pieces of a pattern from a file the user chose
     /// (anywhere; DXF, SVG or PDF): the file is copied into the project's
     /// `imports/` folder, then read, as one undo step. `units` (`mm`, `cm`,

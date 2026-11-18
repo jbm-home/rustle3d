@@ -40,9 +40,9 @@ can be tested through MCP as soon as they exist.
 | M29 | Construction details ✅ | 3–4 wk | A skirt with darts, a pleat and a patch pocket sewn on an internal line |
 | M32 | Editor finishing ✅ | 1–2 wk | A patch pocket sewn on its line and a dimension drawn on the board, all with the mouse |
 | M23 | Animated avatars ✅ | 3–4 wk | The avatar walks and the garment follows |
+| M30 | Production: marker, yardage, tech pack, projector ✅ | 3–4 wk | A graded shirt nested on a 150 cm fabric, its yardage and cost, its tech pack PDF |
 | M20 | Trims: buttons and zippers | 2–3 wk | A shirt that buttons and trousers with a fly zipper, draped closed |
 | M21 | Textures and prints | 2–3 wk | A striped shirt whose stripes follow the grainline on every piece |
-| M30 | Production: marker, yardage ✅, tech pack, projector (open) | 3–4 wk | A graded shirt nested on a 150 cm fabric, its yardage and cost, its tech pack PDF |
 | M24 | Fit maps and virtual tape measure | 2 wk | Tight spots show in colour; the ease at the chest is read on the drape |
 | M31 | Imported avatars | 2–3 wk | A body scan in OBJ/glTF is checked, the pieces placed around it and draped |
 | M15 | Game-ready export | 3–4 wk | LODs + baked wrinkle normal maps + skinning, imported in Godot/Unity/Unreal |
@@ -72,7 +72,8 @@ brings to the app what M27–M29 left to agents and scripts: the commands
 exist, the mouse cannot reach them yet. M23 came next (maintainer,
 2026-11-18): it could be done autonomously, the skeleton and weights
 shipping with the body we already use (CC0) and the motions being our
-own.
+own. M30 followed on 2026-11-18–19, before M20 and M21, for the same
+reason: production needs no new physics or assets.
 
 ---
 
@@ -786,12 +787,33 @@ tests below, in the real app):
   of a piece, Export → Marker… dialog with sizes, width, the layout to
   scale and its figures, Save SVG/PDF). A shirt in sizes 38, 40 and 42
   on 150 cm: 2.80 m, 78 % of the fabric used.
-- **Demo** (first half): `./demos/m30/demo.sh`.
-- **Open** (second half, next): the tech pack PDF, the projector
-  export. Later: true-shape nesting (no-fit polygons) and a gap
-  between pieces, one-way fabrics (nap, prints), folded fabric and
-  several plies, a marker of several garments in one fabric, PDF pages
-  longer than 5 m for Acrobat.
+- Delivered, second half (2026-11-19, spec 23): a garment's notes
+  (`garment.set_notes`, schema v15; a Notes field under the garment in
+  the app); the tech pack (`export.techpack`, `r3d techpack`, the MCP
+  tool `export_techpack` with `views` 3d/photo/none, Export → Tech
+  pack… in the app): a landscape PDF laid out by `r3d_io::techpack`
+  with the garment's front and back, colourways, the bill of materials
+  (each garment's fabric, the fabric per garment from its marker, in
+  every size when graded; trims empty until M20), the measurements
+  (size chart, pieces in the sample size, pieces by size), the pattern
+  to scale at an exact 1:N with the sizes' legend, and the sewing notes
+  (seams, notes). Its words are labels with stable keys and English
+  defaults; the app passes its own (French or English). The projector
+  (Export → Projector… in the app): the selected pieces in the shown
+  size, at 1:1 once calibrated by measuring a 20 cm square on the
+  table, white on black or black on white, mirrored, turned, panned
+  with the mouse or the arrows, a 10 cm scale bar; the calibration is
+  an app preference (`projector.json`), not in the project.
+- **Demo**: `./demos/m30/demo.sh` (the graded shirt's marker, then its
+  tech pack; the projector is a step in the app, described there and in
+  the user guide).
+- **Open** (later): trims in the bill of materials (M20); the projector
+  in the operating system's own full screen (the view fills the app's
+  window today) and keystone correction; points of measure named by
+  the user; true-shape nesting (no-fit polygons) and a gap between
+  pieces, one-way fabrics (nap, prints), folded fabric and several
+  plies, a marker of several garments in one fabric, PDF pages longer
+  than 5 m for Acrobat.
 
 ## M31 — Imported avatars
 - Import a body in OBJ, glTF or GLB (a scan, a game character); the

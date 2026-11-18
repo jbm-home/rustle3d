@@ -16,6 +16,8 @@ import 'guide.dart';
 import 'i18n.dart';
 import 'learn.dart';
 import 'photo.dart';
+import 'projector.dart';
+import 'techpack.dart';
 import 'tour.dart';
 import 'rust/api/engine.dart';
 import 'start_screen.dart' show Logo;
@@ -1577,6 +1579,60 @@ class _ShellState extends State<Shell> {
     );
   }
 
+  /// Ask where to save, then write the tech pack: the garment as the 3D
+  /// view shows it now, front and back, then the production details, in
+  /// the user's language.
+  Future<void> _exportTechpack() async {
+    final name = (_summary['name'] as String?) ?? 'Rustle3D';
+    final l = context.l;
+    final location = await getSaveLocation(
+      suggestedName: '$name-techpack.pdf',
+      acceptedTypeGroups: [
+        const XTypeGroup(label: 'PDF', extensions: ['pdf']),
+      ],
+    );
+    if (location == null || !mounted) return;
+    try {
+      await runBusy(
+        context,
+        widget.engine,
+        l.export,
+        () => widget.engine.exportTechpack(
+          path: location.path,
+          labelsJson: jsonEncode(techpackLabels(l)),
+          letter: false,
+        ),
+      );
+      if (mounted) {
+        _toast(l.exported(location.path.split(RegExp(r'[/\\]')).last));
+      }
+    } on ApiError catch (e) {
+      if (mounted) _toast(context.error(e));
+    }
+  }
+
+  /// The pattern at 1:1 for a projector over the cutting table: the
+  /// pieces selected (all when none is), in the size shown in 3D.
+  Future<void> _openProjector() async {
+    final selection = widget.engine.selection();
+    final String drawing;
+    try {
+      drawing = widget.engine.projectorDrawing(panels: selection);
+    } on ApiError catch (e) {
+      _toast(context.error(e));
+      return;
+    }
+    await Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        opaque: true,
+        pageBuilder: (_, _, _) => ProjectorPage(
+          drawing: jsonDecode(drawing) as Map<String, dynamic>,
+          memory: ProjectorMemory(widget.libraryDir),
+        ),
+      ),
+    );
+  }
+
   /// Ask for a pattern file and import its pieces. When the file does not
   /// say how big its units are, ask which unit it was drawn in and import
   /// it again in that unit (the first import is undone).
@@ -1858,7 +1914,11 @@ class _ShellState extends State<Shell> {
                 onGoTo: _goToStep,
                 onBody: _showBody,
                 onExport: _export,
-                onMarker: _openMarker,
+                onProduction: (what) => switch (what) {
+                  'marker' => _openMarker(),
+                  'techpack' => _exportTechpack(),
+                  _ => _openProjector(),
+                },
                 onImport: _importPattern,
                 agent: _agent,
                 onAllowAgents: _allowAgents,
@@ -2249,7 +2309,7 @@ class _TopBar extends StatelessWidget {
     required this.onRedo,
     required this.onBody,
     required this.onExport,
-    required this.onMarker,
+    required this.onProduction,
     required this.onImport,
     required this.agent,
     required this.onAllowAgents,
@@ -2281,8 +2341,10 @@ class _TopBar extends StatelessWidget {
   /// Export in a format (with the avatar, for 3D formats).
   final void Function(ExportFormat format, bool avatar) onExport;
 
-  /// Lay the pieces out on the fabric (a marker).
-  final VoidCallback onMarker;
+  /// A production export: `marker` (the pieces laid out on the fabric),
+  /// `techpack` (the tech pack PDF) or `projector` (the pattern at 1:1 on
+  /// a projector).
+  final ValueChanged<String> onProduction;
 
   /// Import a pattern drawn elsewhere.
   final VoidCallback onImport;
@@ -2400,13 +2462,13 @@ class _TopBar extends StatelessWidget {
                 label: Text(l.importPattern),
               ),
             ),
-            PopupMenuButton<(ExportFormat?, bool)>(
+            PopupMenuButton<(ExportFormat?, bool, String)>(
               tooltip: l.export,
               onSelected: (choice) {
                 if (choice.$1 case final format?) {
                   onExport(format, choice.$2);
                 } else {
-                  onMarker();
+                  onProduction(choice.$3);
                 }
               },
               itemBuilder: (_) => [
@@ -2419,13 +2481,21 @@ class _TopBar extends StatelessWidget {
                   (ExportFormat.glb, true, l.exportGlbAvatar),
                   (ExportFormat.obj, false, l.exportObj),
                 ])
-                  PopupMenuItem(value: (format, avatar), child: Text(label)),
+                  PopupMenuItem(
+                    value: (format, avatar, ''),
+                    child: Text(label),
+                  ),
                 const PopupMenuDivider(),
-                PopupMenuItem(
-                  key: const Key('export-marker'),
-                  value: (null, false),
-                  child: Text(l.exportMarker),
-                ),
+                for (final (what, label) in [
+                  ('marker', l.exportMarker),
+                  ('techpack', l.exportTechpack),
+                  ('projector', l.exportProjector),
+                ])
+                  PopupMenuItem(
+                    key: Key('export-$what'),
+                    value: (null, false, what),
+                    child: Text(label),
+                  ),
               ],
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -4461,8 +4531,104 @@ class _GarmentCard extends StatelessWidget {
             const SizedBox(height: Space.m),
             _FabricDetails(garment: id, figures: f, run: run),
           ],
+          const SizedBox(height: Space.m),
+          _GarmentNotes(
+            garment: id,
+            notes: garment['notes'] as String? ?? '',
+            run: run,
+          ),
         ],
       ),
+    );
+  }
+}
+
+/// The garment's notes for the tech pack: free text, saved when the field
+/// is left (one undo step per edit).
+class _GarmentNotes extends StatefulWidget {
+  const _GarmentNotes({
+    required this.garment,
+    required this.notes,
+    required this.run,
+  });
+
+  final String garment;
+  final String notes;
+  final ValueChanged<Map<String, Object?>> run;
+
+  @override
+  State<_GarmentNotes> createState() => _GarmentNotesState();
+}
+
+class _GarmentNotesState extends State<_GarmentNotes> {
+  late final _text = TextEditingController(text: widget.notes);
+  final _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(() {
+      if (!_focus.hasFocus) _submit();
+    });
+  }
+
+  @override
+  void didUpdateWidget(_GarmentNotes old) {
+    super.didUpdateWidget(old);
+    if (!_focus.hasFocus && _text.text != widget.notes) {
+      _text.text = widget.notes;
+    }
+  }
+
+  @override
+  void dispose() {
+    _text.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_text.text.trimRight() == widget.notes) return;
+    widget.run({
+      'type': 'garment.set_notes',
+      'garment': widget.garment,
+      'notes': _text.text,
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final l = context.l;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l.garmentNotes,
+          style: ts(fontSize: 13, fontWeight: FontWeight.w600, color: p.text),
+        ),
+        const SizedBox(height: Space.xs),
+        Focus(
+          canRequestFocus: false,
+          skipTraversal: true,
+          onKeyEvent: _NumberField._keepTyping,
+          child: TextField(
+            key: const Key('garment-notes'),
+            controller: _text,
+            focusNode: _focus,
+            minLines: 2,
+            maxLines: 6,
+            style: ts(fontSize: 13, color: p.text),
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: l.garmentNotesHint,
+              hintStyle: ts(fontSize: 12, color: p.textMuted),
+              contentPadding: const EdgeInsets.all(8),
+              border: const OutlineInputBorder(),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -2193,6 +2193,204 @@ class LFr extends L {
   String get markerSavePdf => 'Enregistrer en PDF';
 
   @override
+  String get tpDecimal => ',';
+
+  @override
+  String get tpSizes => 'Tailles';
+
+  @override
+  String get tpSample => 'base';
+
+  @override
+  String get tpViews => 'Vues';
+
+  @override
+  String get tpFront => 'Devant';
+
+  @override
+  String get tpBack => 'Dos';
+
+  @override
+  String get tpColourways => 'Coloris';
+
+  @override
+  String get tpMaterials => 'Nomenclature';
+
+  @override
+  String get tpFabrics => 'Tissus';
+
+  @override
+  String get tpGarment => 'Vêtement';
+
+  @override
+  String get tpFabric => 'Tissu';
+
+  @override
+  String get tpColour => 'Couleur';
+
+  @override
+  String get tpWeight => 'Grammage (g/m²)';
+
+  @override
+  String get tpWidth => 'Laize (cm)';
+
+  @override
+  String get tpPrice => 'Prix au mètre';
+
+  @override
+  String get tpConsumption => 'Tissu par vêtement (m)';
+
+  @override
+  String get tpCost => 'Coût par vêtement';
+
+  @override
+  String get tpConsumptionBySize => 'Tissu par vêtement et par taille (m)';
+
+  @override
+  String get tpTrims => 'Fournitures';
+
+  @override
+  String get tpNoTrims => 'Pas encore de fournitures.';
+
+  @override
+  String get tpMeasurements => 'Mesures';
+
+  @override
+  String get tpSizeChart => 'Tableau des tailles (corps, cm)';
+
+  @override
+  String get tpSize => 'Taille';
+
+  @override
+  String get tpHeight => 'Stature';
+
+  @override
+  String get tpBust => 'Tour de poitrine';
+
+  @override
+  String get tpWaist => 'Tour de taille';
+
+  @override
+  String get tpHips => 'Tour de bassin';
+
+  @override
+  String get tpPieces => 'Pièces';
+
+  @override
+  String get tpPiece => 'Pièce';
+
+  @override
+  String get tpLength => 'Longueur (cm)';
+
+  @override
+  String get tpPieceWidth => 'Largeur (cm)';
+
+  @override
+  String get tpPerimeter => 'Ligne de couture (cm)';
+
+  @override
+  String get tpArea => 'Surface (cm²)';
+
+  @override
+  String get tpCutArea => 'Surface coupée (cm²)';
+
+  @override
+  String get tpAllowance => 'Valeur de couture (mm)';
+
+  @override
+  String get tpMass => 'Masse (g)';
+
+  @override
+  String get tpPiecesBySize => 'Pièces par taille : longueur x largeur (cm)';
+
+  @override
+  String get tpPattern => 'Patron';
+
+  @override
+  String get tpSewing => 'Notes de montage';
+
+  @override
+  String get tpSeams => 'Coutures';
+
+  @override
+  String get tpSideA => 'Côté A';
+
+  @override
+  String get tpSideB => 'Côté B';
+
+  @override
+  String get tpLengthA => 'Longueur A (mm)';
+
+  @override
+  String get tpLengthB => 'Longueur B (mm)';
+
+  @override
+  String get tpEase => 'Embu (mm)';
+
+  @override
+  String get tpGathered => 'Froncé';
+
+  @override
+  String get tpYes => 'oui';
+
+  @override
+  String get tpNoSeams => 'Pas encore de coutures.';
+
+  @override
+  String get tpNotes => 'Notes';
+
+  @override
+  String get exportTechpack => 'Dossier technique (PDF)…';
+
+  @override
+  String get exportProjector => 'Projecteur : le patron à l’échelle 1…';
+
+  @override
+  String get techpackLetter => 'Pages Letter';
+
+  @override
+  String get garmentNotes => 'Notes';
+
+  @override
+  String get garmentNotesHint =>
+      'Notes de montage et de finition, imprimées dans le dossier technique';
+
+  @override
+  String get projectorHelp =>
+      'Faites glisser ou utilisez les flèches pour amener le patron sous le projecteur (Maj : 10 cm). Origine : retour au centre. M : miroir · R : tourner · I : contraste · C : calibrer · Échap : fermer.';
+
+  @override
+  String get projectorCalibrate => 'Calibrer';
+
+  @override
+  String get projectorMirror => 'Miroir';
+
+  @override
+  String get projectorTurn => 'Tourner';
+
+  @override
+  String get projectorContrast => 'Contraste';
+
+  @override
+  String get projectorCalibrateHint =>
+      'Le carré ci-dessous devrait mesurer 20 cm de côté sur la table. Mesurez ses côtés avec une règle et saisissez-les.';
+
+  @override
+  String get projectorMeasuredWidth => 'Largeur mesurée';
+
+  @override
+  String get projectorMeasuredHeight => 'Hauteur mesurée';
+
+  @override
+  String get projectorApply => 'Appliquer';
+
+  @override
+  String get projectorReset => 'Réinitialiser';
+
+  @override
+  String get projectorNothing => 'Aucune pièce à projeter.';
+
+  @override
   String get fabricBought => 'À l’achat';
 
   @override

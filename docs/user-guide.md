@@ -7,7 +7,8 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-18 (M30, fabric as bought, area and mass of the
+Last updated: 2026-11-19 (M30, the tech pack, the projector, a
+garment's notes; fabric as bought, area and mass of the
 pieces, the marker with its length and cost; M23, the avatar walks, turns and raises its arms;
 handles dragged with Select; Dimension tool, formulas typed in a value;
 Sew: part of an edge, several edges, internal lines; ⌘-click to pick a second corner or edge,
@@ -292,6 +293,10 @@ garment's totals: how many pieces, the fabric they take once cut (with
 their seam allowances) and what they weigh. With a piece selected, its
 area, perimeter, cut area and mass are in the inspector.
 
+Under them, **Notes** takes free text for whoever sews or produces the
+garment (interfacing, pressing, topstitching, labels). It is saved when
+you leave the field and printed in the tech pack.
+
 A project can hold several garments, for example trousers and a shirt.
 Start a second template from the project (or **Add a garment**): it
 comes as a garment of its own, worn over the others. The list goes from
@@ -435,6 +440,50 @@ handled yet. Agents and scripts can cut a piece more times, in pairs or
 with a free grain (`marker.compute`, `r3d marker My.r3d --sizes 38,40,42
 --width-cm 150 --format pdf`).
 
+## Tech pack
+**Export** → **Tech pack (PDF)…** writes the garment's production file,
+in landscape A4 pages, in the app's language:
+- **Views**: the garment from the front and the back, as the 3D view
+  shows it now (drape first for a garment that hangs right).
+- **Colourways**: each garment's colour, fabric and colour code.
+- **Bill of materials**: each garment's fabric with its weight, width
+  and price per metre, the fabric one garment takes (from its marker in
+  the size the pattern is drawn in) and its cost; with sizes, the fabric
+  per garment in every size. Trims come in a later version.
+- **Measurements**: with sizes, the size chart (height, bust, waist and
+  hips of each size's body); every piece's length along its grainline,
+  width, sewing line, areas, seam allowance and mass; with sizes, every
+  piece's length and width in each size.
+- **Pattern**: every piece (every size nested, with their colours)
+  scaled to fit the page; the scale is written under it (1:15). Print
+  the pattern itself from **Export** at 1:1.
+- **Sewing notes**: every seam (its two pieces and their lengths, ease,
+  gathering) and the garments' notes.
+
+Agents and scripts write it too (`r3d techpack My.r3d`; with
+`--views photo`, quick photos instead of the 3D view).
+
+## Projector
+**Export** → **Projector: the pattern at 1:1…** shows the pattern at
+real size for a projector hung over the cutting table, to trace or cut
+on the fabric without printing. Select the pieces to project first (on
+the board); with nothing selected, every piece comes. They come in the
+size shown in 3D, as white lines on black.
+- Move the window to the projector's screen and maximise it.
+- **Calibrate** (C) once for the room: a square that should be 20 cm a
+  side is projected; measure its width and height on the table with a
+  ruler and type them in. The pattern is then at 1:1. A 10 cm scale
+  bar in the bottom right corner lets you check it at any time.
+- Drag, or use the arrow keys (1 cm; with Shift, 10 cm), to bring the
+  part of the pattern you are cutting under the lamp; Home brings the
+  pieces back to the middle.
+- **Mirror** (M) turns the pattern over, for a projector shining
+  through a mirror or a piece cut from the wrong side; **Turn** (R)
+  turns it by a quarter; **Contrast** (I) swaps to black lines on
+  white.
+- Escape closes it. The calibration, mirror, turn and contrast are
+  remembered by the app (they belong to the room, not to the project).
+
 ## Import
 **Import** in the top bar brings in a pattern drawn in another program:
 a **DXF-AAMA** or plain **DXF** file, an **SVG**, or a **PDF** (a pattern
@@ -484,9 +533,15 @@ Renaming a project also renames its folder, when no other project has
 that name. A project exported as .zip holds its folder (pattern, body,
 exports), without the cache the app rebuilds by itself.
 Patterns come in from DXF, SVG and PDF and go out as SVG, PDF and
-DXF-AAMA; garments go out as glTF and OBJ: open formats only.
+DXF-AAMA; garments go out as glTF and OBJ; the marker as SVG or PDF and
+the tech pack as PDF: open formats only.
 
 ## Known limits
+- The projector view fills the app's window, not the whole screen:
+  maximise the window on the projector. It cannot correct a projector
+  that is not square to the table (keystone): the scale bar then reads
+  differently at the far end. The tech pack's PDF font writes Western
+  European letters only; others show as "?".
 - On Linux, the pattern and the 3D views are less smooth than on macOS
   and Windows (their images are copied through the processor each
   frame). The same happens on a computer with several graphics cards

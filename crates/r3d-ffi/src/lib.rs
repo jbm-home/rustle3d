@@ -13,6 +13,7 @@ mod sew;
 mod sim;
 mod snap;
 mod surface;
+mod techpack;
 
 // Generated glue: raw FFI entry points (`unsafe`) and wire-format decoding
 // whose invariants the generator guarantees (`unwrap`). Our never-crash

@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `cloth_hit`, `corner_at`, `corner_landing`, `edge_spot`, `edited`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form_now`, `form_soon`, `frozen_board`, `gpu_solver`, `graphics`, `import_from`, `long`, `marker_spec`, `motion_name`, `moving_avatar`, `new`, `new`, `offset_along`, `parse_track`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `selected`, `set_busy`, `sim`, `solver`, `to_theme`, `workspace`
+// These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `cloth_hit`, `corner_at`, `corner_landing`, `dressed_now`, `edge_spot`, `edited`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form_now`, `form_soon`, `frozen_board`, `gpu_solver`, `graphics`, `import_from`, `long`, `marker_spec`, `motion_name`, `moving_avatar`, `new`, `new`, `offset_along`, `parse_track`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `selected`, `set_busy`, `sim`, `solver`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`
 
@@ -135,6 +135,19 @@ abstract class Engine implements RustOpaqueInterface {
     required bool pdf,
   });
 
+  /// Write the tech pack (PDF, spec 23) to `path`, a file the user chose
+  /// (anywhere): the garment's front and back as the 3D view shows it
+  /// now (the running drape, or where it starts), then colourways, bill
+  /// of materials, measurements, pattern and sewing notes.
+  /// `labels_json` holds its words in the user's language, by key
+  /// (`r3d_commands::techpack::LABELS`); `letter`: US Letter pages, else
+  /// A4. Off the UI thread.
+  Future<void> exportTechpack({
+    required String path,
+    required String labelsJson,
+    required bool letter,
+  });
+
   /// The fabrics the UI offers, with the colour each one renders with by
   /// default (ARGB), so swatches match the 3D view.
   static List<FabricSwatch> fabrics() =>
@@ -199,6 +212,14 @@ abstract class Engine implements RustOpaqueInterface {
 
   /// Where the long step running is, or `None` when none is.
   StepProgress? progress();
+
+  /// The pattern for the projector (spec 23), in the size shown in 3D:
+  /// the pieces `panels` (every piece when empty) with their cutting
+  /// and sewing lines, notches, internal lines and grainlines, as JSON:
+  /// `lines` (`points` as x, y pairs in mm, `closed`, `kind`: cut, sew,
+  /// internal, notch, grain or mark), `labels` (`x`, `y`, `text`,
+  /// `size_mm`, centred) and `bounds` (min x, min y, max x, max y).
+  String projectorDrawing({required List<String> panels});
 
   /// Pointer moved to (`x`, `y`) after `press`: pull the cloth there (on
   /// the plane facing the camera through the grabbed point; the

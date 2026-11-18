@@ -3661,6 +3661,396 @@ abstract class L {
   /// **'Save PDF'**
   String get markerSavePdf;
 
+  /// No description provided for @tpDecimal.
+  ///
+  /// In en, this message translates to:
+  /// **'.'**
+  String get tpDecimal;
+
+  /// No description provided for @tpSizes.
+  ///
+  /// In en, this message translates to:
+  /// **'Sizes'**
+  String get tpSizes;
+
+  /// No description provided for @tpSample.
+  ///
+  /// In en, this message translates to:
+  /// **'sample'**
+  String get tpSample;
+
+  /// No description provided for @tpViews.
+  ///
+  /// In en, this message translates to:
+  /// **'Views'**
+  String get tpViews;
+
+  /// No description provided for @tpFront.
+  ///
+  /// In en, this message translates to:
+  /// **'Front'**
+  String get tpFront;
+
+  /// No description provided for @tpBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get tpBack;
+
+  /// No description provided for @tpColourways.
+  ///
+  /// In en, this message translates to:
+  /// **'Colourways'**
+  String get tpColourways;
+
+  /// No description provided for @tpMaterials.
+  ///
+  /// In en, this message translates to:
+  /// **'Bill of materials'**
+  String get tpMaterials;
+
+  /// No description provided for @tpFabrics.
+  ///
+  /// In en, this message translates to:
+  /// **'Fabrics'**
+  String get tpFabrics;
+
+  /// No description provided for @tpGarment.
+  ///
+  /// In en, this message translates to:
+  /// **'Garment'**
+  String get tpGarment;
+
+  /// No description provided for @tpFabric.
+  ///
+  /// In en, this message translates to:
+  /// **'Fabric'**
+  String get tpFabric;
+
+  /// No description provided for @tpColour.
+  ///
+  /// In en, this message translates to:
+  /// **'Colour'**
+  String get tpColour;
+
+  /// No description provided for @tpWeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Weight (g/m²)'**
+  String get tpWeight;
+
+  /// No description provided for @tpWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Width (cm)'**
+  String get tpWidth;
+
+  /// No description provided for @tpPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Price per metre'**
+  String get tpPrice;
+
+  /// No description provided for @tpConsumption.
+  ///
+  /// In en, this message translates to:
+  /// **'Fabric per garment (m)'**
+  String get tpConsumption;
+
+  /// No description provided for @tpCost.
+  ///
+  /// In en, this message translates to:
+  /// **'Cost per garment'**
+  String get tpCost;
+
+  /// No description provided for @tpConsumptionBySize.
+  ///
+  /// In en, this message translates to:
+  /// **'Fabric per garment by size (m)'**
+  String get tpConsumptionBySize;
+
+  /// No description provided for @tpTrims.
+  ///
+  /// In en, this message translates to:
+  /// **'Trims'**
+  String get tpTrims;
+
+  /// No description provided for @tpNoTrims.
+  ///
+  /// In en, this message translates to:
+  /// **'No trims yet.'**
+  String get tpNoTrims;
+
+  /// No description provided for @tpMeasurements.
+  ///
+  /// In en, this message translates to:
+  /// **'Measurements'**
+  String get tpMeasurements;
+
+  /// No description provided for @tpSizeChart.
+  ///
+  /// In en, this message translates to:
+  /// **'Size chart (body, cm)'**
+  String get tpSizeChart;
+
+  /// No description provided for @tpSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Size'**
+  String get tpSize;
+
+  /// No description provided for @tpHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Height'**
+  String get tpHeight;
+
+  /// No description provided for @tpBust.
+  ///
+  /// In en, this message translates to:
+  /// **'Bust'**
+  String get tpBust;
+
+  /// No description provided for @tpWaist.
+  ///
+  /// In en, this message translates to:
+  /// **'Waist'**
+  String get tpWaist;
+
+  /// No description provided for @tpHips.
+  ///
+  /// In en, this message translates to:
+  /// **'Hips'**
+  String get tpHips;
+
+  /// No description provided for @tpPieces.
+  ///
+  /// In en, this message translates to:
+  /// **'Pieces'**
+  String get tpPieces;
+
+  /// No description provided for @tpPiece.
+  ///
+  /// In en, this message translates to:
+  /// **'Piece'**
+  String get tpPiece;
+
+  /// No description provided for @tpLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Length (cm)'**
+  String get tpLength;
+
+  /// No description provided for @tpPieceWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Width (cm)'**
+  String get tpPieceWidth;
+
+  /// No description provided for @tpPerimeter.
+  ///
+  /// In en, this message translates to:
+  /// **'Sewing line (cm)'**
+  String get tpPerimeter;
+
+  /// No description provided for @tpArea.
+  ///
+  /// In en, this message translates to:
+  /// **'Area (cm²)'**
+  String get tpArea;
+
+  /// No description provided for @tpCutArea.
+  ///
+  /// In en, this message translates to:
+  /// **'Cut area (cm²)'**
+  String get tpCutArea;
+
+  /// No description provided for @tpAllowance.
+  ///
+  /// In en, this message translates to:
+  /// **'Allowance (mm)'**
+  String get tpAllowance;
+
+  /// No description provided for @tpMass.
+  ///
+  /// In en, this message translates to:
+  /// **'Mass (g)'**
+  String get tpMass;
+
+  /// No description provided for @tpPiecesBySize.
+  ///
+  /// In en, this message translates to:
+  /// **'Pieces by size: length x width (cm)'**
+  String get tpPiecesBySize;
+
+  /// No description provided for @tpPattern.
+  ///
+  /// In en, this message translates to:
+  /// **'Pattern'**
+  String get tpPattern;
+
+  /// No description provided for @tpSewing.
+  ///
+  /// In en, this message translates to:
+  /// **'Sewing notes'**
+  String get tpSewing;
+
+  /// No description provided for @tpSeams.
+  ///
+  /// In en, this message translates to:
+  /// **'Seams'**
+  String get tpSeams;
+
+  /// No description provided for @tpSideA.
+  ///
+  /// In en, this message translates to:
+  /// **'Side A'**
+  String get tpSideA;
+
+  /// No description provided for @tpSideB.
+  ///
+  /// In en, this message translates to:
+  /// **'Side B'**
+  String get tpSideB;
+
+  /// No description provided for @tpLengthA.
+  ///
+  /// In en, this message translates to:
+  /// **'Length A (mm)'**
+  String get tpLengthA;
+
+  /// No description provided for @tpLengthB.
+  ///
+  /// In en, this message translates to:
+  /// **'Length B (mm)'**
+  String get tpLengthB;
+
+  /// No description provided for @tpEase.
+  ///
+  /// In en, this message translates to:
+  /// **'Ease (mm)'**
+  String get tpEase;
+
+  /// No description provided for @tpGathered.
+  ///
+  /// In en, this message translates to:
+  /// **'Gathered'**
+  String get tpGathered;
+
+  /// No description provided for @tpYes.
+  ///
+  /// In en, this message translates to:
+  /// **'yes'**
+  String get tpYes;
+
+  /// No description provided for @tpNoSeams.
+  ///
+  /// In en, this message translates to:
+  /// **'No seams yet.'**
+  String get tpNoSeams;
+
+  /// No description provided for @tpNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get tpNotes;
+
+  /// No description provided for @exportTechpack.
+  ///
+  /// In en, this message translates to:
+  /// **'Tech pack (PDF)…'**
+  String get exportTechpack;
+
+  /// No description provided for @exportProjector.
+  ///
+  /// In en, this message translates to:
+  /// **'Projector: the pattern at 1:1…'**
+  String get exportProjector;
+
+  /// No description provided for @techpackLetter.
+  ///
+  /// In en, this message translates to:
+  /// **'Letter pages'**
+  String get techpackLetter;
+
+  /// No description provided for @garmentNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get garmentNotes;
+
+  /// No description provided for @garmentNotesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Sewing and finishing notes, printed in the tech pack'**
+  String get garmentNotesHint;
+
+  /// No description provided for @projectorHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag or use the arrow keys to bring the pattern under the projector (Shift: 10 cm). Home: back to the middle. M: mirror · R: turn · I: contrast · C: calibrate · Esc: close.'**
+  String get projectorHelp;
+
+  /// No description provided for @projectorCalibrate.
+  ///
+  /// In en, this message translates to:
+  /// **'Calibrate'**
+  String get projectorCalibrate;
+
+  /// No description provided for @projectorMirror.
+  ///
+  /// In en, this message translates to:
+  /// **'Mirror'**
+  String get projectorMirror;
+
+  /// No description provided for @projectorTurn.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn'**
+  String get projectorTurn;
+
+  /// No description provided for @projectorContrast.
+  ///
+  /// In en, this message translates to:
+  /// **'Contrast'**
+  String get projectorContrast;
+
+  /// No description provided for @projectorCalibrateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The square below should be 20 cm a side on the table. Measure its sides with a ruler and type them in.'**
+  String get projectorCalibrateHint;
+
+  /// No description provided for @projectorMeasuredWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Width measured'**
+  String get projectorMeasuredWidth;
+
+  /// No description provided for @projectorMeasuredHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Height measured'**
+  String get projectorMeasuredHeight;
+
+  /// No description provided for @projectorApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get projectorApply;
+
+  /// No description provided for @projectorReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get projectorReset;
+
+  /// No description provided for @projectorNothing.
+  ///
+  /// In en, this message translates to:
+  /// **'No piece to project.'**
+  String get projectorNothing;
+
   /// No description provided for @fabricBought.
   ///
   /// In en, this message translates to:
