@@ -49,6 +49,8 @@ To dress the avatar: avatar_set, panel_place each panel around the body, seam_ad
 then simulate (headless drape, cached; with `motion` the avatar walks, turns or raises its arms and the \
 cloth follows) and render_3d to see the result; render_board shows the pattern; \
 render_photo makes a photorealistic studio image of the draped garment (quality quick for a first look). \
+For production: marker_compute / export_marker lay the pieces out on the fabric (yardage, cost); \
+export_techpack writes the tech pack PDF (views, colourways, bill of materials, measurements, pattern, sewing notes). \
 Errors carry a stable `code`, `args` and an English `text`.";
 
 /// Errors starting or running the server.
@@ -73,7 +75,12 @@ enum Target {
     GoTo,
     Batch,
     Render(render::View),
+    /// `export.techpack`, with pictures of the garment rendered here.
+    TechPack,
 }
+
+/// The tech pack action, whose tool renders views first.
+const TECHPACK: &str = "export.techpack";
 
 /// Called after a tool changed the project (the app refreshes its views).
 pub type OnChange = Arc<dyn Fn() + Send + Sync>;
@@ -137,12 +144,26 @@ fn catalog() -> (Vec<Tool>, BTreeMap<String, Target>) {
             if info.destructive {
                 description.push_str(" Destructive: pass \"confirm\": true.");
             }
-            add(
-                tool_name(info.name),
-                description,
-                object((info.schema)()),
-                Target::Op(info.name),
-            );
+            let mut schema = object((info.schema)());
+            let target = if info.name == TECHPACK {
+                // The server renders the front and back views itself.
+                if let Some(Value::Object(props)) = schema.get_mut("properties") {
+                    props.insert(
+                        "views".into(),
+                        json!({
+                            "enum": render::TechPackViews::NAMES,
+                            "default": "3d",
+                            "description": "Pictures of the garment rendered first, front and back: 3d (the 3D view, fast), photo (quick photos, slower) or none"
+                        }),
+                    );
+                }
+                description
+                    .push_str(" Front and back views of the garment are rendered first (`views`).");
+                Target::TechPack
+            } else {
+                Target::Op(info.name)
+            };
+            add(tool_name(info.name), description, schema, target);
         }
     }
     add(
@@ -320,6 +341,15 @@ impl Server {
                     Err(e) => error_result(&e.message()),
                 };
             }
+            Some(Target::TechPack) => {
+                return match self.techpack(args) {
+                    Ok(value) => {
+                        let body = serde_json::to_string(&value).unwrap_or_default();
+                        CallToolResult::success(vec![ContentBlock::text(body)])
+                    }
+                    Err(e) => error_result(&e),
+                };
+            }
             Some(Target::Op(op)) => *op,
             Some(Target::Undo) => step::UNDO,
             Some(Target::Redo) => step::REDO,
@@ -387,6 +417,56 @@ impl Server {
             .lock()
             .map_err(|_| internal("workspace lock poisoned"))?;
         render::render(gpu, &ws, view, width, height)
+    }
+
+    /// Write the tech pack, its views rendered first.
+    fn techpack(&self, mut args: Map<String, Value>) -> Result<Value, Message> {
+        let views = match args.remove("views") {
+            None => render::TechPackViews::default(),
+            Some(v) => v
+                .as_str()
+                .and_then(render::TechPackViews::from_name)
+                .ok_or_else(|| {
+                    CommandError::Malformed {
+                        name: "views".into(),
+                        detail: format!(
+                            "expected one of: {}",
+                            render::TechPackViews::NAMES.join(", ")
+                        ),
+                    }
+                    .message()
+                })?,
+        };
+        let request: r3d_commands::techpack::ExportTechPack =
+            serde_json::from_value(Value::Object(args)).map_err(|e| {
+                CommandError::Malformed {
+                    name: TECHPACK.into(),
+                    detail: e.to_string(),
+                }
+                .message()
+            })?;
+        let internal = |detail: &str| {
+            CommandError::Internal {
+                detail: detail.into(),
+            }
+            .message()
+        };
+        // The GPU before the workspace, as in `render`.
+        let mut gpu = self.gpu.lock().map_err(|_| internal("GPU lock poisoned"))?;
+        if views != render::TechPackViews::None && gpu.is_none() {
+            *gpu = Some(render::headless_gpu().map_err(|e| e.message())?);
+        }
+        let ws = self
+            .ws
+            .lock()
+            .map_err(|_| internal("workspace lock poisoned"))?;
+        let pictures = match (views, gpu.as_ref()) {
+            (render::TechPackViews::None, _) | (_, None) => Vec::new(),
+            (_, Some(gpu)) => {
+                render::techpack_views(gpu, &ws, views, &request).map_err(|e| e.message())?
+            }
+        };
+        request.write(&ws, pictures).map_err(|e| e.message())
     }
 
     /// Run the step `type_name` with `args`, saving after a change.

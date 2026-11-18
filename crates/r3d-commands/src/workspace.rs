@@ -28,6 +28,8 @@ pub enum WorkspaceError {
     Read { path: String, detail: String },
     #[error(transparent)]
     Import(#[from] r3d_io::import::ImportError),
+    #[error(transparent)]
+    Image(#[from] r3d_io::techpack::TechPackError),
     #[error("not a readable zip archive: {detail}")]
     Archive { detail: String },
     #[error(
@@ -53,6 +55,7 @@ impl Localizable for WorkspaceError {
                 .arg("path", path)
                 .arg("detail", detail),
             Self::Import(e) => e.message(),
+            Self::Image(e) => e.message(),
             Self::Archive { detail } => {
                 Message::new("archive.invalid", self.to_string()).arg("detail", detail)
             }

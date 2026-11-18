@@ -45,15 +45,15 @@ fn in_size<'a>(project: &'a Project, size: Option<&str>) -> Result<Cow<'a, Proje
 
 /// A piece as it is cut: its sewing line (counter-clockwise), its cutting
 /// line (the sewing line plus the seam allowance) and its holes.
-struct Cut {
-    sew: Vec<DVec2>,
-    cut: Vec<DVec2>,
-    holes: Vec<Vec<DVec2>>,
+pub(crate) struct Cut {
+    pub(crate) sew: Vec<DVec2>,
+    pub(crate) cut: Vec<DVec2>,
+    pub(crate) holes: Vec<Vec<DVec2>>,
     allowance: bool,
 }
 
 impl Cut {
-    fn of(project: &Project, id: PanelId) -> Option<Cut> {
+    pub(crate) fn of(project: &Project, id: PanelId) -> Option<Cut> {
         let panel = project.panel(id)?;
         let mut sew = project.panel_outline(id)?;
         if sew.len() < 3 {
@@ -84,18 +84,18 @@ impl Cut {
     }
 
     /// Cloth inside the sewing line (mm²).
-    fn area(&self) -> f64 {
+    pub(crate) fn area(&self) -> f64 {
         polygon::signed_area(&self.sew).abs() - self.holes_area()
     }
 
     /// Cloth cut, seam allowance included (mm²).
-    fn cut_area(&self) -> f64 {
+    pub(crate) fn cut_area(&self) -> f64 {
         polygon::signed_area(&self.cut).abs() - self.holes_area()
     }
 }
 
 /// Mass of `area_mm2` of fabric weighing `gsm` (grams).
-fn mass_g(area_mm2: f64, gsm: f64) -> f64 {
+pub(crate) fn mass_g(area_mm2: f64, gsm: f64) -> f64 {
     area_mm2 * 1e-6 * gsm
 }
 

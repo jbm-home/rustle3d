@@ -1,6 +1,6 @@
 # Rustle3D architecture
 
-Status: living document, last updated 2026-11-18 (M30, marker).
+Status: living document, last updated 2026-11-19 (M30, tech pack and projector).
 
 Every choice here is the **current best guess**, not a rule. Each one says
 why it was made and what was considered, so it can be challenged and changed
@@ -88,7 +88,7 @@ Changes to the split suggested in the brief:
 ```
 Project                                        (✓ = implemented in M1)
  ├─ name, display_unit, next_id                ✓
- ├─ garments: IdMap<GarmentId, Garment>        ✓ (fabric, colour, layer; M30: fabric details, weight/width/price)
+ ├─ garments: IdMap<GarmentId, Garment>        ✓ (fabric, colour, layer; M30: fabric details, weight/width/price, notes)
  ├─ panels: IdMap<PanelId, Panel>              ✓ (name, garment, contour, grain angle)
  │    Panel { name, contour: Vec<EdgeId>, internal_lines, notches,
  │            symmetry: Option<SymmetryLink>, material: MaterialId,
@@ -601,3 +601,6 @@ code stays **i18n-ready** for more:
 | 2026-11-18 | M23: `r3d-sim` (as the table above already allowed) and `r3d-sim-gpu` depend on `r3d-geom` for `Rigid`, the rigid motion of a bone | The avatar crate and the solver share one type; `r3d-geom` is the pure-math crate both already sit on |
 | 2026-11-18 | M30: the marker is nested by a raster bottom-left-fill of our own (`r3d_geom::nest`, Jakobs 1996, Burke et al. 2006, raster overlap after Bennell & Oliveira 2008), cells of 5 mm, largest piece first; computed on demand (`marker.compute`, `export.marker`), never stored | Deterministic, simple and fast enough for a garment in several sizes (a shirt in three sizes in well under a second), with no new dependency; a raster that marks every cell a piece touches can never overlap two pieces. No-fit polygons would be tighter (a cell of slack at most) and can replace it behind the same function. A marker is derived from the pattern and the fabric, so storing it would let it go stale |
 | 2026-11-18 | M30: a garment's fabric details (weight, width, price per metre) on `Garment`, schema v14; the weight also sets the drape's areal density when given | The fabric as bought belongs to the garment like its fabric preset; one weight for the indicators and the cloth's mass, so they cannot disagree. Unset, the drape is unchanged (the presets' weights) |
+| 2026-11-19 | M30: the tech pack's words are labels with stable keys and English defaults in `r3d-commands`, replaced by the front-end's own (`labels`); `r3d_io::techpack` lays out sections of tables, pictures, swatches, text and a drawing, and holds no words | A PDF is a file the user hands on, so it must be in their language, but core crates hold no translations (§7.7); the app already translates everything else, and agents get English |
+| 2026-11-19 | M30: pictures for the tech pack are rendered by the front-ends (CLI and MCP with `r3d_mcp::render::techpack_views`, the app from its live 3D view) and passed in as decoded images; the action itself takes PNG files from the project folder | `r3d-commands` has no GPU; the app's pictures must show its running drape, which only the app holds. `png` (decode) and `miniz_oxide` (Flate for the PDF's images), both MIT/Apache and already in the tree, join `r3d-io` |
+| 2026-11-19 | M30: the projector is a full-window Flutter route painting the pattern itself (`Engine::projector_drawing`, the same drawing as the 1:1 exports) at a calibrated scale stored as an app preference (`projector.json`); no OS full screen | Drawing in Flutter keeps it independent of the board's renderer and pan/zoom; the calibration belongs to the room, not the project. True full screen needs a window plugin (and `unsafe` on Windows): maximising the window on the projector does the job |

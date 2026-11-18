@@ -23,6 +23,7 @@ thiserror.workspace = true
 zip.workspace = true
 
 [dev-dependencies]
+png.workspace = true
 tempfile.workspace = true
 
 [lints]

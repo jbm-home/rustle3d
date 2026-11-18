@@ -32,6 +32,7 @@ pub mod script;
 pub mod session;
 pub mod spec;
 pub mod step;
+pub mod techpack;
 pub mod templates;
 pub mod workspace;
 

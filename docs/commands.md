@@ -2557,6 +2557,51 @@ Set the garment's fabric as bought: its weight (g/m², also the cloth's mass in 
 
 </details>
 
+### `garment.set_notes`
+
+Write the garment's notes: free text for whoever sews or produces it (finishing, pressing, stitch lengths, labels), printed in the tech pack's sewing notes. Replaces the previous notes; an empty text clears them.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "GarmentId": {
+      "description": "Identifier of a garment, e.g. `garment:1`.",
+      "pattern": "^garment:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Write the garment's sewing and production notes.",
+  "properties": {
+    "garment": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/GarmentId"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Defaults to the project's garment."
+    },
+    "notes": {
+      "description": "Free text (up to 20 000 characters; empty clears them). Lines\nare kept as typed.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "notes"
+  ],
+  "title": "GarmentSetNotes",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `garment.arrange`
 
 Place every panel around the body for the simulation, side by side in the order the seams join them (a panel's right side continues into the next panel; each takes a share of the turn in proportion to its width), tops at the avatar's waist (its narrowest girth) unless top_cm is given. Panels placed on an arm (sleeves) or flat keep their placement. Re-run it after adding panels or seams.
@@ -4330,7 +4375,7 @@ Read-only. Lengths in mm, areas in mm², rounded to 0.001.
 
 ### `project.summary`
 
-Project name, display unit, the garments (fabric, colour), the size range (names, base, shown; null without one), entity counts and a summary of every panel.
+Project name, display unit, the garments (fabric, colour, notes), the size range (names, base, shown; null without one), entity counts and a summary of every panel.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -5409,6 +5454,83 @@ Lay out a marker (as marker.compute) and write it at 1:1 as SVG or PDF: the fabr
     }
   },
   "title": "ExportMarker",
+  "type": "object"
+}
+```
+
+</details>
+
+### `export.techpack`
+
+Write the project's tech pack as a PDF (landscape A4 or Letter): pictures of the garment, colourways (each garment's colour and fabric), the bill of materials (each garment's fabric with weight, width and price, the fabric one garment takes from its marker in the sample size, and by size when graded; trims), the measurements (size chart, every piece's length along the grain, width, sewing line, areas, allowance and mass, and by size), the pattern to scale, and the sewing notes (every seam with its sides' lengths, ease, gathering; the garments' notes). Returns the path and the fabric per garment.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "TechPackImage": {
+      "additionalProperties": false,
+      "description": "A picture to put in the tech pack.",
+      "properties": {
+        "caption": {
+          "description": "Written under it; omitted: none.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "path": {
+          "description": "A PNG file inside the project folder (a render, a photo).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "TechPackPaper": {
+      "description": "Page size of a tech pack (landscape).",
+      "enum": [
+        "a4",
+        "letter"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Write the project's tech pack as a PDF.",
+  "properties": {
+    "images": {
+      "description": "Pictures of the garment (PNG files in the project folder), shown\nside by side first. The CLI and the MCP server render a front\nand a back view of their own before these (`views`).",
+      "items": {
+        "$ref": "#/$defs/TechPackImage"
+      },
+      "type": "array"
+    },
+    "labels": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "The words of the file, by key (see `docs/specs/23-production.md`;\n`decimal` is the decimal separator). Omitted ones are in English.",
+      "type": "object"
+    },
+    "paper": {
+      "$ref": "#/$defs/TechPackPaper",
+      "default": "a4",
+      "description": "`a4` (default) or `letter`, landscape."
+    },
+    "path": {
+      "description": "Output path relative to the project folder. Defaults to\n`exports/<project name>-techpack.pdf`.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "title": "ExportTechPack",
   "type": "object"
 }
 ```

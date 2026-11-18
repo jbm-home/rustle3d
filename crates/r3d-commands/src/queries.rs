@@ -69,7 +69,7 @@ fn summarize(p: &Project, id: PanelId) -> Result<PanelSummary, CommandError> {
 pub struct ProjectSummary {}
 
 impl Described for ProjectSummary {
-    const SUMMARY: &'static str = "Project name, display unit, the garments (fabric, colour), the size range (names, base, shown; null without one), entity counts and a summary of every panel.";
+    const SUMMARY: &'static str = "Project name, display unit, the garments (fabric, colour, notes), the size range (names, base, shown; null without one), entity counts and a summary of every panel.";
 }
 
 #[derive(Serialize)]
@@ -108,7 +108,7 @@ impl QuerySpec for ProjectSummary {
                 .map(|(id, g)| {
                     serde_json::json!({
                         "id": id, "name": g.name, "fabric": g.fabric, "color": g.color,
-                        "layer": g.layer,
+                        "layer": g.layer, "notes": g.notes,
                     })
                 })
                 .collect(),

@@ -242,3 +242,90 @@ fn the_marker_exports_as_svg_and_pdf() {
     let pdf = std::fs::read(dir.join("exports/m.pdf")).unwrap();
     assert!(pdf.starts_with(b"%PDF"));
 }
+
+#[test]
+fn notes_are_kept_trimmed_and_undone() {
+    let mut s = Session::new(Project::new("Untitled"));
+    ok(
+        &mut s,
+        json!({"type": "garment.set_notes", "notes": "Press seams open.\n\n"}),
+    );
+    let g = s.project().garments().values().next().unwrap();
+    assert_eq!(g.notes, "Press seams open.");
+    s.undo().unwrap();
+    assert!(
+        s.project()
+            .garments()
+            .values()
+            .next()
+            .unwrap()
+            .notes
+            .is_empty()
+    );
+    let long = "x".repeat(20_001);
+    let e = run(&mut s, json!({"type": "garment.set_notes", "notes": long})).unwrap_err();
+    assert_eq!(e.message().code, "invalid.range");
+}
+
+#[test]
+fn the_graded_shirt_has_a_tech_pack() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("Shirt.r3d");
+    let mut s = graded_shirt();
+    ok(
+        &mut s,
+        json!({"type": "garment.set_notes", "notes": "Topstitch the collar 6 mm from the edge."}),
+    );
+    r3d_core::project_dir::create(&dir, s.project()).unwrap();
+    let mut ws = Workspace::open(&dir).unwrap();
+    // A picture from the project folder (a 2 x 2 PNG made by hand).
+    let mut png = Vec::new();
+    {
+        let mut enc = png::Encoder::new(&mut png, 2, 2);
+        enc.set_color(png::ColorType::Rgb);
+        enc.set_depth(png::BitDepth::Eight);
+        let mut w = enc.write_header().unwrap();
+        w.write_image_data(&[200; 12]).unwrap();
+    }
+    std::fs::create_dir_all(dir.join("renders")).unwrap();
+    std::fs::write(dir.join("renders/front.png"), &png).unwrap();
+    let out = ws
+        .run_step(
+            &Step::from_value(json!({"type": "export.techpack",
+                "images": [{"path": "renders/front.png", "caption": "Front"}],
+                "labels": {"views": "Vues", "decimal": ","}}))
+            .unwrap(),
+        )
+        .unwrap();
+    assert_eq!(out["path"], "exports/Shirt-techpack.pdf");
+    assert_eq!(out["images"], 1);
+    // The fabric of one shirt in the sample size, priced.
+    let fabric = &out["fabric"][0];
+    let yardage = fabric["yardage_m"].as_f64().unwrap();
+    assert!(yardage > 0.8 && yardage < 2.5, "{yardage}");
+    assert!((fabric["cost"].as_f64().unwrap() - yardage * 12.5).abs() < 0.01);
+    let pdf = std::fs::read(dir.join("exports/Shirt-techpack.pdf")).unwrap();
+    assert!(pdf.starts_with(b"%PDF"));
+    let text = String::from_utf8_lossy(&pdf);
+    for word in [
+        "Vues",
+        "Bill of materials",
+        "Size chart",
+        "Topstitch the collar",
+    ] {
+        assert!(text.contains(word), "{word}");
+    }
+    // Several pages: views, materials, measurements, the pattern, notes.
+    let pages = text.matches("/Type /Page").count() - text.matches("/Type /Pages").count();
+    assert!(pages >= 4, "{pages} pages");
+    // A picture that is not a PNG is refused with a clear code.
+    std::fs::write(dir.join("renders/bad.png"), b"nope").unwrap();
+    let e = ws
+        .run_step(
+            &Step::from_value(json!({"type": "export.techpack",
+                "images": [{"path": "renders/bad.png"}]}))
+            .unwrap(),
+        )
+        .unwrap_err();
+    assert_eq!(e.message().code, "image_unreadable");
+}

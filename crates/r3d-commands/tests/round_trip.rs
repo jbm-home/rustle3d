@@ -88,6 +88,7 @@ fn every_command_round_trips() {
         json!({"type": "garment.set_fabric_details", "weight_gsm": 210,
         "width_mm": 1450, "price_per_m": 12.5}),
     );
+    h.round_trip(json!({"type": "garment.set_notes", "notes": "Press seams open.\n"}));
     let jacket = h.round_trip(json!({"type": "garment.add", "name": "Jacket",
         "fabric": "wool", "color": "#223344"}));
     let jacket = jacket.created[0].to_string();

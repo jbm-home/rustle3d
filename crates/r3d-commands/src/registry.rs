@@ -13,6 +13,7 @@ use crate::production::*;
 use crate::progress::Progress;
 use crate::queries::*;
 use crate::spec::{CommandOutput, CommandSpec, Info, Named, QuerySpec, schema_value};
+use crate::techpack::ExportTechPack;
 use crate::workspace::{Workspace, WorkspaceError};
 
 macro_rules! command_registry {
@@ -164,6 +165,7 @@ command_registry! {
     "pin.remove" => PinRemove,
     "garment.set_fabric" => GarmentSetFabric,
     "garment.set_fabric_details" => GarmentSetFabricDetails,
+    "garment.set_notes" => GarmentSetNotes,
     "garment.arrange" => GarmentArrange,
     "garment.set_color" => GarmentSetColor,
     "garment.add" => GarmentAdd,
@@ -225,4 +227,5 @@ action_registry! {
     "export.dxf" => ExportDxf,
     "import.pattern" => ImportPattern,
     "export.marker" => ExportMarker,
+    "export.techpack" => ExportTechPack,
 }

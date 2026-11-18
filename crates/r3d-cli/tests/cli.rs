@@ -234,6 +234,38 @@ fn marker_lays_out_and_writes() {
 }
 
 #[test]
+fn techpack_writes_a_pdf() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("Bag.r3d");
+    r3d().arg("new").arg(&dir).assert().success();
+    r3d()
+        .arg("run")
+        .arg(&dir)
+        .arg("-")
+        .write_stdin(
+            r#"[{"type": "panel.create_rect", "width": 400, "height": 600},
+                {"type": "garment.set_fabric_details", "price_per_m": 10},
+                {"type": "garment.set_notes", "notes": "Double-stitch the handles."}]"#,
+        )
+        .assert()
+        .success();
+    let out = r3d()
+        .arg("techpack")
+        .arg(&dir)
+        .args(["--views", "none", "--paper", "letter"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let v = json_of(&out);
+    assert_eq!(v["path"], "exports/Bag-techpack.pdf");
+    assert_eq!(v["fabric"][0]["cost"], 6.0);
+    let pdf = std::fs::read(dir.join("exports/Bag-techpack.pdf")).unwrap();
+    assert!(String::from_utf8_lossy(&pdf).contains("Double-stitch the handles."));
+}
+
+#[test]
 fn dry_run_refuses_actions() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("P.r3d");

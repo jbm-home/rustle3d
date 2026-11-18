@@ -1,6 +1,6 @@
 //! A format-independent drawing of the pattern, in board millimetres (y up).
 
-use r3d_core::Project;
+use r3d_core::{PanelId, Project};
 use r3d_geom::{Aabb, DVec2, polygon};
 
 /// What a line represents; renderers map it to a style.
@@ -79,7 +79,7 @@ const LEGEND_GAP_MM: f64 = 10.0;
 /// Build the drawing of every panel plus a 100 mm test square placed above
 /// the top-left corner, so it is on the first page of a tiled print.
 pub fn pattern_drawing(project: &Project) -> Drawing {
-    draw(project, project.name(), &[])
+    draw(project, Some(project.name()), &[], None)
 }
 
 /// One size of a graded nest: its name, how its cutting lines are drawn,
@@ -96,8 +96,51 @@ struct Nested {
 /// name); the others add their cutting lines in colour, named in a legend
 /// beside the test square. Without a range: the pattern as it is.
 pub fn graded_drawing(project: &Project, sizes: &[usize]) -> Drawing {
+    nested_drawing(project, sizes, None, true)
+}
+
+/// The pieces alone, in sizes `sizes` as [`graded_drawing`] draws them
+/// (every piece, or those of `panels`), with no test square, title or
+/// legend: for a drawing shown at another scale (the tech pack) or a
+/// part of the pattern (the projector).
+pub fn pieces_drawing(project: &Project, sizes: &[usize], panels: Option<&[PanelId]>) -> Drawing {
+    nested_drawing(project, sizes, panels, false)
+}
+
+/// The colour of each size's cutting line in [`graded_drawing`] of
+/// `sizes`, in the order given (sRGB; black for the size drawn in full).
+pub fn size_colors(project: &Project, sizes: &[usize]) -> Vec<u32> {
     let Some(g) = project.grading() else {
-        return pattern_drawing(project);
+        return Vec::new();
+    };
+    let reference = if sizes.contains(&g.base) {
+        g.base
+    } else {
+        sizes.first().copied().unwrap_or(g.base)
+    };
+    let mut rank = 0;
+    sizes
+        .iter()
+        .map(|k| {
+            if *k == reference {
+                0
+            } else {
+                rank += 1;
+                Stroke::size_color(rank - 1)
+            }
+        })
+        .collect()
+}
+
+fn nested_drawing(
+    project: &Project,
+    sizes: &[usize],
+    panels: Option<&[PanelId]>,
+    decorate: bool,
+) -> Drawing {
+    let Some(g) = project.grading() else {
+        let title = decorate.then_some(project.name());
+        return draw(project, title, &[], panels);
     };
     let name = |k: usize| g.sizes.get(k).map(|s| s.name.clone()).unwrap_or_default();
     let reference = if sizes.contains(&g.base) {
@@ -120,6 +163,7 @@ pub fn graded_drawing(project: &Project, sizes: &[usize]) -> Drawing {
         let outlines = sized
             .panels()
             .iter()
+            .filter(|(id, _)| panels.is_none_or(|only| only.contains(id)))
             .filter_map(|(id, panel)| {
                 let outline = sized.panel_outline(*id)?;
                 Some(if panel.seam_allowance_mm > 0.0 {
@@ -137,10 +181,17 @@ pub fn graded_drawing(project: &Project, sizes: &[usize]) -> Drawing {
     }
     let names: Vec<String> = sizes.iter().map(|k| name(*k)).collect();
     let title = format!("{} - {}", project.name(), names.join(" "));
-    draw(&main, &title, &nest)
+    draw(&main, decorate.then_some(&title), &nest, panels)
 }
 
-fn draw(project: &Project, title: &str, nest: &[Nested]) -> Drawing {
+/// The pieces (all, or those of `panels`) and the nest's other sizes;
+/// with a `title`, the test square, the title and the nest's legend too.
+fn draw(
+    project: &Project,
+    title: Option<&str>,
+    nest: &[Nested],
+    panels: Option<&[PanelId]>,
+) -> Drawing {
     let mut d = Drawing {
         lines: Vec::new(),
         labels: Vec::new(),
@@ -150,6 +201,9 @@ fn draw(project: &Project, title: &str, nest: &[Nested]) -> Drawing {
         },
     };
     for (id, panel) in project.panels() {
+        if panels.is_some_and(|only| !only.contains(id)) {
+            continue;
+        }
         let Some(outline) = project.panel_outline(*id) else {
             continue;
         };
@@ -233,6 +287,15 @@ fn draw(project: &Project, title: &str, nest: &[Nested]) -> Drawing {
         }
     }
 
+    let Some(title) = title else {
+        if let Some(b) = bounds_of(&d.lines) {
+            d.bounds = Aabb {
+                min: b.min - DVec2::splat(MARGIN_MM),
+                max: b.max + DVec2::splat(MARGIN_MM),
+            };
+        }
+        return d;
+    };
     let content = bounds_of(&d.lines);
     let corner = match content {
         Some(b) => DVec2::new(b.min.x, b.max.y + 2.0 * MARGIN_MM),

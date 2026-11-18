@@ -1972,6 +1972,7 @@ name = "r3d-commands"
 version = "0.1.0"
 dependencies = [
  "glam",
+ "png",
  "r3d-avatar",
  "r3d-core",
  "r3d-geom",
@@ -2013,7 +2014,9 @@ name = "r3d-io"
 version = "0.1.0"
 dependencies = [
  "lopdf",
+ "miniz_oxide 0.9.1",
  "pdf-writer",
+ "png",
  "proptest",
  "r3d-core",
  "r3d-geom",

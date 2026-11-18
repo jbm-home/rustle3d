@@ -126,6 +126,7 @@ fn sample() -> Project {
                 width_mm: Some(1450.0),
                 price_per_m: Some(18.5),
             },
+            notes: "Topstitch the collar 6 mm from the edge.\nPress seams open.".into(),
         },
     );
     let pin = tx.new_pin_id();

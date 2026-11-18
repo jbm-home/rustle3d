@@ -1,0 +1,435 @@
+{
+  "format": "rustle3d.project",
+  "schema_version": 15,
+  "project": {
+    "name": "Golden sample",
+    "display_unit": "mm",
+    "next_id": 28,
+    "garments": {
+      "garment:1": {
+        "name": "Garment 1",
+        "fabric": "cotton",
+        "color": null,
+        "layer": 0
+      },
+      "garment:11": {
+        "name": "Jacket",
+        "fabric": "wool",
+        "color": "#334455",
+        "layer": 1,
+        "template": {
+          "name": "shirt",
+          "sizes": {
+            "length_cm": 70.0
+          }
+        },
+        "fabric_details": {
+          "weight_gsm": 310.0,
+          "width_mm": 1450.0,
+          "price_per_m": 18.5
+        },
+        "notes": "Topstitch the collar 6 mm from the edge.\nPress seams open."
+      }
+    },
+    "panels": {
+      "panel:2": {
+        "name": "Front",
+        "garment": "garment:1",
+        "contour": [
+          "edge:7",
+          "edge:8",
+          "edge:9",
+          "edge:10"
+        ],
+        "grain_angle_deg": 90.0,
+        "seam_allowance_mm": 10.0,
+        "mirror_of": null,
+        "placement": {
+          "around": "body",
+          "angle_deg": 0.0,
+          "top_cm": 104.0,
+          "offset_mm": 30.0,
+          "centre_x_mm": 200.0
+        },
+        "symmetry": {
+          "origin": [
+            200.0,
+            0.0
+          ],
+          "dir": [
+            0.0,
+            1.0
+          ],
+          "start": "point:3",
+          "end": "point:5",
+          "points": [
+            [
+              "point:4",
+              "point:6"
+            ]
+          ],
+          "edges": [
+            [
+              "edge:7",
+              "edge:10"
+            ],
+            [
+              "edge:8",
+              "edge:9"
+            ]
+          ]
+        },
+        "holes": [
+          [
+            "edge:17",
+            "edge:18",
+            "edge:19"
+          ]
+        ]
+      }
+    },
+    "points": {
+      "point:3": {
+        "panel": "panel:2",
+        "pos": [
+          0.0,
+          0.0
+        ]
+      },
+      "point:4": {
+        "panel": "panel:2",
+        "pos": [
+          400.0,
+          0.0
+        ],
+        "grade": [
+          [
+            -10.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0
+          ],
+          [
+            10.0,
+            0.0
+          ]
+        ]
+      },
+      "point:5": {
+        "panel": "panel:2",
+        "pos": [
+          380.0,
+          600.0
+        ],
+        "grade": [
+          [
+            -10.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0
+          ],
+          [
+            10.0,
+            0.0
+          ]
+        ]
+      },
+      "point:6": {
+        "panel": "panel:2",
+        "pos": [
+          20.0,
+          600.0
+        ]
+      },
+      "point:14": {
+        "panel": "panel:2",
+        "pos": [
+          150.0,
+          300.0
+        ]
+      },
+      "point:15": {
+        "panel": "panel:2",
+        "pos": [
+          170.0,
+          330.0
+        ]
+      },
+      "point:16": {
+        "panel": "panel:2",
+        "pos": [
+          190.0,
+          300.0
+        ]
+      }
+    },
+    "edges": {
+      "edge:7": {
+        "panel": "panel:2",
+        "start": "point:3",
+        "end": "point:4",
+        "curve": {
+          "kind": "line"
+        }
+      },
+      "edge:8": {
+        "panel": "panel:2",
+        "start": "point:4",
+        "end": "point:5",
+        "curve": {
+          "kind": "line"
+        }
+      },
+      "edge:9": {
+        "panel": "panel:2",
+        "start": "point:5",
+        "end": "point:6",
+        "curve": {
+          "kind": "cubic",
+          "c1": [
+            260.0,
+            615.0
+          ],
+          "c2": [
+            140.0,
+            615.0
+          ]
+        },
+        "grade": [
+          [
+            [
+              -5.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0
+            ]
+          ],
+          [
+            [
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0
+            ]
+          ],
+          [
+            [
+              5.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0
+            ]
+          ]
+        ]
+      },
+      "edge:10": {
+        "panel": "panel:2",
+        "start": "point:6",
+        "end": "point:3",
+        "curve": {
+          "kind": "line"
+        }
+      },
+      "edge:17": {
+        "panel": "panel:2",
+        "start": "point:14",
+        "end": "point:15",
+        "curve": {
+          "kind": "line"
+        }
+      },
+      "edge:18": {
+        "panel": "panel:2",
+        "start": "point:15",
+        "end": "point:16",
+        "curve": {
+          "kind": "line"
+        }
+      },
+      "edge:19": {
+        "panel": "panel:2",
+        "start": "point:16",
+        "end": "point:14",
+        "curve": {
+          "kind": "line"
+        }
+      }
+    },
+    "notches": {
+      "notch:20": {
+        "edge": "edge:8",
+        "offset_mm": 180.0
+      }
+    },
+    "internal_lines": {
+      "line:21": {
+        "panel": "panel:2",
+        "start": [
+          200.0,
+          600.0
+        ],
+        "segments": [
+          {
+            "kind": "line",
+            "to": [
+              200.0,
+              480.0
+            ]
+          },
+          {
+            "kind": "cubic",
+            "c1": [
+              200.0,
+              400.0
+            ],
+            "c2": [
+              180.0,
+              350.0
+            ],
+            "to": [
+              160.0,
+              300.0
+            ]
+          }
+        ]
+      }
+    },
+    "avatar": {
+      "body": {
+        "masculinity": 0.0,
+        "height_cm": 168.0,
+        "bust_cm": 90.0,
+        "waist_cm": 73.0,
+        "hips_cm": 98.0
+      },
+      "preset": "Women M"
+    },
+    "seams": {
+      "seam:13": {
+        "a": {
+          "edges": [
+            "edge:8"
+          ],
+          "reversed": false
+        },
+        "b": {
+          "edges": [
+            "edge:9",
+            "edge:10"
+          ],
+          "from_mm": 20.0,
+          "to_mm": 500.0,
+          "reversed": true
+        },
+        "gathered": true,
+        "ease_mm": 6.0
+      },
+      "seam:22": {
+        "a": {
+          "line": "line:21",
+          "to_mm": 100.0,
+          "reversed": false
+        },
+        "b": {
+          "edges": [
+            "edge:7"
+          ],
+          "from_mm": 50.0,
+          "to_mm": 150.0,
+          "reversed": true
+        },
+        "gathered": false
+      }
+    },
+    "pins": {
+      "pin:12": {
+        "panel": "panel:2",
+        "at": [
+          10.0,
+          20.0
+        ],
+        "position": [
+          0.05,
+          1.1,
+          0.12
+        ]
+      }
+    },
+    "grading": {
+      "sizes": [
+        {
+          "name": "38",
+          "height_cm": 0.0,
+          "bust_cm": -4.0,
+          "waist_cm": -4.0,
+          "hips_cm": -4.0
+        },
+        {
+          "name": "40",
+          "height_cm": 0.0,
+          "bust_cm": 0.0,
+          "waist_cm": 0.0,
+          "hips_cm": 0.0
+        },
+        {
+          "name": "42",
+          "height_cm": 0.0,
+          "bust_cm": 4.0,
+          "waist_cm": 4.0,
+          "hips_cm": 4.0
+        }
+      ],
+      "base": 1,
+      "shown": 2
+    },
+    "constraints": {
+      "constraint:23": {
+        "kind": "horizontal",
+        "edge": "edge:7"
+      },
+      "constraint:24": {
+        "kind": "fixed",
+        "point": "point:3"
+      },
+      "constraint:25": {
+        "kind": "distance",
+        "a": "point:3",
+        "b": "point:4",
+        "mm": 400.0,
+        "along": "horizontal",
+        "formula": "bust / 2 - ease"
+      },
+      "constraint:26": {
+        "kind": "angle",
+        "a": "edge:7",
+        "b": "edge:8",
+        "deg": 92.0
+      }
+    },
+    "guides": {
+      "guide:27": {
+        "a": [
+          -50.0,
+          300.0
+        ],
+        "b": [
+          450.0,
+          300.0
+        ]
+      }
+    },
+    "variables": {
+      "ease": "5 cm"
+    }
+  }
+}

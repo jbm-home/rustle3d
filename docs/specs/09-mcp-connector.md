@@ -46,6 +46,10 @@ and look at the result, either headless or live in the user's open app.
   (front/three_quarter/side/back), `frame` (garment/body), and advanced
   `samples`, `bounces`, `denoise`; the text result gives the time taken.
   Highlighting of ids comes later.
+- **Tech pack** (M30, spec 23): `export_techpack` is the
+  `export.techpack` action with one more parameter, `views` (`3d`
+  default, `photo`, `none`): the server renders the garment's front and
+  back first and puts them at the top of the PDF.
 - **Naming**: tool names are the operation names with underscores
   (`panel_create_rect`). Errors are tool results with `isError` and the
   structured error (`code`, `args`, `text`).

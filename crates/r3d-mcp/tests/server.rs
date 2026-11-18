@@ -104,6 +104,28 @@ fn batch_and_export() {
 }
 
 #[test]
+fn the_tech_pack_without_views() {
+    let (tmp, s) = server();
+    call(
+        &s,
+        "panel_create_rect",
+        json!({"width": 400, "height": 600}),
+    );
+    let (err, out) = call(
+        &s,
+        "export_techpack",
+        json!({"views": "none", "paper": "letter"}),
+    );
+    assert!(!err, "{out}");
+    assert_eq!(out["images"], 0);
+    assert_eq!(out["path"], "exports/P-techpack.pdf");
+    assert!(tmp.path().join("P.r3d/exports/P-techpack.pdf").is_file());
+    let (err, body) = call(&s, "export_techpack", json!({"views": "sketch"}));
+    assert!(err);
+    assert_eq!(body["error"]["args"]["name"], "views");
+}
+
+#[test]
 fn agents_simulate_and_look_at_the_garment() {
     let tmp = tempfile::tempdir().unwrap();
     let mut ws = Workspace::create(&tmp.path().join("P.r3d"), "P").unwrap();
@@ -164,6 +186,17 @@ fn agents_simulate_and_look_at_the_garment() {
     assert_eq!(info["samples"], 2);
     assert_eq!(info["lighting"], "soft");
     assert_eq!(info["drape"], "simulated");
+
+    // The tech pack opens with the front and back of the drape.
+    let (err, out) = call(
+        &s,
+        "export_techpack",
+        json!({ "labels": {"front": "Devant"} }),
+    );
+    assert!(!err, "{out}");
+    assert_eq!(out["images"], 2);
+    let pdf = std::fs::read(tmp.path().join("P.r3d").join(out["path"].as_str().unwrap())).unwrap();
+    assert!(String::from_utf8_lossy(&pdf).contains("Devant"));
 
     let (err, body) = call(&s, "render_board", json!({ "width": 8 }));
     assert!(err);

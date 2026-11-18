@@ -7,6 +7,7 @@ use glam::Vec3;
 use r3d_commands::CommandError;
 use r3d_commands::Workspace;
 use r3d_commands::drape;
+use r3d_commands::techpack::{ExportTechPack, Image};
 use r3d_core::Fabric;
 use r3d_core::{Localizable, Message};
 use r3d_render::board::BoardView;
@@ -273,6 +274,133 @@ impl Dressed {
     }
 }
 
+/// A camera on the garment from `angle`, framing it (or the body when
+/// there is no cloth).
+fn garment_camera(dressed: &Dressed, angle: CameraAngle) -> OrbitCamera {
+    let mut points = dressed
+        .pieces
+        .iter()
+        .flat_map(|(m, _, _)| m.positions.iter());
+    let garment = points
+        .next()
+        .map(|first| points.fold((*first, *first), |(lo, hi), p| (lo.min(*p), hi.max(*p))));
+    match garment {
+        Some((lo, hi)) => OrbitCamera::framing(lo, hi, angle.yaw()),
+        None => OrbitCamera::facing(angle.yaw()),
+    }
+}
+
+/// The 3D view of the garment (as `render_3d` draws it) through `camera`.
+fn garment_png(
+    gpu: &Gpu,
+    dressed: &Dressed,
+    camera: &OrbitCamera,
+    width: u32,
+    height: u32,
+) -> Result<Vec<u8>, RenderError> {
+    let theme = Theme::LIGHT;
+    let mut draws: Vec<Draw<'_>> = Vec::with_capacity(dressed.pieces.len() + 1);
+    if let Some(a) = &dressed.avatar {
+        draws.push(Draw {
+            mesh: a,
+            material: Material::mannequin(&theme),
+        });
+    }
+    draws.extend(dressed.pieces.iter().map(|(m, fabric, color)| Draw {
+        mesh: m,
+        material: Material::fabric(*fabric, color.as_deref()),
+    }));
+    draws.extend(dressed.lines.iter().map(|mesh| Draw {
+        mesh,
+        material: Material {
+            base: theme.panel_line,
+            sheen: theme.panel_line,
+            sheen_amount: 0.0,
+        },
+    }));
+    let mut renderer = ViewRenderer3d::new(gpu, PNG_FORMAT);
+    render_png(gpu, width, height, |view| {
+        let target = Target {
+            view,
+            width,
+            height,
+        };
+        renderer.render(gpu, target, camera, &draws, &theme);
+    })
+    .map_err(gpu_failure)
+}
+
+/// Which pictures of the garment open a tech pack.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TechPackViews {
+    /// The 3D view, front and back (fast).
+    #[default]
+    View3d,
+    /// Quick photos, front and back (seconds to a minute).
+    Photo,
+    /// None.
+    None,
+}
+
+impl TechPackViews {
+    pub const NAMES: [&'static str; 3] = ["3d", "photo", "none"];
+
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "3d" => Some(Self::View3d),
+            "photo" => Some(Self::Photo),
+            "none" => Some(Self::None),
+            _ => None,
+        }
+    }
+}
+
+/// Size of each tech pack picture (pixels, portrait).
+const TECHPACK_VIEW: (u32, u32) = (900, 1200);
+
+/// The front and back pictures of the garment for a tech pack, captioned
+/// with `request`'s labels: the cached drape if it is up to date,
+/// otherwise where the simulation starts.
+pub fn techpack_views(
+    gpu: &Gpu,
+    ws: &Workspace,
+    views: TechPackViews,
+    request: &ExportTechPack,
+) -> Result<Vec<Image>, RenderError> {
+    let (w, h) = TECHPACK_VIEW;
+    let sides = [
+        (CameraAngle::Front, request.label("front")),
+        (CameraAngle::Back, request.label("back")),
+    ];
+    let pngs: Vec<(Vec<u8>, &str)> = match views {
+        TechPackViews::None => Vec::new(),
+        TechPackViews::View3d => {
+            let dressed = Dressed::of(ws)?;
+            sides
+                .iter()
+                .map(|(angle, caption)| {
+                    let camera = garment_camera(&dressed, *angle);
+                    Ok((garment_png(gpu, &dressed, &camera, w, h)?, *caption))
+                })
+                .collect::<Result<_, RenderError>>()?
+        }
+        TechPackViews::Photo => sides
+            .iter()
+            .map(|(angle, caption)| {
+                let options = PhotoOptions {
+                    settings: Settings::new(Quality::Quick, Lighting::Studio),
+                    angle: *angle,
+                    close_up: true,
+                };
+                Ok((render(gpu, ws, View::Photo(options), w, h)?.0, *caption))
+            })
+            .collect::<Result<_, RenderError>>()?,
+    };
+    pngs.into_iter()
+        .map(|(png, caption)| Image::from_png(&png, caption).map_err(gpu_failure))
+        .collect()
+}
+
 /// Render `view` as PNG bytes of `width × height`, plus facts about what
 /// was drawn.
 pub fn render(
@@ -310,36 +438,7 @@ pub fn render(
         }
         View::Garment => {
             let dressed = Dressed::of(ws)?;
-            let mut draws: Vec<Draw<'_>> = Vec::with_capacity(dressed.pieces.len() + 1);
-            if let Some(a) = &dressed.avatar {
-                draws.push(Draw {
-                    mesh: a,
-                    material: Material::mannequin(&theme),
-                });
-            }
-            draws.extend(dressed.pieces.iter().map(|(m, fabric, color)| Draw {
-                mesh: m,
-                material: Material::fabric(*fabric, color.as_deref()),
-            }));
-            draws.extend(dressed.lines.iter().map(|mesh| Draw {
-                mesh,
-                material: Material {
-                    base: theme.panel_line,
-                    sheen: theme.panel_line,
-                    sheen_amount: 0.0,
-                },
-            }));
-            let camera = OrbitCamera::default();
-            let mut renderer = ViewRenderer3d::new(gpu, PNG_FORMAT);
-            let png = render_png(gpu, width, height, |view| {
-                let target = Target {
-                    view,
-                    width,
-                    height,
-                };
-                renderer.render(gpu, target, &camera, &draws, &theme);
-            })
-            .map_err(gpu_failure)?;
+            let png = garment_png(gpu, &dressed, &OrbitCamera::default(), width, height)?;
             Ok((
                 png,
                 json!({ "view": "3d", "drape": dressed.state, "pieces": dressed.pieces.len(), "avatar": dressed.avatar.is_some() }),
@@ -354,18 +453,10 @@ pub fn render(
                 .map(|(m, fabric, color)| (m, Surface::fabric(*fabric, color.as_deref())))
                 .collect();
             let scene = PhotoScene::new(&cloth, dressed.avatar.as_ref());
-            let mut points = dressed
-                .pieces
-                .iter()
-                .flat_map(|(m, _, _)| m.positions.iter());
-            let garment = points
-                .next()
-                .map(|first| points.fold((*first, *first), |(lo, hi), p| (lo.min(*p), hi.max(*p))));
-            let camera = match garment {
-                Some((lo, hi)) if options.close_up => {
-                    OrbitCamera::framing(lo, hi, options.angle.yaw())
-                }
-                _ => OrbitCamera::facing(options.angle.yaw()),
+            let camera = if options.close_up {
+                garment_camera(&dressed, options.angle)
+            } else {
+                OrbitCamera::facing(options.angle.yaw())
             };
             let png = photo::render_png(gpu, &scene, &camera, options.settings, width, height)
                 .map_err(|e| match e {

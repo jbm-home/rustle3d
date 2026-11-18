@@ -6,7 +6,7 @@
 //! same format-independent [`scene3d::Scene3d`]. M13: patterns as DXF-AAMA
 //! ([`dxf`], both ways), and pattern import from DXF, SVG and PDF
 //! ([`import`]). M30: the marker, pieces laid out on the fabric
-//! ([`marker`]). This crate does no file I/O: it takes and returns bytes,
+//! ([`marker`]) and the tech pack ([`techpack`]). This crate does no file I/O: it takes and returns bytes,
 //! and the caller decides where they come from and go.
 
 pub mod drawing;
@@ -18,5 +18,6 @@ pub mod obj;
 pub mod pdf;
 pub mod scene3d;
 pub mod svg;
+pub mod techpack;
 
-pub use drawing::{Drawing, graded_drawing, pattern_drawing};
+pub use drawing::{Drawing, graded_drawing, pattern_drawing, pieces_drawing};

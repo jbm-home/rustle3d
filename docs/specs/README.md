@@ -32,4 +32,4 @@ descriptions, public papers, open standards, general garment-making knowledge.
 | 20 | [Parametric patterns](20-parametric.md) | M28 |
 | 21 | [Construction details](21-construction-details.md) | M29 |
 | 22 | [Animated avatars](22-animated-avatars.md) | M23 |
-| 23 | [Production: indicators, marker, yardage and cost](23-production.md) | M30 |
+| 23 | [Production: indicators, marker, yardage, cost, tech pack and projector](23-production.md) | M30 |

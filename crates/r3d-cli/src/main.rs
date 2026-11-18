@@ -51,6 +51,23 @@ enum MarkerFormatArg {
 }
 
 #[derive(Clone, Copy, ValueEnum)]
+enum TechPackViewsArg {
+    /// The 3D view, front and back (fast).
+    #[value(name = "3d")]
+    View3d,
+    /// Quick photos, front and back.
+    Photo,
+    /// No pictures of the garment.
+    None,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum TechPackPaperArg {
+    A4,
+    Letter,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
 enum UnitArg {
     Mm,
     Cm,
@@ -261,6 +278,23 @@ enum Cmd {
         paper: PaperArg,
         /// Output path relative to the project (default:
         /// exports/<name>-marker.<ext>).
+        #[arg(long)]
+        out: Option<String>,
+    },
+    /// Write the project's tech pack (PDF) into the project folder: views
+    /// of the garment, colourways, bill of materials with the fabric per
+    /// garment, measurements, the pattern and the sewing notes.
+    Techpack {
+        project: PathBuf,
+        /// Pictures of the garment, front and back: rendered from the
+        /// cached drape (`simulate` first) or where the simulation starts.
+        #[arg(long, value_enum, default_value = "3d")]
+        views: TechPackViewsArg,
+        /// Landscape page size.
+        #[arg(long, value_enum, default_value = "a4")]
+        paper: TechPackPaperArg,
+        /// Output path relative to the project (default:
+        /// exports/<name>-techpack.pdf).
         #[arg(long)]
         out: Option<String>,
     },
@@ -494,6 +528,35 @@ fn cmd_marker(project: &Path, a: MarkerArgs) -> Result<(), Failure> {
     print_json(&result)
 }
 
+fn cmd_techpack(
+    project: &Path,
+    views: TechPackViewsArg,
+    paper: TechPackPaperArg,
+    out: Option<String>,
+) -> Result<(), Failure> {
+    let ws = Workspace::open(project)?;
+    let request = r3d_commands::techpack::ExportTechPack {
+        paper: match paper {
+            TechPackPaperArg::A4 => r3d_commands::techpack::TechPackPaper::A4,
+            TechPackPaperArg::Letter => r3d_commands::techpack::TechPackPaper::Letter,
+        },
+        path: out,
+        ..Default::default()
+    };
+    let views = match views {
+        TechPackViewsArg::View3d => render::TechPackViews::View3d,
+        TechPackViewsArg::Photo => render::TechPackViews::Photo,
+        TechPackViewsArg::None => render::TechPackViews::None,
+    };
+    let pictures = if views == render::TechPackViews::None {
+        Vec::new()
+    } else {
+        let gpu = render::headless_gpu()?;
+        render::techpack_views(&gpu, &ws, views, &request)?
+    };
+    print_json(&request.write(&ws, pictures)?)
+}
+
 fn cmd_import(
     project: &Path,
     file: &Path,
@@ -689,6 +752,12 @@ fn main() -> ExitCode {
                 out,
             },
         ),
+        Cmd::Techpack {
+            project,
+            views,
+            paper,
+            out,
+        } => cmd_techpack(&project, views, paper, out),
         Cmd::Simulate {
             project,
             frames,

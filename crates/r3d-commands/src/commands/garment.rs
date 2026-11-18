@@ -119,6 +119,49 @@ impl CommandSpec for GarmentSetFabricDetails {
     }
 }
 
+/// Longest notes a garment keeps (characters).
+pub const NOTES_MAX_CHARS: usize = 20_000;
+
+/// Write the garment's sewing and production notes.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GarmentSetNotes {
+    /// Defaults to the project's garment.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub garment: Option<GarmentId>,
+    /// Free text (up to 20 000 characters; empty clears them). Lines
+    /// are kept as typed.
+    pub notes: String,
+}
+
+impl Described for GarmentSetNotes {
+    const SUMMARY: &'static str = "Write the garment's notes: free text for whoever sews or produces it (finishing, pressing, stitch lengths, labels), printed in the tech pack's sewing notes. Replaces the previous notes; an empty text clears them.";
+}
+
+impl CommandSpec for GarmentSetNotes {
+    fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        let count = self.notes.chars().count();
+        if count > NOTES_MAX_CHARS {
+            return Err(CommandError::invalid(
+                "notes",
+                Invalid::Range(0.0, NOTES_MAX_CHARS as f64),
+            ));
+        }
+        let (id, g) = garment(tx, self.garment)?;
+        // Trailing blank lines and spaces carry nothing.
+        let notes = self.notes.trim_end().to_owned();
+        tx.put_garment(id, Garment { notes, ..g });
+        Ok(CommandOutput::default())
+    }
+
+    fn merge_key(&self) -> Option<String> {
+        Some(format!(
+            "garment.set_notes:{}",
+            self.garment.map(|g| g.to_string()).unwrap_or_default()
+        ))
+    }
+}
+
 /// Choose the garment's colour.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -196,6 +239,7 @@ impl CommandSpec for GarmentAdd {
                 layer,
                 template: None,
                 fabric_details: FabricDetails::default(),
+                notes: String::new(),
             },
         );
         Ok(CommandOutput {

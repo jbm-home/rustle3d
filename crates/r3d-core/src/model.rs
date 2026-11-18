@@ -323,6 +323,10 @@ pub struct Garment {
     /// The fabric as bought: weight, width, price (production, M30).
     #[serde(default, skip_serializing_if = "FabricDetails::is_empty")]
     pub fabric_details: FabricDetails,
+    /// Sewing and production notes, free text, printed in the tech pack
+    /// (M30).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub notes: String,
 }
 
 /// The fabric of a garment as bought: what it weighs, how wide it is sold
@@ -796,6 +800,7 @@ impl Project {
                 layer: 0,
                 template: None,
                 fabric_details: FabricDetails::default(),
+                notes: String::new(),
             },
         );
         Self {

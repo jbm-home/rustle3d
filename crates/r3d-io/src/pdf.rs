@@ -95,7 +95,7 @@ fn row_letter(r: usize) -> String {
 
 /// Text for the built-in Helvetica (WinAnsi): Latin-1 maps directly, other
 /// characters become `?`.
-fn win_ansi(text: &str) -> Vec<u8> {
+pub(crate) fn win_ansi(text: &str) -> Vec<u8> {
     text.chars()
         .map(|c| match u32::from(c) {
             0x20..=0x7E | 0xA0..=0xFF => c as u8,
@@ -104,7 +104,8 @@ fn win_ansi(text: &str) -> Vec<u8> {
         .collect()
 }
 
-fn line_style(c: &mut Content, stroke: Stroke) {
+/// `unit`: drawing units per millimetre of paper (1 at 1:1).
+fn line_style(c: &mut Content, stroke: Stroke, unit: f32) {
     let (width, gray, dash): (f32, f32, &[f32]) = match stroke {
         Stroke::Cut | Stroke::Notch => (0.5, 0.0, &[]),
         Stroke::Sew => (0.3, 0.0, &[4.0, 2.0]),
@@ -113,7 +114,7 @@ fn line_style(c: &mut Content, stroke: Stroke) {
         Stroke::Mark => (0.3, 0.0, &[]),
         Stroke::Size(_) => (0.4, 0.0, &[]),
     };
-    c.set_line_width(width);
+    c.set_line_width(width * unit);
     if let Stroke::Size(k) = stroke {
         let rgb = Stroke::size_color(k);
         let channel = |shift: u32| ((rgb >> shift) & 0xFF) as f32 / 255.0;
@@ -121,16 +122,19 @@ fn line_style(c: &mut Content, stroke: Stroke) {
     } else {
         c.set_stroke_gray(gray);
     }
-    c.set_dash_pattern(dash.iter().copied(), 0.0);
+    c.set_dash_pattern(dash.iter().map(|d| d * unit), 0.0);
 }
 
 /// Draw the drawing in board millimetres (the caller sets the transform).
-fn draw(c: &mut Content, d: &Drawing) {
+/// `unit` is how many board millimetres one millimetre of paper shows
+/// (1 at 1:1): lines keep their printed width at any scale, and labels
+/// are at least `min_label_mm` tall on paper.
+pub(crate) fn draw(c: &mut Content, d: &Drawing, unit: f32, min_label_mm: f64) {
     for line in &d.lines {
         let Some((first, rest)) = line.points.split_first() else {
             continue;
         };
-        line_style(c, line.stroke);
+        line_style(c, line.stroke, unit);
         c.move_to(first.x as f32, first.y as f32);
         for p in rest {
             c.line_to(p.x as f32, p.y as f32);
@@ -143,12 +147,13 @@ fn draw(c: &mut Content, d: &Drawing) {
     c.set_fill_gray(0.0);
     for label in &d.labels {
         let bytes = win_ansi(&label.text);
-        let width = approx_text_width(&label.text, label.size_mm);
+        let size = label.size_mm.max(min_label_mm * f64::from(unit));
+        let width = approx_text_width(&label.text, size);
         c.begin_text();
-        c.set_font(FONT, label.size_mm as f32);
+        c.set_font(FONT, size as f32);
         c.next_line(
             (label.pos.x - width / 2.0) as f32,
-            (label.pos.y - label.size_mm * 0.35) as f32,
+            (label.pos.y - size * 0.35) as f32,
         );
         c.show(Str(&bytes));
         c.end_text();
@@ -242,7 +247,7 @@ pub fn to_pdf(d: &Drawing, paper: Paper) -> Vec<u8> {
         );
         c.clip_nonzero();
         c.end_path();
-        draw(&mut c, d);
+        draw(&mut c, d, 1.0, 0.0);
         c.restore_state();
         pdf.stream(content_id, &c.finish());
     }
