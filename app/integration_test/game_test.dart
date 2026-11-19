@@ -44,7 +44,7 @@ void main() {
     ) as Map<String, dynamic>;
     expect((out['lods'] as List).length, 2);
     expect(out['skinned'], true);
-    expect(out['animations'], ['walk', 'turn', 'raise_arms']);
+    expect(out['animations'], ['walk', 'turn', 'raise_arms', 'idle']);
     final glb = File('$dir/tee.glb').readAsBytesSync();
     expect(String.fromCharCodes(glb.sublist(0, 4)), 'glTF');
 

@@ -961,6 +961,13 @@ tests below, in the real app):
   (maintainer: a good start). A motion library shared by all projects:
   add to it after an import, manage it in a dialog (add files, play,
   rename, delete), its motions in the Motion menu.
+- A more natural walk and a standing motion (2026-11-19): the walk's
+  thigh no longer forward on average (22° forward to 16° back), the
+  knee bending before toe-off, the pelvis dropping on the swing side,
+  level shoulders and a steady head, easier arms (ranges checked
+  against the CMU slow walk, kept smaller); `idle` (Stand at ease): the
+  weight shifting from leg to leg, breathing, over 8 s. The relaxed arms
+  hang 10° closer to the body.
 - Fixed (2026-11-19; maintainer, seen with a captured walk): the hands
   passed through the hips and caught the garment, which got pulled, and
   trousers slid down and up again as the avatar walked. One cause: the

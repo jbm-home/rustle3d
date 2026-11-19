@@ -236,6 +236,7 @@
   "motionTip": "Faire bouger l'avatar",
   "motionStill": "Immobile",
   "motionWalk": "Marcher",
+  "motionIdle": "Attendre",
   "motionTurn": "Se tourner",
   "motionRaiseArms": "Lever les bras",
   "maximizeViewTip": "Agrandir à la place des deux vues  M",

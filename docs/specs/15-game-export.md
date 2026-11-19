@@ -84,7 +84,7 @@ one object per panel, UVs and normals, geometry only.
   the body's rest pose: a drape that ended while the avatar moved is
   carried back to the rest pose by inverting each vertex's blended bone
   motion. With `animations` (default on), the three motions (`walk`,
-  `turn`, `raise_arms`) are baked as glTF animations, one cycle each at
+  `turn`, `raise_arms`, `idle`) are baked as glTF animations, one cycle each at
   30 frames a second, at full amplitude, looping. With `avatar`, the body
   is exported too, skinned with its own weights. An imported body has no
   skeleton: skinning is refused with `export.no_skeleton` (export with

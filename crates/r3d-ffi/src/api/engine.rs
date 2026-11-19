@@ -438,7 +438,8 @@ pub struct SimStatus {
     pub max_seam_gap_mm: f64,
     /// Where the solver runs: `cpu` or `gpu`.
     pub backend: String,
-    /// The avatar's motion chosen last (`walk`, `turn`, `raise_arms`), if
+    /// The avatar's motion chosen last (`walk`, `turn`, `raise_arms`,
+    /// `idle`), if
     /// any: playing, or next once the body is back at rest.
     pub motion: Option<String>,
 }
@@ -935,7 +936,8 @@ impl Engine {
         self.simulation_status()
     }
 
-    /// Make the avatar move (`walk`, `turn`, `raise_arms`, or a captured
+    /// Make the avatar move (`walk`, `turn`, `raise_arms`, `idle`, or a
+    /// captured
     /// motion: a BVH file in the project folder, see
     /// [`Engine::import_motion`]) or stand still (`None`) while the
     /// garment drapes, and run the simulation. A motion

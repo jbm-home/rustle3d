@@ -36,8 +36,17 @@ whether the shirt rides up at the waist.
   hand, thigh, shin, foot). It is fitted with the body: its joints follow
   the measurements like the skin does. Each skin vertex follows up to four
   bones (linear blend skinning).
-- **Motions.** `walk`: walking on the spot, a step cycle of 1.1 s, arms
-  hanging relaxed and swinging against the legs. `turn`: half a turn to
+- **Motions.** `walk`: walking on the spot, a step cycle of 1.15 s, an
+  easy pace: the thigh from 22° forward to 16° back, the knee bending
+  about 58° in swing, the ankle pushing off; the pelvis drops on the
+  swing side and turns with the swinging leg, the shoulders stay level
+  and turn against it, the head looks ahead; the arms hang relaxed and
+  swing against the legs, the elbow bending as the arm comes forward
+  (ranges checked against a slow walk of the CMU motion capture
+  database played on our skeleton, and kept smaller). `idle`: standing
+  at rest over 8 s: the weight shifts onto one leg and the other (the
+  hips about 3 cm over the loaded foot, the other knee easing), two
+  breaths, the head looking a little around. `turn`: half a turn to
   the left over two seconds, a pause, back, a pause (6 s). `raise_arms`:
   both arms raised to about 40° above the horizontal over 1.5 s, held,
   lowered, held (4 s). Every
@@ -97,7 +106,7 @@ whether the shirt rides up at the waist.
   (docs/physics.md §5, Moving body); a contact never throws the cloth
   faster than the skin moves.
 - **Agents and the CLI.** `simulate` takes `motion` (`walk`, `turn`,
-  `raise_arms`) or `motion_file` (a BVH file in the project folder;
+  `raise_arms`, `idle`) or `motion_file` (a BVH file in the project folder;
   `r3d simulate --motion file.bvh` copies the file into `motions/`
   first); the cached drape remembers it (a captured one by its path and
   a hash of the file, so a changed file makes the cache stale), so `render --view 3d`,

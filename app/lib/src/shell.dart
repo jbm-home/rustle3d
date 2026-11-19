@@ -594,7 +594,7 @@ class _ShellState extends State<Shell> {
     _drape(() => widget.engine.runSimulation(running: running));
   }
 
-  /// Make the avatar move (`walk`, `turn`, `raise_arms`) or stand still
+  /// Make the avatar move (`walk`, `idle`, `turn`, `raise_arms`) or stand still
   /// (`null`); the drape runs, and the 3D view comes back if needed.
   void _setMotion(String? motion) {
     if (_maximized == ViewKind.board) {
@@ -4950,6 +4950,7 @@ class _SimControls extends StatelessWidget {
   static List<(String?, String)> _motions(L l) => [
     (null, l.motionStill),
     ('walk', l.motionWalk),
+    ('idle', l.motionIdle),
     ('turn', l.motionTurn),
     ('raise_arms', l.motionRaiseArms),
   ];

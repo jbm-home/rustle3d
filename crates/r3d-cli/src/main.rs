@@ -417,8 +417,8 @@ enum Cmd {
         #[arg(long, default_value_t = 300)]
         frames: u32,
         /// Move the avatar after 1.5 s of draping: walk, turn,
-        /// raise_arms, or a BVH motion capture file (copied into the
-        /// project's motions/ folder).
+        /// raise_arms, idle, or a BVH motion capture file (copied into
+        /// the project's motions/ folder).
         #[arg(long)]
         motion: Option<String>,
     },

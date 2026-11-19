@@ -1,11 +1,15 @@
-//! The avatar's motions: walking on the spot, turning around, raising the
-//! arms, and motions captured on real people ([`crate::captured`]).
+//! The avatar's motions: walking on the spot, standing at rest, turning
+//! around, raising the arms, and motions captured on real people
+//! ([`crate::captured`]).
 //!
-//! The built-in ones are our own procedural motions: joint angles over a cycle, written from
-//! general knowledge of human gait and movement (hip, knee and ankle
-//! ranges of a normal walk, the arms swinging against the legs, the
-//! pelvis and the chest turning against each other); no motion capture
-//! data. A motion's cycle starts with it and repeats every
+//! The built-in ones are our own procedural motions: joint angles over a
+//! cycle, written from general knowledge of human gait and posture (hip,
+//! knee and ankle ranges of a normal walk, the pelvis dropping on the
+//! swing side, the arms swinging against the legs, the pelvis and the
+//! chest turning against each other, a standing body shifting its weight
+//! and breathing). The walk's ranges were checked against a slow walk of
+//! the CMU motion capture database (mocap.cs.cmu.edu, subject 7, trial 4)
+//! played on our skeleton, and kept smaller; no capture data is used. A motion's cycle starts with it and repeats every
 //! [`Motion::period`]; over the first [`EASE_IN_S`] it grows from the rest
 //! pose.
 
@@ -25,6 +29,9 @@ pub const EASE_IN_S: f32 = 1.0;
 pub enum Motion {
     /// Walking on the spot.
     Walk,
+    /// Standing at rest: shifting the weight from one leg to the other,
+    /// breathing, looking around a little.
+    Idle,
     /// Turning half round and back.
     Turn,
     /// Raising both arms overhead and lowering them.
@@ -33,18 +40,22 @@ pub enum Motion {
     Captured(Arc<CapturedMotion>),
 }
 
+/// One step cycle of the walk (s): about 105 steps a minute, an easy pace.
+const WALK_PERIOD_S: f32 = 1.15;
+
 /// How far the arms come down from the rest (A) pose to hang relaxed
 /// (degrees).
-const ARMS_DOWN: f32 = 20.0;
+const ARMS_DOWN: f32 = 30.0;
 
 impl Motion {
-    pub const BUILT_IN: [Motion; 3] = [Motion::Walk, Motion::Turn, Motion::RaiseArms];
+    pub const BUILT_IN: [Motion; 4] = [Motion::Walk, Motion::Turn, Motion::RaiseArms, Motion::Idle];
 
     /// The name agents and the app call it by: `walk`, `turn`,
-    /// `raise_arms`, or a captured motion's own.
+    /// `raise_arms`, `idle`, or a captured motion's own.
     pub fn name(&self) -> &str {
         match self {
             Motion::Walk => "walk",
+            Motion::Idle => "idle",
             Motion::Turn => "turn",
             Motion::RaiseArms => "raise_arms",
             Motion::Captured(m) => &m.name,
@@ -54,7 +65,8 @@ impl Motion {
     /// Length of one cycle (s).
     pub fn period(&self) -> f32 {
         match self {
-            Motion::Walk => 1.1,
+            Motion::Walk => WALK_PERIOD_S,
+            Motion::Idle => 8.0,
             Motion::Turn => 6.0,
             Motion::RaiseArms => 4.0,
             Motion::Captured(m) => m.period(),
@@ -73,6 +85,7 @@ impl Motion {
         let u = (t.max(0.0) / self.period()).fract();
         match self {
             Motion::Walk => walk(&mut b, u),
+            Motion::Idle => idle(&mut b, u),
             Motion::Turn => turn(&mut b, u),
             Motion::RaiseArms => raise_arms(&mut b, u),
             Motion::Captured(_) => {}
@@ -138,29 +151,100 @@ impl Builder<'_> {
 }
 
 /// A walk on the spot, the left heel striking at phase 0. Angles in
-/// degrees: hip flexion 30 to −10, knee flexion about 15 in stance and 60
-/// in swing, ankle dorsiflexion in stance and a push-off, arms swinging
-/// against the legs, pelvis and chest turning against each other.
+/// degrees. The thigh swings from 22 forward at heel strike to 16 back at
+/// toe-off (not forward on average, which reads as sitting); the knee
+/// takes the load (about 18) after heel strike, straightens through
+/// stance, bends before the toe leaves (about 30) and most in swing
+/// (about 58); the ankle lowers the foot after heel strike, flexes over
+/// stance, pushes off and lifts the toe in swing. The pelvis drops on the
+/// swing side and turns with the swinging leg; the spine takes both back,
+/// so the shoulders stay level and turn against the pelvis, and the head
+/// looks ahead. The arms swing against the legs, a little behind, the
+/// elbow bending as the arm comes forward.
 fn walk(b: &mut Builder<'_>, u: f32) {
     b.relax_arms();
+    let drop = 4.0 * (TAU * u).sin();
     for (side, sign) in SIDES {
         let v = if sign > 0.0 { u } else { (u + 0.5).fract() };
-        let hip = 10.0 + 20.0 * (TAU * v).cos();
-        let knee = 5.0 + 12.0 * bump(v, 0.15, 0.07) + 55.0 * bump(v, 0.72, 0.12);
-        let ankle = 7.0 * bump(v, 0.45, 0.12) - 15.0 * bump(v, 0.62, 0.06);
+        let hip = 3.0 + 19.0 * (TAU * (v - 0.04)).cos();
+        let knee = 4.0
+            + 14.0 * bump(v, 0.13, 0.07)
+            + 12.0 * bump(v, 0.6, 0.05)
+            + 54.0 * bump(v, 0.72, 0.11);
+        let ankle = -4.0 * bump(v, 0.06, 0.04) + 8.0 * bump(v, 0.42, 0.12)
+            - 14.0 * bump(v, 0.61, 0.06)
+            + 3.0 * bump(v, 0.82, 0.08);
+        // The pelvis's drop is taken back at the hip: the leg stays
+        // upright.
         b.turn(&format!("thigh_{side}"), Vec3::X, -hip);
+        b.turn(&format!("thigh_{side}"), Vec3::Z, -drop);
         b.turn(&format!("shin_{side}"), Vec3::X, knee);
         b.turn(&format!("foot_{side}"), Vec3::X, -ankle);
         // The arm swings forward while the other side's leg does.
-        let swing = -16.0 * (TAU * v).cos();
-        b.turn(&format!("upper_arm_{side}"), Vec3::X, -swing);
-        b.elbow(side, 8.0 * swing.max(0.0) / 16.0);
+        let swing = -15.0 * (TAU * v).cos();
+        b.turn(&format!("upper_arm_{side}"), Vec3::X, 2.0 - swing);
+        b.elbow(side, 6.0 + 14.0 * swing.max(0.0) / 15.0);
     }
+    // Left hip up while the left foot is on the ground (drop > 0).
+    b.turn("pelvis", Vec3::Z, drop);
+    b.turn("spine1", Vec3::Z, -0.7 * drop);
+    b.turn("spine2", Vec3::Z, -0.3 * drop);
     let twist = (TAU * u).cos();
-    b.turn("pelvis", Vec3::Y, -4.0 * twist);
+    b.turn("pelvis", Vec3::Y, -5.0 * twist);
     for bone in ["spine3", "chest", "upper_chest"] {
-        b.turn(bone, Vec3::Y, 2.5 * twist);
+        b.turn(bone, Vec3::Y, 3.0 * twist);
     }
+    // The chest ends up turned 4° against the pelvis: the head turns back.
+    b.turn("neck", Vec3::Y, -2.0 * twist);
+    b.turn("head", Vec3::Y, -2.0 * twist);
+}
+
+/// Standing at rest over eight seconds: the weight goes onto the left leg,
+/// over to the right one and back (the hips move about 3 cm over the
+/// loaded foot, its side of the pelvis up, the other knee easing), two
+/// breaths lift the chest and the shoulders, the head looks a little
+/// around, the arms hang relaxed. Every term repeats within the cycle, so
+/// it loops without a jump.
+fn idle(b: &mut Builder<'_>, u: f32) {
+    b.relax_arms();
+    let weight = (TAU * u).sin();
+    // Both legs lean under the hips, and the body moves back over the
+    // feet: the hips, not the feet, go to the side.
+    let lean = 2.0 * weight;
+    let height = |name: &str| {
+        b.skeleton
+            .find(name)
+            .and_then(|i| b.skeleton.bones.get(i))
+            .map_or(0.0, |bone| bone.head.y)
+    };
+    let length = height("thigh_l") - height("foot_l");
+    for (side, sign) in SIDES {
+        // The unloaded leg's knee eases forward.
+        let ease_off = 6.0 * (-sign * weight).max(0.0);
+        b.turn(&format!("thigh_{side}"), Vec3::X, -0.5 * ease_off);
+        b.turn(&format!("thigh_{side}"), Vec3::Z, -lean - 1.5 * weight);
+        b.turn(&format!("shin_{side}"), Vec3::X, ease_off);
+        b.turn(&format!("foot_{side}"), Vec3::X, -0.5 * ease_off);
+    }
+    b.pose.offset.x = length * lean.to_radians().sin();
+    // The loaded side of the pelvis up; the spine keeps the trunk upright.
+    b.turn("pelvis", Vec3::Z, 1.5 * weight);
+    b.turn("spine1", Vec3::Z, -weight);
+    b.turn("spine2", Vec3::Z, -0.5 * weight);
+    let breath = (2.0 * TAU * u).sin();
+    b.turn("chest", Vec3::X, -0.8 * breath);
+    b.turn("upper_chest", Vec3::X, -0.5 * breath);
+    for (side, sign) in SIDES {
+        b.turn(&format!("clavicle_{side}"), Vec3::Z * sign, breath);
+        b.turn(
+            &format!("upper_arm_{side}"),
+            Vec3::X,
+            2.0 * (TAU * u + 0.7).sin(),
+        );
+    }
+    b.turn("neck", Vec3::Y, 2.0 * (TAU * u + 1.0).sin());
+    b.turn("head", Vec3::Y, 3.0 * (TAU * u + 1.0).sin());
+    b.turn("head", Vec3::X, 1.5 * (2.0 * TAU * u + 0.5).sin());
 }
 
 /// Half a turn to the left over two seconds, a pause, back over two

@@ -821,6 +821,9 @@ class LEn extends L {
   String get motionWalk => 'Walk';
 
   @override
+  String get motionIdle => 'Stand at ease';
+
+  @override
   String get motionTurn => 'Turn';
 
   @override

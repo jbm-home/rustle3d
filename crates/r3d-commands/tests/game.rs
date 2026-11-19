@@ -88,7 +88,10 @@ fn a_draped_t_shirt_exports_with_lods_maps_and_skin() {
         lods[2]["triangles"].as_f64().unwrap() <= 0.3 * full,
         "{out}"
     );
-    assert_eq!(out["animations"], json!(["walk", "turn", "raise_arms"]));
+    assert_eq!(
+        out["animations"],
+        json!(["walk", "turn", "raise_arms", "idle"])
+    );
 
     let glb = std::fs::read(ws.dir().join("a.glb")).unwrap();
     // Deterministic.

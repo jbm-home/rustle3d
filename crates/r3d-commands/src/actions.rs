@@ -192,12 +192,15 @@ pub struct Simulate {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum AvatarMotion {
-    /// Walking on the spot (a 1.1 s step cycle).
+    /// Walking on the spot (a 1.15 s step cycle).
     Walk,
     /// Half a turn to the left and back (6 s).
     Turn,
     /// Both arms raised overhead and lowered (4 s).
     RaiseArms,
+    /// Standing at rest: the weight shifting from leg to leg, breathing
+    /// (8 s).
+    Idle,
 }
 
 impl From<AvatarMotion> for r3d_avatar::motion::Motion {
@@ -206,6 +209,7 @@ impl From<AvatarMotion> for r3d_avatar::motion::Motion {
             AvatarMotion::Walk => Self::Walk,
             AvatarMotion::Turn => Self::Turn,
             AvatarMotion::RaiseArms => Self::RaiseArms,
+            AvatarMotion::Idle => Self::Idle,
         }
     }
 }

@@ -1513,6 +1513,12 @@ abstract class L {
   /// **'Walk'**
   String get motionWalk;
 
+  /// No description provided for @motionIdle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stand at ease'**
+  String get motionIdle;
+
   /// No description provided for @motionTurn.
   ///
   /// In en, this message translates to:

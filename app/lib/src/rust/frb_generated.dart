@@ -6228,7 +6228,8 @@ class EngineImpl extends RustOpaque implements Engine {
   void setFitMap({String? map}) =>
       RustLib.instance.api.crateApiEngineEngineSetFitMap(that: this, map: map);
 
-  /// Make the avatar move (`walk`, `turn`, `raise_arms`, or a captured
+  /// Make the avatar move (`walk`, `turn`, `raise_arms`, `idle`, or a
+  /// captured
   /// motion: a BVH file in the project folder, see
   /// [`Engine::import_motion`]) or stand still (`None`) while the
   /// garment drapes, and run the simulation. A motion

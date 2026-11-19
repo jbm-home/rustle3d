@@ -5917,7 +5917,7 @@ Drape the placed and sewn panels on the avatar for a number of frames (1/60 s ea
       "oneOf": [
         {
           "const": "walk",
-          "description": "Walking on the spot (a 1.1 s step cycle).",
+          "description": "Walking on the spot (a 1.15 s step cycle).",
           "type": "string"
         },
         {
@@ -5928,6 +5928,11 @@ Drape the placed and sewn panels on the avatar for a number of frames (1/60 s ea
         {
           "const": "raise_arms",
           "description": "Both arms raised overhead and lowered (4 s).",
+          "type": "string"
+        },
+        {
+          "const": "idle",
+          "description": "Standing at rest: the weight shifting from leg to leg, breathing\n(8 s).",
           "type": "string"
         }
       ]

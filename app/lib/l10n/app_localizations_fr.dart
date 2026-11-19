@@ -830,6 +830,9 @@ class LFr extends L {
   String get motionWalk => 'Marcher';
 
   @override
+  String get motionIdle => 'Attendre';
+
+  @override
   String get motionTurn => 'Se tourner';
 
   @override

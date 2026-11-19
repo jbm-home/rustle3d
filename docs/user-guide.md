@@ -7,7 +7,7 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-19 (captured motions whose rest pose lies flat play upright; pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
+Last updated: 2026-11-19 (a more natural walk and a new motion, Stand at ease; captured motions whose rest pose lies flat play upright; pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
 hips, so trousers no longer slide with each step; a garment worn over
 trousers starts outside them; captured motions: Motion › Import a captured
 motion… plays a BVH motion capture on the avatar, Motion › Motion
@@ -443,9 +443,10 @@ size to size (its grade), and the other sizes follow.
 - **Arrange around the body** places every piece side by side in seam
   order at the waist, each taking room in proportion to its width.
 - **Motion** (the walking figure next to Simulate) makes the avatar move
-  while the garment drapes: **Walk** on the spot, **Turn** half round and
-  back, **Raise arms** above the shoulders and down; **Stand still**
-  stops. The motion starts once the garment has closed on the body
+  while the garment drapes: **Walk** on the spot at an easy pace,
+  **Stand at ease** (the weight shifting from one leg to the other,
+  breathing), **Turn** half round and back, **Raise arms** above the
+  shoulders and down; **Stand still** stops. The motion starts once the garment has closed on the body
   (after about 1.5 s of draping) and repeats; choosing another one first
   brings the body back to rest. The cloth follows the body: watch a skirt
   swing, or a shirt ride up when the arms go up. You can keep editing the
@@ -561,7 +562,8 @@ true colour under neutral light.
   joined along the edges; give the thickness in mm), for engines or
   shaders that hide back faces.
 - **Skin to the body's skeleton**: the garment follows the body's 24
-  bones, with the walk, turn and raise-arms motions as animations, so it
+  bones, with the walk, turn, raise-arms and stand-at-ease motions as
+  animations, so it
   moves with a character. It is off for an imported body (it has no
   skeleton). **Include the body** adds the body too.
 
@@ -572,7 +574,7 @@ in one image (with the print baked into it). The file is in metres with
 Y up, as glTF wants: the engines convert it themselves.
 - **Godot 4**: drop the `.glb` into the project and open it: the
   skeleton, one mesh per level (show one, or set visibility ranges) and
-  an AnimationPlayer with `walk`, `turn` and `raise_arms`.
+  an AnimationPlayer with `walk`, `turn`, `raise_arms` and `idle`.
 - **Unity**: install the glTFast package, drop the `.glb` into Assets,
   and put the `_LOD` meshes in a LOD Group.
 - **Unreal Engine 5**: Import, choose the `.glb`: it comes in as a
@@ -700,7 +702,7 @@ Protocol):
   headless. Drapes made there (and with `r3d simulate`) run on the
   processor, so they give the same result every time. A drape can make
   the avatar move: `r3d simulate My.r3d --frames 300 --motion walk`
-  (`walk`, `turn`, `raise_arms`, or a `.bvh` file, copied into the
+  (`walk`, `turn`, `raise_arms`, `idle`, or a `.bvh` file, copied into the
   project's `motions` folder); pictures and exports then show the
   body and the garment at the last frame.
 - An agent can look at its work: a picture of the pattern, of the 3D
