@@ -2402,6 +2402,21 @@ impl Engine {
         Ok(found.map(|(_, e)| e.to_string()))
     }
 
+    /// The piece under pattern point (`x_mm`, `y_mm`), if any, selected as
+    /// a click would (the Button tool's two clicks).
+    #[frb(sync)]
+    pub fn pick_piece_at(&self, x_mm: f64, y_mm: f64) -> Result<Option<String>, ApiError> {
+        let at = r3d_geom::DVec2::new(x_mm, y_mm);
+        let found = {
+            let ws = self.workspace()?;
+            BoardScene::from_project(ws.session().project(), &[]).panel_at(at)
+        };
+        *self.selected()? = found.into_iter().collect();
+        self.selected_edges.lock().map_err(|_| poisoned())?.clear();
+        self.selected_points.lock().map_err(|_| poisoned())?.clear();
+        Ok(found.map(|p| p.to_string()))
+    }
+
     /// The board's pan and zoom, fixed from now on if it was fitting the
     /// pattern (so points keep their place while the pattern changes);
     /// `None` for a 3D view.

@@ -68,6 +68,14 @@ class _ShellState extends State<Shell> {
   List<dynamic> _seams = const [];
   String? _edge;
 
+  /// The Button tool's first click: the piece and the point (mm) where
+  /// the button goes.
+  (String, Offset)? _buttonFirst;
+
+  /// The Zipper tool's first click: the edge, and whether its bottom
+  /// stop is at its end (the click was nearer the end).
+  (String, bool)? _zipFirst;
+
   /// Every edge picked (one, or two picked with ⇧), and the construction
   /// line picked.
   List<String> _edges = const [];
@@ -635,6 +643,8 @@ class _ShellState extends State<Shell> {
     _path.clear();
     _guideStart = null;
     _hover = null;
+    _buttonFirst = null;
+    _zipFirst = null;
   });
 
   /// The points a new point may line up with: the first and the last
@@ -726,6 +736,52 @@ class _ShellState extends State<Shell> {
       maxMm: _pickPx * mmPerPx,
     ),
   );
+
+  /// Button: a click where the button goes, then one where it buttons
+  /// (the buttonhole's end, on the piece lapped over it).
+  void _buttonTap(Offset mm, double mmPerPx) {
+    final l = context.l;
+    final panel = _guard(
+      () => widget.engine.pickPieceAt(xMm: mm.dx, yMm: mm.dy),
+    );
+    if (panel == null) return _toast(l.buttonClickPiece);
+    final first = _buttonFirst;
+    if (first == null) {
+      _buttonFirst = (panel, mm);
+      return _refresh();
+    }
+    _buttonFirst = null;
+    final out = _run({
+      'type': 'button.add',
+      'panel': first.$1,
+      'at': [first.$2.dx, first.$2.dy],
+      'hole_panel': panel,
+      'hole_at': [mm.dx, mm.dy],
+    });
+    _refresh();
+    if (out != null) _toast(l.toastButtonAdded);
+  }
+
+  /// Zipper: a click on one edge near the zipper's bottom, then on the
+  /// edge it zips to; the zipper runs along both edges.
+  void _zipperTap(Offset mm, double mmPerPx) {
+    final spot = _spot(mm, mmPerPx);
+    if (spot == null) return;
+    final fromEnd = spot.offsetMm > spot.lengthMm / 2;
+    final first = _zipFirst;
+    if (first == null || first.$1 == spot.edge) {
+      setState(() => _zipFirst = (spot.edge, fromEnd));
+      return;
+    }
+    setState(() => _zipFirst = null);
+    final out = _run({
+      'type': 'zipper.add',
+      'a': {'edge': first.$1, 'reversed': first.$2},
+      'b': {'edge': spot.edge},
+    });
+    _refresh();
+    if (out != null) _toast(context.l.toastZipperAdded);
+  }
 
   /// Dart: drawn, folded and sewn where the edge was clicked.
   Future<void> _dartTap(Offset mm, double mmPerPx) async {
@@ -1155,6 +1211,10 @@ class _ShellState extends State<Shell> {
 
     if (_tool == 'sew') _paintSew(canvas, toScreen, p);
     if (_tool == 'dimension') _paintDimension(canvas, toScreen, p);
+    if (_buttonFirst case (_, final at) when _tool == 'button') {
+      canvas.drawCircle(toScreen(at), 7, line);
+      point(toScreen(at), 2.5);
+    }
     if (_polygon.isNotEmpty) {
       final pts = [for (final q in _polygon) toScreen(q)];
       for (var i = 1; i < pts.length; i++) {
@@ -2055,6 +2115,12 @@ class _ShellState extends State<Shell> {
                                             'pleat' => PatternPointer(
                                               onTap: _pleatTap,
                                             ),
+                                            'button' => PatternPointer(
+                                              onTap: _buttonTap,
+                                            ),
+                                            'zipper' => PatternPointer(
+                                              onTap: _zipperTap,
+                                            ),
                                             'hole' => PatternPointer(
                                               onTap: _polygonTap,
                                               onHover: _hoverAt,
@@ -2894,6 +2960,7 @@ class _ToolRail extends StatelessWidget {
     ('shapes', ['rectangle', 'ellipse', 'sector']),
     ('curves', ['bend', 'straighten', 'addPoint', 'arc']),
     ('details', ['dart', 'pleat', 'hole']),
+    ('trims', ['button', 'zipper']),
   ];
 
   static List<_RailTool> _details(L l) => [
@@ -2905,6 +2972,23 @@ class _ToolRail extends StatelessWidget {
       l.toolHole,
       '',
       l.toolHoleHint,
+    ),
+  ];
+
+  static List<_RailTool> _trims(L l) => [
+    (
+      'button',
+      Icons.radio_button_checked_rounded,
+      l.toolButton,
+      '',
+      l.toolButtonHint,
+    ),
+    (
+      'zipper',
+      Icons.vertical_split_outlined,
+      l.toolZipper,
+      '',
+      l.toolZipperHint,
     ),
   ];
 
@@ -2956,6 +3040,7 @@ class _ToolRail extends StatelessWidget {
     ),
     ('cut', Icons.content_cut_rounded, l.toolCut, 'K', l.toolCutHint),
     ('details', l.toolDetails, _details(l)),
+    ('trims', l.toolTrims, _trims(l)),
     ('draw', Icons.brush_rounded, l.toolDraw, 'D', l.toolDrawHint),
     ('tape', Icons.linear_scale_rounded, l.toolTape, '', l.toolTapeHint),
     (
@@ -3415,6 +3500,10 @@ class _Inspector extends StatelessWidget {
             ),
             1 when panel != null => _PanelInspector(
               panel: panel!,
+              trims: switch (query({'type': 'trim.list'})) {
+                final Map<String, dynamic> t => t,
+                _ => const {},
+              },
               figures: [
                 for (final g in indicators)
                   for (final f in g['pieces'] as List)
@@ -3630,6 +3719,7 @@ class _MultiInspector extends StatelessWidget {
 class _PanelInspector extends StatelessWidget {
   const _PanelInspector({
     required this.panel,
+    required this.trims,
     required this.garments,
     required this.grading,
     required this.points,
@@ -3647,6 +3737,9 @@ class _PanelInspector extends StatelessWidget {
 
   /// Its `production.indicators` entry: cut area and mass.
   final Map<String, dynamic>? figures;
+
+  /// Every button and zipper (`trim.list`).
+  final Map<String, dynamic> trims;
 
   /// The other pieces, as the project summary lists them.
   final List<Map<String, dynamic>> others;
@@ -3730,6 +3823,10 @@ class _PanelInspector extends StatelessWidget {
                     (e['length_mm'] as num).toDouble(),
                   ),
           ),
+        ],
+        if (_TrimsCard.on(trims, id)) ...[
+          const SizedBox(height: Space.m),
+          _TrimsCard(panel: id, trims: trims, run: run),
         ],
         if (!linked && (points.isNotEmpty || edges.isNotEmpty)) ...[
           const SizedBox(height: Space.m),
@@ -5299,6 +5396,163 @@ class _FabricPicker extends StatelessWidget {
 }
 
 /// The edge picked in either view: its length and its seam.
+/// The buttons, buttonholes and zippers on a piece (spec 26): button or
+/// unbutton them, open a zipper part or all the way, remove them. The
+/// drape follows while it runs.
+class _TrimsCard extends StatelessWidget {
+  const _TrimsCard({
+    required this.panel,
+    required this.trims,
+    required this.run,
+  });
+
+  final String panel;
+  final Map<String, dynamic> trims;
+  final ValueChanged<Map<String, Object?>> run;
+
+  static List<Map<String, dynamic>> _list(Map<String, dynamic> t, String k) => [
+    for (final x in (t[k] as List?) ?? const []) x as Map<String, dynamic>,
+  ];
+
+  static List<Map<String, dynamic>> _buttons(
+    Map<String, dynamic> t,
+    String panel,
+  ) => [
+    for (final b in _list(t, 'buttons'))
+      if (b['panel'] == panel || b['hole_panel'] == panel) b,
+  ];
+
+  static List<Map<String, dynamic>> _zippers(
+    Map<String, dynamic> t,
+    String panel,
+  ) => [
+    for (final z in _list(t, 'zippers'))
+      if (z['panel_a'] == panel || z['panel_b'] == panel) z,
+  ];
+
+  /// Whether `panel` has any trim.
+  static bool on(Map<String, dynamic> t, String panel) =>
+      _buttons(t, panel).isNotEmpty || _zippers(t, panel).isNotEmpty;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final l = context.l;
+    final buttons = _buttons(trims, panel);
+    final zippers = _zippers(trims, panel);
+    Widget remove(Map<String, Object?> step) => IconButton(
+      tooltip: l.trimRemove,
+      visualDensity: VisualDensity.compact,
+      icon: const Icon(Icons.close_rounded, size: 16),
+      onPressed: () => run(step),
+    );
+    final label = ts(fontSize: 13, fontWeight: FontWeight.w500, color: p.text);
+    return Container(
+      padding: const EdgeInsets.all(Space.m),
+      decoration: BoxDecoration(
+        border: Border.all(color: p.border),
+        borderRadius: BorderRadius.circular(Tokens.radius(context)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l.trimsTitle,
+            style: ts(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w600,
+              color: p.text,
+            ),
+          ),
+          const SizedBox(height: Space.xs),
+          for (final b in buttons)
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    b['panel'] == panel
+                        ? l.trimButton(
+                            context.number(b['diameter_mm'] as num, 0),
+                          )
+                        : l.trimButtonhole(
+                            context.number(b['diameter_mm'] as num, 0),
+                            '${b['panel_name'] ?? b['panel']}',
+                          ),
+                    style: label,
+                  ),
+                ),
+                Text(
+                  l.trimButtoned,
+                  style: ts(fontSize: 12, color: p.textMuted),
+                ),
+                Switch(
+                  key: ValueKey('buttoned-${b['id']}'),
+                  value: b['closed'] == true,
+                  onChanged: (on) => run({
+                    'type': 'button.set_closed',
+                    'buttons': [b['id']],
+                    'closed': on,
+                  }),
+                ),
+                remove({'type': 'button.remove', 'button': b['id']}),
+              ],
+            ),
+          if (buttons.length > 1)
+            Wrap(
+              children: [
+                for (final (closed, text) in [
+                  (true, l.buttonAll),
+                  (false, l.unbuttonAll),
+                ])
+                  TextButton(
+                    onPressed: () => run({
+                      'type': 'button.set_closed',
+                      'buttons': [for (final b in buttons) b['id']],
+                      'closed': closed,
+                    }),
+                    child: Text(text),
+                  ),
+              ],
+            ),
+          for (final z in zippers) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    l.trimZipper(
+                      context.number((z['length_mm'] as num? ?? 0) / 10, 1),
+                    ),
+                    style: label,
+                  ),
+                ),
+                remove({'type': 'zipper.remove', 'zipper': z['id']}),
+              ],
+            ),
+            KeyedSubtree(
+              key: ValueKey('zipper-${z['id']}'),
+              child: _SliderRow(
+                fieldKey: ValueKey('zipper-open-${z['id']}'),
+                label: l.trimOpen,
+                value: (z['open_mm'] as num).toDouble() / 10,
+                min: 0,
+                max: ((z['length_mm'] as num? ?? 0) / 10).toDouble(),
+                unit: l.cm,
+                digits: 1,
+                enabled: true,
+                onChanged: (cm) => run({
+                  'type': 'zipper.set_open',
+                  'zipper': z['id'],
+                  'open_mm': cm * 10,
+                }),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _EdgeCard extends StatelessWidget {
   const _EdgeCard({
     required this.edge,

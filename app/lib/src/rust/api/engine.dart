@@ -202,6 +202,10 @@ abstract class Engine implements RustOpaqueInterface {
     required double maxMm,
   });
 
+  /// The piece under pattern point (`x_mm`, `y_mm`), if any, selected as
+  /// a click would (the Button tool's two clicks).
+  String? pickPieceAt({required double xMm, required double yMm});
+
   /// ⌥-click at (`x`, `y`) in the 3D view: pin the cloth there, where it
   /// is now (a `pin.add` command, so it is saved and undoable; the running
   /// simulation follows). Returns the new pin's id, or `None` when there

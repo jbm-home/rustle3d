@@ -2284,7 +2284,7 @@ abstract class L {
   /// No description provided for @errSewn.
   ///
   /// In en, this message translates to:
-  /// **'This edge is sewn: unpick the seam first.'**
+  /// **'This edge is sewn or zipped: unpick the seam or remove the zipper first.'**
   String get errSewn;
 
   /// No description provided for @errNothingToUndo.
@@ -3778,7 +3778,7 @@ abstract class L {
   /// No description provided for @tpNoTrims.
   ///
   /// In en, this message translates to:
-  /// **'No trims yet.'**
+  /// **'No trims.'**
   String get tpNoTrims;
 
   /// No description provided for @tpMeasurements.
@@ -4332,6 +4332,150 @@ abstract class L {
   /// In en, this message translates to:
   /// **'This image is too large (16384 pixels a side at most).'**
   String get errTextureTooLarge;
+
+  /// No description provided for @toolTrims.
+  ///
+  /// In en, this message translates to:
+  /// **'Trims'**
+  String get toolTrims;
+
+  /// No description provided for @toolButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Button'**
+  String get toolButton;
+
+  /// No description provided for @toolButtonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Click where the button goes, then where it buttons: the end of the buttonhole, on the piece that laps over'**
+  String get toolButtonHint;
+
+  /// No description provided for @toolZipper.
+  ///
+  /// In en, this message translates to:
+  /// **'Zipper'**
+  String get toolZipper;
+
+  /// No description provided for @toolZipperHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Click one edge near the zipper\'s bottom, then the edge it zips to'**
+  String get toolZipperHint;
+
+  /// No description provided for @toastButtonAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Button added.'**
+  String get toastButtonAdded;
+
+  /// No description provided for @toastZipperAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Zipper added.'**
+  String get toastZipperAdded;
+
+  /// No description provided for @buttonClickPiece.
+  ///
+  /// In en, this message translates to:
+  /// **'Click on a piece.'**
+  String get buttonClickPiece;
+
+  /// No description provided for @trimsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Buttons and zippers'**
+  String get trimsTitle;
+
+  /// No description provided for @trimButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Button · {mm} mm'**
+  String trimButton(String mm);
+
+  /// No description provided for @trimButtonhole.
+  ///
+  /// In en, this message translates to:
+  /// **'Buttonhole · {mm} mm button on {piece}'**
+  String trimButtonhole(String mm, String piece);
+
+  /// No description provided for @trimButtoned.
+  ///
+  /// In en, this message translates to:
+  /// **'Buttoned'**
+  String get trimButtoned;
+
+  /// No description provided for @trimZipper.
+  ///
+  /// In en, this message translates to:
+  /// **'Zipper · {cm} cm'**
+  String trimZipper(String cm);
+
+  /// No description provided for @trimOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get trimOpen;
+
+  /// No description provided for @buttonAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Button all'**
+  String get buttonAll;
+
+  /// No description provided for @unbuttonAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Unbutton all'**
+  String get unbuttonAll;
+
+  /// No description provided for @trimRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get trimRemove;
+
+  /// No description provided for @tpTrim.
+  ///
+  /// In en, this message translates to:
+  /// **'Trim'**
+  String get tpTrim;
+
+  /// No description provided for @tpTrimSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Size'**
+  String get tpTrimSize;
+
+  /// No description provided for @tpQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity'**
+  String get tpQuantity;
+
+  /// No description provided for @tpPlacement.
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get tpPlacement;
+
+  /// No description provided for @tpButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Button'**
+  String get tpButton;
+
+  /// No description provided for @tpZipper.
+  ///
+  /// In en, this message translates to:
+  /// **'Zipper'**
+  String get tpZipper;
+
+  /// No description provided for @errOutsidePiece.
+  ///
+  /// In en, this message translates to:
+  /// **'Put it inside the piece.'**
+  String get errOutsidePiece;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

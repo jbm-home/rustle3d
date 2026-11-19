@@ -42,7 +42,7 @@ can be tested through MCP as soon as they exist.
 | M23 | Animated avatars ✅ | 3–4 wk | The avatar walks and the garment follows |
 | M30 | Production: marker, yardage, tech pack, projector ✅ | 3–4 wk | A graded shirt nested on a 150 cm fabric, its yardage and cost, its tech pack PDF |
 | M24 | Fit maps and virtual tape measure ✅ | 2 wk | Tight spots show in colour; the ease at the chest is read on the drape |
-| M20 | Trims: buttons and zippers | 2–3 wk | A shirt that buttons and trousers with a fly zipper, draped closed |
+| M20 | Trims: buttons and zippers ✅ | 2–3 wk | A shirt that buttons and trousers with a fly zipper, draped closed |
 | M21 | Textures and prints ✅ | 2–3 wk | A striped shirt whose stripes follow the grainline on every piece |
 | M31 | Imported avatars | 2–3 wk | A body scan in OBJ/glTF is checked, the pieces placed around it and draped |
 | M15 | Game-ready export | 3–4 wk | LODs + baked wrinkle normal maps + skinning, imported in Godot/Unity/Unreal |
@@ -76,7 +76,9 @@ own. M30 followed on 2026-11-18–19, before M20 and M21, for the same
 reason: production needs no new physics or assets. M24 came next
 (2026-11-19), also before M20 and M21: it reads the drape we already
 have. M21 followed the same night (2026-11-19): prints need no new
-physics either, and every later render and export shows them.
+physics either, and every later render and export shows them. M20
+closed the same night (2026-11-19), the first of these to touch both
+solvers.
 
 ---
 
@@ -472,7 +474,9 @@ the legs.
 - Every seam closed and no cloth in the body: women's M and men's L on
   the CPU, women's M on the GPU.
 - Not yet: buttons on the shirt's front and cuffs (M20; the fronts are
-  sewn shut), a waistband and fly (M20), darts.
+  sewn shut), a waistband and fly (M20), darts. (2026-11-19: the
+  buttons and the fly came with M20; a waistband and darts are still
+  open.)
 
 Plan as written:
 - Trousers and shirt (collar, cuffs, sleeves) templates in the guided
@@ -498,9 +502,42 @@ Plan as written:
   a layer order so the outer garment drapes over the inner one (a shirt
   tucked in or worn out).
 
-## M20 — Trims: buttons and zippers
+## M20 — Trims: buttons and zippers ✅ (2026-11-19)
 - Buttons and buttonholes, zippers, placed on the pattern and simulated
   as closures; open and close them in 3D.
+- **Demo**: `./demos/m20/demo.sh`: a men's shirt that buttons down the
+  front (7 buttons) and at the cuffs, and trousers with an 18 cm fly
+  zipper, draped closed and rendered (board, 3D); then the two top
+  buttons undone and the fly opened, draped again without the
+  closures that were let go; the shirt's tech pack lists the buttons.
+- Delivered (spec 26): schema v17, buttons (a point on a piece, a
+  diameter, a buttonhole on the same or another piece, buttoned or
+  not) and zippers (two sides given as a seam's, an open length from
+  the top). Commands `button.add`, `button.set`, `button.set_closed`,
+  `button.remove`, `zipper.add`, `zipper.set_open`, `zipper.remove`,
+  query `trim.list`; a stretch is sewn or zipped, never both. Board:
+  buttons at their size, slits with bar tacks, zippers as a brass band
+  (solid closed, dashed open). Tech pack: trims in the bill of
+  materials. Drape: a closure constraint on both solvers, a stiff
+  distance whose target shrinks at 0.5 m/s (a button fastened while the
+  garment hangs closes without a jolt); buttons and buttonholes made
+  mesh vertices; the layers around a buttoned button may lie on each
+  other (no self-collision there); opening or closing rebuilds the
+  scene and carries the cloth over. 3D view, renders and tech pack
+  pictures: buttons as dark discs, zippers as a brass band. Templates:
+  the shirt's fronts with a 15 mm band, buttoned (left over right on a
+  men's body), cuffs with a 2 cm lap and a button; trousers with a fly
+  zipper above the crotch seam. App: Button and Zipper tools in the
+  rail's Trims menu; a piece's card buttons, unbuttons (all), opens a
+  zipper with a slider, removes trims; integration test
+  `trims_test.dart`.
+- Open: trims in photos (the path tracer) and in glTF/OBJ exports;
+  buttons kept when pieces are copied and pasted, or mirrored; the
+  Zipper tool on part of an edge (agents can); a button's own colour
+  and shape (shank, four holes); vertical buttonholes drawn along the
+  band; a waistband with a button on the trousers; snaps, hooks and
+  elastic. The overlapping bands of a shirt may pass through each
+  other near a button (self-collision is off there, see physics.md).
 
 ## M21 — Textures and prints ✅ (2026-11-19)
 - UVs from the pattern pieces, aligned with the grainline.

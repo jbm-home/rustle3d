@@ -7,7 +7,9 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-19 (M21, prints: stripes, gingham, dots, twill and
+Last updated: 2026-11-19 (M20, buttons and zippers: the Button and
+Zipper tools, buttoned or open while the garment drapes, the shirt
+buttoned and the trousers' fly zipper; M21, prints: stripes, gingham, dots, twill and
 your own images on the fabric; M24, fit maps and the tape measure; M30,
 the tech pack, the projector, a
 garment's notes; fabric as bought, area and mass of the
@@ -34,8 +36,9 @@ and Linux, and an AI agent can drive it too.
 ## Getting started
 
 ### The start screen
-- **What will you make?** Pick a template: T-shirt, shirt (long sleeves,
-  cuffs and a stand collar), trousers, dress, straight skirt, A-line
+- **What will you make?** Pick a template: T-shirt, shirt (buttoned down
+  the front, long sleeves with buttoned cuffs and a stand collar),
+  trousers (with a fly zipper), dress, straight skirt, A-line
   skirt or tote bag (the easiest start), or a blank project. Templates
   are drafted to the body's measurements. For a shirt, the sleeve length
   includes the cuff; trousers are measured from the waist to the hem.
@@ -279,6 +282,33 @@ linked mirror copy must be unlinked first.
   is gathered evenly onto the shorter one (a skirt into a waistband, a
   sleeve cap). The ratio is shown (for example 2 : 1).
 
+## Buttons and zippers
+- **Button** (in the rail's **Trims** menu): click where the button goes,
+  then where it buttons, on the piece that laps over it: that point is
+  the end of the buttonhole where the button sits. The board draws the
+  button at its size (11 mm unless you change it) and the buttonhole as
+  a slit running into the piece. A cuff buttons on itself: click both
+  points on the cuff.
+- **Zipper** (Trims menu): click one edge near the zipper's bottom, then
+  the edge it closes onto. The zipper runs along both edges; an edge
+  that is sewn cannot take a zipper (and a zipped edge cannot be sewn).
+  On the board a zipper is a brass band, solid where it is closed,
+  dashed where it is open.
+- Select a piece: its card lists its buttons, buttonholes and zippers.
+  Switch a button off to unbutton it (or **Unbutton all**), drag a
+  zipper's **Open** slider or type how many centimetres are open from
+  the top, and remove a trim with its ×. Click the garment in the 3D
+  view to pick the piece there.
+- In 3D, a buttoned button holds the two pieces together and a zipper
+  closes like a seam up to its slider. Button, unbutton or open a zipper
+  while the garment drapes: it opens or closes in a fraction of a
+  second, without starting over. Buttons show as small dark discs on the
+  cloth, a zipper as a brass band.
+- The shirt template comes buttoned: buttons down one front, buttonholes
+  on the other (left over right on a men's body, right over left
+  otherwise), one on each cuff. The trousers have an 18 cm fly zipper,
+  closed.
+
 ## Fabric and garments
 With nothing selected, the panel on the right lists the project's
 garments: pick each one's fabric (cotton, denim, jersey, silk, wool).
@@ -489,7 +519,8 @@ in landscape A4 pages, in the app's language:
 - **Bill of materials**: each garment's fabric with its weight, width
   and price per metre, the fabric one garment takes (from its marker in
   the size the pattern is drawn in) and its cost; with sizes, the fabric
-  per garment in every size. Trims come in a later version.
+  per garment in every size; the trims: buttons by size and zippers by
+  length, how many, and the pieces they go on.
 - **Measurements**: with sizes, the size chart (height, bust, waist and
   hips of each size's body); every piece's length along its grainline,
   width, sewing line, areas, seam allowance and mass; with sizes, every
@@ -617,6 +648,11 @@ the tech pack as PDF: open formats only.
   drapes with folds at the sides in the largest sizes (from about 48).
   A template's pieces graded after they were laid out keep their place
   on the board: the largest sizes of neighbouring pieces can touch.
+- Buttons and zippers: photos do not show them yet. A copied piece is
+  pasted without its buttons. The two pieces a button holds may pass
+  through each other near the button (they are allowed to lie on each
+  other there). Agents can place a zipper on part of an edge; in the app
+  the Zipper tool takes whole edges.
 - Prints colour the fabric only: no relief of the weave yet, and the
   same print shows on both sides of the cloth. Transparent parts of an
   image are shown as they are, not see-through. The marker does not

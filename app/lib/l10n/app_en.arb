@@ -662,7 +662,7 @@
       }
     }
   },
-  "errSewn": "This edge is sewn: unpick the seam first.",
+  "errSewn": "This edge is sewn or zipped: unpick the seam or remove the zipper first.",
   "errNothingToUndo": "Nothing to undo.",
   "errNothingToRedo": "Nothing to redo.",
   "errNothingToSimulate": "Nothing to simulate: place at least one piece on the body.",
@@ -1097,7 +1097,7 @@
   "tpCost": "Cost per garment",
   "tpConsumptionBySize": "Fabric per garment by size (m)",
   "tpTrims": "Trims",
-  "tpNoTrims": "No trims yet.",
+  "tpNoTrims": "No trims.",
   "tpMeasurements": "Measurements",
   "tpSizeChart": "Size chart (body, cm)",
   "tpSize": "Size",
@@ -1212,5 +1212,53 @@
   "piecePrintTurn": "Turn",
   "errTextureFormat": "This file is not a PNG or JPEG image.",
   "errTextureBad": "This image cannot be read.",
-  "errTextureTooLarge": "This image is too large (16384 pixels a side at most)."
+  "errTextureTooLarge": "This image is too large (16384 pixels a side at most).",
+  "toolTrims": "Trims",
+  "toolButton": "Button",
+  "toolButtonHint": "Click where the button goes, then where it buttons: the end of the buttonhole, on the piece that laps over",
+  "toolZipper": "Zipper",
+  "toolZipperHint": "Click one edge near the zipper's bottom, then the edge it zips to",
+  "toastButtonAdded": "Button added.",
+  "toastZipperAdded": "Zipper added.",
+  "buttonClickPiece": "Click on a piece.",
+  "trimsTitle": "Buttons and zippers",
+  "trimButton": "Button · {mm} mm",
+  "@trimButton": {
+    "placeholders": {
+      "mm": {
+        "type": "String"
+      }
+    }
+  },
+  "trimButtonhole": "Buttonhole · {mm} mm button on {piece}",
+  "@trimButtonhole": {
+    "placeholders": {
+      "mm": {
+        "type": "String"
+      },
+      "piece": {
+        "type": "String"
+      }
+    }
+  },
+  "trimButtoned": "Buttoned",
+  "trimZipper": "Zipper · {cm} cm",
+  "@trimZipper": {
+    "placeholders": {
+      "cm": {
+        "type": "String"
+      }
+    }
+  },
+  "trimOpen": "Open",
+  "buttonAll": "Button all",
+  "unbuttonAll": "Unbutton all",
+  "trimRemove": "Remove",
+  "tpTrim": "Trim",
+  "tpTrimSize": "Size",
+  "tpQuantity": "Quantity",
+  "tpPlacement": "On",
+  "tpButton": "Button",
+  "tpZipper": "Zipper",
+  "errOutsidePiece": "Put it inside the piece."
 }

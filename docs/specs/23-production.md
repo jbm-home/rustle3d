@@ -13,7 +13,7 @@ indicators in the inspector and its Marker dialog; the garment's notes
 `r3d techpack`, the MCP tool `export_techpack`, Export → Tech pack… in
 the app), the projector view in the app.
 
-Later: trims in the bill of materials (M20), the operating system's own
+Trims are in the bill of materials since M20 (spec 26). Later: the operating system's own
 full screen for the projector view (the app fills its window; the user
 maximises it on the projector), keystone correction (a projector not
 square to the table), points of measure named by the user in the
@@ -108,7 +108,9 @@ it to the cutting room.
      g/m², width cm, price per metre), the fabric one garment takes (the
      yardage of its marker in the sample size, on its fabric width or
      150 cm) and its cost; with a size range, the fabric per garment in
-     every size; trims (none until M20).
+     every size; trims (M20, spec 26): buttons grouped by diameter,
+     zippers by length rounded up to the centimetre, with how many and
+     the pieces they go on, per garment ("No trims." without).
   4. **Measurements**: with a size range and a body, the size chart
      (height, bust, waist, hips of each size's body, the sample size
      marked `*`); every piece in the sample size: length along its

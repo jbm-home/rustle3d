@@ -1267,7 +1267,8 @@ class LEn extends L {
   }
 
   @override
-  String get errSewn => 'This edge is sewn: unpick the seam first.';
+  String get errSewn =>
+      'This edge is sewn or zipped: unpick the seam or remove the zipper first.';
 
   @override
   String get errNothingToUndo => 'Nothing to undo.';
@@ -2228,7 +2229,7 @@ class LEn extends L {
   String get tpTrims => 'Trims';
 
   @override
-  String get tpNoTrims => 'No trims yet.';
+  String get tpNoTrims => 'No trims.';
 
   @override
   String get tpMeasurements => 'Measurements';
@@ -2518,4 +2519,84 @@ class LEn extends L {
   @override
   String get errTextureTooLarge =>
       'This image is too large (16384 pixels a side at most).';
+
+  @override
+  String get toolTrims => 'Trims';
+
+  @override
+  String get toolButton => 'Button';
+
+  @override
+  String get toolButtonHint =>
+      'Click where the button goes, then where it buttons: the end of the buttonhole, on the piece that laps over';
+
+  @override
+  String get toolZipper => 'Zipper';
+
+  @override
+  String get toolZipperHint =>
+      'Click one edge near the zipper\'s bottom, then the edge it zips to';
+
+  @override
+  String get toastButtonAdded => 'Button added.';
+
+  @override
+  String get toastZipperAdded => 'Zipper added.';
+
+  @override
+  String get buttonClickPiece => 'Click on a piece.';
+
+  @override
+  String get trimsTitle => 'Buttons and zippers';
+
+  @override
+  String trimButton(String mm) {
+    return 'Button · $mm mm';
+  }
+
+  @override
+  String trimButtonhole(String mm, String piece) {
+    return 'Buttonhole · $mm mm button on $piece';
+  }
+
+  @override
+  String get trimButtoned => 'Buttoned';
+
+  @override
+  String trimZipper(String cm) {
+    return 'Zipper · $cm cm';
+  }
+
+  @override
+  String get trimOpen => 'Open';
+
+  @override
+  String get buttonAll => 'Button all';
+
+  @override
+  String get unbuttonAll => 'Unbutton all';
+
+  @override
+  String get trimRemove => 'Remove';
+
+  @override
+  String get tpTrim => 'Trim';
+
+  @override
+  String get tpTrimSize => 'Size';
+
+  @override
+  String get tpQuantity => 'Quantity';
+
+  @override
+  String get tpPlacement => 'On';
+
+  @override
+  String get tpButton => 'Button';
+
+  @override
+  String get tpZipper => 'Zipper';
+
+  @override
+  String get errOutsidePiece => 'Put it inside the piece.';
 }

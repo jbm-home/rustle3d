@@ -1280,7 +1280,8 @@ class LFr extends L {
   }
 
   @override
-  String get errSewn => 'Ce bord est cousu : décousez d’abord la couture.';
+  String get errSewn =>
+      'Ce bord est cousu ou fermé par une fermeture éclair : décousez d’abord la couture ou retirez la fermeture.';
 
   @override
   String get errNothingToUndo => 'Rien à annuler.';
@@ -2250,7 +2251,7 @@ class LFr extends L {
   String get tpTrims => 'Fournitures';
 
   @override
-  String get tpNoTrims => 'Pas encore de fournitures.';
+  String get tpNoTrims => 'Aucune fourniture.';
 
   @override
   String get tpMeasurements => 'Mesures';
@@ -2541,4 +2542,84 @@ class LFr extends L {
   @override
   String get errTextureTooLarge =>
       'Cette image est trop grande (16384 pixels de côté au plus).';
+
+  @override
+  String get toolTrims => 'Fournitures';
+
+  @override
+  String get toolButton => 'Bouton';
+
+  @override
+  String get toolButtonHint =>
+      'Cliquez où va le bouton, puis où il se boutonne : le bout de la boutonnière, sur la pièce qui croise par-dessus';
+
+  @override
+  String get toolZipper => 'Fermeture éclair';
+
+  @override
+  String get toolZipperHint =>
+      'Cliquez un bord près du bas de la fermeture, puis le bord qu\'elle ferme avec lui';
+
+  @override
+  String get toastButtonAdded => 'Bouton ajouté.';
+
+  @override
+  String get toastZipperAdded => 'Fermeture éclair ajoutée.';
+
+  @override
+  String get buttonClickPiece => 'Cliquez sur une pièce.';
+
+  @override
+  String get trimsTitle => 'Boutons et fermetures';
+
+  @override
+  String trimButton(String mm) {
+    return 'Bouton · $mm mm';
+  }
+
+  @override
+  String trimButtonhole(String mm, String piece) {
+    return 'Boutonnière · bouton de $mm mm sur $piece';
+  }
+
+  @override
+  String get trimButtoned => 'Boutonné';
+
+  @override
+  String trimZipper(String cm) {
+    return 'Fermeture éclair · $cm cm';
+  }
+
+  @override
+  String get trimOpen => 'Ouverte';
+
+  @override
+  String get buttonAll => 'Tout boutonner';
+
+  @override
+  String get unbuttonAll => 'Tout déboutonner';
+
+  @override
+  String get trimRemove => 'Retirer';
+
+  @override
+  String get tpTrim => 'Fourniture';
+
+  @override
+  String get tpTrimSize => 'Taille';
+
+  @override
+  String get tpQuantity => 'Quantité';
+
+  @override
+  String get tpPlacement => 'Sur';
+
+  @override
+  String get tpButton => 'Bouton';
+
+  @override
+  String get tpZipper => 'Fermeture éclair';
+
+  @override
+  String get errOutsidePiece => 'Placez-le à l\'intérieur de la pièce.';
 }

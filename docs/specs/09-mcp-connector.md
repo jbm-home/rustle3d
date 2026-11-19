@@ -57,6 +57,12 @@ and look at the result, either headless or live in the user's open app.
   already be in the project folder (the server reads and writes nothing
   outside it), e.g. `textures/name.jpg`. `render_board`, `render_3d`,
   `render_photo` and the glTF/OBJ exports show the print.
+- **Trims** (M20, spec 26): `button_add`, `button_set`,
+  `button_set_closed`, `button_remove`, `zipper_add`, `zipper_set_open`,
+  `zipper_remove` and `trim_list`; `simulate` reports `closures` and
+  `max_closure_gap_mm`; `render_board` and `render_3d` draw buttons and
+  zippers. An agent attached to the app opens or closes them while the
+  drape runs.
 - **Tech pack** (M30, spec 23): `export_techpack` is the
   `export.techpack` action with one more parameter, `views` (`3d`
   default, `photo`, `none`): the server renders the garment's front and
