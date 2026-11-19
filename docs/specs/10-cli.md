@@ -54,10 +54,12 @@ nothing is written. Scripts can refer to earlier results
   given).
 - `r3d mcp --project path`: MCP server over a folder; `r3d mcp --attach
   [--endpoint file]`: relay to the project open in the app (see 09).
-- `r3d export <project> --format svg|pdf|dxf|glb|obj [--paper a4|letter|single]
+- `r3d export <project> --format svg|pdf|dxf|glb|obj|game [--paper a4|letter|single]
   [--avatar] [--sizes 36,44|all] [--out path]`: the pattern (in some sizes
   of its range, nested, with `--sizes`; spec 18), or the draped garment
-  (see 07, 15).
+  (see 07, 15). `--format game` (M15, `export.game`) takes `--preset
+  generic|godot|unity|unreal`, `--lods 1,0.5,0.2`, `--normal-map N`,
+  `--shell [--thickness-mm T]`, `--no-skin`, `--no-animations`.
 - `r3d marker <project> [--sizes 38,40|all] [--width-cm W] [--garment id]
   [--format svg|pdf] [--paper single|a4|letter] [--out path]`: lay the
   garment's pieces out on the fabric and print the length, efficiency,

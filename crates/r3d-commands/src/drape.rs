@@ -718,9 +718,17 @@ impl Form {
         }
     }
 
+    /// The body's skeleton and each vertex's skin weights; `None` for a
+    /// body without a skeleton (an imported one).
+    pub fn rig(&self) -> Option<(&Skeleton, &[Influences])> {
+        self.rig
+            .as_ref()
+            .map(|r| (&r.skeleton, r.weights.as_slice()))
+    }
+
     /// Each bone's motion at `time` (simulated, s) of `animation`; `None`
     /// for a form without a skeleton.
-    fn transforms(&self, animation: &Animation, time: f32) -> Option<Vec<Rigid>> {
+    pub fn transforms(&self, animation: &Animation, time: f32) -> Option<Vec<Rigid>> {
         let rig = self.rig.as_ref()?;
         let since = |t: f32| (t - animation.start).max(0.0);
         let pose = match animation.stop {
@@ -2126,6 +2134,9 @@ pub struct Latest {
     pub positions: Vec<Vec3>,
     /// The avatar's surface at that moment (posed if it moved).
     pub body: Option<Vec<Vec3>>,
+    /// The avatar's motion and the simulated time (s) at that moment.
+    pub animation: Option<Animation>,
+    pub time: f32,
     /// From the cache (`true`) or the starting positions.
     pub simulated: bool,
 }
@@ -2142,11 +2153,16 @@ impl Latest {
             None => f.positions.clone(),
         });
         let simulated = cached.is_some();
+        let (animation, time) = cached
+            .as_ref()
+            .map_or((None, 0.0), |c| (c.animation, c.time));
         Ok(Self {
             positions: cached.map_or(start, |c| c.positions),
             drape,
             form,
             body,
+            animation,
+            time,
             simulated,
         })
     }

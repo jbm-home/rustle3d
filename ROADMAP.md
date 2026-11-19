@@ -984,6 +984,26 @@ tests below, in the real app):
 - Decimated LODs, wrinkle detail baked into normal maps, back faces or
   thickness; skinning to the avatar skeleton (M23); presets for Godot,
   Unity and Unreal.
+- **Demo**: `./demos/m15/demo.sh`: a striped T-shirt draped on the
+  women's M body, exported with three LODs (3274, 1636, 654 triangles),
+  normal maps baked from the full drape, the stripes in an atlas, skinned
+  to the 24-bone skeleton with walk, turn and raise_arms as animations
+  and the body; then for Unreal as a 1.5 mm shell; both files pass the
+  Khronos glTF Validator with no error or warning.
+- Delivered so far (2026-11-19, spec 15): action `export.game` (MCP
+  `export_game`), `r3d export --format game` (`--preset`, `--lods`,
+  `--normal-map`, `--shell`, `--thickness-mm`, `--no-skin`,
+  `--no-animations`); `r3d_geom::decimate` (quadric error metrics,
+  Garland & Heckbert 1997, half-edge collapses keeping borders and
+  refusing flips in 3D and in the atlas), `r3d_geom::bake` (tangents,
+  normal maps through the shared atlas after Cohen, Olano & Manocha
+  1998, colour baking, padding); `r3d_io::game` (skins, animations,
+  tangents, normal and colour maps); `r3d_commands::game` (one mesh per
+  garment and LOD, the atlas, closest-point skin weight transfer
+  smoothed over the garment, a drape that ended mid-motion carried back
+  to the rest pose, the motions baked at 30 fps, presets and names).
+  `scripts/validate-exports.sh` validates two game exports.
+- Open: the app's Export dialog (next step).
 
 ## Later (architecture kept ready, not scheduled)
 Material calibration from measurements (a home protocol: a strip

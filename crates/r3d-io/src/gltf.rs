@@ -14,23 +14,24 @@ use crate::scene3d::{Mesh3d, Scene3d, linear_rgb};
 const ARRAY_BUFFER: u32 = 34962;
 const ELEMENT_ARRAY_BUFFER: u32 = 34963;
 const FLOAT: u32 = 5126;
+const UNSIGNED_BYTE: u32 = 5121;
 const UNSIGNED_INT: u32 = 5125;
-const LINEAR: u32 = 9729;
-const LINEAR_MIPMAP_LINEAR: u32 = 9987;
+pub(crate) const LINEAR: u32 = 9729;
+pub(crate) const LINEAR_MIPMAP_LINEAR: u32 = 9987;
 const REPEAT: u32 = 10497;
 
 /// The binary buffer and the JSON arrays that describe it.
 #[derive(Default)]
-struct Builder {
-    bin: Vec<u8>,
-    views: Vec<Value>,
-    accessors: Vec<Value>,
+pub(crate) struct Builder {
+    pub(crate) bin: Vec<u8>,
+    pub(crate) views: Vec<Value>,
+    pub(crate) accessors: Vec<Value>,
 }
 
 impl Builder {
     /// Append `bytes` as a buffer view (4-byte aligned) for vertex data
     /// or indices (`target`) or an image (none); its index.
-    fn view(&mut self, bytes: &[u8], target: Option<u32>) -> usize {
+    pub(crate) fn view(&mut self, bytes: &[u8], target: Option<u32>) -> usize {
         while !self.bin.len().is_multiple_of(4) {
             self.bin.push(0);
         }
@@ -47,17 +48,30 @@ impl Builder {
     }
 
     /// Vectors of `N` floats as an accessor (with bounds when asked, as
-    /// glTF requires for positions); its index.
-    fn floats<const N: usize>(&mut self, data: &[[f32; N]], bounds: bool) -> usize {
+    /// glTF requires for positions and animation times); its index.
+    pub(crate) fn floats<const N: usize>(&mut self, data: &[[f32; N]], bounds: bool) -> usize {
+        self.floats_in(data, bounds, Some(ARRAY_BUFFER))
+    }
+
+    /// The same in a view for `target`: none for animation data and
+    /// matrices.
+    pub(crate) fn floats_in<const N: usize>(
+        &mut self,
+        data: &[[f32; N]],
+        bounds: bool,
+        target: Option<u32>,
+    ) -> usize {
         let bytes: Vec<u8> = data
             .iter()
             .flatten()
             .flat_map(|f| f.to_le_bytes())
             .collect();
-        let view = self.view(&bytes, Some(ARRAY_BUFFER));
+        let view = self.view(&bytes, target);
         let kind = match N {
             2 => "VEC2",
             3 => "VEC3",
+            4 => "VEC4",
+            16 => "MAT4",
             _ => "SCALAR",
         };
         let mut accessor = json!({
@@ -79,7 +93,17 @@ impl Builder {
         self.accessors.len() - 1
     }
 
-    fn indices(&mut self, data: &[u32]) -> usize {
+    /// Four bytes per vertex (skin joints).
+    pub(crate) fn bytes4(&mut self, data: &[[u8; 4]]) -> usize {
+        let bytes: Vec<u8> = data.iter().flatten().copied().collect();
+        let view = self.view(&bytes, Some(ARRAY_BUFFER));
+        self.accessors.push(json!({
+            "bufferView": view, "componentType": UNSIGNED_BYTE, "count": data.len(), "type": "VEC4",
+        }));
+        self.accessors.len() - 1
+    }
+
+    pub(crate) fn indices(&mut self, data: &[u32]) -> usize {
         let bytes: Vec<u8> = data.iter().flat_map(|i| i.to_le_bytes()).collect();
         let view = self.view(&bytes, Some(ELEMENT_ARRAY_BUFFER));
         self.accessors.push(json!({
@@ -191,11 +215,17 @@ pub fn to_glb(scene: &Scene3d) -> Vec<u8> {
             "magFilter": LINEAR, "minFilter": LINEAR_MIPMAP_LINEAR, "wrapS": REPEAT, "wrapT": REPEAT,
         }]);
     }
+    glb(&doc, &b.bin)
+}
+
+/// The GLB container: the JSON chunk (padded with spaces) and the binary
+/// chunk (4-byte aligned already).
+pub(crate) fn glb(doc: &Value, bin: &[u8]) -> Vec<u8> {
     let mut json = doc.to_string().into_bytes();
     while !json.len().is_multiple_of(4) {
         json.push(b' ');
     }
-    let total = 12 + 8 + json.len() + 8 + b.bin.len();
+    let total = 12 + 8 + json.len() + 8 + bin.len();
     let mut out = Vec::with_capacity(total);
     out.extend_from_slice(b"glTF");
     out.extend_from_slice(&2u32.to_le_bytes());
@@ -203,9 +233,9 @@ pub fn to_glb(scene: &Scene3d) -> Vec<u8> {
     out.extend_from_slice(&(json.len() as u32).to_le_bytes());
     out.extend_from_slice(b"JSON");
     out.extend_from_slice(&json);
-    out.extend_from_slice(&(b.bin.len() as u32).to_le_bytes());
+    out.extend_from_slice(&(bin.len() as u32).to_le_bytes());
     out.extend_from_slice(b"BIN\0");
-    out.extend_from_slice(&b.bin);
+    out.extend_from_slice(bin);
     out
 }
 

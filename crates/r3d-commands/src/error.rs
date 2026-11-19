@@ -80,6 +80,10 @@ pub enum Invalid {
     HasHoles,
     #[error("must be inside the piece")]
     OutsidePiece,
+    #[error("must start at 1 and decrease, each above 0, at most five levels")]
+    Lods,
+    #[error("must be 0 or a power of two from 256 to 4096")]
+    TextureSize,
 }
 
 impl Invalid {
@@ -122,6 +126,8 @@ impl Invalid {
             Invalid::Apart => "invalid.apart",
             Invalid::HasHoles => "invalid.has_holes",
             Invalid::OutsidePiece => "invalid.outside_piece",
+            Invalid::Lods => "invalid.lods",
+            Invalid::TextureSize => "invalid.texture_size",
         }
     }
 }
@@ -188,6 +194,8 @@ pub enum CommandError {
     BodyUnavailable { file: String },
     #[error("an imported body cannot move yet: drape it standing still")]
     ImportedBodyStill,
+    #[error("the avatar has no skeleton (an imported body, or no avatar): export without skinning")]
+    NoSkeleton,
     #[error("internal error: {detail}")]
     Internal { detail: String },
 }
@@ -266,6 +274,7 @@ impl Localizable for CommandError {
                 Message::new("avatar.mesh_unavailable", text).arg("file", file)
             }
             Self::ImportedBodyStill => Message::new("motion.imported_body", text),
+            Self::NoSkeleton => Message::new("export.no_skeleton", text),
             Self::Internal { detail } => Message::new("internal", text).arg("detail", detail),
         }
     }

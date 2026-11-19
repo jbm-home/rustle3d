@@ -57,6 +57,10 @@ and look at the result, either headless or live in the user's open app.
   already be in the project folder (the server reads and writes nothing
   outside it), e.g. `textures/name.jpg`. `render_board`, `render_3d`,
   `render_photo` and the glTF/OBJ exports show the print.
+- **Game-ready export** (M15, spec 15): `export_game` writes a GLB with
+  levels of detail, baked normal maps and the garment skinned to the
+  avatar's skeleton with its motions, for a `preset` engine; on an
+  imported body it needs `skin: false` (`export.no_skeleton`).
 - **Imported avatars** (M31, spec 27): `avatar_import` reads an OBJ,
   glTF or GLB body already in the project folder (e.g.
   `avatars/scan.glb`) and drapes on it; `avatar_check` reports what to

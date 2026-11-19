@@ -45,7 +45,7 @@ Use project_summary and panel_get to inspect, the panel_*/point_*/edge_*/notch_*
 batch to apply several commands atomically, history_undo/history_redo to step back. \
 Every successful change is saved to the project folder. \
 export_pdf / export_svg write 1:1 patterns under exports/ (paths stay inside the project); \
-export_gltf / export_obj write the draped garment (after simulate) for 3D tools and game engines. \
+export_gltf / export_obj write the draped garment (after simulate) for 3D tools; export_game writes it ready for Godot, Unity or Unreal (LODs, baked normal maps, skinned to the avatar's skeleton with its motions). \
 To dress the avatar: avatar_set, panel_place each panel around the body, seam_add, garment_set_fabric, \
 then simulate (headless drape, cached; with `motion` the avatar walks, turns or raises its arms and the \
 cloth follows) and render_3d to see the result; render_board shows the pattern; \

@@ -42,6 +42,44 @@ enum Format {
     /// The pattern as DXF-AAMA (ASTM D6673), for pattern and cutting
     /// software.
     Dxf,
+    /// The draped garment ready for a game engine (GLB with LODs, baked
+    /// normal maps and skinning to the avatar; see --preset).
+    Game,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum PresetArg {
+    Generic,
+    Godot,
+    Unity,
+    Unreal,
+}
+
+/// Options of `export --format game`.
+#[derive(clap::Args)]
+struct GameArgs {
+    /// Game export: the target engine (sets the LODs, map size, names).
+    #[arg(long, value_enum, default_value = "generic")]
+    preset: PresetArg,
+    /// Game export: LOD ratios, comma-separated, the first 1 (e.g.
+    /// 1,0.5,0.2).
+    #[arg(long)]
+    lods: Option<String>,
+    /// Game export: normal map size in pixels (0: none; 256-4096).
+    #[arg(long)]
+    normal_map: Option<u32>,
+    /// Game export: a thin shell instead of double-sided faces.
+    #[arg(long)]
+    shell: bool,
+    /// Game export: the shell's thickness (mm).
+    #[arg(long)]
+    thickness_mm: Option<f64>,
+    /// Game export: do not skin the garment to the avatar's skeleton.
+    #[arg(long)]
+    no_skin: bool,
+    /// Game export: skin without the motions as animations.
+    #[arg(long)]
+    no_animations: bool,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -306,8 +344,8 @@ enum Cmd {
         angle: f64,
     },
     /// Export the pattern at 1:1 scale (svg, pdf, dxf) or the draped garment
-    /// (glb, obj; the cached `simulate` result if up to date) into the
-    /// project folder.
+    /// (glb, obj, game; the cached `simulate` result if up to date) into
+    /// the project folder.
     Export {
         project: PathBuf,
         #[arg(long, value_enum)]
@@ -325,6 +363,8 @@ enum Cmd {
         /// Output path relative to the project (default: exports/<name>.<ext>).
         #[arg(long)]
         out: Option<String>,
+        #[command(flatten)]
+        game: GameArgs,
     },
     /// Lay a garment's pieces out on the fabric (a marker): length,
     /// efficiency, yardage and cost; with --format, also write it at 1:1
@@ -530,6 +570,7 @@ fn cmd_export(
     avatar: bool,
     sizes: Option<String>,
     out: Option<String>,
+    game: GameArgs,
 ) -> Result<(), Failure> {
     let mut step = match format {
         Format::Svg => json!({ "type": "export.svg" }),
@@ -544,6 +585,36 @@ fn cmd_export(
         Format::Glb => json!({ "type": "export.gltf", "avatar": avatar }),
         Format::Obj => json!({ "type": "export.obj", "avatar": avatar }),
         Format::Dxf => json!({ "type": "export.dxf" }),
+        Format::Game => {
+            let mut step = json!({
+                "type": "export.game",
+                "avatar": avatar,
+                "preset": match game.preset {
+                    PresetArg::Generic => "generic",
+                    PresetArg::Godot => "godot",
+                    PresetArg::Unity => "unity",
+                    PresetArg::Unreal => "unreal",
+                },
+                "sides": if game.shell { "shell" } else { "double_sided" },
+                "skin": !game.no_skin,
+                "animations": !game.no_animations,
+            });
+            if let Some(lods) = &game.lods {
+                let ratios: Result<Vec<f64>, _> =
+                    lods.split(',').map(|r| r.trim().parse::<f64>()).collect();
+                step["lods"] = json!(ratios.map_err(|e| CommandError::Malformed {
+                    name: "lods".into(),
+                    detail: e.to_string(),
+                })?);
+            }
+            if let Some(size) = game.normal_map {
+                step["normal_map"] = json!(size);
+            }
+            if let Some(mm) = game.thickness_mm {
+                step["thickness_mm"] = json!(mm);
+            }
+            step
+        }
     };
     if let Some(path) = out {
         step["path"] = Value::from(path);
@@ -895,7 +966,8 @@ fn main() -> ExitCode {
             avatar,
             sizes,
             out,
-        } => cmd_export(&project, format, paper, avatar, sizes, out),
+            game,
+        } => cmd_export(&project, format, paper, avatar, sizes, out, game),
         Cmd::Import {
             project,
             file,

@@ -285,6 +285,31 @@ fn export_writes_into_the_project() {
     assert_eq!(v["path"], "exports/Skirt.pdf");
     assert!(v["pages"].as_u64().unwrap() >= 4);
     assert!(dir.join("exports/Skirt.pdf").is_file());
+
+    // Game-ready: no avatar, so no skin; two LODs as asked.
+    let out = r3d()
+        .args(["export"])
+        .arg(&dir)
+        .args(["--format", "game", "--preset", "godot", "--no-skin"])
+        .args(["--lods", "1,0.4", "--normal-map", "256", "--shell"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let v = json_of(&out);
+    assert_eq!(v["path"], "exports/Skirt-godot.glb");
+    assert_eq!(v["lods"].as_array().unwrap().len(), 2);
+    assert_eq!(v["skinned"], false);
+    assert!(dir.join("exports/Skirt-godot.glb").is_file());
+    let out = r3d()
+        .args(["export"])
+        .arg(&dir)
+        .args(["--format", "game"])
+        .assert()
+        .failure();
+    let err = String::from_utf8_lossy(&out.get_output().stderr).to_string();
+    assert!(err.contains("export.no_skeleton"), "{err}");
 }
 
 #[test]

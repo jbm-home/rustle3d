@@ -7,11 +7,13 @@
 //! ([`dxf`], both ways), and pattern import from DXF, SVG and PDF
 //! ([`import`]). M30: the marker, pieces laid out on the fabric
 //! ([`marker`]) and the tech pack ([`techpack`]). M31: a body read from
-//! OBJ or glTF ([`model`]). This crate does no file I/O: it takes and returns bytes,
-//! and the caller decides where they come from and go.
+//! OBJ or glTF ([`model`]). M15: the game-ready GLB with skeleton,
+//! animations and maps ([`game`]). This crate does no file I/O: it takes
+//! and returns bytes, and the caller decides where they come from and go.
 
 pub mod drawing;
 pub mod dxf;
+pub mod game;
 pub mod gltf;
 pub mod import;
 pub mod marker;

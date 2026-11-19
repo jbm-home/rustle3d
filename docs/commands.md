@@ -6091,6 +6091,113 @@ Export the draped garment as Wavefront OBJ: one object per piece, metres, Y up, 
 
 </details>
 
+### `export.game`
+
+Export the draped garment ready for a game engine as glTF 2.0 binary (GLB): per garment one mesh per level of detail (`lods`, ratios of the triangle count; simplified by quadric error metrics, the pieces' edges kept), texture coordinates in an atlas of the pieces, the full drape's wrinkles baked into a tangent-space normal map for each lower LOD (`normal_map` pixels), tangents, the print baked into a base-colour atlas, `sides` double_sided or a `shell` of `thickness_mm`, and with `skin` the avatar's 24-bone skeleton, weights transferred from the body (closest point, smoothed, four bones) and the walk, turn and raise_arms motions as animations; `preset` godot, unity or unreal sets the defaults and names. Metres, Y up. Uses the cached drape from `simulate` if it is up to date. An imported body has no skeleton: use skin false. Returns the path and each LOD's triangles.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "GamePreset": {
+      "description": "The engine an export is made for.",
+      "enum": [
+        "generic",
+        "godot",
+        "unity",
+        "unreal"
+      ],
+      "type": "string"
+    },
+    "Sides": {
+      "description": "How the cloth's back is drawn.",
+      "oneOf": [
+        {
+          "const": "double_sided",
+          "description": "One surface, its material drawn from both sides.",
+          "type": "string"
+        },
+        {
+          "const": "shell",
+          "description": "An inner surface `thickness_mm` inside, facing inwards, and a rim\nalong the pieces' edges; a one-sided material.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Export the draped garment for a game engine.",
+  "properties": {
+    "animations": {
+      "default": true,
+      "description": "With `skin`, the avatar's motions as animations (default true).",
+      "type": "boolean"
+    },
+    "avatar": {
+      "default": false,
+      "description": "Include the avatar's body (default false).",
+      "type": "boolean"
+    },
+    "lods": {
+      "description": "Levels of detail as ratios of the full triangle count: the first\n1, then decreasing, above 0, at most five (default from the preset:\n1, 0.5, 0.2; Unreal 1, 0.5, 0.25, 0.125).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "normal_map": {
+      "description": "Size of the baked normal maps (pixels a side): 0 for none, or a\npower of two from 256 to 4096 (default from the preset: 1024,\n2048 for the engines).",
+      "format": "uint32",
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "path": {
+      "description": "Output path relative to the project folder. Defaults to\n`exports/<project name>-<preset>.glb`.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "preset": {
+      "$ref": "#/$defs/GamePreset",
+      "default": "generic",
+      "description": "`generic` (default), `godot`, `unity` or `unreal`: sets the\ndefaults below and the names."
+    },
+    "sides": {
+      "$ref": "#/$defs/Sides",
+      "default": "double_sided",
+      "description": "`double_sided` (default) or `shell`."
+    },
+    "skin": {
+      "default": true,
+      "description": "Skin the garment to the avatar's skeleton (default true; refused\nfor a body without one).",
+      "type": "boolean"
+    },
+    "thickness_mm": {
+      "description": "The shell's thickness (mm, 0.2–20, default 1).",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "title": "ExportGame",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `export.dxf`
 
 Export all panels as DXF-AAMA (ASTM D6673, ASCII DXF in mm), for pattern and cutting software: one block per piece with its cutting line, sewing line, turn points, notches, grainline, internal lines and name. With `sizes`, a graded nest: every piece once per size, with a `Size:` text. Returns the written path.

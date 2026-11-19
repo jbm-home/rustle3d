@@ -1,6 +1,7 @@
 # Rendering
 
-Status: living document, last updated 2026-11-19 (M24, fit maps).
+Status: living document, last updated 2026-11-19 (M15, baked normal
+maps for game exports).
 
 How `r3d-render` draws, and where each algorithm comes from. Read it
 before touching `crates/r3d-render/src/photo` or its shaders. Every
@@ -166,7 +167,37 @@ accumulate. The denoiser is guided by this albedo, so the print stays
 sharp after filtering. The sheen keeps the tint of the print's average
 colour.
 
-## 3. Tests
+## 3. Baked maps for game exports (M15)
+The game-ready export (spec 15, `r3d_commands::game`) draws nothing on
+the GPU: its images are baked on the CPU by `r3d_geom::bake`.
+- **Atlas.** Each garment's pieces are laid flat as on the pattern (one
+  scale, upright, along the grain) in rows in the unit square, with a
+  gap; these are the meshes' only texture coordinates.
+- **Levels of detail** (`r3d_geom::decimate`): quadric error metrics
+  (Garland & Heckbert, SIGGRAPH 1997) with half-edge collapses onto
+  existing vertices ("subset placement"), so every level keeps the full
+  mesh's atlas coordinates; border vertices never move and no collapse
+  may turn a triangle over in 3D or in the atlas (or break the link
+  condition, Dey et al. 1999).
+- **Tangents** (`bake::tangents`): per triangle the derivatives of the
+  position along `u` and `v` (Lengyel's method), summed per vertex,
+  orthogonalised against the normal; `w` makes `(normal × tangent) · w`
+  point towards −`v`, the image's up, which is glTF's convention for the
+  normal map's green channel (Mikkelsen 2008 for the frame renderers
+  rebuild).
+- **Normal maps** (`bake::bake_normals`): appearance-preserving
+  simplification (Cohen, Olano & Manocha, SIGGRAPH 1998). The full mesh
+  and the level share the atlas, so no rays are cast: both are
+  rasterised in the atlas, and at each texel the full mesh's
+  interpolated normal is written in the level's interpolated tangent
+  frame. Texels outside the pieces are grown from their neighbours
+  (8 texels), then flat (128, 128, 255). The same input gives the same
+  bytes.
+- **Base colour** (`bake::bake_colour`): a print is sampled (bilinear,
+  repeating) at each texel's print coordinates, so engines need one
+  texture and one set of coordinates.
+
+## 4. Tests
 `crates/r3d-render/tests/photo.rs` (skipped on machines without any GPU
 adapter; a software Vulkan driver such as lavapipe is enough): a photo in each lighting, the same photo twice is
 identical, more samples and the denoiser smooth the image at the same

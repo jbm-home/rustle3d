@@ -15,6 +15,7 @@
 //! - [`projects`]: whole project folders: rename, delete, zip archives.
 //! - [`production`]: indicators per piece and the marker (M30).
 //! - [`bodies`]: bodies imported from a file (M31).
+//! - [`game`]: the game-ready export (M15).
 //!
 //! See `docs/architecture.md` §4 and the generated `docs/commands.md`.
 
@@ -25,6 +26,7 @@ pub mod docs;
 pub mod drape;
 pub mod error;
 pub mod fit;
+pub mod game;
 pub mod history;
 pub mod prints;
 pub mod production;

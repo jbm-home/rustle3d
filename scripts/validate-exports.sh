@@ -2,6 +2,9 @@
 # Export each template draped (briefly) with the avatar as GLB and check
 # the files with the Khronos glTF Validator; the T-shirt and the dress in
 # a print (built-in, JPEG image), so embedded textures are checked too.
+# The T-shirt also game-ready (spec 15): LODs, normal maps, its print in
+# an atlas, skinned to the avatar with the motions; and as an Unreal
+# shell without skin.
 # Needs Node.js; the validator is installed once into target/gltf-validator.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -34,4 +37,8 @@ JSON
   target/debug/r3d run "$project" "$work/$template-export.json" >/dev/null
   files+=("$project/out.glb")
 done
+tee="$work/t_shirt.r3d"
+target/debug/r3d export "$tee" --format game --avatar --normal-map 256 --out game.glb >/dev/null
+target/debug/r3d export "$tee" --format game --preset unreal --shell --no-skin --normal-map 256   --out game-shell.glb >/dev/null
+files+=("$tee/game.glb" "$tee/game-shell.glb")
 node "$tools/validate-gltf.mjs" "${files[@]}"

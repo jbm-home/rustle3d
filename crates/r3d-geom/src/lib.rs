@@ -8,12 +8,16 @@
 //! fabric ([`nest`], a marker). [`rigid`] holds the one 3D type: the
 //! rigid motion of a body's bone (metres, `f32`); [`trimesh`] and
 //! [`winding`] check a 3D surface (an imported body) and tell its inside
-//! from its outside.
+//! from its outside; [`decimate`] simplifies a draped mesh into lighter
+//! levels of detail and [`bake`] writes its shading into textures (game
+//! exports, M15).
 //!
 //! Units: millimetres, `f64`. See `docs/architecture.md`.
 
+pub mod bake;
 pub mod bezier;
 pub mod boolean;
+pub mod decimate;
 pub mod fit;
 pub mod mesh;
 pub mod nest;

@@ -7,7 +7,9 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-19 (M31, imported bodies: Body › Import body…,
+Last updated: 2026-11-19 (M15, game-engine export: Export › Game
+engine (glTF)…, levels of detail, normal maps, skinning to the body's
+skeleton with its motions; M31, imported bodies: Body › Import body…,
 the check, the arrangement points; M20, buttons and zippers: the Button and
 Zipper tools, buttoned or open while the garment drapes, the shirt
 buttoned and the trousers' fly zipper; M21, prints: stripes, gingham, dots, twill and
@@ -508,6 +510,48 @@ true colour under neutral light.
   view shows it, for Blender, game engines and other 3D tools. A print
   goes with it: inside the GLB file, or for OBJ as a material file
   (`.mtl`) and the print's image saved next to the OBJ.
+- **Game engine (glTF)…**: the garment ready for Godot, Unity, Unreal or
+  Blender, in one GLB file (see below).
+
+### Game engines
+**Export › Game engine (glTF)…** opens a window:
+- **Engine**: Generic, Godot, Unity or Unreal. It fills the other
+  settings with what suits that engine, and names things its way (for
+  Unreal `SK_`, `M_` and `T_` names).
+- **Levels of detail**: lighter copies of the garment for when it is far
+  away, as percentages of its triangles, for example `100, 50, 20`. The
+  first is always 100. The edges of the pieces never move, so seams stay
+  closed and hems keep their shape; a level can keep a few more
+  triangles than asked.
+- **Normal map**: the size of the image (512 to 4096 pixels) into which
+  the full garment's wrinkles are baked for each lighter level, so they
+  still look wrinkled. **None** leaves them out.
+- **Back faces**: **Double-sided** (the cloth drawn from both sides) or
+  **Thickness** (a real inside surface a little inside the outside one,
+  joined along the edges; give the thickness in mm), for engines or
+  shaders that hide back faces.
+- **Skin to the body's skeleton**: the garment follows the body's 24
+  bones, with the walk, turn and raise-arms motions as animations, so it
+  moves with a character. It is off for an imported body (it has no
+  skeleton). **Include the body** adds the body too.
+
+The garment is exported as the 3D view shows it, put back in the body's
+standing pose when skinned. Each garment is one mesh per level of
+detail, named `Shirt_LOD0`, `Shirt_LOD1`…, and its pieces are laid out
+in one image (with the print baked into it). The file is in metres with
+Y up, as glTF wants: the engines convert it themselves.
+- **Godot 4**: drop the `.glb` into the project and open it: the
+  skeleton, one mesh per level (show one, or set visibility ranges) and
+  an AnimationPlayer with `walk`, `turn` and `raise_arms`.
+- **Unity**: install the glTFast package, drop the `.glb` into Assets,
+  and put the `_LOD` meshes in a LOD Group.
+- **Unreal Engine 5**: Import, choose the `.glb`: it comes in as a
+  skeletal mesh with its animations (in centimetres, Z up).
+- **Blender**: File › Import › glTF 2.0.
+
+From the command line: `r3d export My.r3d --format game --preset godot`
+(also `--lods 1,0.5,0.2`, `--normal-map 2048`, `--shell`,
+`--thickness-mm 1`, `--no-skin`, `--avatar`).
 
 Every pattern export shows the cutting line, the sewing line (dashed,
 when the piece has a seam allowance), notches, internal lines, the
@@ -666,6 +710,9 @@ the tech pack as PDF: open formats only.
 - Garments worn close together can show through each other where they
   touch, and a shirt cannot be tucked into fitted trousers yet: layers of
   cloth keep about 2 cm apart in the simulation.
+- Game export: the levels of detail are separate meshes (no automatic
+  switching inside the file); the inside of a garment exported with
+  thickness shows the wrinkles of the outside reversed.
 - The avatar walks on the spot (not along a path), raises its arms to
   above the shoulders but not straight up, and only the built-in body
   moves (not an imported one, even if its file has a skeleton).

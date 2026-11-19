@@ -10,6 +10,7 @@ use crate::actions::*;
 use crate::commands::*;
 use crate::error::CommandError;
 use crate::fit::{FitReport, FitTape};
+use crate::game::ExportGame;
 use crate::production::*;
 use crate::progress::Progress;
 use crate::queries::*;
@@ -242,6 +243,7 @@ action_registry! {
     "export.pdf" => ExportPdf,
     "export.gltf" => ExportGltf,
     "export.obj" => ExportObj,
+    "export.game" => ExportGame,
     "export.dxf" => ExportDxf,
     "import.pattern" => ImportPattern,
     "avatar.import" => AvatarImport,
