@@ -3170,7 +3170,7 @@ class _ToolRail extends StatelessWidget {
       ('draw', Icons.brush_rounded, l.toolDraw, 'D', l.toolDrawHint),
     ],
     [
-      ('guide', Icons.straighten_rounded, l.toolGuide, 'G', l.toolGuideHint),
+      ('guide', Icons.linear_scale_rounded, l.toolGuide, 'G', l.toolGuideHint),
       (
         'dimension',
         Icons.square_foot_rounded,
@@ -3178,7 +3178,7 @@ class _ToolRail extends StatelessWidget {
         'T',
         l.toolDimensionHint,
       ),
-      ('tape', Icons.linear_scale_rounded, l.toolTape, '', l.toolTapeHint),
+      ('tape', Icons.straighten_rounded, l.toolTape, '', l.toolTapeHint),
     ],
     [
       (
@@ -4069,6 +4069,20 @@ class _PanelInspector extends StatelessWidget {
             'angle_deg': v.roundToDouble(),
           }),
         ),
+        // The fabric of the piece's garment, also shown with nothing
+        // selected: changing it changes every piece of that garment.
+        for (final g in garments)
+          if (g['id'] == panel['garment']) ...[
+            const SizedBox(height: Space.xl),
+            _FabricPicker(
+              current: g['fabric'] as String? ?? 'cotton',
+              onPick: (fabric) => run({
+                'type': 'garment.set_fabric',
+                'garment': g['id'],
+                'fabric': fabric,
+              }),
+            ),
+          ],
         if (garments.any(
           (g) => g['id'] == panel['garment'] && g['print'] != null,
         )) ...[

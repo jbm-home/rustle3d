@@ -165,7 +165,7 @@ class _TapeCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.linear_scale_rounded, size: 16, color: p.accent),
+              Icon(Icons.straighten_rounded, size: 16, color: p.accent),
               const SizedBox(width: Space.s),
               Text(
                 l.toolTape,

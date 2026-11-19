@@ -7,7 +7,7 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-19 (the tool rail in four sections, drawing, measuring, sewing and trims, with Dart and Pleat under Darts and pleats and Hole a tool of its own; the guided flow's step bar and banner removed; a more natural walk and a new motion, Stand at ease; captured motions whose rest pose lies flat play upright; pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
+Last updated: 2026-11-19 (a selected piece's panel shows its garment's fabric; the Construction line and Tape measure tools have new icons; the tool rail in four sections, drawing, measuring, sewing and trims, with Dart and Pleat under Darts and pleats and Hole a tool of its own; the guided flow's step bar and banner removed; a more natural walk and a new motion, Stand at ease; captured motions whose rest pose lies flat play upright; pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
 hips, so trousers no longer slide with each step; a garment worn over
 trousers starts outside them; captured motions: Motion › Import a captured
 motion… plays a BVH motion capture on the avatar, Motion › Motion
@@ -353,6 +353,8 @@ linked mirror copy must be unlinked first.
 ## Fabric and garments
 With nothing selected, the panel on the right lists the project's
 garments: pick each one's fabric (cotton, denim, jersey, silk, wool).
+A selected piece's panel shows its garment's fabric too; changing it
+there changes every piece of that garment.
 Fabric changes how a garment hangs and looks; the drape follows. (A
 custom colour can be set by an agent or the command line,
 `garment.set_color`; not yet in the app.)
