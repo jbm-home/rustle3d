@@ -301,13 +301,18 @@ pub struct Body {
     pub hips_cm: f64,
 }
 
-/// The avatar of a project: measurements, and the preset they came from.
+/// The avatar of a project: measurements, the preset they came from, and
+/// the body imported from a file, if any.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Avatar {
     pub body: Body,
     /// Name of the preset the measurements were taken from, if any.
     pub preset: Option<String>,
+    /// A body imported from a file (spec 27), draped instead of the one
+    /// fitted to `body`; `body` then holds measurements taken on it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mesh: Option<crate::imported::AvatarMesh>,
 }
 
 /// A group of panels worn together, in one fabric and colour. A project

@@ -233,6 +233,11 @@ impl ActionSpec for Simulate {
             return Err(CommandError::invalid("frames", Invalid::Range(1.0, 3600.0)).into());
         }
         let project = ws.session().project();
+        let imported = project.avatar().and_then(|a| a.mesh.as_ref());
+        if imported.is_some() && self.motion.is_some() {
+            return Err(CommandError::ImportedBodyStill.into());
+        }
+        let body_warnings = imported.map(|m| crate::bodies::check(m).warnings());
         let motion = self.motion.map(Into::into);
         let out = drape::simulate(project, self.frames, motion, progress)?;
         let cache = drape::encode_cache(drape::fingerprint(project)?, &out);
@@ -258,6 +263,54 @@ impl ActionSpec for Simulate {
             "motion_s": out
                 .animation
                 .map(|a| r3((f64::from(out.frames) / 60.0 - f64::from(a.start)).max(0.0))),
+            "body_warnings": body_warnings,
+        }))
+    }
+}
+
+/// Drape on a body imported from an OBJ, glTF or GLB file.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AvatarImport {
+    /// The file, relative to the project folder (`r3d avatar import` and
+    /// the app copy files into `avatars/`): `.obj`, `.gltf` (buffers
+    /// embedded) or `.glb`.
+    pub path: String,
+    /// Metres per file unit; detected when omitted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scale: Option<f64>,
+    /// The file's up axis (`y`, `z`, `x`, `-y`, `-z`, `-x`); detected
+    /// when omitted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub up: Option<r3d_core::UpAxis>,
+    /// Turn about the vertical (degrees) so the body faces +Z; detected
+    /// when omitted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turn_deg: Option<f64>,
+}
+
+impl Described for AvatarImport {
+    const SUMMARY: &'static str = "Drape on a body imported from an OBJ, glTF or GLB file inside the project folder (a scan, a game character; you own its licence). Units, up axis and facing are detected unless given (correct them with avatar.orient); the arrangement points are guessed (move them with avatar.set_point) and the measurements taken on the body. One undo step (`avatar.import_mesh`). Returns the measurements and the check (as avatar.check). Imported bodies do not move.";
+}
+
+impl ActionSpec for AvatarImport {
+    fn run(&self, ws: &mut Workspace) -> Result<Value, WorkspaceError> {
+        let format = r3d_io::model::ModelFormat::of_name(&self.path)
+            .ok_or_else(|| CommandError::invalid("path", Invalid::Format))?;
+        let bytes = ws.read(&self.path)?;
+        let loaded = crate::bodies::register(&bytes, format)?;
+        let cmd = Command::AvatarImportMesh(crate::commands::AvatarImportMesh {
+            file: self.path.clone(),
+            hash: loaded.hash.clone(),
+            scale: self.scale,
+            up: self.up,
+            turn_deg: self.turn_deg,
+        });
+        ws.session_mut().execute(&cmd)?;
+        let avatar = ws.session().project().avatar();
+        Ok(json!({
+            "body": avatar.map(|a| a.body),
+            "check": avatar.and_then(|a| a.mesh.as_ref()).map(crate::bodies::check),
         }))
     }
 }

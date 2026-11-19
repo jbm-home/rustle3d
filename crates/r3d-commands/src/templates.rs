@@ -716,7 +716,11 @@ fn draft_size(
     };
     let mut project = Project::new("");
     let mut tx = Transaction::begin(&mut project);
-    tx.set_avatar(Some(Avatar { body, preset: None }));
+    tx.set_avatar(Some(Avatar {
+        body,
+        preset: None,
+        mesh: None,
+    }));
     let (_, origins) = draft_in(&mut tx, template, sizes, &[])?;
     Ok(Drafted {
         origins,

@@ -495,6 +495,25 @@ impl QuerySpec for AvatarGet {
         let Some(avatar) = p.avatar() else {
             return Ok(Value::Null);
         };
+        if let Some(mesh) = &avatar.mesh {
+            // Taken on the imported body at its points.
+            let cm = |k: r3d_core::BodyPoint| {
+                mesh.points
+                    .get(&k)
+                    .map(|v| (v[1] / 10.0 * 10.0).round() / 10.0)
+            };
+            return Ok(serde_json::json!({
+                "body": avatar.body,
+                "preset": avatar.preset,
+                "achieved": avatar.body,
+                "heights_cm": {
+                    "waist": cm(r3d_core::BodyPoint::Waist),
+                    "hips": cm(r3d_core::BodyPoint::Hips),
+                    "crotch": cm(r3d_core::BodyPoint::Crotch),
+                },
+                "imported": mesh,
+            }));
+        }
         let model = body_model()?;
         let fit = fitted(&avatar.body)?;
         let a = fit.achieved;
@@ -518,6 +537,25 @@ impl QuerySpec for AvatarGet {
                 "crotch": h.crotch.map(|c| r1(c * 100.0)),
             },
         }))
+    }
+}
+
+/// The check of the imported body (spec 27).
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AvatarCheck {}
+
+impl Described for AvatarCheck {
+    const SUMMARY: &'static str = "Check the imported body before draping: `ready` (no error), triangle and vertex counts, height, units/up axis/turn used, whether the file has a skeleton, `items` (each a stable `code`, a `severity` error/warning/info and `args`: file.unavailable, mesh.open, mesh.non_manifold, mesh.pieces, mesh.heavy, mesh.coarse, mesh.reoriented, mesh.inside_out, mesh.degenerate, scale.height, orientation.up, orientation.facing, points.outside, points.side, measurements.clamped, motion.unavailable) and the arrangement points with their distance to the surface (mm, negative inside). Fails when the avatar has no imported body.";
+}
+
+impl QuerySpec for AvatarCheck {
+    fn run(&self, p: &Project) -> Result<Value, CommandError> {
+        let mesh = p
+            .avatar()
+            .and_then(|a| a.mesh.as_ref())
+            .ok_or(CommandError::NoImportedBody)?;
+        to_value(&crate::bodies::check(mesh))
     }
 }
 

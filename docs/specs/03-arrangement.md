@@ -22,8 +22,12 @@ axis (`flat`: a bag hanging from pins). The inspector sets a piece's
 placement, and ⌘-drag in 3D moves a piece around the body. Schema v8
 (M12): a placement may name the pattern abscissa that goes to its angle
 (`centre_x_mm`, default the panel's horizontal centre); the pieces of a
-cut panel keep the whole's, so they start where it was. Not yet: legs,
-arrangement points shown in 3D.
+cut panel keep the whole's, so they start where it was. Since
+2026-11-19 (M31, spec 27) an imported body has arrangement points
+(chest, waist, hips, crotch, each arm's shoulder, elbow and wrist, each
+leg's thigh and shin) guessed from its sections, shown and moved in 3D
+and checked before draping: sleeves and trouser legs wrap around the
+axes they give. Not yet: dragging a piece onto a point.
 
 ## Behavior
 - The avatar has **arrangement points**: front torso, back torso, left/right

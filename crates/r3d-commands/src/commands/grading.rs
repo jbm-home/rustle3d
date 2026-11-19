@@ -401,6 +401,7 @@ impl CommandSpec for GradingUseChart {
             tx.set_avatar(Some(Avatar {
                 body: *base_body,
                 preset: None,
+                mesh: None,
             }));
         }
         let sizes: Vec<SizeSpec> = range

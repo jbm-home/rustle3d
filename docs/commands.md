@@ -183,6 +183,263 @@ Remove the avatar from the project.
 
 </details>
 
+### `avatar.import_mesh`
+
+Drape on a body read from a file in the project folder (run `avatar.import`, which reads the file and calls this). Units, up axis and facing are detected unless given; the arrangement points are guessed and the measurements taken on the body (templates are sized from them).
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "UpAxis": {
+      "description": "An axis of a model file.",
+      "enum": [
+        "y",
+        "z",
+        "x",
+        "-y",
+        "-z",
+        "-x"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Drape on a body imported from a file already read (`avatar.import`\nreads it; an agent calls that action rather than this command).",
+  "properties": {
+    "file": {
+      "description": "The file, relative to the project folder (`avatars/scan.glb`).",
+      "type": "string"
+    },
+    "hash": {
+      "description": "Its fingerprint, as `avatar.import` returns it.",
+      "type": "string"
+    },
+    "scale": {
+      "description": "Metres per file unit; detected when omitted.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "turn_deg": {
+      "description": "Turn about the vertical (degrees) so the body faces +Z; detected\nwhen omitted.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "up": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/UpAxis"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The file's up axis; detected when omitted."
+    }
+  },
+  "required": [
+    "file",
+    "hash"
+  ],
+  "title": "AvatarImportMesh",
+  "type": "object"
+}
+```
+
+</details>
+
+### `avatar.orient`
+
+Correct how the imported body's file is read: its units (scale, metres per unit), which axis is up, and a turn about the vertical so it faces +Z. Omitted values stay. The arrangement points are guessed again and the measurements taken again.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "UpAxis": {
+      "description": "An axis of a model file.",
+      "enum": [
+        "y",
+        "z",
+        "x",
+        "-y",
+        "-z",
+        "-x"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Correct the units, up axis or facing of the imported body.",
+  "properties": {
+    "scale": {
+      "description": "Metres per file unit (0.01 for centimetres, 0.001 for millimetres,\n0.0254 for inches).",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "turn_deg": {
+      "description": "Turn about the vertical (degrees) so the body faces +Z.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "up": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/UpAxis"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The file's axis that points up: `y`, `z`, `x`, `-y`, `-z`, `-x`."
+    }
+  },
+  "title": "AvatarOrient",
+  "type": "object"
+}
+```
+
+</details>
+
+### `avatar.set_point`
+
+Move an arrangement point of the imported body (mm, Y up, facing +Z, the body's left at +x): chest, waist, hips (the measurements are taken again at their height), crotch, left/right_shoulder, _elbow, _wrist (the axis sleeves wrap around), left/right_thigh, _shin (the trouser legs' axis). A point must lie inside the body; avatar.check flags it otherwise.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "BodyPoint": {
+      "description": "Points that tell the drape where the body's parts are (spec 27).",
+      "oneOf": [
+        {
+          "enum": [
+            "left_shoulder",
+            "left_elbow",
+            "left_wrist",
+            "right_shoulder",
+            "right_elbow",
+            "right_wrist",
+            "right_thigh",
+            "right_shin"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "chest",
+          "description": "The middle of the torso at the bust or chest girth.",
+          "type": "string"
+        },
+        {
+          "const": "waist",
+          "description": "The middle of the torso at the waist girth.",
+          "type": "string"
+        },
+        {
+          "const": "hips",
+          "description": "The middle of the torso at the hips girth.",
+          "type": "string"
+        },
+        {
+          "const": "crotch",
+          "description": "Where the legs part.",
+          "type": "string"
+        },
+        {
+          "const": "left_thigh",
+          "description": "The middle of the left thigh: the top of the left leg's axis.",
+          "type": "string"
+        },
+        {
+          "const": "left_shin",
+          "description": "The middle of the left shin: the axis goes through it.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Move one arrangement point of the imported body.",
+  "properties": {
+    "at_mm": {
+      "description": "Where (mm, Y up, the body facing +Z, its left at +x, feet at 0).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 3,
+      "minItems": 3,
+      "type": "array"
+    },
+    "point": {
+      "$ref": "#/$defs/BodyPoint"
+    }
+  },
+  "required": [
+    "point",
+    "at_mm"
+  ],
+  "title": "AvatarSetPoint",
+  "type": "object"
+}
+```
+
+</details>
+
+### `avatar.guess_points`
+
+Guess the imported body's arrangement points again from its sections (arms down or in an A pose), and take its measurements again.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Guess the imported body's arrangement points again.",
+  "title": "AvatarGuessPoints",
+  "type": "object"
+}
+```
+
+</details>
+
+### `avatar.remove_mesh`
+
+Drape on the built-in body again, fitted to the avatar's measurements (those taken on the imported body). The file stays in the project's avatars/ folder.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Go back to the built-in body.",
+  "title": "AvatarRemoveMesh",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `panel.create_rect`
 
 Create a rectangular panel. Returns the panel, then its 4 points (counter-clockwise from the origin), then its 4 edges.
@@ -5227,6 +5484,24 @@ Built-in body presets: standard women's and men's sizes, as {name, body} pairs u
 
 </details>
 
+### `avatar.check`
+
+Check the imported body before draping: `ready` (no error), triangle and vertex counts, height, units/up axis/turn used, whether the file has a skeleton, `items` (each a stable `code`, a `severity` error/warning/info and `args`: file.unavailable, mesh.open, mesh.non_manifold, mesh.pieces, mesh.heavy, mesh.coarse, mesh.reoriented, mesh.inside_out, mesh.degenerate, scale.height, orientation.up, orientation.facing, points.outside, points.side, measurements.clamped, motion.unavailable) and the arrangement points with their distance to the surface (mm, negative inside). Fails when the avatar has no imported body.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The check of the imported body (spec 27).",
+  "title": "AvatarCheck",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `seam.list`
 
 Every seam: its two sides (an `edge`, or `edges` / a `line` with `from_mm` and `to_mm` for part of a path; with their panels, lengths in mm and direction), the length mismatch in mm beyond its ease, its ease, whether it is gathered and its gathering ratio (longer side / shorter side).
@@ -5932,6 +6207,74 @@ Import the pieces of a pattern drawn elsewhere, from a DXF-AAMA (or plain DXF), 
     "path"
   ],
   "title": "ImportPattern",
+  "type": "object"
+}
+```
+
+</details>
+
+### `avatar.import`
+
+Drape on a body imported from an OBJ, glTF or GLB file inside the project folder (a scan, a game character; you own its licence). Units, up axis and facing are detected unless given (correct them with avatar.orient); the arrangement points are guessed (move them with avatar.set_point) and the measurements taken on the body. One undo step (`avatar.import_mesh`). Returns the measurements and the check (as avatar.check). Imported bodies do not move.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "UpAxis": {
+      "description": "An axis of a model file.",
+      "enum": [
+        "y",
+        "z",
+        "x",
+        "-y",
+        "-z",
+        "-x"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Drape on a body imported from an OBJ, glTF or GLB file.",
+  "properties": {
+    "path": {
+      "description": "The file, relative to the project folder (`r3d avatar import` and\nthe app copy files into `avatars/`): `.obj`, `.gltf` (buffers\nembedded) or `.glb`.",
+      "type": "string"
+    },
+    "scale": {
+      "description": "Metres per file unit; detected when omitted.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "turn_deg": {
+      "description": "Turn about the vertical (degrees) so the body faces +Z; detected\nwhen omitted.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "up": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/UpAxis"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The file's up axis (`y`, `z`, `x`, `-y`, `-z`, `-x`); detected\nwhen omitted."
+    }
+  },
+  "required": [
+    "path"
+  ],
+  "title": "AvatarImport",
   "type": "object"
 }
 ```

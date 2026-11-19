@@ -14,10 +14,12 @@
 //! - [`Session`]: a project plus its history; executes all of the above.
 //! - [`projects`]: whole project folders: rename, delete, zip archives.
 //! - [`production`]: indicators per piece and the marker (M30).
+//! - [`bodies`]: bodies imported from a file (M31).
 //!
 //! See `docs/architecture.md` §4 and the generated `docs/commands.md`.
 
 pub mod actions;
+pub mod bodies;
 pub mod commands;
 pub mod docs;
 pub mod drape;

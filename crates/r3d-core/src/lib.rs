@@ -14,6 +14,7 @@ pub mod file;
 pub mod formula;
 pub mod grading;
 pub mod id;
+pub mod imported;
 pub mod integrity;
 pub mod measure;
 pub mod message;
@@ -28,6 +29,7 @@ pub use id::{
     AnyId, ButtonId, ConstraintId, EdgeId, GarmentId, GuideId, InternalLineId, NotchId, PanelId,
     PinId, PointId, SeamId, ZipperId,
 };
+pub use imported::{AvatarMesh, BodyPoint, UpAxis};
 pub use message::{Localizable, Message};
 pub use model::{
     Along, Around, Avatar, Body, Constraint, DisplayUnit, Edge, EdgeCurve, Fabric, FabricDetails,

@@ -13,7 +13,7 @@ CLI, renders and exports showing the body as it is at the last frame.
 Not yet: walking forward along a path (the avatar walks on the spot),
 arms raised straight overhead (linear blend skinning folds the armpit;
 a better skinning, e.g. dual quaternions, would allow it), motions of
-imported avatars (M31), a timeline to scrub through a motion, recording
+imported avatars (M31 imports bodies but they stand still, spec 27), a timeline to scrub through a motion, recording
 a motion as a video, skinning the garment for game engines (M15).
 
 ## User story

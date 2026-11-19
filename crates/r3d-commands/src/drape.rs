@@ -88,6 +88,20 @@ pub struct Form {
     collider: StaticMesh,
     /// What moves the body, if it can move.
     rig: Option<Rig>,
+    /// Heights (m) of the chest, waist and hips, for an imported body
+    /// (its arrangement points); the built-in body's are found on it.
+    pub levels: Option<[f32; 3]>,
+}
+
+/// Where a body's limbs are (m): each arm's shoulder, elbow and wrist,
+/// each leg's thigh and shin middles, left (+x) first, and the height of
+/// the crotch. Found on the body ([`Parts::find`]) or given by an
+/// imported body's arrangement points.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Parts {
+    pub arms: [[Vec3; 3]; 2],
+    pub legs: [[Vec3; 2]; 2],
+    pub crotch: f32,
 }
 
 /// A body's skeleton and skin weights.
@@ -216,6 +230,14 @@ const REACH_FROM: f32 = 0.5;
 /// Where to look for the wrist: this far past the elbow along the
 /// forearm (m; a forearm is 0.14–0.15 of stature).
 const WRIST_SEARCH: (f32, f32) = (0.12, 0.32);
+/// A forearm's length, as a fraction of stature.
+const FOREARM: f32 = 0.145;
+/// The shoulder joint's height, as a fraction of stature (just below
+/// the acromion, 0.81).
+const SHOULDER_JOINT: f32 = 0.79;
+/// How far above the upper arm's middle the shoulder is put on a raised
+/// arm (m).
+const RAISED_SHOULDER_M: f32 = 0.1;
 /// Cloth narrower than a leg starts this far out from it (m).
 const LIMB_CLEARANCE_M: f32 = 0.005;
 /// A leg's axis runs through the middle of the thigh and of the shin at
@@ -339,6 +361,28 @@ impl Leg {
         self.point + self.down * ((y - self.point.y) / self.down.y)
     }
 
+    /// The leg on `side` through the middles of its thigh and its shin
+    /// (an imported body's arrangement points); `body` as for
+    /// [`Leg::find`].
+    fn through([thigh, shin]: [Vec3; 2], body: &[Vec3], height: f32, side: f32) -> Self {
+        let mut leg = Self {
+            point: thigh,
+            down: (shin - thigh).normalize_or(Vec3::NEG_Y),
+            profile: Profile::default(),
+        };
+        leg.profile = leg.profile_of(body, height, side);
+        leg
+    }
+
+    /// The body on this leg's side around its axis.
+    fn profile_of(&self, body: &[Vec3], height: f32, side: f32) -> Profile {
+        let half = body.iter().filter(|p| side * p.x > 0.0).map(|p| {
+            let c = self.centre(p.y);
+            (p.y, Vec2::new(p.x - c.x, p.z - c.z))
+        });
+        Profile::new(height, half)
+    }
+
     /// Find the leg on `side` of a body; `body` holds the points that are
     /// not arms or hands. The middle of a slice is the middle of its
     /// bounding box: the vertices are not spread evenly around a leg.
@@ -361,11 +405,7 @@ impl Leg {
             down: (shin - thigh).normalize_or(Vec3::NEG_Y),
             profile: Profile::default(),
         };
-        let half = body.iter().filter(|p| side * p.x > 0.0).map(|p| {
-            let c = leg.centre(p.y);
-            (p.y, Vec2::new(p.x - c.x, p.z - c.z))
-        });
-        leg.profile = Profile::new(height, half);
+        leg.profile = leg.profile_of(body, height, side);
         leg
     }
 
@@ -421,6 +461,38 @@ impl Arm {
             let elbow = self.point + self.down * self.elbow;
             (elbow + self.fore * (t - self.elbow), self.fore)
         }
+    }
+
+    /// The arm through a shoulder, an elbow and a wrist (an imported
+    /// body's arrangement points).
+    fn through([shoulder, elbow, wrist]: [Vec3; 3], positions: &[Vec3], height: f32) -> Self {
+        let mut arm = Self {
+            point: shoulder,
+            down: (elbow - shoulder).normalize_or(Vec3::NEG_Y),
+            elbow: shoulder.distance(elbow),
+            fore: Vec3::NEG_Y,
+            reach: Vec::new(),
+        };
+        arm.fore = (wrist - elbow).normalize_or(arm.down);
+        arm.measure(positions, height);
+        arm
+    }
+
+    /// The shoulder, elbow and wrist of an arm found on a body: the axis
+    /// where it reaches the shoulder's height (or a little above its
+    /// upper arm when the arm is raised), the elbow, and the middle of
+    /// the wrist (or a forearm's length past the elbow).
+    fn joints(&self, positions: &[Vec3], height: f32) -> [Vec3; 3] {
+        let up = if self.down.y < -0.3 {
+            (SHOULDER_JOINT * height - self.point.y) / self.down.y
+        } else {
+            -RAISED_SHOULDER_M
+        };
+        let elbow = self.point + self.down * self.elbow;
+        let wrist = self
+            .wrist(positions, height)
+            .unwrap_or(elbow + self.fore * FOREARM * height);
+        [self.point + self.down * up, elbow, wrist]
     }
 
     /// Find the arm on `side` of a body (A pose).
@@ -533,30 +605,96 @@ impl Arm {
     }
 }
 
+/// The body's points that are not arms or hands (the torso and the legs).
+fn torso_and_legs(positions: &[Vec3], arms: &[Arm; 2], height: f32) -> Vec<Vec3> {
+    positions
+        .iter()
+        .copied()
+        .filter(|p| {
+            Vec2::new(p.x, p.z).length() < ARM_REACH_M
+                && !arms.iter().any(|a| a.holds(*p, height).is_some())
+        })
+        .collect()
+}
+
+/// The height of the crotch: the lowest body point on the median plane,
+/// above the feet.
+fn crotch_of(body: &[Vec3], height: f32) -> f32 {
+    body.iter()
+        .filter(|p| p.x.abs() < MEDIAN_POINT_M && p.y > CROTCH_ABOVE * height)
+        .map(|p| p.y)
+        .fold(CROTCH_FRACTION * height, f32::min)
+}
+
+impl Parts {
+    /// The limbs of a body standing with its arms down or in an A pose
+    /// (positions in m, feet at y = 0, facing +Z): the guess for an
+    /// imported body's arrangement points.
+    pub fn find(positions: &[Vec3]) -> Self {
+        let height = positions.iter().map(|p| p.y).fold(0.0, f32::max);
+        let arms = [1.0, -1.0].map(|side| Arm::find(positions, height, side));
+        let body = torso_and_legs(positions, &arms, height);
+        let legs = [1.0, -1.0].map(|side| {
+            let leg = Leg::find(&body, height, side);
+            [leg.point, leg.centre(LEG_SLICES.1 * height)]
+        });
+        Self {
+            arms: arms.map(|a| a.joints(positions, height)),
+            legs,
+            crotch: crotch_of(&body, height),
+        }
+    }
+}
+
 impl Form {
     /// A dress form that stands still.
     pub fn new(positions: Vec<Vec3>, triangles: Vec<[u32; 3]>) -> Self {
         Self::with_rig(positions, triangles, None)
     }
 
+    /// A dress form for an imported body: its limbs where `parts` says,
+    /// its chest, waist and hips at `levels` (m); it does not move.
+    pub fn imported(
+        positions: Vec<Vec3>,
+        triangles: Vec<[u32; 3]>,
+        parts: &Parts,
+        levels: [f32; 3],
+    ) -> Self {
+        let mut form = Self::build(positions, triangles, None, Some(parts));
+        form.levels = Some(levels);
+        form
+    }
+
     fn with_rig(positions: Vec<Vec3>, triangles: Vec<[u32; 3]>, rig: Option<Rig>) -> Self {
+        Self::build(positions, triangles, rig, None)
+    }
+
+    fn build(
+        positions: Vec<Vec3>,
+        triangles: Vec<[u32; 3]>,
+        rig: Option<Rig>,
+        parts: Option<&Parts>,
+    ) -> Self {
         let height = positions.iter().map(|p| p.y).fold(0.0, f32::max);
-        let arms = [1.0, -1.0].map(|side| Arm::find(&positions, height, side));
-        let body: Vec<Vec3> = positions
-            .iter()
-            .copied()
-            .filter(|p| {
-                Vec2::new(p.x, p.z).length() < ARM_REACH_M
-                    && !arms.iter().any(|a| a.holds(*p, height).is_some())
-            })
-            .collect();
+        let arms = match parts {
+            Some(p) => p
+                .arms
+                .map(|joints| Arm::through(joints, &positions, height)),
+            None => [1.0, -1.0].map(|side| Arm::find(&positions, height, side)),
+        };
+        let body = torso_and_legs(&positions, &arms, height);
         let radial = Profile::new(height, body.iter().map(|p| (p.y, Vec2::new(p.x, p.z))));
-        let legs = [1.0, -1.0].map(|side| Leg::find(&body, height, side));
-        let crotch = body
-            .iter()
-            .filter(|p| p.x.abs() < MEDIAN_POINT_M && p.y > CROTCH_ABOVE * height)
-            .map(|p| p.y)
-            .fold(CROTCH_FRACTION * height, f32::min);
+        let legs = match parts {
+            Some(p) => {
+                let [left, right] = p.legs;
+                [
+                    Leg::through(left, &body, height, 1.0),
+                    Leg::through(right, &body, height, -1.0),
+                ]
+            }
+            None => [1.0, -1.0].map(|side| Leg::find(&body, height, side)),
+        };
+        let crotch = parts.map_or_else(|| crotch_of(&body, height), |p| p.crotch);
         let skin: Vec<Skin> = rig
             .iter()
             .flat_map(|r| &r.weights)
@@ -576,6 +714,7 @@ impl Form {
             crotch,
             collider,
             rig,
+            levels: None,
         }
     }
 
@@ -640,7 +779,11 @@ impl Form {
 
     /// The project's avatar fitted to its measurements, if it has one
     /// (in the shown size's).
+    /// An imported body (spec 27) is draped as it is, in every size.
     pub fn of_project(project: &Project) -> Result<Option<Self>, CommandError> {
+        if let Some(mesh) = project.avatar().and_then(|a| a.mesh.as_ref()) {
+            return Ok(Some(crate::bodies::form(mesh)?.as_ref().clone()));
+        }
         project.shown_body().map(|b| Self::of_body(&b)).transpose()
     }
 
@@ -666,6 +809,10 @@ impl Form {
 /// it is given, so a cuff below a sleeve `len` long starts `len × drop`
 /// below the sleeve's top.
 pub(crate) fn arm_drop(project: &Project) -> Result<f64, CommandError> {
+    if let Some(mesh) = project.avatar().and_then(|a| a.mesh.as_ref()) {
+        let form = crate::bodies::form(mesh)?;
+        return Ok(form.arms.first().map_or(0.8, |a| f64::from(-a.down.y)));
+    }
     let arm = match project.avatar() {
         Some(avatar) => {
             let model = body_model()?;

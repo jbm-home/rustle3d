@@ -1,6 +1,6 @@
 # Rustle3D architecture
 
-Status: living document, last updated 2026-11-19 (M20, buttons and zippers).
+Status: living document, last updated 2026-11-19 (M31, imported avatars).
 
 Every choice here is the **current best guess**, not a rule. Each one says
 why it was made and what was considered, so it can be challenged and changed
@@ -58,7 +58,7 @@ the change log at the end. Sections marked **Open** are explicitly undecided.
 | `r3d-core` | `r3d-geom`, `serde`, `serde_json`, `schemars` | sim, GUI, GPU |
 | `r3d-sim` | `r3d-geom`, `glam`, `rayon`, `thiserror` | core, GUI, GPU |
 | `r3d-sim-gpu` | `r3d-sim`, `r3d-geom`, `wgpu`, `bytemuck`, `pollster`, `thiserror` | core, commands, render, GUI |
-| `r3d-io` | `r3d-core`, `r3d-geom`, `pdf-writer`, `lopdf`, `roxmltree`, `svgtypes`, `png`, `zune-jpeg`, `miniz_oxide`, `serde_json`, `thiserror` | sim, GUI, GPU; no file I/O (takes and returns bytes) |
+| `r3d-io` | `r3d-core`, `r3d-geom`, `glam`, `pdf-writer`, `lopdf`, `roxmltree`, `svgtypes`, `png`, `zune-jpeg`, `miniz_oxide`, `serde_json`, `thiserror` | sim, GUI, GPU; no file I/O (takes and returns bytes) |
 | `r3d-commands` | core, geom, io (sim from M4), avatar, `rayon` | GUI, GPU |
 | `r3d-render` | core, geom, `wgpu`, `image` | commands, GUI toolkit |
 | `r3d-mcp` | commands (render from M3), `rmcp`, `tokio` | GUI toolkit |
@@ -97,14 +97,13 @@ Project                                        (✓ = implemented in M1)
  ├─ edges:   IdMap<EdgeId, Edge>               (line or cubic Bézier between two PointIds)
  ├─ seams:   IdMap<SeamId, Seam>               (two sides: edges or an internal line, a stretch, a direction; ease)
  ├─ materials: IdMap<MaterialId, FabricMaterial>
- ├─ avatar:  Option<AvatarRef>                 (path inside the project folder + landmarks)
+ ├─ avatar:  Option<Avatar>                    ✓ (measurements; M31: an imported body's file, orientation, arrangement points)
  ├─ grading: Option<Grading>                   ✓ (M22: sizes with body differences, base, shown)
  ├─ constraints: IdMap<ConstraintId, Constraint> ✓ (M27: geometric constraints and dimensions)
  ├─ guides: IdMap<GuideId, Guide>              ✓ (M27: construction lines)
  ├─ variables: name → formula                  ✓ (M28: named variables for formulas)
  ├─ buttons: IdMap<ButtonId, Button>           ✓ (M20: a button, its buttonhole, buttoned or not)
  ├─ zippers: IdMap<ZipperId, Zipper>           ✓ (M20: two sides, an open length from the top)
- ├─ arrangement_points: from the avatar, editable
  └─ drape:   Option<DrapeSnapshot>             (last saved simulated positions)
 ```
 
@@ -169,7 +168,7 @@ Project                                        (✓ = implemented in M1)
 ```
 MySkirt.r3d/
  ├─ project.json        the document (pretty-printed, stable key order)
- ├─ avatars/            imported avatar meshes (copied in, referenced relatively)
+ ├─ avatars/            imported avatar meshes (copied in, referenced relatively; spec 27)
  ├─ imports/            pattern files imported (DXF, SVG, PDF), kept as given
  ├─ textures/           print images the user added (PNG, JPEG; spec 25)
  ├─ exports/            default output location for OBJ/glTF/SVG/PDF/PNG
@@ -614,4 +613,7 @@ code stays **i18n-ready** for more:
 | 2026-11-19 | M21: built-in prints drawn by our own code (`r3d_core::print::builtin`, in the garment's colour), no shipped image assets; prints decoded in `r3d-io` (`png`, and `zune-jpeg`, MIT/Apache-2.0/Zlib, pure Rust, for JPEG) and cached per front-end by `r3d_commands::prints::Prints` | No third-party image licences to track; built-ins follow the garment's colour. JPEG is what photos of fabric come as; `zune-jpeg` is the decoder the `image` crate itself uses now, without its other codecs |
 | 2026-11-19 | M21: the photo tracer reads prints from the storage buffer it already had for the sheen table (one buffer: table, then a header and every print's texels), with manual bilinear filtering and no mip-maps | WebGPU guarantees eight storage buffers per shader stage and the tracer used all of them; binding arrays of textures are not portable. Samples accumulating per pixel filter the print |
 | 2026-11-19 | M20: buttons and zippers as entity maps on `Project` (schema v17), omitted from the JSON when empty; a zipper's state is its open length from the top, not a slider position from the bottom | Projects without trims keep the same file (and the same drape cache key); a closed zipper stays closed when its sides change length |
+| 2026-11-19 | M31: an imported body is a file in `avatars/` named in the document by relative path and fingerprint, with how to read it (scale, up axis, turn) and its arrangement points (schema v18); the file is read when the folder is opened or the body imported and kept in memory by fingerprint (`r3d_commands::bodies`), where commands, queries and `Form::of_project` find it | Commands and queries see only the document, and every front-end already opens projects through a `Workspace`; the fingerprint makes the drape cache follow the file and notices a file changed by hand. Passing the folder down to every `Form::of_project` caller (tests, renders, the app's form cache) would have touched them all for one case |
+| 2026-11-19 | M31: model files read by `r3d-io` itself (`model`: OBJ, glTF/GLB with embedded buffers; our own base64), `glam` added to `r3d-io` for node transforms; no `gltf`/`tobj` crates | The subset a body needs is small (positions, triangles, node transforms); glam is already in the tree; compressed glTF (Draco, meshopt) is refused with a message rather than pulling in decoders |
+| 2026-11-19 | M31: the distance field of an open or non-manifold body signs nodes near the bad edges by generalized winding numbers (Barill et al.'s hierarchy, `r3d_geom::winding`), elsewhere by pseudo-normals as before | Exact and unchanged for closed bodies; robust near holes at the cost of a few thousand winding numbers; both solvers read the same field |
 | 2026-11-19 | M20: closures are a constraint kind of their own in the solvers (`SimScene::closures`), a stiff distance whose target shrinks at 0.5 m/s, not seams; opening or closing one rebuilds the scene and carries the cloth over | Seams close on the sewing ramp and are stiff after it: a button fastened later snapped shut at ≈ 50 m/s. The rebuild path already carries pattern edits into a running drape, so no solver needs constraints added or removed at run time |

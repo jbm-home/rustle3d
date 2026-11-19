@@ -100,6 +100,62 @@ fn starter_garments_drape_on_the_gpu_as_on_the_cpu() {
 }
 
 #[test]
+fn a_t_shirt_drapes_on_an_imported_body_on_the_gpu() {
+    let Some(gpu) = gpu::context() else {
+        return;
+    };
+    // The built-in body written in centimetres, Z up, its soles open.
+    let body: r3d_core::Body = serde_json::from_value(json!({"masculinity": 0,
+        "height_cm": 168, "bust_cm": 90, "waist_cm": 73, "hips_cm": 98}))
+    .unwrap();
+    let form = Form::of_body(&body).unwrap();
+    let mut obj = String::new();
+    for p in &form.positions {
+        obj += &format!(
+            "v {} {} {}
+",
+            p.x * 100.0,
+            -p.z * 100.0,
+            p.y * 100.0
+        );
+    }
+    for t in &form.triangles {
+        if t.iter().any(|v| form.positions[*v as usize].y > 0.015) {
+            obj += &format!(
+                "f {} {} {}
+",
+                t[0] + 1,
+                t[1] + 1,
+                t[2] + 1
+            );
+        }
+    }
+    let loaded =
+        r3d_commands::bodies::register(obj.as_bytes(), r3d_io::model::ModelFormat::Obj).unwrap();
+    let mut s = Session::new(Project::new("Untitled"));
+    for step in [
+        json!({"type": "avatar.import_mesh", "file": "avatars/body.obj", "hash": loaded.hash}),
+        json!({"type": "template.apply", "template": "t_shirt"}),
+    ] {
+        s.run_step(&Step::from_value(step).unwrap()).unwrap();
+    }
+    let form = Form::of_project(s.project()).unwrap().unwrap();
+    let scene = build(s.project(), Some(&form), DEFAULT_SPACING_MM)
+        .unwrap()
+        .scene;
+    let on_gpu = drape(
+        &mut GpuSolver::new(gpu, scene.clone()).unwrap(),
+        &scene,
+        180,
+    );
+    let on_cpu = drape(&mut CpuSolver::new(scene.clone()), &scene, 180);
+    assert!(
+        (on_gpu.0 - on_cpu.0).abs() < 0.02 && (on_gpu.1 - on_cpu.1).abs() < 0.02,
+        "gpu {on_gpu:?} vs cpu {on_cpu:?}"
+    );
+}
+
+#[test]
 fn a_t_shirt_comes_to_rest_on_the_gpu() {
     let Some(gpu) = gpu::context() else {
         return;

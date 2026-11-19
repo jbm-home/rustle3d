@@ -6,7 +6,12 @@
 //! The sign comes from angle-weighted pseudo-normals (Bærentzen & Aanæs,
 //! "Signed distance computation using the angle weighted pseudonormal",
 //! IEEE TVCG 2005), which is exact for closed manifold meshes such as the
-//! avatar. A query is a trilinear interpolation: constant time.
+//! built-in avatar. On an open or non-manifold mesh (an imported body),
+//! a node whose closest point lies on an open or non-manifold edge, where
+//! the pseudo-normal says nothing, takes the sign of the generalized
+//! winding number instead (`r3d_geom::winding`, Jacobson et al. 2013,
+//! evaluated as Barill et al. 2018). A query is a trilinear
+//! interpolation: constant time.
 //!
 //! A body that moves (an animated avatar) keeps the field of its rest
 //! pose: each node also records the body vertex nearest to its closest
@@ -16,6 +21,8 @@
 use std::collections::HashMap;
 
 use glam::Vec3;
+use r3d_geom::trimesh::bad_vertices;
+use r3d_geom::winding::Winding;
 use rayon::prelude::*;
 
 /// Nodes per brick side.
@@ -174,6 +181,13 @@ impl StaticMesh {
             .filter(|t| t.iter().all(|v| (*v as usize) < n))
             .collect();
         let normals = PseudoNormals::new(&positions, &triangles);
+        // Where pseudo-normals cannot sign the distance: vertices on open
+        // or non-manifold edges, and the winding numbers that will.
+        let bad = bad_vertices(n, &triangles);
+        let winding = bad
+            .iter()
+            .any(|b| *b)
+            .then(|| Winding::new(&positions, &triangles));
         let (lo, hi) = positions
             .iter()
             .fold((Vec3::MAX, Vec3::MIN), |(lo, hi), p| {
@@ -253,8 +267,17 @@ impl StaticMesh {
                         }
                     }
                     if let (d2, Some((q, ti, feature))) = best {
-                        let pn = normals.at(ti, &triangles[ti], feature);
-                        let sign = if (p - q).dot(pn) < 0.0 { -1.0 } else { 1.0 };
+                        let t = &triangles[ti];
+                        let unsure = match feature {
+                            Feature::Face => false,
+                            Feature::Edge(k) => bad[t[k] as usize] || bad[t[(k + 1) % 3] as usize],
+                            Feature::Vertex(k) => bad[t[k] as usize],
+                        };
+                        let inside = match (&winding, unsure) {
+                            (Some(w), true) => w.inside(p),
+                            _ => (p - q).dot(normals.at(ti, t, feature)) < 0.0,
+                        };
+                        let sign = if inside { -1.0 } else { 1.0 };
                         *value = sign * d2.sqrt();
                         if skinned {
                             // The corner of the closest triangle nearest
@@ -480,6 +503,11 @@ mod tests {
     /// A closed cube of side `s` centred at the origin (12 triangles,
     /// counter-clockwise seen from outside).
     fn cube(s: f32) -> StaticMesh {
+        let (positions, triangles) = cube_mesh(s);
+        StaticMesh::new(positions, triangles, 0.005)
+    }
+
+    fn cube_mesh(s: f32) -> (Vec<Vec3>, Vec<[u32; 3]>) {
         let h = s / 2.0;
         let positions = (0..8)
             .map(|i| {
@@ -502,7 +530,22 @@ mod tests {
             .iter()
             .flat_map(|[a, b, c, d]| [[*a, *b, *c], [*a, *c, *d]])
             .collect();
-        StaticMesh::new(positions, triangles, 0.005)
+        (positions, triangles)
+    }
+
+    #[test]
+    fn an_open_box_is_signed_by_winding_numbers_at_its_hole() {
+        // A 3 cm box without its top: above the hole, the closest points
+        // are on the open rim, whose pseudo-normal (a side's) would say
+        // inside.
+        let (positions, mut triangles) = cube_mesh(0.03);
+        triangles.retain(|t| !t.iter().all(|v| v & 2 != 0));
+        assert_eq!(triangles.len(), 10);
+        let m = StaticMesh::new(positions, triangles, 0.005);
+        let above = m.sample(Vec3::new(0.0, 0.025, 0.0)).unwrap();
+        assert!(above.distance > 0.01, "{}", above.distance);
+        let inside = m.sample(Vec3::new(0.0, -0.005, 0.0)).unwrap();
+        assert!(inside.distance < -0.005, "{}", inside.distance);
     }
 
     #[test]

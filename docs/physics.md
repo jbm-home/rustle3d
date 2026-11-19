@@ -195,8 +195,26 @@ after 4 s; the skirt still holds at the waist.
   angle-weighted pseudo-normals [17], exact for closed
   manifold meshes; the MakeHuman body is closed (checked: no boundary or
   non-manifold edge). Built in parallel per brick in ~0.16 s, so it is not
-  cached on disk. (The winding-number sign [9] stays the plan for open or
-  imported avatars.)
+  cached on disk.
+- **Imported bodies** (M31, spec 27) may be open (a scan without soles,
+  a neck cut) or non-manifold. Where a node's closest point lies on an
+  open or non-manifold edge (or a vertex of one), the pseudo-normal
+  means nothing, and the node takes the sign of the generalized winding
+  number instead [21]: the sum of the triangles' solid angles [22] over
+  4π, inside above ½. It is evaluated through a bounding-volume
+  hierarchy [9]: a cluster farther than 3 of its radii counts as one
+  dipole (its area-weighted normal at its centre), nearer ones are
+  summed exactly; within 2 % of the exact sum, plenty to tell ½ apart
+  (`r3d_geom::winding`). Closed bodies build exactly as before. Before
+  that, the import turns triangles so that neighbours agree and each
+  piece faces outward (`r3d_geom::trimesh::orient`). The CPU and GPU
+  solvers read the same field. Checked: an open box is signed right
+  above its hole, where the rim's pseudo-normal says "inside"
+  (`an_open_box_is_signed_by_winding_numbers_at_its_hole`), and a
+  T-shirt drapes on the built-in body with its soles cut open, on both
+  backends (`r3d-commands` `tests/imported.rs`, `r3d-sim-gpu`
+  `a_t_shirt_drapes_on_an_imported_body_on_the_gpu`). Imported bodies
+  stand still (no skeleton is mapped onto our motions yet).
 - Particle vs SDF at every substep: trilinear distance and gradient,
   constant time. Penetrations up to the band (2 cm) are pushed back out,
   far more than a particle moves in a substep.
@@ -587,5 +605,7 @@ positions alone, so the CPU and GPU results read alike:
 18. C. Ericson. *Real-Time Collision Detection*, §5.1.5 (closest point on a triangle). Morgan Kaufmann, 2004.
 19. N. Magnenat-Thalmann, R. Laperrière, D. Thalmann. *Joint-Dependent Local Deformations for Hand Animation and Object Grasping.* Graphics Interface 1988.
 20. J. Bonet, R. D. Wood. *Nonlinear Continuum Mechanics for Finite Element Analysis.* Cambridge University Press, 1997 (§3: deformation gradient, principal stretches).
+21. A. Jacobson, L. Kavan, O. Sorkine-Hornung. *Robust Inside-Outside Segmentation using Generalized Winding Numbers.* SIGGRAPH 2013.
+22. A. Van Oosterom, J. Strackee. *The Solid Angle of a Plane Triangle.* IEEE Transactions on Biomedical Engineering 30(2), 1983.
 
 Reading order for contributors: [1] → [2] → [3] → [4] → [5] → [7] → [8] → [6].

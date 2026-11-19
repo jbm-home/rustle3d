@@ -36,3 +36,4 @@ descriptions, public papers, open standards, general garment-making knowledge.
 | 24 | [Fit maps and virtual tape measure](24-fit-maps-tape.md) | M24 |
 | 25 | [Textures and prints](25-textures-prints.md) | M21 |
 | 26 | [Trims: buttons and zippers](26-trims.md) | M20 |
+| 27 | [Imported avatars](27-imported-avatars.md) | M31 |

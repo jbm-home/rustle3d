@@ -10,8 +10,9 @@ the app, and I can read or version the file with ordinary tools.
 ## Behavior
 - A project is a **folder** `Name.r3d/` containing `project.json`, `avatars/`,
   `exports/` and a disposable `.r3d-cache/` (see `docs/architecture.md` §3);
-  `imports/` holds the pattern files imported (M13) and `textures/` the
-  print images the user added (M21, spec 25).
+  `imports/` holds the pattern files imported (M13), `textures/` the
+  print images the user added (M21, spec 25) and `avatars/` the bodies
+  imported (M31, spec 27).
 - Prints (schema v16): a garment's `print` is `{"source": {"builtin":
   "stripes"} | {"image": "textures/name.jpg"}, "width_mm", "height_mm"?,
   "angle_deg"?}`; a piece's `print` is its shift and turn of it
@@ -24,6 +25,13 @@ the app, and I can read or version the file with ordinary tools.
   "hole": {"panel", "at", "angle_deg"}, "closed"}`) and `zippers`
   (`{"a", "b"` as seam sides, `"open_mm"}`), absent when empty, so
   projects without trims keep the same file.
+- Imported bodies (schema v18, spec 27): the avatar's `mesh` is
+  `{"file": "avatars/name.glb", "hash", "scale", "up", "turn_deg",
+  "points"}`: the file inside the folder by relative path (never in the
+  JSON), its FNV-1a 64 fingerprint (16 hex digits), how to read it
+  (metres per unit, up axis `y|z|x|-y|-z|-x`, a turn about the vertical)
+  and the arrangement points (mm, by name); absent with the built-in
+  body, so other projects keep the same file.
 - `project.json` is pretty-printed with a stable key order, so diffs stay small.
 - A `schema_version` field; older versions are migrated on load. Files newer
   than the app are refused with a clear message, never half-loaded.

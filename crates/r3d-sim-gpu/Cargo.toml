@@ -20,6 +20,7 @@ wgpu.workspace = true
 [dev-dependencies]
 r3d-commands.workspace = true
 r3d-core.workspace = true
+r3d-io.workspace = true
 criterion.workspace = true
 serde_json.workspace = true
 

@@ -2013,6 +2013,7 @@ dependencies = [
 name = "r3d-io"
 version = "0.1.0"
 dependencies = [
+ "glam",
  "lopdf",
  "miniz_oxide 0.9.1",
  "pdf-writer",
@@ -2084,6 +2085,7 @@ dependencies = [
  "r3d-commands",
  "r3d-core",
  "r3d-geom",
+ "r3d-io",
  "r3d-sim",
  "serde_json",
  "thiserror",

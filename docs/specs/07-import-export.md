@@ -8,9 +8,10 @@ take out my draped garment and my patterns to use in other tools or to
 print and cut.
 
 ## Behavior
-- **Import avatar**: OBJ or glTF/GLB. The user picks the units if the file
-  does not say (glTF = metres). The mesh is auto-centred on the ground and
-  checked (non-manifold meshes and holes produce a warning, not a refusal).
+- **Import avatar** (M31, spec 27): OBJ, glTF with embedded buffers, or
+  GLB. Units, up axis and facing are detected and can be corrected; the
+  mesh stands on the ground, centred, and is checked (holes and
+  non-manifold edges produce a warning, not a refusal).
 - **Export garment**: OBJ or glTF/GLB of the draped mesh (or the arranged
   state if not simulated), with normals and UVs from the 2D pattern along
   each piece's grainline (in repeats of the garment's print, or 1 UV unit

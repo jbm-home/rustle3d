@@ -67,6 +67,31 @@ enum TechPackPaperArg {
     Letter,
 }
 
+#[derive(Subcommand)]
+enum AvatarCmd {
+    /// Import a body from an OBJ, glTF (buffers embedded) or GLB file,
+    /// then save: the file is copied into the project's `avatars/`
+    /// folder; units, up axis and facing are detected unless given;
+    /// prints the measurements taken on it and its check.
+    Import {
+        project: PathBuf,
+        /// The .obj, .gltf or .glb file.
+        file: PathBuf,
+        /// Metres per file unit (0.01 for centimetres).
+        #[arg(long)]
+        scale: Option<f64>,
+        /// The file's up axis: y, z, x, -y, -z or -x.
+        #[arg(long, allow_hyphen_values = true)]
+        up: Option<String>,
+        /// Turn about the vertical (degrees) so the body faces +Z.
+        #[arg(long, allow_negative_numbers = true)]
+        turn: Option<f64>,
+    },
+    /// Check the imported body before draping: holes, scale, orientation,
+    /// arrangement points.
+    Check { project: PathBuf },
+}
+
 #[derive(Clone, Copy, ValueEnum)]
 enum UnitArg {
     Mm,
@@ -250,6 +275,12 @@ enum Cmd {
         /// PDF: import only this page (1 = first).
         #[arg(long)]
         page: Option<u32>,
+    },
+    /// Drape on a body imported from a file (a scan, a game character;
+    /// you own its licence), or check it.
+    Avatar {
+        #[command(subcommand)]
+        cmd: AvatarCmd,
     },
     /// Put a print on a garment's fabric, then save: a PNG or JPEG file
     /// (copied into the project's `textures/` folder) or a built-in print
@@ -645,6 +676,39 @@ fn cmd_import(
     print_json(&result)
 }
 
+fn cmd_avatar(cmd: AvatarCmd) -> Result<(), Failure> {
+    match cmd {
+        AvatarCmd::Import {
+            project,
+            file,
+            scale,
+            up,
+            turn,
+        } => {
+            let mut ws = Workspace::open(&project)?;
+            let path = ws.adopt_body(&file)?;
+            let mut step = json!({ "type": "avatar.import", "path": path });
+            if let Some(s) = scale {
+                step["scale"] = json!(s);
+            }
+            if let Some(u) = up {
+                step["up"] = json!(u);
+            }
+            if let Some(t) = turn {
+                step["turn_deg"] = json!(t);
+            }
+            let result = ws.run_step(&Step::from_value(step)?)?;
+            ws.save()?;
+            print_json(&result)
+        }
+        AvatarCmd::Check { project } => {
+            let mut ws = Workspace::open(&project)?;
+            let step = Step::from_value(json!({ "type": "avatar.check" }))?;
+            print_json(&ws.run_step(&step)?)
+        }
+    }
+}
+
 fn cmd_texture(
     project: &Path,
     print: &str,
@@ -839,6 +903,7 @@ fn main() -> ExitCode {
             scale,
             page,
         } => cmd_import(&project, &file, units, scale, page),
+        Cmd::Avatar { cmd } => cmd_avatar(cmd),
         Cmd::Texture {
             project,
             print,

@@ -57,6 +57,39 @@ fn every_command_round_trips() {
     h.round_trip(json!({"type": "avatar.set", "body": body, "preset": "Women M"}));
     h.round_trip(json!({"type": "avatar.remove"}));
 
+    // An imported body: the built-in one written as an OBJ, read into
+    // memory as `avatar.import` does.
+    let form =
+        r3d_commands::drape::Form::of_body(&serde_json::from_value(body.clone()).unwrap()).unwrap();
+    let mut obj = String::new();
+    for p in &form.positions {
+        obj += &format!(
+            "v {} {} {}
+",
+            p.x, p.y, p.z
+        );
+    }
+    for t in &form.triangles {
+        obj += &format!(
+            "f {} {} {}
+",
+            t[0] + 1,
+            t[1] + 1,
+            t[2] + 1
+        );
+    }
+    let loaded =
+        r3d_commands::bodies::register(obj.as_bytes(), r3d_io::model::ModelFormat::Obj).unwrap();
+    h.round_trip(
+        json!({"type": "avatar.import_mesh", "file": "avatars/body.obj",
+        "hash": loaded.hash}),
+    );
+    h.round_trip(json!({"type": "avatar.orient", "turn_deg": 10}));
+    h.round_trip(json!({"type": "avatar.set_point", "point": "waist", "at_mm": [0, 1000, 0]}));
+    h.round_trip(json!({"type": "avatar.guess_points"}));
+    h.round_trip(json!({"type": "avatar.remove_mesh"}));
+    h.round_trip(json!({"type": "avatar.remove"}));
+
     let rect = h.round_trip(json!({
         "type": "panel.create_rect", "name": "Front", "origin": [10, 20], "width": 400, "height": 600
     }));

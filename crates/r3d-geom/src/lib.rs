@@ -6,7 +6,9 @@
 //! a closed panel contour into a triangle mesh with controllable particle
 //! spacing (used by the simulation), and pieces nested on a strip of
 //! fabric ([`nest`], a marker). [`rigid`] holds the one 3D type: the
-//! rigid motion of a body's bone (metres, `f32`).
+//! rigid motion of a body's bone (metres, `f32`); [`trimesh`] and
+//! [`winding`] check a 3D surface (an imported body) and tell its inside
+//! from its outside.
 //!
 //! Units: millimetres, `f64`. See `docs/architecture.md`.
 
@@ -19,6 +21,8 @@ pub mod polygon;
 pub mod rigid;
 pub mod solve;
 pub mod transform;
+pub mod trimesh;
+pub mod winding;
 
 pub use bezier::CubicBez;
 pub use glam::DVec2;

@@ -32,6 +32,8 @@ pub enum WorkspaceError {
     Image(#[from] r3d_io::techpack::TechPackError),
     #[error(transparent)]
     Texture(#[from] r3d_io::texture::TextureError),
+    #[error(transparent)]
+    Model(#[from] r3d_io::model::ModelError),
     #[error("not a readable zip archive: {detail}")]
     Archive { detail: String },
     #[error(
@@ -59,6 +61,7 @@ impl Localizable for WorkspaceError {
             Self::Import(e) => e.message(),
             Self::Image(e) => e.message(),
             Self::Texture(e) => e.message(),
+            Self::Model(e) => e.message(),
             Self::Archive { detail } => {
                 Message::new("archive.invalid", self.to_string()).arg("detail", detail)
             }
@@ -96,6 +99,7 @@ impl Workspace {
     pub fn open(path: &Path) -> Result<Self, WorkspaceError> {
         let dir = project_dir::resolve(path);
         let loaded = project_dir::load(&dir)?;
+        crate::bodies::load(&dir, &loaded.project);
         Ok(Self {
             dir,
             session: Session::new(loaded.project),
@@ -231,6 +235,24 @@ impl Workspace {
         })?;
         r3d_io::texture::decode(&bytes)?;
         self.adopt(source, "textures")
+    }
+
+    /// Copy a body model from anywhere (one the user picked) into the
+    /// project's `avatars/` folder, as [`Self::adopt`] does, after
+    /// checking that it can be read (spec 27). Returns its relative path.
+    pub fn adopt_body(&self, source: &Path) -> Result<String, WorkspaceError> {
+        let name = source
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or_default();
+        let format = r3d_io::model::ModelFormat::of_name(name)
+            .ok_or_else(|| CommandError::invalid("path", crate::error::Invalid::Format))?;
+        let bytes = fs::read(source).map_err(|e| WorkspaceError::Read {
+            path: source.display().to_string(),
+            detail: e.to_string(),
+        })?;
+        crate::bodies::register(&bytes, format)?;
+        self.adopt(source, "avatars")
     }
 
     /// Copy a file from anywhere (one the user picked) into the project's

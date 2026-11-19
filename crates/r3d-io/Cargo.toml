@@ -11,6 +11,7 @@ publish.workspace = true
 [dependencies]
 r3d-core.workspace = true
 r3d-geom.workspace = true
+glam.workspace = true
 pdf-writer.workspace = true
 png.workspace = true
 zune-jpeg.workspace = true

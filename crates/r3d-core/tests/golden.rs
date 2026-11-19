@@ -12,10 +12,10 @@ use std::path::PathBuf;
 use glam::DVec2;
 use r3d_core::file::{self, SCHEMA_VERSION};
 use r3d_core::{
-    Along, Around, Avatar, Body, Button, Buttonhole, Constraint, Edge, EdgeCurve, Fabric,
-    FabricDetails, Garment, Grading, Guide, InternalLine, Notch, Panel, PathSegment, Pin,
-    Placement, Point, Print, PrintPlacement, PrintSource, Project, Seam, SeamSide, Size, Symmetry,
-    TemplateRef, Transaction, Zipper,
+    Along, Around, Avatar, AvatarMesh, Body, BodyPoint, Button, Buttonhole, Constraint, Edge,
+    EdgeCurve, Fabric, FabricDetails, Garment, Grading, Guide, InternalLine, Notch, Panel,
+    PathSegment, Pin, Placement, Point, Print, PrintPlacement, PrintSource, Project, Seam,
+    SeamSide, Size, Symmetry, TemplateRef, Transaction, UpAxis, Zipper,
 };
 
 fn golden_dir(version: u32) -> PathBuf {
@@ -244,6 +244,20 @@ fn sample() -> Project {
             hips_cm: 98.0,
         },
         preset: Some("Women M".into()),
+        // An imported body (v18): a scan in centimetres, Z up, facing -Z.
+        mesh: Some(AvatarMesh {
+            file: "avatars/scan.obj".into(),
+            hash: "0123456789abcdef".into(),
+            scale: 0.01,
+            up: UpAxis::Z,
+            turn_deg: 180.0,
+            points: [
+                (BodyPoint::Waist, [0.0, 1050.0, 10.0]),
+                (BodyPoint::LeftElbow, [230.0, 1080.0, -20.0]),
+            ]
+            .into_iter()
+            .collect(),
+        }),
     }));
     let size = |name: &str, bust_cm: f64| Size {
         name: name.into(),

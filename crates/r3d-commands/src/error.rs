@@ -180,6 +180,14 @@ pub enum CommandError {
     NothingToSimulate,
     #[error("stopped before the end: nothing was changed")]
     Cancelled,
+    #[error("the avatar has no imported body")]
+    NoImportedBody,
+    #[error(
+        "the body file {file} is missing from the project folder or was changed since it was imported: import it again"
+    )]
+    BodyUnavailable { file: String },
+    #[error("an imported body cannot move yet: drape it standing still")]
+    ImportedBodyStill,
     #[error("internal error: {detail}")]
     Internal { detail: String },
 }
@@ -253,6 +261,11 @@ impl Localizable for CommandError {
                 .arg("reference", reference)
                 .arg("reason", reason),
             Self::Cancelled => Message::new("cancelled", text),
+            Self::NoImportedBody => Message::new("avatar.no_mesh", text),
+            Self::BodyUnavailable { file } => {
+                Message::new("avatar.mesh_unavailable", text).arg("file", file)
+            }
+            Self::ImportedBodyStill => Message::new("motion.imported_body", text),
             Self::Internal { detail } => Message::new("internal", text).arg("detail", detail),
         }
     }

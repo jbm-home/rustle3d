@@ -156,6 +156,69 @@ fn schema_lists_and_describes_operations() {
 }
 
 #[test]
+fn avatar_import_copies_detects_and_checks() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("Scan.r3d");
+    r3d().arg("new").arg(&dir).assert().success();
+    // A box 170 cm tall, 40 wide, 25 deep, in centimetres.
+    let mut obj = String::new();
+    for i in 0..8 {
+        let (x, y, z) = (
+            if i & 1 == 0 { -20 } else { 20 },
+            if i & 2 == 0 { 0 } else { 170 },
+            if i & 4 == 0 { -12 } else { 13 },
+        );
+        obj += &format!(
+            "v {x} {y} {z}
+"
+        );
+    }
+    obj += "f 1 3 4 2
+f 5 6 8 7
+f 1 2 6 5
+f 3 7 8 4
+f 1 5 7 3
+f 2 4 8 6
+";
+    let file = tmp.path().join("box.obj");
+    std::fs::write(&file, obj).unwrap();
+    let out = r3d()
+        .args(["avatar", "import"])
+        .arg(&dir)
+        .arg(&file)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let out = json_of(&out);
+    assert_eq!(out["check"]["scale"], 0.01);
+    assert_eq!(out["check"]["height_m"], 1.7);
+    assert!(dir.join("avatars/box.obj").is_file());
+    let out = r3d()
+        .args(["avatar", "check"])
+        .arg(&dir)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let check = json_of(&out);
+    assert_eq!(check["ready"], true);
+    assert_eq!(check["file"], "avatars/box.obj");
+    // Not a model: refused, nothing copied.
+    let bad = tmp.path().join("body.stl");
+    std::fs::write(&bad, "solid").unwrap();
+    r3d()
+        .args(["avatar", "import"])
+        .arg(&dir)
+        .arg(&bad)
+        .assert()
+        .failure();
+    assert!(!dir.join("avatars/body.stl").exists());
+}
+
+#[test]
 fn texture_puts_a_print_on_the_garment() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("Shirt.r3d");

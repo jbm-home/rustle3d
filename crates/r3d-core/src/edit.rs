@@ -43,8 +43,8 @@ pub enum Change {
     Button(Box<EntityChange<ButtonId, Button>>),
     Zipper(Box<EntityChange<ZipperId, Zipper>>),
     Avatar {
-        before: Option<Avatar>,
-        after: Option<Avatar>,
+        before: Option<Box<Avatar>>,
+        after: Option<Box<Avatar>>,
     },
     Name {
         before: String,
@@ -102,7 +102,7 @@ impl Change {
                 p.display_unit = if forward { *after } else { *before };
             }
             Change::Avatar { before, after } => {
-                p.avatar = if forward { after } else { before }.clone();
+                p.avatar = if forward { after } else { before }.as_deref().cloned();
             }
             Change::Grading { before, after } => {
                 p.grading = if forward { after } else { before }.clone();
@@ -449,8 +449,8 @@ impl<'a> Transaction<'a> {
     pub fn set_avatar(&mut self, avatar: Option<Avatar>) {
         let before = mem::replace(&mut self.project.avatar, avatar.clone());
         self.changes.push(Change::Avatar {
-            before,
-            after: avatar,
+            before: before.map(Box::new),
+            after: avatar.map(Box::new),
         });
     }
 

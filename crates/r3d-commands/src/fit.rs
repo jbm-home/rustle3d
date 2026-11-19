@@ -768,6 +768,9 @@ fn sewn_to(drape: &Drape) -> HashMap<u32, u32> {
 /// Heights (m) of the body's chest (over the bust points), waist
 /// (narrowest girth) and hips (largest), for the tape.
 pub fn landmarks(form: &Form) -> Result<[(&'static str, f32); 3], CommandError> {
+    if let Some([chest, waist, hips]) = form.levels {
+        return Ok([("chest", chest), ("waist", waist), ("hips", hips)]);
+    }
     let model = crate::queries::body_model()?;
     let (p, t) = (&form.positions, &form.triangles[..]);
     let chest = model

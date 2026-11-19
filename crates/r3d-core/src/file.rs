@@ -20,7 +20,7 @@ use crate::model::Project;
 /// Identifies a Rustle3D project file.
 pub const FORMAT: &str = "rustle3d.project";
 /// Version written by this build.
-pub const SCHEMA_VERSION: u32 = 17;
+pub const SCHEMA_VERSION: u32 = 18;
 
 type Migration = fn(Value) -> Result<Value, FileError>;
 
@@ -42,6 +42,7 @@ const MIGRATIONS: &[Migration] = &[
     migrate_v14_to_v15,
     migrate_v15_to_v16,
     migrate_v16_to_v17,
+    migrate_v17_to_v18,
 ];
 
 fn object<'a>(
@@ -51,6 +52,12 @@ fn object<'a>(
     value.as_object_mut().ok_or_else(|| FileError::Json {
         detail: format!("{what} is not an object"),
     })
+}
+
+/// v18 adds the avatar's imported body (absent: the built-in one).
+/// Nothing to convert.
+fn migrate_v17_to_v18(project: Value) -> Result<Value, FileError> {
+    Ok(project)
 }
 
 /// v17 adds buttons and zippers (absent: none). Nothing to convert.

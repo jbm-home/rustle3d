@@ -219,6 +219,7 @@ impl Project {
             let sizes = [b.height_cm, b.bust_cm, b.waist_cm, b.hips_cm];
             if !(0.0..=1.0).contains(&b.masculinity)
                 || sizes.iter().any(|v| !(v.is_finite() && *v > 0.0))
+                || a.mesh.as_ref().is_some_and(|m| !m.valid())
             {
                 return Err(E::BadAvatar);
             }
