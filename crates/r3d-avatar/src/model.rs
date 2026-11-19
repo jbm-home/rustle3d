@@ -42,9 +42,12 @@ pub struct BodyShape {
     pub girths: [f32; 3],
 }
 
-/// Targets are linear, so they can be pushed moderately past their authored
-/// range to reach larger sizes.
-pub const MAX_EXTRAPOLATION: f32 = 1.8;
+/// Targets are linear, so they can be pushed past their authored range to
+/// reach larger sizes. 1.8 stopped the women's chart at 50; past a weight
+/// of about 2.4 the arms meet the torso (in the A pose) and the girths
+/// cannot be measured, which the fit's backtracking stops short of: the
+/// women's 56 is the one chart size it cannot reach (≈ 5 cm short).
+pub const MAX_EXTRAPOLATION: f32 = 3.0;
 
 /// Pairs of targets selected by a signed parameter.
 struct Signed<'a> {

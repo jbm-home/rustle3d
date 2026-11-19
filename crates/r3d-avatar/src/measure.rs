@@ -157,6 +157,10 @@ pub struct Landmarks {
 
 impl Landmarks {
     /// Locate the landmarks on a neutral body (metres, feet at y = 0).
+    /// The bust apex is searched from 0.69 of the stature up: from 0.64,
+    /// the belly of the women's M body, as far forward as its bust, was
+    /// taken for it on an imported copy of it, and its bust measured 75 cm
+    /// for 90.
     pub fn find(positions: &[Vec3]) -> Self {
         let height = positions.iter().map(|p| p.y).fold(0.0, f32::max);
         let apex = |side: f32| {
@@ -166,8 +170,8 @@ impl Landmarks {
                 .filter(|(_, p)| {
                     p.x * side > 0.02
                         && p.x * side < 0.15
-                        && p.y > 0.64 * height
-                        && p.y < 0.76 * height
+                        && p.y > 0.69 * height
+                        && p.y < 0.78 * height
                 })
                 .max_by(|(_, a), (_, b)| a.z.total_cmp(&b.z))
                 .map_or(0, |(i, _)| i as u32)

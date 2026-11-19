@@ -423,3 +423,45 @@ fn measurements_given_to_a_template_follow_the_sizes() {
     };
     assert!((height(&p.at_size(0)) - height(&p.at_size(8))).abs() < 40.0);
 }
+
+/// Every size of the built-in charts can be fitted: the avatar each size
+/// is draped on measures what the chart says, within a centimetre. A
+/// women's 52 (waist 104 cm) came out with a waist of 69 cm, and every
+/// size from 48 up was slimmer than asked: trousers graded to it fell.
+/// The women's 56 is past what the body can reach (its arms would meet
+/// its torso): it comes within 6 cm.
+#[test]
+fn every_chart_size_is_fitted() {
+    let model = r3d_avatar::model::BodyModel::builtin().unwrap();
+    for (chart, from, to) in [("women", "32", "56"), ("men", "44", "60")] {
+        let mut s = Session::new(Project::new("Untitled"));
+        ok(
+            &mut s,
+            json!({"type": "grading.use_chart", "chart": chart, "from": from, "to": to, "base": from}),
+        );
+        let range = s
+            .run_step(&Step::from_value(json!({"type": "grading.get"})).unwrap())
+            .unwrap();
+        for size in range["sizes"].as_array().unwrap() {
+            let body: r3d_core::Body = serde_json::from_value(size["body"].clone()).unwrap();
+            let a = r3d_avatar::fit::fit(&model, &body).achieved;
+            let worst = [
+                (f64::from(a.bust_cm) - body.bust_cm).abs(),
+                (f64::from(a.waist_cm) - body.waist_cm).abs(),
+                (f64::from(a.hips_cm) - body.hips_cm).abs(),
+            ]
+            .into_iter()
+            .fold(0.0, f64::max);
+            let within = if chart == "women" && size["name"] == "56" {
+                6.0
+            } else {
+                1.0
+            };
+            assert!(
+                worst < within,
+                "{chart} {} off by {worst} cm: {a:?}",
+                size["name"]
+            );
+        }
+    }
+}

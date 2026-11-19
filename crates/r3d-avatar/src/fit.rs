@@ -21,10 +21,13 @@ pub struct Fit {
     pub achieved: Measurements,
 }
 
-const ITERATIONS: usize = 12;
+const ITERATIONS: usize = 20;
 const STEP: f32 = 0.05;
-/// Pull towards the neutral body when several shapes fit equally well.
-const REGULARISATION: f32 = 0.002;
+/// Pull towards the neutral body when several shapes fit equally well
+/// (residuals are relative). At 0.002 it outweighed the residuals of
+/// large sizes and left every body from about 44 up slimmer than asked
+/// (a women's 50 with a waist of 94.6 cm for 98).
+const REGULARISATION: f32 = 0.00001;
 
 fn with_params(base: BodyShape, u: [f32; 4]) -> BodyShape {
     BodyShape {
@@ -113,10 +116,18 @@ pub fn fit(model: &BodyModel, spec: &Body) -> Fit {
     };
     let base = BodyShape { stature, ..neutral };
 
-    let mut u = [0.0f32; 4];
-    for _ in 0..ITERATIONS {
+    // The objective (squared residuals plus the pull to neutral) at `u`,
+    // and its residuals.
+    let cost = |u: [f32; 4]| {
         let (m, _) = scaled(model, &with_params(base, u), height_cm);
         let r = residuals(&m, spec);
+        let c = r.iter().map(|e| e * e).sum::<f32>()
+            + REGULARISATION * u.iter().map(|v| v * v).sum::<f32>();
+        (if c.is_finite() { c } else { f32::MAX }, r)
+    };
+    let mut u = [0.0f32; 4];
+    let (mut c, mut r) = cost(u);
+    for _ in 0..ITERATIONS {
         if r.iter().all(|e| e.abs() < 0.002) {
             break;
         }
@@ -145,9 +156,39 @@ pub fn fit(model: &BodyModel, spec: &Body) -> Fit {
             a[j][j] += REGULARISATION;
             b[j] = -(0..3).map(|i| jac[i][j] * r[i]).sum::<f32>() - REGULARISATION * u[j];
         }
-        let Some(delta) = solve4(a, b) else { break };
-        for j in 0..4 {
-            u[j] = (u[j] + delta[j]).clamp(-1.0, MAX_EXTRAPOLATION);
+        // Take a step only if it lowers the cost, halving it until it
+        // does (backtracking). Taken whole, a step past the targets'
+        // range (clamped there) threw the fit far off: a women's size 52
+        // (waist 104 cm) came out with a waist of 69 cm. Far past the
+        // targets' authored range the Gauss–Newton step can point the
+        // wrong way: then a steepest-descent step (the Cauchy point of
+        // the same model) is tried, as in a dogleg.
+        let gauss_newton = solve4(a, b);
+        let jb: [f32; 3] = std::array::from_fn(|i| (0..4).map(|j| jac[i][j] * b[j]).sum());
+        let bb: f32 = b.iter().map(|v| v * v).sum();
+        let curvature: f32 = jb.iter().map(|v| v * v).sum::<f32>() + REGULARISATION * bb;
+        let descent = (curvature > 1e-12).then(|| b.map(|v| v * bb / curvature));
+        let mut improved = false;
+        for delta in [gauss_newton, descent].into_iter().flatten() {
+            let mut scale = 1.0;
+            for _ in 0..8 {
+                let v: [f32; 4] = std::array::from_fn(|j| {
+                    (u[j] + scale * delta[j]).clamp(-1.0, MAX_EXTRAPOLATION)
+                });
+                let (cv, rv) = cost(v);
+                if cv < c {
+                    (u, c, r) = (v, cv, rv);
+                    improved = true;
+                    break;
+                }
+                scale *= 0.5;
+            }
+            if improved {
+                break;
+            }
+        }
+        if !improved {
+            break;
         }
     }
     let shape = with_params(base, u);
