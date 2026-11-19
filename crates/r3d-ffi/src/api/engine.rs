@@ -520,6 +520,8 @@ pub struct Engine {
     sim: Mutex<Option<SimThread>>,
     /// The loaded simulation's scene (pieces, pattern positions).
     cloth: Mutex<Option<Drape>>,
+    /// The body the loaded simulation drapes on.
+    draped_on: Mutex<Option<FormKey>>,
     /// How the avatar moves while the garment drapes, if it does.
     animation: Mutex<Option<Animation>>,
     /// Simulate on the CPU only: asked for (`R3D_SOLVER=cpu`), or the
@@ -652,6 +654,7 @@ impl Engine {
             selected_points: Mutex::new(Vec::new()),
             sim: Mutex::new(None),
             cloth: Mutex::new(None),
+            draped_on: Mutex::new(None),
             animation: Mutex::new(None),
             show_sizes: AtomicBool::new(true),
             cpu_only: AtomicBool::new(
@@ -812,19 +815,27 @@ impl Engine {
 
     /// Rebuild the simulation from the document. With `carry`, the cloth
     /// continues from where it is (pattern edits while draping); without,
-    /// it starts again around the body, paused. Works on a copy of the
-    /// document: fitting a new body takes seconds, and the UI's calls must
-    /// not wait for it.
+    /// it starts again around the body, paused. On another body (another
+    /// size shown, new measurements, another avatar) it starts again
+    /// around it even with `carry`, still running if it was: carried over
+    /// onto a larger body, the cloth ended inside it deeper than the body
+    /// sees (2 cm), and an arm stayed out of its sleeve for good. Works on
+    /// a copy of the document: fitting a new body takes seconds, and the
+    /// UI's calls must not wait for it.
     fn rebuild(&self, carry: bool) -> Result<(), ApiError> {
         let project = self.workspace()?.session().project().clone();
-        let form = self.form_now(FormKey::of(&project))?;
+        let key = FormKey::of(&project);
+        let form = self.form_now(key.clone())?;
         self.report("drape.prepare");
         let mut drape = drape::prepare(&project, form.as_deref()).map_err(err)?;
         let sim = self.sim()?;
         let thread = sim.as_ref().ok_or_else(poisoned)?;
         let now = thread.latest();
         let mut cloth = self.cloth.lock().map_err(|_| poisoned())?;
-        let carry = carry && now.loaded;
+        let mut draped_on = self.draped_on.lock().map_err(|_| poisoned())?;
+        let new_body = *draped_on != key;
+        let keep_running = carry && now.running;
+        let carry = carry && now.loaded && !new_body;
         if carry && let Some(old) = cloth.as_ref() {
             drape::carry_over(old, &now.positions, &mut drape);
         }
@@ -849,11 +860,12 @@ impl Engine {
                 solver.continue_at(now.time);
             }
             thread.load(solver);
-            if carry && now.running {
+            if keep_running {
                 thread.set_running(true);
             }
         }
         *cloth = Some(drape);
+        *draped_on = key;
         Ok(())
     }
 
@@ -3804,6 +3816,45 @@ mod tests {
         // Standing still again: nothing chosen, the body comes back to rest.
         let status = engine.set_motion(None).unwrap();
         assert_eq!(status.motion, None);
+    }
+
+    /// Pattern edits carry the cloth over; another body (here new
+    /// measurements) starts the drape again around it, still running.
+    #[test]
+    fn a_new_body_starts_the_drape_again() {
+        let tmp = tempfile::tempdir().unwrap();
+        let engine = Engine::open(tmp.path().join("P.r3d").to_string_lossy().into()).unwrap();
+        engine.cpu_only.store(true, Ordering::Relaxed);
+        for step in [
+            r#"{"type":"avatar.set","preset":"Women M","body":{"masculinity":0,"height_cm":168,"bust_cm":90,"waist_cm":73,"hips_cm":98}}"#,
+            r#"{"type":"template.apply","template":"a_line_skirt"}"#,
+        ] {
+            engine.run_long(step.into()).unwrap();
+        }
+        engine.run_simulation(true).unwrap();
+        let deadline = Instant::now() + std::time::Duration::from_secs(60);
+        let draped = || {
+            while engine.simulation_status().unwrap().time_s < 0.3 && Instant::now() < deadline {
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            engine.simulation_status().unwrap().time_s
+        };
+        // The time once the rebuilt solver has stepped.
+        let after_rebuild = || {
+            engine.rebuild(true).unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            engine.simulation_status().unwrap()
+        };
+        let before = draped();
+        // The same body: the cloth carries over, its time goes on.
+        let same = after_rebuild();
+        assert!(same.time_s >= before, "{} vs {before}", same.time_s);
+        engine
+            .run_long(r#"{"type":"avatar.set","body":{"masculinity":0,"height_cm":168,"bust_cm":110,"waist_cm":92,"hips_cm":118}}"#.into())
+            .unwrap();
+        let status = after_rebuild();
+        assert!(status.time_s < before, "{} vs {before}", status.time_s);
+        assert!(status.loaded && status.running);
     }
 
     #[test]

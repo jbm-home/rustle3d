@@ -31,7 +31,7 @@ can be tested through MCP as soon as they exist.
 | M16 | Zero-copy views on Windows ✅ and Linux | 1–2 wk | The garment drapes as smoothly on Windows and Linux as on macOS |
 | M17 | GPU cloth solver ✅ | 3–4 wk | A T-shirt drapes at 60 fps; a dress stays interactive |
 | M18 | Trousers and shirt templates ✅ | 1–2 wk | A first-time user makes trousers and a shirt from templates |
-| M19 | Layers and multiple garments (tucked in: open) | 3–4 wk | A shirt tucked into trousers, each in its own fabric and colour |
+| M19 | Layers and multiple garments ✅ | 3–4 wk | A shirt tucked into trousers, each in its own fabric and colour |
 | M22 | Grading and sizes ✅ | 2–3 wk | A shirt graded from 36 to 52, each size draped on a matching avatar |
 | M25 | Maximized views ✅ | < 1 wk | The board fills the window, the drape pauses; one click brings both views back |
 | M26 | History, editing comfort, feedback on long steps ✅ | 2–3 wk | Jump back ten steps from the history panel; paste two sewn pieces with their seam; a graded template shows its progress |
@@ -79,9 +79,10 @@ have. M21 followed the same night (2026-11-19): prints need no new
 physics either, and every later render and export shows them. M20
 closed the same night (2026-11-19), the first of these to touch both
 solvers. M31 closed after it (2026-11-19): imported bodies reuse the
-distance field both solvers read, and stand still. M15 closed last
+distance field both solvers read, and stand still. M15 closed next
 (2026-11-19): it exports what all of these build, skinned to M23's
-skeleton.
+skeleton. M19's close layers closed last (2026-11-19): thin contacts
+between garments, in both solvers.
 
 ---
 
@@ -485,7 +486,7 @@ Plan as written:
 - Trousers and shirt (collar, cuffs, sleeves) templates in the guided
   flow, sized from the avatar's measurements.
 
-## M19 — Layers and multiple garments (2026-11-17: tucked in still open)
+## M19 — Layers and multiple garments ✅ (2026-11-19)
 Today one project holds one garment: a shirt and trousers share one
 fabric and colour.
 - Done: several garments per project, each with its own fabric and
@@ -493,21 +494,29 @@ fabric and colour.
   (`garment.set_layer`), the outer garment starting over the inner one;
   templates added to a project become garments of their own; the
   garments list in the inspector; schema v9 (spec 17).
-- Open: close layers. A shirt worn over trousers drapes with closed
-  seams but they show through each other where they touch, and a shirt
-  cannot be tucked in: self-collision keeps layers about 2 cm apart
-  (particle radius 0.4 × spacing). Three start poses were measured and
-  failed (physics.md, "Several garments"). Next: thin cloth–cloth
-  contacts (vertex–triangle) between garments, CPU and GPU.
+- Done (2026-11-19): close layers. Garments touch through thin
+  point–triangle contacts (`r3d_sim::layers`, CPU and GPU) instead of
+  particle repulsion, which kept them 2 cm apart: a shirt worn under
+  trousers is tucked into them, and a T-shirt over trousers hides them.
+  Sides come from the layer order, candidates are gathered again as the
+  cloth moves, open seams are bridged, and cloth resting on the body
+  lets the garment over it take the push (physics.md, Several garments).
+- Done: the trousers' back waist starts behind the body instead of in
+  front of it (it was dragged round through a shirt tucked in, which
+  happened to cinch the waist). Placed right, the trousers settle a
+  little lower; the template's default length is now the waist's
+  height less 4 cm (it was 0.565 of the stature: the men's hem lay on
+  the floor).
 - 2026-11-19 (maintainer: a T-shirt over trousers sits wrong): the
   T-shirt started inside loose trousers at the hips; fixed (physics.md,
-  Several garments). A T-shirt as wide as the trousers at the hips still
-  shows them through in places: that needs the thin contacts above.
-- Open: the trousers' back waist starts in front of the body and is
-  dragged round it, which happens to cinch the waist; placed right, the
-  trousers settle 1.6–2.7 cm lower and the men's hem touches the floor
-  (physics.md, Starting positions, Known issue). Needs a better waist
-  hold first.
+  Several garments).
+- Open: edge–edge contacts between garments, and point–triangle contacts
+  within a garment (its own folds stay a particle diameter apart); on
+  the GPU a shirt and trousers step in 13.9 ms (6.2 ms without contacts
+  between garments), a hash of its own for self-collision is the lever.
+- **Demo**: `./demos/m19/demo.sh`: trousers and a shirt worn over them,
+  then the shirt tucked in (garment.set_layer), draped and photographed
+  from the front and the back.
 
 Plan as written:
 - Several garments per project, each with its own fabric and colour;
@@ -606,9 +615,20 @@ instead of 46.
   pattern exports of a graded project are the nest; `r3d export --sizes`.
 - The app: a Sizes section in the inspector (chart, range, base, size
   shown in 3D), a grade step on a selected point.
-- Open: the shirt template drapes with folds at the sides from about
-  size 48 (the shirt drafted directly for that body does too: the
-  template, not the grading); notches graded on their own; an ASTM rule
+- 2026-11-19 (maintainer: graded trousers fell from size 52, arms came
+  out of the sleeves): the avatar fit collapsed past size 50 (a women's
+  52, waist 104 cm, came out at 69 cm) and every size from 44 up was
+  slimmer than asked (a pull to the neutral body outweighed the
+  residuals). The fit now backtracks, falls back to steepest descent and
+  barely regularises: every chart size within 1 cm but the women's 56
+  (≈ 5 cm short: past it the arms meet the torso). In the app, a new
+  body (size shown, measurements) starts the drape again around it: the
+  cloth carried over onto a larger body left arms out of their sleeves.
+  Trousers' default length is the waist's height less 4 cm.
+- Open: the shirt, T-shirt and dress take shoulders, neck and armhole
+  from the chest (too wide in large sizes): to be measured on the
+  avatar; trousers hold at the waist by friction only (a 52 settles
+  under the belly, its hem on the floor); notches graded on their own; an ASTM rule
   table (`.rul`) and grading read from imported files. A graded
   template takes about 6 s to add on 9 sizes (one body fit per size, in
   parallel).

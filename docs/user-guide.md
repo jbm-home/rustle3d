@@ -7,7 +7,7 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-19 (a selected piece's panel shows its garment's fabric; the Construction line and Tape measure tools have new icons; the tool rail in four sections, drawing, measuring, sewing and trims, with Dart and Pleat under Darts and pleats and Hole a tool of its own; the guided flow's step bar and banner removed; a more natural walk and a new motion, Stand at ease; captured motions whose rest pose lies flat play upright; pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
+Last updated: 2026-11-19 (the avatar now takes the measurements given in every size of the charts, up to the women's 54: large sizes came out too slim and trousers fell off them; changing the size or the body while draping starts the drape again around the new body; trousers end just above the floor whatever the body; garments worn in layers lie close together: a shirt worn under trousers is tucked into them, and nothing shows through a garment worn over another; the trousers template is a little shorter; a selected piece's panel shows its garment's fabric; the Construction line and Tape measure tools have new icons; the tool rail in four sections, drawing, measuring, sewing and trims, with Dart and Pleat under Darts and pleats and Hole a tool of its own; the guided flow's step bar and banner removed; a more natural walk and a new motion, Stand at ease; captured motions whose rest pose lies flat play upright; pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
 hips, so trousers no longer slide with each step; a garment worn over
 trousers starts outside them; captured motions: Motion › Import a captured
 motion… plays a BVH motion capture on the avatar, Motion › Motion
@@ -85,7 +85,11 @@ English or French, from the language button in the top bar.
 ## The body
 **Body › Measurements…** opens the measurements: choose a size (women's
 or men's presets) or enter height, bust, waist and hips. Save your own
-presets. The garment drapes on the new body.
+presets. The garment drapes on the new body: changing the body (or the
+size shown, see Sizes) while the garment drapes starts the drape again
+around it. The avatar takes your measurements to within a centimetre,
+up to a women's 54 or a men's 60; larger, its arms would meet its body,
+and it stays smaller than asked (a women's 56 about 5 cm small).
 
 ### Your own body: a scan or a character
 **Body › Import body…** drapes on a body of your own: a 3D scan of a
@@ -393,6 +397,11 @@ comes as a garment of its own, worn over the others. The list goes from
 the body out; the arrows wear a garment under or over its neighbour. To
 move a piece to another garment, pick it in the piece's **Garment**
 menu. Deleting a garment deletes its pieces too (undo brings them back).
+
+Garments drape in that order, as close together as their fabrics are
+thick: a garment stays over the ones under it. To tuck a shirt into
+trousers, wear it under them (the arrows); worn over them, it hangs
+outside.
 
 ## Sizes
 A pattern can come in a range of sizes, for example 36 to 52. It is
@@ -737,10 +746,9 @@ the tech pack as PDF: open formats only.
   when the app does not run on the one that shows the window.
 - On the men's body presets, a heavy skirt (denim) can slide off the hips
   during the drape.
-- Garments worn close together can show through each other where they
-  touch (a T-shirt about as wide as the trousers under it, at the hips),
-  and a shirt cannot be tucked into fitted trousers yet: layers of cloth
-  keep about 2 cm apart in the simulation.
+- The folds of one garment keep about 2 cm apart in the simulation (the
+  layers of different garments lie close together), so they look a
+  little puffy.
 - Game export: the levels of detail are separate meshes (no automatic
   switching inside the file); the inside of a garment exported with
   thickness shows the wrinkles of the outside reversed.
@@ -768,8 +776,9 @@ the tech pack as PDF: open formats only.
   board draws it (it cannot be moved by hand). A symmetric piece's axis
   is straight.
 - Sizes: notches keep their distance along the edge in every size, and
-  a grade is set per point, not per edge, in the app. The shirt template
-  drapes with folds at the sides in the largest sizes (from about 48).
+  a grade is set per point, not per edge, in the app. In the largest
+  sizes the shirt's shoulders come out too wide (the template takes
+  them from the chest).
   A template's pieces graded after they were laid out keep their place
   on the board: the largest sizes of neighbouring pieces can touch.
 - Buttons and zippers: photos do not show them yet. A copied piece is
