@@ -18,12 +18,21 @@ pub struct Particle {
     pub pinned: bool,
 }
 
-/// A cloth triangle.
+/// A cloth triangle. Its normal `(b − a) × (c − a)` points out of its
+/// garment (the pattern seen from its right side): contacts between
+/// garments ([`crate::layers`]) keep each garment on the outer face of
+/// those worn under it.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Triangle {
     pub vertices: [u32; 3],
     /// Index into [`SimScene::fabrics`].
     pub fabric: u16,
+    /// The garment it belongs to, numbered from the body out: a garment
+    /// is worn over those with lower numbers. Cloth of different
+    /// garments touches through thin layer contacts ([`crate::layers`]),
+    /// cloth of one garment through particle repulsion
+    /// ([`crate::selfcollide`]).
+    pub garment: u16,
     /// Warp (grainline) direction on the pattern, unit length.
     pub warp: Vec2,
 }

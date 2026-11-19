@@ -3,7 +3,7 @@
 //! XPBD with small steps ([`solver`]): anisotropic membrane (warp, weft,
 //! shear) and dihedral bending per triangle pair, seams, pins, gravity,
 //! collisions with a static body ([`collide`]) and the ground, friction,
-//! self-collision. A scene is compiled once into a [`Model`]; backends
+//! self-collision, and thin contacts between garments ([`layers`]). A scene is compiled once into a [`Model`]; backends
 //! implement [`Solver`] on it. [`CpuSolver`] is the reference backend and
 //! is deterministic: the same scene always gives the same result.
 //!
@@ -13,6 +13,7 @@
 pub mod collide;
 mod cpu;
 pub mod fabric;
+pub mod layers;
 pub mod model;
 pub mod motion;
 pub mod scene;

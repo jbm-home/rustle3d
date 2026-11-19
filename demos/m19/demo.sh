@@ -2,8 +2,10 @@
 # M19 demo: several garments in layers. An agent (or a script) drafts
 # trousers, then a shirt (a garment of its own, worn over them), gives the
 # shirt a colour, drapes both headless and renders a photo, each garment
-# in its fabric and colour. A shirt tucked in (garment.set_layer to 0) is
-# not draped well yet (docs/specs/17).
+# in its fabric and colour; then wears the shirt under the trousers
+# (garment.set_layer to 0) and drapes again: the shirt is tucked in, the
+# garments lying as close as their fabrics are thick (thin contacts
+# between garments, docs/physics.md "Several garments").
 # Run from the repository root: ./demos/m19/demo.sh
 set -euo pipefail
 . "$(dirname "$0")/../out.sh"
@@ -32,8 +34,18 @@ echo "[{\"type\": \"garment.set_color\", \"garment\": \"$SHIRT\", \"color\": \"#
   > "$DIR/color.json"
 "$R3D" run "$OUT" "$DIR/color.json" >/dev/null
 
-echo "== 2. Drape both (4 s), then a photo"
+echo "== 2. The shirt worn over the trousers: drape both (4 s), then a photo"
 "$R3D" simulate "$OUT" --frames 240 | grep -E '"(top_m|bottom_m|max_seam_gap_mm)"'
 "$R3D" render "$OUT" --view photo --quality quick --camera front --frame body \
   --out "$DIR/outfit.png" >/dev/null
+
+echo "== 3. The shirt worn under them (layer 0): tucked in, front and back"
+echo "[{\"type\": \"garment.set_layer\", \"garment\": \"$SHIRT\", \"layer\": 0}]" \
+  > "$DIR/tuck.json"
+"$R3D" run "$OUT" "$DIR/tuck.json" >/dev/null
+"$R3D" simulate "$OUT" --frames 240 | grep -E '"(top_m|bottom_m|max_seam_gap_mm)"'
+for camera in front back; do
+  "$R3D" render "$OUT" --view photo --quality quick --camera "$camera" --frame body \
+    --out "$DIR/tucked-$camera.png" >/dev/null
+done
 ls -1 "$DIR"/*.png

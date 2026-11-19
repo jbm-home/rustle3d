@@ -17,12 +17,15 @@
 //!   between two particles near the body are kept out of it at their
 //!   middle too (a straight edge cuts into a convex body such as the bust);
 //! - self-collision between distant parts of the cloth (`selfcollide`);
+//! - thin contacts between garments worn in layers (`layers`);
 //! - grab: the user pulls a patch of cloth towards a moving target with a
 //!   soft zero-length constraint per particle (offsets kept).
 
 use glam::{Vec2, Vec3};
 use rayon::prelude::*;
 
+use crate::collide::BAND;
+use crate::layers::{Cloth, Touch};
 use crate::model::{Hinge, Membrane, Model};
 use crate::motion::{Posed, touch};
 use crate::scene::SimScene;
@@ -47,6 +50,12 @@ pub struct CpuSolver {
     v: Vec<Vec3>,
     /// Self-collision candidates, gathered once per frame.
     pairs: Vec<[u32; 2]>,
+    /// Contacts between garments, gathered at least once per frame, and
+    /// where the cloth was then.
+    touches: Vec<Touch>,
+    gathered: Vec<Vec3>,
+    /// Per triangle, whether it was turned over at the last gathering.
+    turned: Vec<bool>,
     /// Particles near the body (within their contact distance + [`NEAR`])
     /// in the last contact pass.
     near: Vec<bool>,
@@ -82,6 +91,9 @@ impl CpuSolver {
             prev: model.positions.clone(),
             v: vec![Vec3::ZERO; n],
             pairs: Vec::new(),
+            touches: Vec::new(),
+            gathered: Vec::new(),
+            turned: Vec::new(),
             near: vec![false; n],
             edge_push: vec![(Vec3::ZERO, 0); n],
             grab: None,
@@ -128,6 +140,19 @@ impl CpuSolver {
             close(&mut self.x, &self.prev, w, [*a as usize, *b as usize], h);
         }
         self.model.self_contact.solve(&self.pairs, &mut self.x, w);
+        let m = &self.model;
+        m.layers.solve(
+            &self.touches,
+            &mut self.x,
+            &self.prev,
+            Cloth {
+                w,
+                thickness: &m.thickness,
+                friction: &m.friction,
+                on_body: &self.near,
+            },
+            h,
+        );
         if let Some(g) = &self.grab {
             let alpha = GRAB_COMPLIANCE / h2;
             for (i, offset) in &g.particles {
@@ -281,7 +306,33 @@ impl Solver for CpuSolver {
         self.model
             .self_contact
             .candidates(&self.x, &self.model.inv_mass, &mut self.pairs);
-        for _ in 0..SUBSTEPS {
+        for s in 0..SUBSTEPS {
+            if s == 0 || self.model.layers.moved_on(&self.x, &self.gathered) {
+                let m = &self.model;
+                let posed = m.motion.as_ref().map(|mo| {
+                    let now = mo.at(self.time);
+                    Posed::new(now.clone(), now)
+                });
+                if let Some(body) = m.collider.as_ref() {
+                    m.layers.turned(
+                        &self.x,
+                        |p| {
+                            touch(body, posed.as_ref(), p)
+                                .filter(|(c, _)| c.distance < BAND)
+                                .map(|(c, _)| c.normal)
+                        },
+                        &mut self.turned,
+                    );
+                }
+                m.layers.candidates(
+                    &self.x,
+                    &m.inv_mass,
+                    &m.thickness,
+                    &self.turned,
+                    &mut self.touches,
+                );
+                self.gathered.clone_from(&self.x);
+            }
             self.substep(h);
             self.time += h;
         }

@@ -9,7 +9,11 @@
 //! particle by gathering (Jacobi, averaged), so no two invocations ever
 //! write the same particle. Self-collision candidates come from a spatial
 //! hash rebuilt on the GPU once per frame (Teschner et al. 2003) and are
-//! kept sorted, so a run is deterministic on a given GPU.
+//! kept sorted, so a run is deterministic on a given GPU. Contacts between
+//! garments (`r3d_sim::layers`) gather their candidates from the same
+//! hash, rebuilt within the frame whenever the cloth has moved enough (a
+//! flag the hash kernels read), and push a triangle's corners through
+//! integer atomics, whose sums do not depend on their order.
 //!
 //! A frame is one command buffer (about thirty dispatches per substep);
 //! positions and velocities are read back at its end. A moving body's
@@ -26,18 +30,37 @@ use bytemuck::{Pod, Zeroable};
 use glam::Vec3;
 use r3d_geom::Rigid;
 use r3d_sim::collide::{BAND, BRICK};
+use r3d_sim::layers::{BORDER, LAYER_SKIN, OPEN_SEAM, OVERHANG, RECOVER, RECOVERY_SPEED, TURNED};
 use r3d_sim::model::Model;
 use r3d_sim::motion::{BodyMotion, ITERATIONS, ON_SKIN};
 use r3d_sim::selfcollide::MARGIN;
 use r3d_sim::solver::{
-    CLOSING_SPEED, CLOSURE_COMPLIANCE, GRAB_COMPLIANCE, NEAR, SKIN, SUBSTEPS, StepError, StepStats,
-    grabbed, sewing,
+    CLOSING_SPEED, CLOSURE_COMPLIANCE, GRAB_COMPLIANCE, NEAR, SEWING_TIME, SKIN, SUBSTEPS,
+    StepError, StepStats, grabbed, sewing,
 };
 use r3d_sim::{SimScene, Solver};
 
 /// Self-collision candidates kept per particle; past this the highest
 /// indices are dropped (a particle has about five on another layer).
 const MAX_NEIGHBOURS: u32 = 32;
+/// Candidate triangles of other garments kept per particle (sorted; past
+/// this the highest indices are dropped).
+const MAX_TOUCHES: u32 = 24;
+/// Unit of the integer sums of the pushes between garments (m): 0.1 µm,
+/// up to ±214 m.
+const FIXED: f32 = 1e-7;
+/// The average push of contacts between garments on a particle is scaled
+/// by this (successive over-relaxation of averaged constraints, Macklin et
+/// al. 2014 §4.2: from 1 to 2).
+const LAYER_RELAXATION: f32 = 1.5;
+/// Marks a triangle of the cloth's own in `GpuLayerTri::bridged`.
+const NONE: u32 = u32::MAX;
+/// Contacts between garments gather their candidates again, if the cloth
+/// has moved enough, every this many substeps once the garment is sewn
+/// (every substep before, when the seams close at up to 20 m/s): a check
+/// is six dispatches, and checked every substep they made the frame of a
+/// shirt and trousers 6 ms longer (RTX 2080).
+const REGATHER_EVERY: u32 = 5;
 const WORKGROUP: u32 = 64;
 /// Uniform slots are this far apart (the largest dynamic offset alignment
 /// wgpu allows a device to require).
@@ -76,6 +99,19 @@ struct SceneUniform {
     /// Where the field's nodes' vertices start in its values, bones of a
     /// moving body (0: it stands still), where the skin weights start.
     body: [u32; 4],
+    /// x: how far the corners of a triangle of another garment a
+    /// particle may touch can be (m); 0: a single garment.
+    layers: [f32; 4],
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct GpuLayerTri {
+    /// Corners; garment | free edges << 16.
+    v: [u32; 4],
+    /// The cloth triangle a seam's bridge continues ([`NONE`]: cloth).
+    bridged: u32,
+    _pad: [u32; 3],
 }
 
 #[repr(C)]
@@ -118,10 +154,16 @@ mod bind {
     pub const CONTACTS: u32 = 20;
     pub const BODY: u32 = 21;
     pub const CLOSURES: u32 = 22;
+    pub const GARMENT: u32 = 23;
+    pub const INCIDENT: u32 = 24;
+    pub const TRIANGLES: u32 = 25;
+    pub const TOUCHES: u32 = 26;
+    pub const LAYER_DELTA: u32 = 27;
+    pub const GATHERED: u32 = 28;
     /// Bindings the kernels only read.
-    pub const READ_ONLY: [u32; 12] = [
+    pub const READ_ONLY: [u32; 15] = [
         PDATA, MEMBRANES, HINGES, SEAMS, EDGE_ROWS, SEWN, EXCLUDED, SDF_SLOTS, SDF_VALUES, GRAB,
-        BODY, CLOSURES,
+        BODY, CLOSURES, GARMENT, INCIDENT, TRIANGLES,
     ];
 }
 
@@ -148,8 +190,14 @@ mod kernel {
     pub const SELF_GATHER: usize = 15;
     pub const SELF_APPLY: usize = 16;
     pub const CLOSURE: usize = 17;
+    pub const LAYER_MARK: usize = 18;
+    pub const LAYER_RESET: usize = 19;
+    pub const LAYER_MOVED: usize = 20;
+    pub const LAYER_FIND: usize = 21;
+    pub const LAYER_SOLVE: usize = 22;
+    pub const LAYER_TURNED: usize = 23;
 
-    pub const ALL: [(&str, &[u32]); 18] = [
+    pub const ALL: [(&str, &[u32]); 24] = [
         ("predict", &[X, PREV, VEL, PDATA]),
         ("membrane", &[X, PDATA, MEMBRANES]),
         ("hinge", &[X, PDATA, HINGES]),
@@ -157,7 +205,16 @@ mod kernel {
         ("pull", &[X, PDATA, GRAB]),
         (
             "collide",
-            &[X, PREV, PDATA, NEARBY, SDF_SLOTS, SDF_VALUES, BODY],
+            &[
+                X,
+                PREV,
+                PDATA,
+                NEARBY,
+                SDF_SLOTS,
+                SDF_VALUES,
+                BODY,
+                LAYER_DELTA,
+            ],
         ),
         (
             "edges",
@@ -167,10 +224,10 @@ mod kernel {
         ),
         ("apply", &[X, DELTA]),
         ("velocity", &[X, PREV, VEL, PDATA]),
-        ("hash_clear", &[CELL_COUNT]),
-        ("hash_count", &[X, CELL_COUNT]),
-        ("hash_scan", &[CELL_COUNT, CELL_START]),
-        ("hash_scatter", &[X, CELL_COUNT, SORTED]),
+        ("hash_clear", &[CELL_COUNT, TOUCHES]),
+        ("hash_count", &[X, CELL_COUNT, TOUCHES]),
+        ("hash_scan", &[CELL_COUNT, CELL_START, TOUCHES]),
+        ("hash_scatter", &[X, CELL_COUNT, SORTED, TOUCHES]),
         (
             "find_neighbours",
             &[
@@ -181,6 +238,7 @@ mod kernel {
                 SORTED,
                 NEIGHBOURS,
                 NEIGHBOUR_COUNT,
+                GARMENT,
             ],
         ),
         (
@@ -193,6 +251,32 @@ mod kernel {
         ),
         ("self_apply", &[X, DELTA, SEWN]),
         ("closure", &[X, PREV, PDATA, CLOSURES]),
+        ("layer_mark", &[TOUCHES]),
+        ("layer_reset", &[TOUCHES]),
+        ("layer_moved", &[X, TOUCHES, GATHERED]),
+        (
+            "layer_find",
+            &[
+                X, PDATA, CELL_START, SORTED, INCIDENT, TRIANGLES, TOUCHES, GATHERED,
+            ],
+        ),
+        (
+            "layer_solve",
+            &[
+                X,
+                PREV,
+                PDATA,
+                NEARBY,
+                INCIDENT,
+                TRIANGLES,
+                TOUCHES,
+                LAYER_DELTA,
+            ],
+        ),
+        (
+            "layer_turned",
+            &[X, TRIANGLES, TOUCHES, SDF_SLOTS, SDF_VALUES, BODY],
+        ),
     ];
 }
 
@@ -254,7 +338,14 @@ impl GpuContext {
              const BRICK: u32 = {BRICK}u;\nconst MAX_NEIGHBOURS: u32 = {MAX_NEIGHBOURS}u;\n\
              const ITERATIONS: u32 = {ITERATIONS}u;\nconst ON_SKIN: f32 = {ON_SKIN:?};\n\
              const CLOSURE_COMPLIANCE: f32 = {CLOSURE_COMPLIANCE:?};\n\
-             const CLOSING_SPEED: f32 = {CLOSING_SPEED:?};\n{}",
+             const CLOSING_SPEED: f32 = {CLOSING_SPEED:?};\n\
+             const MAX_TOUCHES: u32 = {MAX_TOUCHES}u;\nconst LAYER_SKIN: f32 = {LAYER_SKIN:?};\n\
+             const OVERHANG: f32 = {OVERHANG:?};\nconst RECOVER: f32 = {RECOVER:?};\n\
+             const RECOVERY_SPEED: f32 = {RECOVERY_SPEED:?};\n\
+             const OPEN_SEAM: f32 = {OPEN_SEAM:?};\nconst BORDER: u32 = {BORDER}u;\n\
+             const MARGIN: f32 = {MARGIN:?};\nconst FIXED: f32 = {FIXED:?};\n\
+             const LAYER_RELAXATION: f32 = {LAYER_RELAXATION:?};\n\
+             const TURNED: f32 = {TURNED:?};\n{}",
             include_str!("shaders/xpbd.wgsl")
         );
         let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -408,6 +499,9 @@ pub struct GpuSolver {
     frame_passes: Vec<Dispatch>,
     /// Every substep.
     substep_passes: Vec<Dispatch>,
+    /// Before each substep but the first while sewing, then every
+    /// [`REGATHER_EVERY`]th.
+    regather_passes: Vec<Dispatch>,
     /// The grab's dispatch, inserted after self-collision while held.
     pull: Dispatch,
     /// Where `pull` goes in `substep_passes`.
@@ -646,17 +740,54 @@ impl GpuSolver {
         let self_collision = contact.radius > 0.0 && n > 1;
         let reach = 2.0 * contact.radius + MARGIN;
         let table = (2 * n).next_power_of_two().clamp(256, 1 << 20) as u32;
+        // Contacts between garments: their triangles (the cloth's, then
+        // the seams' bridges) and each particle's.
+        let layers = &model.layers;
+        let layered = layers.reach > 0.0 && n > 1;
+        let layer_tris: Vec<GpuLayerTri> = layers
+            .triangles
+            .iter()
+            .enumerate()
+            .map(|(k, t)| GpuLayerTri {
+                v: [
+                    t[0],
+                    t[1],
+                    t[2],
+                    u32::from(layers.triangle_garment.get(k).copied().unwrap_or(0))
+                        | u32::from(layers.free.get(k).copied().unwrap_or(0)) << 16,
+                ],
+                bridged: k
+                    .checked_sub(layers.cloth)
+                    .and_then(|b| layers.bridged.get(b).copied())
+                    .unwrap_or(NONE),
+                _pad: [0; 3],
+            })
+            .collect();
+        let incident_csr = csr(layers.incident.iter().map(Vec::as_slice));
+        let garment_of: Vec<u32> = layers.garment.iter().map(|g| u32::from(*g)).collect();
+        let rows = u64::from(MAX_TOUCHES + 1) * n as u64;
         let scene = SceneUniform {
             sdf_origin,
             sdf_dims,
             contact: [
                 contact.radius,
-                reach,
+                // The hash's cells hold both kinds of candidates.
+                if layered {
+                    reach.max(layers.reach)
+                } else {
+                    reach
+                },
                 if model.ground { 1.0 } else { 0.0 },
                 reach,
             ],
             counts: [n32, table, 0, 0],
             body: [values, parts, 2 * values, 0],
+            layers: [
+                if layered { layers.reach } else { 0.0 },
+                layers.cloth as f32,
+                0.0,
+                0.0,
+            ],
         };
 
         // Buffers.
@@ -757,6 +888,43 @@ impl GpuSolver {
                 zeroed("cloth neighbour counts", 4 * n as u64),
             ),
             (bind::CONTACTS, zeroed("cloth contacts", 4 * n as u64)),
+            (
+                bind::GARMENT,
+                storage(
+                    "cloth garments",
+                    bytemuck::cast_slice(&garment_of),
+                    U::empty(),
+                ),
+            ),
+            (
+                bind::INCIDENT,
+                storage(
+                    "layer incident",
+                    bytemuck::cast_slice(&incident_csr),
+                    U::empty(),
+                ),
+            ),
+            (
+                bind::TRIANGLES,
+                storage(
+                    "layer triangles",
+                    bytemuck::cast_slice(&layer_tris),
+                    U::empty(),
+                ),
+            ),
+            // The rows, then both flags raised (the first frame gathers),
+            // then whether each cloth triangle is turned over.
+            (bind::TOUCHES, {
+                let mut words = vec![0u32; rows as usize];
+                words.extend([1, 1]);
+                words.extend(std::iter::repeat_n(0, layers.cloth));
+                storage("layer touches", bytemuck::cast_slice(&words), U::empty())
+            }),
+            (bind::LAYER_DELTA, zeroed("layer pushes", 16 * n as u64)),
+            (
+                bind::GATHERED,
+                storage("layer gathered", bytemuck::cast_slice(&start), U::empty()),
+            ),
         ]
         .into_iter()
         .collect();
@@ -867,8 +1035,38 @@ impl GpuSolver {
             range: 0,
             groups: groups(n32),
         };
+        let one = |kernel| Dispatch {
+            kernel,
+            range: 0,
+            groups: 1,
+        };
+        // Over the cloth's triangles.
+        let turned = Dispatch {
+            kernel: LAYER_TURNED,
+            range: 0,
+            groups: groups(u32::try_from(layers.cloth).unwrap_or(u32::MAX)),
+        };
+        let hash = [
+            Dispatch {
+                kernel: HASH_CLEAR,
+                range: 0,
+                groups: groups(table),
+            },
+            all(HASH_COUNT),
+            one(HASH_SCAN),
+            all(HASH_SCATTER),
+        ];
         let mut frame_passes = Vec::new();
         let mut substep_passes = vec![all(PREDICT)];
+        // Gather the candidates again if the cloth has moved.
+        let mut regather_passes = Vec::new();
+        if layered {
+            regather_passes.push(all(LAYER_MOVED));
+            regather_passes.extend(hash);
+            regather_passes.push(turned);
+            regather_passes.push(all(LAYER_FIND));
+            regather_passes.push(one(LAYER_RESET));
+        }
         let coloured = |kernel, slots: &[(u32, u32)]| {
             slots
                 .iter()
@@ -883,25 +1081,27 @@ impl GpuSolver {
         substep_passes.extend(coloured(HINGE, &hinge_slots));
         substep_passes.extend(coloured(SEAM, &seam_slots));
         substep_passes.extend(coloured(CLOSURE, &closure_slots));
+        if layered {
+            frame_passes.push(all(LAYER_MOVED));
+        }
+        if self_collision || layered {
+            frame_passes.push(one(LAYER_MARK));
+            frame_passes.extend(hash);
+        }
         if self_collision {
-            frame_passes = vec![
-                Dispatch {
-                    kernel: HASH_CLEAR,
-                    range: 0,
-                    groups: groups(table),
-                },
-                all(HASH_COUNT),
-                Dispatch {
-                    kernel: HASH_SCAN,
-                    range: 0,
-                    groups: 1,
-                },
-                all(HASH_SCATTER),
-                all(FIND_NEIGHBOURS),
-            ];
+            frame_passes.push(all(FIND_NEIGHBOURS));
             substep_passes.push(all(SELF_COUNT));
             substep_passes.push(all(SELF_GATHER));
             substep_passes.push(all(SELF_APPLY));
+        }
+        if layered {
+            // The pushes are applied by `collide`.
+            frame_passes.push(turned);
+            frame_passes.push(all(LAYER_FIND));
+            substep_passes.push(all(LAYER_SOLVE));
+        }
+        if self_collision || layered {
+            frame_passes.push(one(LAYER_RESET));
         }
         let pull_at = substep_passes.len();
         substep_passes.push(all(COLLIDE));
@@ -925,6 +1125,7 @@ impl GpuSolver {
             readback,
             frame_passes,
             substep_passes,
+            regather_passes,
             pull: Dispatch {
                 kernel: PULL,
                 range: 0,
@@ -972,7 +1173,17 @@ impl GpuSolver {
             run(d, 0);
         }
         let held = self.grab.is_some() && self.pull.groups > 0;
+        let every = if self.time < SEWING_TIME {
+            1
+        } else {
+            REGATHER_EVERY
+        };
         for s in 0..SUBSTEPS {
+            if s > 0 && s % every == 0 {
+                for d in &self.regather_passes {
+                    run(d, s);
+                }
+            }
             for (k, d) in self.substep_passes.iter().enumerate() {
                 if k == self.pull_at && held {
                     run(&self.pull, s);

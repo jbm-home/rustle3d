@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use glam::{Vec2, Vec3};
 
 use crate::collide::StaticMesh;
+use crate::layers::LayerContact;
 use crate::motion::BodyMotion;
 use crate::scene::SimScene;
 use crate::selfcollide::SelfContact;
@@ -58,6 +59,8 @@ pub struct Model {
     /// Mesh edges, each once, sorted.
     pub edges: Vec<[u32; 2]>,
     pub self_contact: SelfContact,
+    /// Contacts between garments.
+    pub layers: LayerContact,
     pub collider: Option<StaticMesh>,
     /// How the body moves, if it does (only with a collider).
     pub motion: Option<BodyMotion>,
@@ -192,12 +195,29 @@ impl Model {
             .filter(|c| c.overlap > 0.0)
             .map(|c| (c.pair, c.overlap))
             .collect();
-        let self_contact = SelfContact::new(
-            &scene.particles.iter().map(|p| p.rest).collect::<Vec<_>>(),
-            &triangles.iter().map(|t| t.vertices).collect::<Vec<_>>(),
-            &ties,
-            &overlaps,
+        let rest_positions: Vec<Vec2> = scene.particles.iter().map(|p| p.rest).collect();
+        let corners: Vec<[u32; 3]> = triangles.iter().map(|t| t.vertices).collect();
+        let garments: Vec<u16> = triangles.iter().map(|t| t.garment).collect();
+        let longest = edges
+            .iter()
+            .map(|[a, b]| rest(*a).distance(rest(*b)))
+            .fold(0.0f32, f32::max);
+        let mut sewn = vec![false; n];
+        for [a, b] in &ties {
+            sewn[*a as usize] = true;
+            sewn[*b as usize] = true;
+        }
+        let layers = LayerContact::new(
+            n,
+            &corners,
+            &garments,
+            &seams,
+            &sewn,
+            longest,
+            thickness.iter().copied().fold(0.0, f32::max),
         );
+        let self_contact =
+            SelfContact::new(&rest_positions, &corners, &ties, &overlaps, &layers.garment);
         Self {
             positions: scene.particles.iter().map(|p| p.position).collect(),
             inv_mass,
@@ -210,6 +230,7 @@ impl Model {
             closures: closures.iter().map(|c| c.pair).collect(),
             edges,
             self_contact,
+            layers,
             motion: scene.motion.filter(|_| scene.collider.is_some()),
             collider: scene.collider,
             ground: scene.ground,

@@ -1,8 +1,8 @@
 # 17 — Several garments and layers
 
-Provenance: maintainer's functional brief (ROADMAP M19, 2026-11-17); general garment-making knowledge (garments worn in layers, a shirt tucked in or worn out); self-collision limits from `docs/physics.md` §5.
+Provenance: maintainer's functional brief (ROADMAP M19, 2026-11-17); general garment-making knowledge (garments worn in layers, a shirt tucked in or worn out); contacts between garments from `docs/physics.md` §5 (Bridson et al. 2002).
 
-## Status (2026-11-17)
+## Status (2026-11-19)
 
 Implemented: several garments per project (`garment.add`, `garment.rename`,
 `garment.remove`, `garment.set_layer`, `panel.set_garment`), each with its
@@ -11,12 +11,11 @@ exports (one material per garment); a template applied to a project with
 pieces becomes a garment of its own, worn over the others; the garments
 list in the app's inspector. Project files: schema v9 (`layer`).
 
-Not yet: a garment worn closely over another, such as a shirt tucked into
-fitted trousers. Cloth layers repel each other particle to particle, two
-particle radii apart (about 2 cm at the default mesh spacing), so close
-layers either start 2 cm apart and pull in through each other, or
-interpenetrate where they touch (docs/physics.md, "Several garments").
-This needs thin cloth–cloth contacts (vertex–triangle) in both solvers.
+Close layers (2026-11-19): garments touch through thin contacts (a
+point of one kept on its side of the other's triangles, a few
+millimetres away), in both solvers, so a garment fits closely over
+another. A shirt worn under trousers is tucked into them; worn over
+them, it hides them (docs/physics.md, "Several garments").
 
 ## User story
 As a designer, I dress the avatar in a shirt and trousers, each in its own
@@ -38,6 +37,10 @@ or tucked in.
   outside the ones under it (a layer's gap further out), and with several
   garments the pieces start just outside the body near their own height,
   so seams do not close across a gap through another garment.
+- Garments stay in their layer order as they drape: a garment's cloth
+  stays outside the cloth of the garments under it, as close as the
+  fabrics are thick; it passes inside another only around that one's
+  free edges (a shirt tucked into the waistband).
 
 ## UX
 - With nothing selected, the inspector lists the garments from the body
@@ -50,3 +53,6 @@ or tucked in.
   load (migration v8 → v9).
 - Trousers with a shirt worn over them drape with closed seams, each in
   its fabric, the shirt starting outside the trousers.
+- A shirt worn under trousers drapes tucked into them: from the hips to
+  under the waistband no shirt shows through the trousers, front or
+  back, on the CPU and the GPU; a T-shirt worn over trousers hides them.

@@ -866,11 +866,11 @@ struct Under<'a> {
 }
 
 /// A garment starts this much farther out per garment worn under it (m),
-/// so the layers start in order. Two layers' particles repel each other
-/// within two particle radii (`r3d_sim::selfcollide`: 0.4 of the 25 mm
-/// spacing each): at 8 mm apart they were pushed past each other at once.
-/// The same distance keeps a garment from fitting closely over another:
-/// a shirt cannot be tucked into fitted trousers yet (docs/physics.md).
+/// so the layers start in order. Layers touch through thin contacts
+/// (`r3d_sim::layers`) and settle as close as their cloth is thick; the
+/// gap is room for the first frames, when the seams close at up to
+/// 20 m/s: at 10 mm, more than twice as much of a tucked shirt started
+/// outside the trousers (docs/physics.md, Several garments).
 const LAYER_GAP_M: f32 = 0.025;
 
 impl Under<'_> {
@@ -1072,10 +1072,18 @@ fn wrap_arm(l: &Laid, under: &Under, side: f32) -> Vec<Vec3> {
 /// apart. Pushed out there below the crotch too, where nothing lies
 /// between the legs, the back crotch point started 18 cm behind the
 /// front one and their seam swept through the gap.
+///
+/// A piece's share of the half turn is measured against the leg's
+/// circumference no higher than `rim`, the lowest top of the leg's
+/// pieces: above the front's top, a back (which rises higher) is the
+/// whole circumference, narrowing to nothing at its top, so its share
+/// exploded there and its waist started in front of the body, then swept
+/// round it (through a shirt tucked in).
 fn wrap_leg(
     l: &Laid,
     under: &Under,
     side: f32,
+    rim: f32,
     around_leg: &dyn Fn(f32) -> f32,
     around_hips: &dyn Fn(f32) -> f32,
 ) -> Vec<Vec3> {
@@ -1141,7 +1149,7 @@ fn wrap_leg(
             let inner = span_ends(&l.boundary, v.y)
                 .map_or(centre, |(lo, hi)| if inner_on_plus { hi } else { lo });
             let own = (around_hips(y) / std::f32::consts::TAU).max(1e-3);
-            let share = ((v.x - inner) / 1000.0) as f32 / around_leg(y).max(1e-3);
+            let share = ((v.x - inner) / 1000.0) as f32 / around_leg(y.min(rim)).max(1e-3);
             let theta = angle0 + std::f32::consts::PI * share;
             let r = outside(y, theta).max(own);
             let on_body = Vec3::new(r * theta.sin(), y, r * theta.cos());
@@ -1520,6 +1528,13 @@ pub fn build(
         };
         let around_hips =
             |y: f32| around(layer, Around::LeftLeg, y) + around(layer, Around::RightLeg, y);
+        // The lowest top of a leg's pieces (m).
+        let rim = |kind: Around| {
+            laid.iter()
+                .filter(|l| l.layer == layer && l.place.around == kind)
+                .map(|l| l.place.top_cm as f32 / 100.0)
+                .fold(f32::MAX, f32::min)
+        };
         for (l, start) in laid.iter().zip(&mut starts) {
             if l.layer != layer {
                 continue;
@@ -1532,6 +1547,7 @@ pub fn build(
                     l,
                     &under,
                     1.0,
+                    rim(Around::LeftLeg),
                     &|y| around(layer, Around::LeftLeg, y),
                     &around_hips,
                 ),
@@ -1539,6 +1555,7 @@ pub fn build(
                     l,
                     &under,
                     -1.0,
+                    rim(Around::RightLeg),
                     &|y| around(layer, Around::RightLeg, y),
                     &around_hips,
                 ),
@@ -1591,6 +1608,7 @@ pub fn build(
             .extend(mesh.triangles.iter().map(|t| Triangle {
                 vertices: t.map(|i| offset + i),
                 fabric,
+                garment: fabric,
                 warp,
             }));
     }

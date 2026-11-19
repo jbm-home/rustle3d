@@ -70,6 +70,7 @@ fn draping(n: usize) -> CpuSolver {
                 triangles.push(Triangle {
                     vertices,
                     fabric: 0,
+                    garment: 0,
                     warp: Vec2::Y,
                 });
             }

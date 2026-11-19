@@ -706,9 +706,11 @@ pub fn girth(drape: &Drape, positions: &[Vec3], body: Option<Body<'_>>, probe: P
         Probe::Height(_) => around_axis(cloth.into_iter().filter(|l| l.closed)),
     };
     // The body's loop inside the garment's (the torso in a shirt, an arm
-    // in a sleeve), the largest; without a garment loop, the torso.
-    let inner = match garment.as_ref().filter(|l| l.closed) {
-        Some(g) => {
+    // in a sleeve), the largest; without a closed garment loop, the one
+    // nearest the point asked about (an arm at a sleeve's hem: the torso
+    // was reported there), or the torso at a height.
+    let inner = match (garment.as_ref().filter(|l| l.closed), probe) {
+        (Some(g), _) => {
             let outline = g.hull();
             bodies
                 .iter()
@@ -716,7 +718,11 @@ pub fn girth(drape: &Drape, positions: &[Vec3], body: Option<Body<'_>>, probe: P
                 .max_by(|a, b| a.tape().total_cmp(&b.tape()))
                 .cloned()
         }
-        None => around_axis(bodies.iter().cloned()),
+        (None, Probe::Near(p)) => bodies
+            .iter()
+            .min_by(|a, b| a.distance(p).total_cmp(&b.distance(p)))
+            .cloned(),
+        (None, Probe::Height(_)) => around_axis(bodies.iter().cloned()),
     };
     Girth {
         height,
@@ -1031,6 +1037,7 @@ mod tests {
         let tri = |a, b, c| r3d_sim::scene::Triangle {
             vertices: [a, b, c],
             fabric: 0,
+            garment: 0,
             warp: Vec2::X,
         };
         let ts = [tri(0, 1, 2), tri(2, 3, 4), tri(5, 6, 7), tri(7, 8, 9)];

@@ -1,6 +1,6 @@
 # Cloth physics
 
-Status: living document (2026-11-19, M20); the solver choice is revisable (see
+Status: living document (2026-11-19, M19); the solver choice is revisable (see
 the alternatives below). All algorithms come from the
 published papers listed in §9. Code that implements a method cites the paper
 in its doc comment.
@@ -397,17 +397,20 @@ starts:
   apart and pulled the waist down to the hips on a male body;
 - blended over 8 cm above the crotch; cloth that would cross the median
   plane is pressed flat 6 mm from it, in front of (or behind) the body.
-- Known issue: above the front's top, a trouser back (which rises higher)
-  is the whole circumference of its leg, narrowing to nothing at its top,
-  so its share of the half turn explodes there: the back's waist starts
-  in front of the body (edges stretched 10–15 times) and is dragged back
-  round it. That drag cinches the waist. Measuring the share against the
-  circumference no higher than the lowest top of the leg's pieces places
-  it right, but then the trousers settle where the body is as wide as
-  their waist (drafted at the body's, without ease, the denim stretched
-  a little by its weight): 1.6 cm lower on the men's L body, whose hem
-  then touches the floor, and 2.7 cm on the women's M. The waist needs a
-  better hold before that fix goes in.
+- A piece's share of the half turn is measured against the leg's
+  circumference no higher than the lowest top of the leg's pieces
+  (2026-11-19). Above the front's top, a trouser back (which rises
+  higher) is the whole circumference of its leg, narrowing to nothing at
+  its top, so its share exploded there: the back's waist started in
+  front of the body (edges stretched 10–15 times) and was dragged back
+  round it, through a shirt tucked in. That drag also cinched the waist:
+  placed right, the trousers settle where the body is as wide as their
+  waist (drafted at the body's, without ease), lower than before; at the
+  template's former length (0.565 of the stature) the men's L hem lay on
+  the floor. The template's length is now the waist's height less 4 cm:
+  at rest the hem is about 2 cm above the floor on the men's L and the
+  women's M (`tests/templates.rs`), and on the floor on a women's 52,
+  whose trousers settle under the belly (the waist's hold is open).
 Trousers hold at the waist by friction alone (no ease there): the CPU and
 GPU contact solvers settle them about 3 cm apart, both at rest.
 
@@ -430,23 +433,74 @@ own height, not at their placement offset outside everything above them:
 both open the side seams (12–22 cm on the shirt), and a seam closing
 across a gap cuts straight through the garment underneath.
 
-Close layers do not work yet. Self-collision keeps particles two radii
-apart (§5: 0.4 of the spacing each, 20 mm at 25 mm): two layers 8 mm
-apart were pushed past each other at once, and fitted trousers cannot
-leave 2 cm for a shirt under their waist. Tried for a shirt tucked into
-trousers, all measured on the first frame:
-- the trousers started around the shirt, spread around the larger circle
-  (stretched 20–47 %): they snapped back through it;
-- the trousers kept their widths (side seams apart): the seams closed
-  straight across, through the shirt;
-- the shirt started gathered inside the trousers, at their natural size,
-  with compression made 100 to 10⁴ times softer than stretch: the shirt
-  was still pushed out within a frame (the softer compression made no
-  difference and was not kept).
-Worn over the trousers, the shirt drapes with closed seams but the two
-show through each other where they touch. The way forward is thin
-cloth–cloth contact (vertex–triangle, with a thickness of millimetres)
-between garments, in both solvers.
+Close layers (2026-11-19, `r3d_sim::layers`). Particle repulsion kept
+two garments two radii apart (0.4 of the spacing each, 20 mm at 25 mm):
+fitted trousers could not leave 2 cm for a shirt under their waist, a
+shirt tucked in was pushed out within a frame, and two garments worn one
+over the other showed through each other where they touched. Between
+garments, repulsion gave way to point–triangle contacts [6]: a particle
+is kept on its side of the triangles of the other garments, its
+thickness plus theirs plus 2 mm (`LAYER_SKIN`) away, by an XPBD
+inequality constraint on the particle and the triangle's corners (normal
+held constant), with Coulomb friction in positions as for the body.
+Within a garment, particles still repel each other. Each point below
+fixed a way the shirt ended outside the trousers, found by tracing the
+particles that did, substep by substep:
+
+- **Sides from the layer order.** Garments are numbered from the body
+  out and every triangle faces out of its garment (the pattern is seen
+  from its right side on the body, the arms and the legs, mirror copies
+  included: checked on every template). A particle of an outer garment
+  belongs on the side an inner garment's triangles face, and the other
+  way round. Remembering the side a particle started the frame on locked
+  in every crossing of the first frames, when the seams close at up to
+  20 m/s.
+- **Gathered again when the cloth moves.** Candidates come from a spatial
+  hash [8] at the start of a frame, and again whenever a particle has
+  moved half the 1 cm margin since: half the cloth moves more than 1 cm
+  in the first frame, up to 19 cm.
+- **Crossings stopped, old ones undone slowly.** A particle that crossed
+  a triangle's plane during the substep is stopped at once, as by any
+  contact. One already on the wrong side when the substep began (up to
+  2 cm deep, `RECOVER`) comes back at 0.5 m/s (`RECOVERY_SPEED`): pulled
+  back at once, it left at 36 m/s and tore the seams; moved back without
+  the speed of the move (pre-stabilisation [7]), it dragged its
+  neighbours through and six times more cloth ended on the wrong side.
+  It is not pulled back over a fold of that garment turned over (some of
+  its triangles near it have the particle on their right side), nor
+  through a triangle at a free edge of the cloth (a waistline, a hem):
+  a garment passes from outside another to inside it around its free
+  edges, and pulled back there a shirt bloused over the waistband fought
+  the trousers without end. Past a free edge a particle lies over no
+  triangle (elsewhere up to 20 % of the triangle past an edge counts, for
+  creases).
+- **Seams bridged while open.** A seam still closing leaves a gap no
+  triangle covers: the shirt slipped through the trousers' centre back
+  and the seam closed over it. Two contact-only triangles span each
+  stretch between consecutive sewn pairs, while the seam is open wider
+  than 5 mm and they face as the cloth they continue: over a closed seam
+  they are slivers facing either way, and one facing in pushed the shirt
+  out.
+- **Turned-over cloth takes no part.** Near the body, a triangle whose
+  normal points into it (cosine below −0.5 with the body's outward
+  normal) is the inner sheet of a fold: which side of it another
+  garment belongs on is not known. Taken by the layer order, the turned
+  sheet of a shirt's fold at the centre back was pushed out through the
+  trousers, a few millimetres a substep.
+- **Shock propagation.** The inner cloth of a contact that rests on the
+  body does not move; the outer one takes the whole push (Guendelman et
+  al. [23]). Pushed by its share, a light shirt went into the body, the
+  body (solved last) pushed it back out, and the trousers' waist crept
+  through it by a millimetre per substep.
+
+A shirt under trousers drapes tucked into them and a T-shirt over them
+hides them, on both solvers (`tests/garments.rs`: no shirt seen through
+the trousers from the front or the back, from the hips to under the
+waistband; the same on the GPU). Garments still start `LAYER_GAP_M`
+(25 mm) apart: at 10 mm, more than twice as much of a tucked shirt
+started outside the trousers. Not done: edge–edge contacts (two edges
+crossing where no vertex is over the other cloth); contacts within a
+garment (its folds stay a particle diameter apart).
 
 Below the crotch, cloth pressed against the median plane stays where it
 is (nothing lies between the legs): pushed in front of or behind the body
@@ -470,8 +524,9 @@ one and the inseam swept through the gap.
 - Consequences: layers stay apart by up to one particle diameter (less
   where particles nest in each other's gaps, ≈ 8 mm on a regular grid), so
   folds look slightly puffy; it costs ≈ 1 ms per frame on the skirt.
-- **Later**: vertex–triangle and edge–edge continuous collision [6] for
-  thin layers, and untangling for already-intersecting states.
+- **Later**: point–triangle contacts within a garment too (they hold
+  layers of different garments since M19, see Several garments), and
+  edge–edge contacts [6].
 
 ### Known issues
 
@@ -534,6 +589,17 @@ kernel per stage:
   a held corner whipped at 10 m/s, against 2 m/s on the CPU). Particles
   sewn together and closed move as one, as on the CPU: each adds the
   pushes of its welded partners.
+- **Contacts between garments** (§5, Several garments): a particle's
+  candidate triangles (24 at most, sorted) come from the same hash.
+  Whether the cloth has moved enough to gather them again is a flag the
+  hash kernels read: the GPU cannot leave out a dispatch on its own, so
+  a check costs its dispatches even when nothing moved. A contact pushes
+  a triangle's three corners, which other invocations push too: the
+  pushes are summed with integer atomics (units of 0.1 µm, a sum that
+  does not depend on its order) and averaged per particle (Jacobi),
+  over-relaxed by 1.5 [7] §4.2: averaged alone, a tucked shirt pressed
+  between the trousers and the body slipped out through them over a few
+  substeps at their centre back, where the CPU's sweep held it.
 - **Per frame**: one command buffer (the substeps' uniforms in 256-byte
   slots, dynamic offsets), then positions and velocities read back for
   the views and the statistics. Device or validation errors become a
@@ -575,6 +641,16 @@ and the views keep 60 fps. The GPU cost is per dispatch (≈ 42 per
 substep), not per particle: the dress meshed at 2.3k, 4.4k and 6.5k
 particles steps in 5.4, 5.7 and 6.2 ms. Fewer substeps (VBD [12]) or
 fewer colours (one kernel over all constraint kinds) are the next levers.
+
+Contacts between garments (M19) cost one dispatch per substep, and the
+check whether to gather their candidates again six more; checked every
+substep it made a shirt and trousers (5 052 particles) 6 ms slower, so
+the GPU checks every substep only while sewing (0.6 s) and every fifth
+after. The same shirt and trousers step in 13.9 ms on the GPU (RTX
+2080; 6.2 ms with the contacts between garments off), and in about
+120 ms on the CPU. The hash's cells grow to the reach of a contact
+between garments (≈ 7 cm, against 3 cm for self-collision), which the
+self-collision search pays for: a hash of its own is the next lever.
 Not measured yet: Apple M-series (Metal), Linux (Vulkan).
 
 Budget per 30 fps frame: ≤ 20 ms solver, ≤ 3 ms rebuild of the spatial hash,
@@ -645,5 +721,6 @@ positions alone, so the CPU and GPU results read alike:
 20. J. Bonet, R. D. Wood. *Nonlinear Continuum Mechanics for Finite Element Analysis.* Cambridge University Press, 1997 (§3: deformation gradient, principal stretches).
 21. A. Jacobson, L. Kavan, O. Sorkine-Hornung. *Robust Inside-Outside Segmentation using Generalized Winding Numbers.* SIGGRAPH 2013.
 22. A. Van Oosterom, J. Strackee. *The Solid Angle of a Plane Triangle.* IEEE Transactions on Biomedical Engineering 30(2), 1983.
+23. E. Guendelman, R. Bridson, R. Fedkiw. *Nonconvex Rigid Bodies with Stacking.* SIGGRAPH 2003 (shock propagation).
 
 Reading order for contributors: [1] → [2] → [3] → [4] → [5] → [7] → [8] → [6].

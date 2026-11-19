@@ -214,3 +214,76 @@ fn a_t_shirt_starts_outside_the_trousers_all_around() {
         "the T-shirt starts inside the trousers: {worst:?}"
     );
 }
+
+/// Two templates on the women's M body, `inner` worn under `outer`; the
+/// scene to drape.
+fn layered(inner: &str, outer: &str) -> r3d_sim::SimScene {
+    let mut s = Session::new(Project::new("Untitled"));
+    common::women_m(&mut s);
+    for template in [inner, outer] {
+        run(
+            &mut s,
+            json!({"type": "template.apply", "template": template}),
+        )
+        .unwrap();
+    }
+    let p = s.project();
+    let form = Form::of_project(p).unwrap().unwrap();
+    build(p, Some(&form), DEFAULT_SPACING_MM).unwrap().scene
+}
+
+/// Drape `scene` for `frames` frames; the positions, after the usual
+/// checks (finite, seams closed).
+fn drape(scene: &r3d_sim::SimScene, frames: u32) -> Vec<glam::Vec3> {
+    let mut solver = CpuSolver::new(scene.clone());
+    for _ in 0..frames {
+        solver.step(1.0 / 60.0).unwrap();
+    }
+    let x = solver.positions().to_vec();
+    assert!(x.iter().all(|v| v.is_finite()));
+    let stats = solver.stats();
+    assert!(stats.max_seam_gap < 0.005, "seams open: {stats:?}");
+    x
+}
+
+/// A shirt worn under trousers drapes tucked into them: from the hips to
+/// just under the waistband, no shirt shows through the trousers, front
+/// or back (thin contacts between garments, docs/physics.md). Particle
+/// repulsion kept layers 2 cm apart, and the trousers' waist snapped
+/// through the shirt.
+#[test]
+fn a_shirt_under_trousers_is_tucked_in() {
+    let scene = layered("shirt", "trousers");
+    let x = drape(&scene, 150);
+    // The shirt is garment 0, the trousers 1; their waistband's top.
+    let top = scene
+        .triangles
+        .iter()
+        .filter(|t| t.garment == 1)
+        .flat_map(|t| t.vertices)
+        .map(|v| x[v as usize])
+        .filter(|p| p.x.abs() < 0.1)
+        .map(|p| p.y)
+        .fold(0.0f32, f32::max);
+    let seen = common::seen_through(&scene, &x, 0, 1, 0.85, top - 0.03);
+    assert_eq!(seen, 0, "shirt showing through the trousers below {top}");
+}
+
+/// A T-shirt worn over trousers hides them where it covers them: the
+/// trousers showed through it in places.
+#[test]
+fn trousers_do_not_show_through_a_t_shirt_over_them() {
+    let scene = layered("trousers", "t_shirt");
+    let x = drape(&scene, 150);
+    let hem = scene
+        .triangles
+        .iter()
+        .filter(|t| t.garment == 1)
+        .flat_map(|t| t.vertices)
+        .map(|v| x[v as usize])
+        .filter(|p| p.x.abs() < 0.1)
+        .map(|p| p.y)
+        .fold(f32::MAX, f32::min);
+    let seen = common::seen_through(&scene, &x, 0, 1, hem + 0.03, 1.15);
+    assert_eq!(seen, 0, "trousers showing through the T-shirt above {hem}");
+}

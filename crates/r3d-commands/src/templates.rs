@@ -160,15 +160,20 @@ const CROTCH_HEIGHT: f64 = 0.455;
 /// Gap between pieces on the pattern board (mm).
 const BOARD_GAP: f64 = 80.0;
 const SEAM_ALLOWANCE_MM: f64 = 10.0;
+/// Trousers end this far above the floor by default (cm): their length
+/// is the waist's height less this. A fraction of the stature left the
+/// hem on the floor of one body and 19 cm above it on another.
+const TROUSER_HEM_CM: f64 = 4.0;
 
 impl Sizes {
-    /// Every size `template` reads, filled in from `body`.
-    pub fn resolve(self, template: Template, body: &Body) -> Sizes {
+    /// Every size `template` reads, filled in from `body`, whose waist (its
+    /// narrowest girth) is `waist_height_cm` above the floor.
+    pub fn resolve(self, template: Template, body: &Body, waist_height_cm: f64) -> Sizes {
         let h = body.height_cm;
         let (length, ease) = match template {
             Template::StraightSkirt => (0.33 * h, 2.0),
             Template::ALineSkirt => (0.36 * h, 2.0),
-            Template::Trousers => (0.565 * h, 4.0),
+            Template::Trousers => (waist_height_cm - TROUSER_HEM_CM, 4.0),
             Template::TShirt => (0.39 * h, 10.0),
             Template::Shirt => (0.43 * h, 12.0),
             Template::Dress => (0.55 * h, 8.0),
@@ -212,18 +217,19 @@ pub struct TemplateInfo {
     pub sizes: Sizes,
 }
 
-/// Every template with its default sizes for `body` (or the standard
-/// size).
-pub fn list(body: Option<&Body>) -> Vec<TemplateInfo> {
-    let body = body.unwrap_or(&STANDARD);
-    Template::ALL
+/// Every template with its default sizes for `project`'s avatar (or the
+/// standard size).
+pub fn list(project: &Project) -> Result<Vec<TemplateInfo>, CommandError> {
+    let body = project.avatar().map_or(STANDARD, |a| a.body);
+    let waist = waist_height_cm(project)?;
+    Ok(Template::ALL
         .into_iter()
         .map(|t| TemplateInfo {
             template: t,
             title: t.title(),
-            sizes: Sizes::default().resolve(t, body),
+            sizes: Sizes::default().resolve(t, &body, waist),
         })
-        .collect()
+        .collect())
 }
 
 /// A size the template reads (always resolved), in mm, checked positive.
@@ -842,7 +848,7 @@ fn draft_in(
     room: &[(f64, f64)],
 ) -> Result<(Vec<AnyId>, BTreeMap<PanelId, f64>), CommandError> {
     let body = tx.project().avatar().map_or(STANDARD, |a| a.body);
-    let sizes = sizes.resolve(template, &body);
+    let sizes = sizes.resolve(template, &body, waist_height_cm(tx.project())?);
     let fresh = tx.project().panels().is_empty();
     let x = tx
         .project()

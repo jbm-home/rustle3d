@@ -35,6 +35,7 @@ pub fn sheet(w: f32, h: f32, n: usize, warp: Vec2, place: impl Fn(Vec2) -> Vec3)
                 triangles.push(Triangle {
                     vertices: v,
                     fabric: 0,
+                    garment: 0,
                     warp,
                 });
             }

@@ -734,7 +734,7 @@ impl Described for TemplateList {
 
 impl QuerySpec for TemplateList {
     fn run(&self, p: &Project) -> Result<Value, CommandError> {
-        to_value(&crate::templates::list(p.avatar().map(|a| &a.body)))
+        to_value(&crate::templates::list(p)?)
     }
 }
 

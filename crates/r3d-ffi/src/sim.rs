@@ -254,6 +254,7 @@ mod tests {
             triangles: vec![Triangle {
                 vertices: [0, 1, 2],
                 fabric: 0,
+                garment: 0,
                 warp: Vec2::Y,
             }],
             fabrics: vec![FabricPreset::Cotton.params()],

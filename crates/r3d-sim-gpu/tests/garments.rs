@@ -4,6 +4,8 @@
 //! into it, seams and closures closed, the T-shirt at rest), and the same
 //! extent as the CPU drape within a couple of centimetres.
 
+#[path = "../../r3d-commands/tests/common/mod.rs"]
+mod common;
 mod gpu;
 
 use glam::Vec3;
@@ -217,4 +219,40 @@ fn a_dress_walks_on_the_gpu() {
     assert!(solver.stats().max_seam_gap < 0.01, "{:?}", solver.stats());
     let top = p.iter().map(|v| v.y).fold(f32::MIN, f32::max);
     assert!(top > 1.2, "the dress slid down: {top}");
+}
+
+/// A shirt worn under trousers drapes tucked into them on the GPU as on
+/// the CPU (`r3d-commands`' `a_shirt_under_trousers_is_tucked_in`): no
+/// shirt shows through the trousers from the hips to under the waistband.
+#[test]
+fn a_shirt_under_trousers_is_tucked_in_on_the_gpu() {
+    let Some(gpu) = gpu::context() else {
+        return;
+    };
+    let mut s = Session::new(Project::new("Untitled"));
+    common::women_m(&mut s);
+    for template in ["shirt", "trousers"] {
+        s.run_step(
+            &Step::from_value(json!({"type": "template.apply", "template": template})).unwrap(),
+        )
+        .unwrap();
+    }
+    let form = Form::of_project(s.project()).unwrap().unwrap();
+    let scene = build(s.project(), Some(&form), DEFAULT_SPACING_MM)
+        .unwrap()
+        .scene;
+    let mut solver = GpuSolver::new(gpu, scene.clone()).unwrap();
+    drape(&mut solver, &scene, 150);
+    let x = solver.positions();
+    let top = scene
+        .triangles
+        .iter()
+        .filter(|t| t.garment == 1)
+        .flat_map(|t| t.vertices)
+        .map(|v| x[v as usize])
+        .filter(|p| p.x.abs() < 0.1)
+        .map(|p| p.y)
+        .fold(0.0f32, f32::max);
+    let seen = common::seen_through(&scene, x, 0, 1, 0.85, top - 0.03);
+    assert_eq!(seen, 0, "shirt showing through the trousers below {top}");
 }

@@ -37,6 +37,9 @@ pub struct SelfContact {
     /// For each particle, the others sewn to it (its seam group, empty
     /// for most particles).
     pub sewn: Vec<Vec<u32>>,
+    /// The garment of each particle: particles of different garments do
+    /// not repel each other here ([`crate::layers`] keeps them apart).
+    pub garment: Vec<u16>,
 }
 
 /// The particles within `reach` of `start` along the cloth `graph`
@@ -94,12 +97,13 @@ impl SelfContact {
     /// cloth's connectivity. `overlaps`: pairs of points whose
     /// surroundings (within the given distance on the cloth, m) lie on
     /// each other on purpose (a buttoned band): those never collide.
-    /// Indices are assumed valid.
+    /// `garment`: each particle's. Indices are assumed valid.
     pub fn new(
         rest: &[Vec2],
         triangles: &[[u32; 3]],
         seams: &[[u32; 2]],
         overlaps: &[([u32; 2], f32)],
+        garment: &[u16],
     ) -> Self {
         let n = rest.len();
         // Cloth graph: mesh edges (rest length) and seams (length 0).
@@ -170,6 +174,7 @@ impl SelfContact {
             radius,
             excluded,
             sewn: seam_groups(n, seams),
+            garment: garment.to_vec(),
         }
     }
 
@@ -235,6 +240,7 @@ impl SelfContact {
                             let (iu, ju) = (i as u32, j);
                             if ju <= iu
                                 || w[i] + w[j as usize] == 0.0
+                                || self.garment.get(i) != self.garment.get(j as usize)
                                 || x[j as usize].distance_squared(*p) > reach * reach
                                 || self.excluded[i].binary_search(&ju).is_ok()
                             {
@@ -333,14 +339,14 @@ mod tests {
     #[test]
     fn near_on_the_cloth_is_excluded_far_is_not() {
         let (rest, tris) = strip(20);
-        let s = SelfContact::new(&rest, &tris, &[], &[]);
+        let s = SelfContact::new(&rest, &tris, &[], &[], &vec![0; rest.len()]);
         assert!((s.radius - 0.004).abs() < 1e-6);
         // Reach 4 radii = 16 mm: 1 cm and the 1.4 cm diagonal are in, 3 cm
         // along the strip is out.
         assert!(s.is_excluded(0, 2) && s.is_excluded(0, 3));
         assert!(!s.is_excluded(0, 6) && !s.is_excluded(0, 40));
         // A seam joining both ends makes them neighbours.
-        let s = SelfContact::new(&rest, &tris, &[[0, 40]], &[]);
+        let s = SelfContact::new(&rest, &tris, &[[0, 40]], &[], &vec![0; rest.len()]);
         assert!(s.is_excluded(0, 40) && s.is_excluded(2, 40));
     }
 
@@ -353,7 +359,13 @@ mod tests {
         let (rest2, tris2) = strip(20);
         rest.extend(rest2);
         tris.extend(tris2.iter().map(|t| t.map(|v| v + 42)));
-        let s = SelfContact::new(&rest, &tris, &[[0, 42]], &[([0, 42], 0.02)]);
+        let s = SelfContact::new(
+            &rest,
+            &tris,
+            &[[0, 42]],
+            &[([0, 42], 0.02)],
+            &vec![0; rest.len()],
+        );
         assert!(s.is_excluded(2, 45) && s.is_excluded(45, 2));
         assert!(!s.is_excluded(8, 50));
     }
@@ -366,7 +378,7 @@ mod tests {
         let (rest2, tris2) = strip(20);
         rest.extend(rest2);
         tris.extend(tris2.iter().map(|t| t.map(|v| v + 42)));
-        let s = SelfContact::new(&rest, &tris, &[[0, 42]], &[]);
+        let s = SelfContact::new(&rest, &tris, &[[0, 42]], &[], &vec![0; rest.len()]);
         let mut x: Vec<Vec3> = (0..84).map(|i| Vec3::new(i as f32, 1.0, 0.0)).collect();
         x[0] = Vec3::ZERO;
         x[42] = Vec3::new(0.0, 0.0, 0.0005);

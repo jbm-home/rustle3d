@@ -7,7 +7,9 @@
 // so no two invocations write the same particle.
 //
 // Prepended by the Rust side: SKIN, NEAR, BAND, BRICK, MAX_NEIGHBOURS,
-// ITERATIONS, ON_SKIN, CLOSURE_COMPLIANCE, CLOSING_SPEED.
+// ITERATIONS, ON_SKIN, CLOSURE_COMPLIANCE, CLOSING_SPEED, MAX_TOUCHES,
+// LAYER_SKIN, OVERHANG, RECOVER, RECOVERY_SPEED, OPEN_SEAM, BORDER,
+// MARGIN, FIXED, LAYER_RELAXATION, TURNED.
 
 struct Step {
     // xyz: gravity (m/s²), w: substep h (s).
@@ -40,6 +42,22 @@ struct Scene {
     // x: where the nodes' vertices start in `sdf_values`, y: bones of a
     // moving body (0: the body stands still), z: where the skin starts.
     body: vec4u,
+    // x: how far the corners of a triangle of another garment a particle
+    // may touch can be (m); 0: a single garment. y: the cloth's triangles
+    // (before the seams' bridges; exact as a float).
+    layers: vec4f,
+}
+
+// A triangle for contacts between garments: corners, then its garment
+// (low 16 bits) and free edges (bits 16..24: bit k the edge opposite
+// corner k, BORDER a corner on a free edge); for a seam's bridge, the
+// cloth triangle it continues (NONE for the cloth's own).
+struct LayerTri {
+    v: vec4u,
+    bridged: u32,
+    _pad0: u32,
+    _pad1: u32,
+    _pad2: u32,
 }
 
 struct Membrane {
@@ -95,6 +113,21 @@ struct Hinge {
 // inverse, and the bone's at the substep's start.
 @group(1) @binding(21) var<storage, read> body: array<vec4f>;
 @group(1) @binding(22) var<storage, read> closures: array<vec2u>;
+// Per particle, its garment (numbered from the body out).
+@group(1) @binding(23) var<storage, read> garment: array<u32>;
+// Compressed rows: per particle, the triangles it is a corner of.
+@group(1) @binding(24) var<storage, read> incident_csr: array<u32>;
+@group(1) @binding(25) var<storage, read> triangles: array<LayerTri>;
+// Per particle, a row of 1 + MAX_TOUCHES: how many triangles of other
+// garments it may touch, then those triangles; after the rows, two flags
+// (rebuild the hash, gather the candidates again), then per cloth
+// triangle 1 if it is turned over (see `layer_turned`).
+@group(1) @binding(26) var<storage, read_write> touches: array<u32>;
+// Per particle, the sum of its pushes from contacts between garments
+// (xyz, in units of FIXED m) and their count.
+@group(1) @binding(27) var<storage, read_write> layer_delta: array<atomic<i32>>;
+// Where each particle was when the candidates were gathered.
+@group(1) @binding(28) var<storage, read_write> gathered: array<vec4f>;
 
 const WG: u32 = 64u;
 
@@ -537,6 +570,9 @@ fn collide(@builtin(global_invocation_id) id: vec3u) {
     if i >= scene.counts.x {
         return;
     }
+    if scene.layers.x > 0.0 {
+        apply_layers(i);
+    }
     near[i] = 0u;
     let d = pdata[i];
     if d.x == 0.0 {
@@ -641,28 +677,42 @@ fn hash(c: vec3i) -> u32 {
     return ((u.x * 73856093u) ^ (u.y * 19349663u) ^ (u.z * 83492791u)) & (scene.counts.y - 1u);
 }
 
+// The hash is rebuilt only when asked (the first flag after the rows of
+// `touches`): at the start of a frame, and when the cloth has moved
+// since the candidates between garments were gathered.
+fn rehash() -> bool {
+    return touches[scene.counts.x * (MAX_TOUCHES + 1u)] != 0u;
+}
+
 @compute @workgroup_size(WG)
 fn hash_clear(@builtin(global_invocation_id) id: vec3u) {
-    if id.x < scene.counts.y {
+    if id.x < scene.counts.y && rehash() {
         atomicStore(&cell_count[id.x], 0u);
     }
 }
 
 @compute @workgroup_size(WG)
 fn hash_count(@builtin(global_invocation_id) id: vec3u) {
-    if id.x < scene.counts.x {
+    if id.x < scene.counts.x && rehash() {
         atomicAdd(&cell_count[hash(cell_of(x[id.x].xyz))], 1u);
     }
 }
 
 const SCAN: u32 = 256u;
 var<workgroup> partial: array<u32, SCAN>;
+var<workgroup> scan_wanted: u32;
 
 // Exclusive prefix sum of the cell counts into `cell_start` (one
 // workgroup; each thread scans a chunk); the counts become write cursors.
 @compute @workgroup_size(SCAN)
 fn hash_scan(@builtin(local_invocation_id) lid: vec3u) {
     let t = lid.x;
+    if t == 0u {
+        scan_wanted = select(0u, 1u, rehash());
+    }
+    if workgroupUniformLoad(&scan_wanted) == 0u {
+        return;
+    }
     let size = scene.counts.y;
     let chunk = size / SCAN;
     var sum = 0u;
@@ -696,7 +746,7 @@ fn hash_scan(@builtin(local_invocation_id) lid: vec3u) {
 
 @compute @workgroup_size(WG)
 fn hash_scatter(@builtin(global_invocation_id) id: vec3u) {
-    if id.x < scene.counts.x {
+    if id.x < scene.counts.x && rehash() {
         let slot = atomicAdd(&cell_count[hash(cell_of(x[id.x].xyz))], 1u);
         sorted[slot] = id.x;
     }
@@ -741,7 +791,7 @@ fn find_neighbours(@builtin(global_invocation_id) id: vec3u) {
                 let h = hash(c + vec3i(dx, dy, dz));
                 for (var k = cell_start[h]; k < cell_start[h + 1u]; k++) {
                     let j = sorted[k];
-                    if j == i || wi + pdata[j].x == 0.0 {
+                    if j == i || wi + pdata[j].x == 0.0 || garment[j] != garment[i] {
                         continue;
                     }
                     let d = x[j].xyz - p;
@@ -883,4 +933,382 @@ fn self_apply(@builtin(global_invocation_id) id: vec3u) {
         }
     }
     x[i] = vec4f(x[i].xyz + total, 0.0);
+}
+
+// ---------------------------------------------------------------------------
+// Contacts between garments (r3d-sim's `layers.rs`; Bridson et al. 2002):
+// a particle stays on its side of the triangles of other garments (the
+// outer garment on the face an inner one's triangles show), a few
+// millimetres away. Candidates are gathered from the spatial hash when
+// the cloth has moved MARGIN / 2 since they last were (checked at the
+// start of a frame and every few substeps; the flags after the rows of
+// `touches`). The pushes are scattered to the triangles' corners as
+// integers (sums independent of their order) and averaged per particle.
+
+// +1 if particle i (of garment g) belongs on the side triangle t faces.
+fn layer_side(g: u32, t: LayerTri) -> f32 {
+    return select(-1.0, 1.0, g > (t.v.w & 0xffffu));
+}
+
+fn layer_gap(i: u32, t: LayerTri) -> f32 {
+    let sheet = (pdata[t.v.x].y + pdata[t.v.y].y + pdata[t.v.z].y) / 3.0;
+    return pdata[i].y + sheet + LAYER_SKIN;
+}
+
+fn free_bits(t: LayerTri) -> u32 {
+    return (t.v.w >> 16u) & 0xffu;
+}
+
+// The garment of particle i (that of its first triangle); NONE if it is
+// in no triangle.
+const NONE: u32 = 0xffffffffu;
+fn garment_of(i: u32) -> u32 {
+    if incident_csr[i] == incident_csr[i + 1u] {
+        return NONE;
+    }
+    return triangles[incident_csr[incident_csr[i]]].v.w & 0xffffu;
+}
+
+struct Over {
+    ok: bool,
+    n: vec3f,
+    bary: vec3f,
+    d: f32,
+}
+
+// Where p lies over triangle (a, b, c): its unit normal, the barycentric
+// weights of p's foot (clamped to the triangle) and p's signed distance;
+// not ok for a degenerate triangle, or p farther past an edge than
+// OVERHANG, or past a free one (bit k of `free`: the edge opposite
+// corner k).
+fn over(p: vec3f, a: vec3f, b: vec3f, c: vec3f, free: u32) -> Over {
+    var out: Over;
+    out.ok = false;
+    let e1 = b - a;
+    let e2 = c - a;
+    let nn = cross(e1, e2);
+    let area2 = dot(nn, nn);
+    if area2 < 1e-16 {
+        return out;
+    }
+    let rel = p - a;
+    let d00 = dot(e1, e1);
+    let d01 = dot(e1, e2);
+    let d11 = dot(e2, e2);
+    let d20 = dot(rel, e1);
+    let d21 = dot(rel, e2);
+    let det = d00 * d11 - d01 * d01;
+    if abs(det) < 1e-20 {
+        return out;
+    }
+    let v = (d11 * d20 - d01 * d21) / det;
+    let w = (d00 * d21 - d01 * d20) / det;
+    let u = 1.0 - v - w;
+    let lim = vec3f(
+        select(-OVERHANG, 0.0, (free & 1u) != 0u),
+        select(-OVERHANG, 0.0, (free & 2u) != 0u),
+        select(-OVERHANG, 0.0, (free & 4u) != 0u),
+    );
+    if u < lim.x || v < lim.y || w < lim.z {
+        return out;
+    }
+    let b3 = max(vec3f(u, v, w), vec3f(0.0));
+    let n = nn / sqrt(area2);
+    out.ok = true;
+    out.n = n;
+    out.bary = b3 / (b3.x + b3.y + b3.z);
+    out.d = dot(rel, n);
+    return out;
+}
+
+// Whether triangle t holds cloth off now: always for the cloth's own; a
+// seam's bridge while the seam is open wider than OPEN_SEAM and it faces
+// as the cloth triangle it continues.
+fn holds(t: LayerTri) -> bool {
+    if t.bridged == NONE {
+        return true;
+    }
+    let a = x[t.v.x].xyz;
+    let b = x[t.v.y].xyz;
+    let c = x[t.v.z].xyz;
+    let r = triangles[t.bridged].v;
+    let ra = x[r.x].xyz;
+    let facing = cross(x[r.y].xyz - ra, x[r.z].xyz - ra);
+    let fl = length(facing);
+    if fl < 1e-12 {
+        return false;
+    }
+    let longest = max(max(length(b - a), length(c - b)), length(a - c));
+    return dot(cross(b - a, c - a), facing / fl) > OPEN_SEAM * longest;
+}
+
+fn flag_at() -> u32 {
+    return scene.counts.x * (MAX_TOUCHES + 1u);
+}
+
+// Ask for the hash (the self-collision candidates need it every frame).
+@compute @workgroup_size(1)
+fn layer_mark() {
+    touches[flag_at()] = 1u;
+}
+
+@compute @workgroup_size(1)
+fn layer_reset() {
+    touches[flag_at()] = 0u;
+    touches[flag_at() + 1u] = 0u;
+}
+
+// Whether each cloth triangle is turned over: near the body, its normal
+// points into it (cosine below TURNED). Which side of it another garment
+// belongs on is then not known: it takes no part (r3d-sim's `layers.rs`).
+@compute @workgroup_size(WG)
+fn layer_turned(@builtin(global_invocation_id) id: vec3u) {
+    let k = id.x;
+    if f32(k) >= scene.layers.y || touches[flag_at() + 1u] == 0u {
+        return;
+    }
+    let t = triangles[k].v;
+    let a = x[t.x].xyz;
+    let b = x[t.y].xyz;
+    let c = x[t.z].xyz;
+    let nn = cross(b - a, c - a);
+    let l = length(nn);
+    let g = touch((a + b + c) / 3.0).c;
+    touches[flag_at() + 2u + k] = select(0u, 1u, l > 1e-12 && g.w < BAND && dot(nn / l, g.xyz) < TURNED);
+}
+
+// Raise both flags if a particle moved MARGIN / 2 since the candidates
+// were gathered (every particle that does writes the same 1s). They start
+// raised, so the first frame gathers.
+@compute @workgroup_size(WG)
+fn layer_moved(@builtin(global_invocation_id) id: vec3u) {
+    let i = id.x;
+    if i >= scene.counts.x {
+        return;
+    }
+    let d = x[i].xyz - gathered[i].xyz;
+    if dot(d, d) > 0.25 * MARGIN * MARGIN {
+        touches[flag_at()] = 1u;
+        touches[flag_at() + 1u] = 1u;
+    }
+}
+
+// Each particle's candidate triangles of other garments, sorted: those
+// it may touch on its side, and those it lies on the wrong side of (from
+// up to RECOVER deep, not at a free edge) unless some of that garment's
+// triangles have it on their right side (then it is over a fold of that
+// garment turned over).
+@compute @workgroup_size(WG)
+fn layer_find(@builtin(global_invocation_id) id: vec3u) {
+    let i = id.x;
+    if i >= scene.counts.x || touches[flag_at() + 1u] == 0u {
+        return;
+    }
+    let row = i * (MAX_TOUCHES + 1u);
+    let p = x[i].xyz;
+    gathered[i] = vec4f(p, 0.0);
+    let own = garment_of(i);
+    if own == NONE {
+        touches[row] = 0u;
+        return;
+    }
+    let reach = scene.layers.x;
+    let reach2 = reach * reach;
+    let wi = pdata[i].x;
+    // Triangle index; bit 31: the particle is on its right side.
+    var list: array<u32, MAX_TOUCHES>;
+    var n = 0u;
+    let c = cell_of(p);
+    for (var dz = -1; dz <= 1; dz++) {
+        for (var dy = -1; dy <= 1; dy++) {
+            for (var dx = -1; dx <= 1; dx++) {
+                let h = hash(c + vec3i(dx, dy, dz));
+                for (var k = cell_start[h]; k < cell_start[h + 1u]; k++) {
+                    let j = sorted[k];
+                    let dj = x[j].xyz - p;
+                    if dot(dj, dj) > reach2 {
+                        continue;
+                    }
+                    for (var r = incident_csr[j]; r < incident_csr[j + 1u]; r++) {
+                        let tk = incident_csr[r];
+                        let t = triangles[tk];
+                        if (t.v.w & 0xffffu) == own {
+                            break;
+                        }
+                        var at = n;
+                        var seen = false;
+                        for (var s = 0u; s < n; s++) {
+                            let e = list[s] & 0x7fffffffu;
+                            if e == tk {
+                                seen = true;
+                                break;
+                            }
+                            if e > tk {
+                                at = s;
+                                break;
+                            }
+                        }
+                        if seen || at >= MAX_TOUCHES {
+                            continue;
+                        }
+                        let turned = f32(tk) < scene.layers.y && touches[flag_at() + 2u + tk] != 0u;
+                        if wi + pdata[t.v.x].x + pdata[t.v.y].x + pdata[t.v.z].x == 0.0 || turned || !holds(t) {
+                            continue;
+                        }
+                        let free = free_bits(t);
+                        let o = over(p, x[t.v.x].xyz, x[t.v.y].xyz, x[t.v.z].xyz, free);
+                        if !o.ok {
+                            continue;
+                        }
+                        let d = o.d * layer_side(own, t);
+                        let deepest = select(-RECOVER, 0.0, (free & BORDER) != 0u);
+                        if d >= layer_gap(i, t) + MARGIN || d < deepest {
+                            continue;
+                        }
+                        var s = min(n, MAX_TOUCHES - 1u);
+                        while s > at {
+                            list[s] = list[s - 1u];
+                            s--;
+                        }
+                        list[at] = tk | select(0u, 0x80000000u, d >= 0.0);
+                        n = min(n + 1u, MAX_TOUCHES);
+                    }
+                }
+            }
+        }
+    }
+    var kept = 0u;
+    for (var s = 0u; s < n; s++) {
+        let e = list[s];
+        var keep = (e & 0x80000000u) != 0u;
+        if !keep {
+            let g = triangles[e & 0x7fffffffu].v.w & 0xffffu;
+            keep = true;
+            for (var q = 0u; q < n; q++) {
+                let f = list[q];
+                if (f & 0x80000000u) != 0u && (triangles[f & 0x7fffffffu].v.w & 0xffffu) == g {
+                    keep = false;
+                    break;
+                }
+            }
+        }
+        if keep {
+            touches[row + 1u + kept] = e & 0x7fffffffu;
+            kept += 1u;
+        }
+    }
+    touches[row] = kept;
+}
+
+// Add a push to particle i's sums; one that does not move it (a share of
+// 0: pinned, or the inner side resting on the body) is not counted, or it
+// would dilute the average of the pushes that do.
+fn scatter(i: u32, v: vec3f, w: f32) {
+    if w == 0.0 {
+        return;
+    }
+    let q = vec3i(round(v / FIXED));
+    atomicAdd(&layer_delta[4u * i], q.x);
+    atomicAdd(&layer_delta[4u * i + 1u], q.y);
+    atomicAdd(&layer_delta[4u * i + 2u], q.z);
+    atomicAdd(&layer_delta[4u * i + 3u], 1);
+}
+
+// Inverse mass of i in a contact: 0 if it is the inner side and rests on
+// the body (shock propagation, Guendelman et al. 2003).
+fn held_w(i: u32, inner: bool) -> f32 {
+    return select(pdata[i].x, 0.0, inner && near[i] != 0u);
+}
+
+// Each candidate that came too close: XPBD on side·(p − q)·n ≥ gap (q the
+// foot, n held constant), cloth already through coming back at
+// RECOVERY_SPEED; then positional friction against the triangle's motion
+// this substep. Pushes on the particle and the triangle's corners.
+@compute @workgroup_size(WG)
+fn layer_solve(@builtin(global_invocation_id) id: vec3u) {
+    let i = id.x;
+    if i >= scene.counts.x {
+        return;
+    }
+    let own = garment_of(i);
+    if own == NONE {
+        return;
+    }
+    let row = i * (MAX_TOUCHES + 1u);
+    let p = x[i].xyz;
+    let h = step.gravity_h.w;
+    for (var s = 0u; s < touches[row]; s++) {
+        let t = triangles[touches[row + 1u + s]];
+        if !holds(t) {
+            continue;
+        }
+        let a = x[t.v.x].xyz;
+        let b = x[t.v.y].xyz;
+        let c = x[t.v.z].xyz;
+        let free = free_bits(t);
+        let o = over(p, a, b, c, free);
+        if !o.ok {
+            continue;
+        }
+        let side = layer_side(own, t);
+        var depth = layer_gap(i, t) - side * o.d;
+        if depth <= 0.0 {
+            continue;
+        }
+        if side * o.d < 0.0 {
+            // On which side of the triangle's plane it was at the
+            // substep's start.
+            let pa = prev[t.v.x].xyz;
+            let normal = cross(prev[t.v.y].xyz - pa, prev[t.v.z].xyz - pa);
+            if side * dot(prev[i].xyz - pa, normal) < 0.0 {
+                if (free & BORDER) != 0u {
+                    continue;
+                }
+                depth = min(depth, RECOVERY_SPEED * h);
+            }
+        }
+        let wp = held_w(i, side < 0.0);
+        let w3 = vec3f(held_w(t.v.x, side > 0.0), held_w(t.v.y, side > 0.0), held_w(t.v.z, side > 0.0));
+        let denom = wp + dot(o.bary * o.bary, w3);
+        if denom <= 1e-12 {
+            continue;
+        }
+        let push = o.n * (side * depth / denom);
+        // Friction: the sliding over the triangle this substep (the push,
+        // along the normal, does not change it), cancelled up to μ × the
+        // push.
+        let foot = a * o.bary.x + b * o.bary.y + c * o.bary.z;
+        let before = prev[t.v.x].xyz * o.bary.x + prev[t.v.y].xyz * o.bary.y + prev[t.v.z].xyz * o.bary.z;
+        let moved = (p - prev[i].xyz) - (foot - before);
+        let tangential = moved - o.n * dot(moved, o.n);
+        let sliding = length(tangential);
+        var k = push;
+        if sliding > 0.0 {
+            let mu = (pdata[i].z + (pdata[t.v.x].z + pdata[t.v.y].z + pdata[t.v.z].z) / 3.0) * 0.5;
+            k -= tangential * (min(mu * depth / sliding, 1.0) / denom);
+        }
+        scatter(i, k * wp, wp);
+        scatter(t.v.x, -k * (o.bary.x * w3.x), o.bary.x * w3.x);
+        scatter(t.v.y, -k * (o.bary.y * w3.y), o.bary.y * w3.y);
+        scatter(t.v.z, -k * (o.bary.z * w3.z), o.bary.z * w3.z);
+    }
+}
+
+// A particle moves by the average of its pushes from contacts between
+// garments, over-relaxed by LAYER_RELAXATION (constraint averaging with
+// successive over-relaxation, Macklin et al. 2014 §4.2): averaged alone,
+// a tucked shirt pressed between the trousers and the body slipped out
+// through them over a few substeps, where the CPU's sweep (Gauss–Seidel)
+// held it. The sums are cleared. Called by `collide`, which runs next (a
+// dispatch of its own cost as much as the pushes).
+fn apply_layers(i: u32) {
+    let count = atomicExchange(&layer_delta[4u * i + 3u], 0);
+    let q = vec3i(
+        atomicExchange(&layer_delta[4u * i], 0),
+        atomicExchange(&layer_delta[4u * i + 1u], 0),
+        atomicExchange(&layer_delta[4u * i + 2u], 0),
+    );
+    if count > 0 {
+        x[i] = vec4f(x[i].xyz + vec3f(q) * (FIXED * LAYER_RELAXATION / f32(count)), 0.0);
+    }
 }
