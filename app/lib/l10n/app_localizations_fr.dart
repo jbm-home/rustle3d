@@ -891,6 +891,9 @@ class LFr extends L {
   String get piece => 'Pièce';
 
   @override
+  String get renamePiece => 'Renommer la pièce (ou double-cliquer sur son nom)';
+
+  @override
   String get mirrorCopy => 'Copie symétrique — suit sa source';
 
   @override

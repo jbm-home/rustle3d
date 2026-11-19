@@ -7,7 +7,7 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-19 (a moving avatar keeps its hands clear of its
+Last updated: 2026-11-19 (pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
 hips, so trousers no longer slide with each step; a garment worn over
 trousers starts outside them; captured motions: Motion › Import a captured
 motion… plays a BVH motion capture on the avatar, Motion › Motion
@@ -172,6 +172,10 @@ drag a corner, the point lands on what is near the pointer: a corner,
 the middle of an edge, an edge, a construction line, a symmetry axis, or
 level with the previous point (or the first one, or a dragged corner's
 neighbours). A small label says what it snapped to.
+
+**Naming a piece**: select it; in the inspector, click the pencil next
+to its name (or double-click the name), type the new one and press
+Enter. Esc keeps the old name. Renaming is one step you can undo.
 
 **Half pieces**: with Polygon or Curve, turn on **Half piece** (top left
 of the board) and draw half of a symmetric piece, ending where you

@@ -880,6 +880,9 @@ class LEn extends L {
   String get piece => 'Piece';
 
   @override
+  String get renamePiece => 'Rename the piece (or double-click its name)';
+
+  @override
   String get mirrorCopy => 'Mirror copy — follows its source';
 
   @override

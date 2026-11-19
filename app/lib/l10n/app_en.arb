@@ -470,6 +470,7 @@
     }
   },
   "piece": "Piece",
+  "renamePiece": "Rename the piece (or double-click its name)",
   "mirrorCopy": "Mirror copy — follows its source",
   "unlink": "Unlink",
   "area": "Area",

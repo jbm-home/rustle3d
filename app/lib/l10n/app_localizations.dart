@@ -1609,6 +1609,12 @@ abstract class L {
   /// **'Piece'**
   String get piece;
 
+  /// No description provided for @renamePiece.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename the piece (or double-click its name)'**
+  String get renamePiece;
+
   /// No description provided for @mirrorCopy.
   ///
   /// In en, this message translates to:

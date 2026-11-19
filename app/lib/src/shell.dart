@@ -4078,9 +4078,11 @@ class _PanelInspector extends StatelessWidget {
       children: [
         Text(l.piece, style: ts(fontSize: 12, color: p.textMuted)),
         const SizedBox(height: Space.xs),
-        Text(
-          panel['name'] as String,
-          style: ts(fontSize: 24, fontWeight: FontWeight.w600, color: p.text),
+        _PieceName(
+          key: ValueKey('piece-name-$id'),
+          name: panel['name'] as String,
+          onRename: (name) =>
+              run({'type': 'panel.rename', 'panel': id, 'name': name}),
         ),
         if (linked) ...[
           const SizedBox(height: Space.s),
@@ -4631,6 +4633,108 @@ class _NumberField extends StatelessWidget {
           border: const OutlineInputBorder(),
         ),
       ),
+    );
+  }
+}
+
+/// The piece's name, big; the pencil or a double click turns it into a
+/// field. Enter or leaving the field renames the piece, Esc keeps the name.
+class _PieceName extends StatefulWidget {
+  const _PieceName({super.key, required this.name, required this.onRename});
+
+  final String name;
+  final ValueChanged<String> onRename;
+
+  @override
+  State<_PieceName> createState() => _PieceNameState();
+}
+
+class _PieceNameState extends State<_PieceName> {
+  final _text = TextEditingController();
+  final _focus = FocusNode();
+  var _editing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(() {
+      if (!_focus.hasFocus && _editing) _commit();
+    });
+  }
+
+  @override
+  void dispose() {
+    _text.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _edit() {
+    _text.value = TextEditingValue(
+      text: widget.name,
+      selection: TextSelection(baseOffset: 0, extentOffset: widget.name.length),
+    );
+    setState(() => _editing = true);
+  }
+
+  void _commit() {
+    final name = _text.text.trim();
+    setState(() => _editing = false);
+    if (name.isNotEmpty && name != widget.name) widget.onRename(name);
+  }
+
+  KeyEventResult _key(FocusNode node, KeyEvent event) {
+    if (event is KeyDownEvent &&
+        event.logicalKey == LogicalKeyboardKey.escape) {
+      setState(() => _editing = false);
+      return KeyEventResult.handled;
+    }
+    return _NumberField._keepTyping(node, event);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final style = ts(fontSize: 24, fontWeight: FontWeight.w600, color: p.text);
+    if (_editing) {
+      return Focus(
+        canRequestFocus: false,
+        skipTraversal: true,
+        onKeyEvent: _key,
+        child: TextField(
+          key: const Key('piece-name-field'),
+          controller: _text,
+          focusNode: _focus,
+          autofocus: true,
+          style: style,
+          onSubmitted: (_) => _commit(),
+          decoration: const InputDecoration(
+            isDense: true,
+            contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            border: OutlineInputBorder(),
+          ),
+        ),
+      );
+    }
+    return Row(
+      children: [
+        Flexible(
+          child: GestureDetector(
+            onDoubleTap: _edit,
+            child: Text(
+              widget.name,
+              style: style,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+        _IconAction(
+          key: const Key('piece-rename'),
+          icon: Icons.edit_outlined,
+          tip: context.l.renamePiece,
+          onTap: _edit,
+        ),
+      ],
     );
   }
 }

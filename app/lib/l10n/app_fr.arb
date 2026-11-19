@@ -252,6 +252,7 @@
   "wholeGarment": "Vêtement entier",
   "piecesSelected": "{count} pièces sélectionnées. Cliquez une seule pièce sur le patron pour la modifier.",
   "piece": "Pièce",
+  "renamePiece": "Renommer la pièce (ou double-cliquer sur son nom)",
   "mirrorCopy": "Copie symétrique — suit sa source",
   "unlink": "Délier",
   "area": "Surface",
