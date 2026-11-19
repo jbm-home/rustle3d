@@ -1,5 +1,6 @@
 // Renaming a piece from its inspector: the pencil turns the name into a
-// field; Enter renames (one undoable step), Esc keeps the name.
+// field; Enter, the tick or a click elsewhere renames (one undoable step),
+// Esc keeps the name.
 
 import 'dart:convert';
 import 'dart:io';
@@ -79,5 +80,34 @@ void main() {
     expect(find.text('Left front'), findsWidgets);
     engine.run(stepJson: '{"type":"history.undo"}');
     expect(name(), 'Front');
+    await frames();
+
+    // Enter is the field's, not the window's (which finishes a drawing):
+    // the key is left to the text input, which submits.
+    await tester.tap(pencil);
+    await frames(4);
+    final field = find.byKey(const Key('piece-name-field'));
+    await tester.enterText(field, 'Back');
+    expect(
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter),
+      isFalse,
+      reason: 'a window shortcut took Enter',
+    );
+    await frames(4);
+
+    // The tick renames.
+    await tester.enterText(field, 'Back');
+    await tester.tap(find.byKey(const Key('piece-name-ok')));
+    await frames();
+    expect(name(), 'Back');
+
+    // So does a click elsewhere in the inspector.
+    await tester.tap(pencil);
+    await frames(4);
+    await tester.enterText(field, 'Yoke');
+    await tester.tapAt(tester.getBottomLeft(field) + const Offset(4, 80));
+    await frames();
+    expect(name(), 'Yoke');
+    expect(find.byKey(const Key('piece-name-field')), findsNothing);
   });
 }

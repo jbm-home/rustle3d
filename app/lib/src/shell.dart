@@ -4586,11 +4586,15 @@ class _NumberField extends StatelessWidget {
   /// A formula may be typed instead of a number (`waist / 4 + 10 mm`).
   final bool formula;
 
-  /// Typed characters go to the field, not to the window's one-key
-  /// shortcuts (1–4 would turn the camera, R add a piece).
+  /// Typed characters and Enter go to the field, not to the window's
+  /// one-key shortcuts (1–4 would turn the camera, R add a piece, Enter
+  /// finish a drawing instead of submitting the field).
   static KeyEventResult _keepTyping(FocusNode _, KeyEvent event) {
     final keys = HardwareKeyboard.instance;
-    return event.character != null &&
+    final enter =
+        event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter;
+    return (enter || event.character != null) &&
             !keys.isMetaPressed &&
             !keys.isControlPressed
         ? KeyEventResult.skipRemainingHandlers
@@ -4638,7 +4642,8 @@ class _NumberField extends StatelessWidget {
 }
 
 /// The piece's name, big; the pencil or a double click turns it into a
-/// field. Enter or leaving the field renames the piece, Esc keeps the name.
+/// field. Enter, the tick, a click elsewhere or leaving the field renames
+/// the piece; Esc keeps the name.
 class _PieceName extends StatefulWidget {
   const _PieceName({super.key, required this.name, required this.onRename});
 
@@ -4678,6 +4683,7 @@ class _PieceNameState extends State<_PieceName> {
   }
 
   void _commit() {
+    if (!_editing) return;
     final name = _text.text.trim();
     setState(() => _editing = false);
     if (name.isNotEmpty && name != widget.name) widget.onRename(name);
@@ -4708,10 +4714,21 @@ class _PieceNameState extends State<_PieceName> {
           autofocus: true,
           style: style,
           onSubmitted: (_) => _commit(),
-          decoration: const InputDecoration(
+          // A click anywhere else renames too, as leaving the field does.
+          onTapOutside: (_) => _commit(),
+          decoration: InputDecoration(
             isDense: true,
-            contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            border: OutlineInputBorder(),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 6,
+            ),
+            border: const OutlineInputBorder(),
+            suffixIcon: _IconAction(
+              key: const Key('piece-name-ok'),
+              icon: Icons.check_rounded,
+              tip: context.l.renamePieceOk,
+              onTap: _commit,
+            ),
           ),
         ),
       );
