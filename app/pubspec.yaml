@@ -1,7 +1,7 @@
 name: rustle3d
 description: "Rustle3D desktop app: Flutter UI over the Rust core."
 publish_to: 'none'
-version: 26.11.19
+version: 26.11.20
 
 environment:
   sdk: ^3.14.0
