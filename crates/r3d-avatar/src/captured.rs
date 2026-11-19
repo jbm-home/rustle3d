@@ -10,6 +10,10 @@
 //! bones between the hips and the chest share the captured spine's
 //! rotations along the chain (spherical interpolation). Poses are made
 //! for each body when played, so a captured motion follows every size.
+//! Some files leave their rest pose lying (every bone along one axis, a
+//! leg up and the other down) and turn each joint upright in every frame;
+//! for those, the sampled frame that stands best stands in for the rest
+//! pose, each joint's rotation at that frame undone.
 //!
 //! **Looping.** The motion repeats the longest stretch whose end matches
 //! its start, poses and speeds compared over a few frames, within a
@@ -247,17 +251,97 @@ fn map(bvh: &Bvh, basis: Quat, rest: &[Vec3]) -> Result<Mapping, MotionError> {
     })
 }
 
+/// Frames sampled to find how the body stands in the motion.
+const AXIS_SAMPLES: usize = 32;
+/// The rest pose stands if its hips-to-head direction is within 45° of
+/// the motion's up.
+const STANDING_COS: f32 = std::f32::consts::FRAC_1_SQRT_2;
+
+/// The file's axis (±X, ±Y or ±Z) nearest to `v`.
+fn nearest_axis(v: Vec3) -> Vec3 {
+    let a = v.abs();
+    if a.x >= a.y && a.x >= a.z {
+        Vec3::X * v.x.signum()
+    } else if a.y >= a.z {
+        Vec3::Y * v.y.signum()
+    } else {
+        Vec3::Z * v.z.signum()
+    }
+}
+
+/// The rotation whose columns are the body's left, up and forward, from
+/// `up` and a `left` made square to it.
+fn frame(up: Vec3, left: Vec3) -> Mat3 {
+    let left = (left - up * left.dot(up)).normalize_or(up.any_orthonormal_vector());
+    Mat3::from_cols(left, up, left.cross(up))
+}
+
+/// The body's up and left in `positions`: up from the hips to the head,
+/// left from the right thigh to the left one (not normalized).
+fn body_axes(positions: &[Vec3], hips: usize, head: usize, thighs: [usize; 2]) -> (Vec3, Vec3) {
+    let at = |i: usize| positions.get(i).copied().unwrap_or(Vec3::ZERO);
+    (at(head) - at(hips), at(thighs[0]) - at(thighs[1]))
+}
+
+/// The joints that tell how a body stands.
+struct Stance {
+    hips: usize,
+    head: usize,
+    thighs: [usize; 2],
+    /// Each thigh's child joint.
+    knees: [usize; 2],
+}
+
+impl Stance {
+    /// How well `positions` stand along `up`: the cosine of the worst of
+    /// the trunk (hips to head, along up) and the thighs (down).
+    fn standing(&self, positions: &[Vec3], up: Vec3) -> f32 {
+        let at = |i: usize| positions.get(i).copied().unwrap_or(Vec3::ZERO);
+        let along =
+            |from: usize, to: usize, dir: Vec3| (at(to) - at(from)).normalize_or_zero().dot(dir);
+        along(self.hips, self.head, up)
+            .min(along(self.thighs[0], self.knees[0], -up))
+            .min(along(self.thighs[1], self.knees[1], -up))
+    }
+}
+
+/// The frame to retarget from, when the file's rest pose does not stand:
+/// some files leave every bone along one axis (a leg up, the other down)
+/// and turn them in every frame; rotations from such a rest pose would
+/// lay our avatar down and twist its limbs. Then the sampled frame that
+/// stands best serves as the rest pose. Up in the motion is the file axis
+/// nearest to the hips-to-head direction over the capture.
+fn reference_frame(bvh: &Bvh, rest: &[Vec3], stance: &Stance) -> Option<usize> {
+    let step = (bvh.frames() / AXIS_SAMPLES).max(1);
+    let sampled: Vec<(usize, Vec<Vec3>)> = (0..bvh.frames())
+        .step_by(step)
+        .map(|f| (f, bvh.posed_positions(f)))
+        .collect();
+    let up = sampled
+        .iter()
+        .map(|(_, p)| {
+            body_axes(p, stance.hips, stance.head, stance.thighs)
+                .0
+                .normalize_or_zero()
+        })
+        .sum::<Vec3>();
+    let up = nearest_axis(up.normalize_or(Vec3::Y));
+    if stance.standing(rest, up) > STANDING_COS {
+        return None;
+    }
+    sampled
+        .iter()
+        .map(|(f, p)| (*f, stance.standing(p, up)))
+        .max_by(|a, b| a.1.total_cmp(&b.1))
+        .map(|(f, _)| f)
+}
+
 /// The turn from the file's axes to ours (X to the body's left, Y up, Z
-/// forward), found from its rest pose: up from the hips to the head, left
-/// from the right thigh to the left one.
-fn basis(rest: &[Vec3], hips: usize, head: usize, thighs: [usize; 2]) -> Quat {
-    let at = |i: usize| rest.get(i).copied().unwrap_or(Vec3::ZERO);
-    let up = (at(head) - at(hips)).normalize_or(Vec3::Y);
-    let left = at(thighs[0]) - at(thighs[1]);
-    let left = (left - up * left.dot(up)).normalize_or(Vec3::X);
-    let forward = left.cross(up);
+/// forward), found from its (standing) rest pose.
+fn basis(rest: &[Vec3], stance: &Stance) -> Quat {
+    let (up, left) = body_axes(rest, stance.hips, stance.head, stance.thighs);
     // Rows: the file's left, up and forward, so that they map to X, Y, Z.
-    Quat::from_mat3(&Mat3::from_cols(left, up, forward).transpose()).normalize()
+    Quat::from_mat3(&frame(up.normalize_or(Vec3::Y), left).transpose()).normalize()
 }
 
 /// Angle between two rotations (radians).
@@ -279,7 +363,24 @@ impl CapturedMotion {
             .iter()
             .position(|j| key(&j.name) == head_key)
             .unwrap_or(0);
-        let basis = basis(&rest, hips, head, first.thighs);
+        let child = |j: usize| bvh.joints.iter().position(|c| c.parent == Some(j));
+        let stance = Stance {
+            hips,
+            head,
+            thighs: first.thighs,
+            knees: first.thighs.map(|t| child(t).unwrap_or(t)),
+        };
+        // Rotations are taken from the rest pose, or from the reference
+        // frame's pose (each joint's rotation at that frame undone).
+        let reference = reference_frame(&bvh, &rest, &stance);
+        let (rest, undo): (Vec<Vec3>, Vec<Quat>) = match reference {
+            Some(f) => (
+                bvh.posed_positions(f),
+                bvh.world_rotations(f).iter().map(|q| q.inverse()).collect(),
+            ),
+            None => (rest, Vec::new()),
+        };
+        let basis = basis(&rest, &stance);
         let mapping = map(&bvh, basis, &rest)?;
 
         let step = ((1.0 / (bvh.frame_time * MAX_FPS)).round() as usize).max(1);
@@ -298,7 +399,11 @@ impl CapturedMotion {
             let world: Vec<Quat> = bvh
                 .world_rotations(f)
                 .into_iter()
-                .map(|q| (basis * q * inverse).normalize())
+                .enumerate()
+                .map(|(j, q)| {
+                    let q = q * undo.get(j).copied().unwrap_or(Quat::IDENTITY);
+                    (basis * q * inverse).normalize()
+                })
                 .collect();
             let at = |j: usize| world.get(j).copied().unwrap_or(Quat::IDENTITY);
             let spine = |s: f32| {
@@ -671,6 +776,115 @@ mod tests {
                         other.name
                     );
                 }
+            }
+        }
+    }
+
+    /// The same capture as `capture(seconds, false, angles)`, from a
+    /// skeleton whose joints each have a frame of their own: the rest
+    /// pose lies along X, a leg up and the other down, and every frame
+    /// turns it upright (as some exporters write files).
+    fn lying_capture(seconds: f32, angles: impl Fn(f32) -> Vec<(usize, usize, f32)>) -> String {
+        use glam::EulerRot;
+        use std::f32::consts::FRAC_PI_2;
+        let orient = |i: usize| -> Quat {
+            let name = JOINTS[i].0;
+            let turn = if name.starts_with("Left") {
+                FRAC_PI_2
+            } else {
+                -FRAC_PI_2
+            };
+            Quat::from_rotation_z(turn) * Quat::from_rotation_x(0.3 * i as f32)
+        };
+        let parent_orient = |i: usize| JOINTS[i].1.map_or(Quat::IDENTITY, orient);
+        let turns = "Zrotation Xrotation Yrotation";
+        fn emit(s: &mut String, i: usize, offset: &dyn Fn(usize) -> Vec3, turns: &str) {
+            let (name, parent, _) = JOINTS[i];
+            let o = offset(i);
+            let (kind, channels) = match parent {
+                None => (
+                    "ROOT",
+                    format!("CHANNELS 6 Xposition Yposition Zposition {turns}"),
+                ),
+                Some(_) => ("JOINT", format!("CHANNELS 3 {turns}")),
+            };
+            writeln!(
+                s,
+                "{kind} {name} {{ OFFSET {} {} {} {channels}",
+                o.x, o.y, o.z
+            )
+            .unwrap();
+            for c in (0..JOINTS.len()).filter(|c| JOINTS[*c].1 == Some(i)) {
+                emit(s, c, offset, turns);
+            }
+            s.push_str(
+                "}
+",
+            );
+        }
+        // A joint's offset is in its parent's frame.
+        let offset = |i: usize| parent_orient(i).inverse() * Vec3::from(JOINTS[i].2);
+        let mut s = String::from(
+            "HIERARCHY
+",
+        );
+        emit(&mut s, 0, &offset, turns);
+        let frames = (seconds * 120.0) as usize;
+        writeln!(
+            s,
+            "MOTION
+Frames: {frames}
+Frame Time: {}",
+            1.0 / 120.0
+        )
+        .unwrap();
+        for f in 0..frames {
+            let mut euler = [[0.0f32; 3]; JOINTS.len()];
+            for (j, c, v) in angles(f as f32 / 120.0) {
+                euler[j][c] = v.to_radians();
+            }
+            let mut row = vec![0.0, 90.0, 0.0];
+            for (j, [z, x, y]) in euler.iter().enumerate() {
+                // The upright local rotation, seen from the joints' frames.
+                let local = Quat::from_euler(EulerRot::ZXY, *z, *x, *y);
+                let lying = parent_orient(j).inverse() * local * orient(j);
+                let (z, x, y) = lying.to_euler(EulerRot::ZXY);
+                row.extend([z.to_degrees(), x.to_degrees(), y.to_degrees()]);
+            }
+            let line: Vec<String> = row.iter().map(|v| v.to_string()).collect();
+            writeln!(s, "{}", line.join(" ")).unwrap();
+        }
+        s
+    }
+
+    #[test]
+    fn a_lying_rest_pose_still_walks_upright() {
+        let (_, _, skeleton) = body();
+        let upright = CapturedMotion::from_bvh("a", &capture(3.0, false, walk)).unwrap();
+        let lying = CapturedMotion::from_bvh("b", &lying_capture(3.0, walk)).unwrap();
+        assert!((lying.period() - upright.period()).abs() < 0.02);
+        // The loops may start at another point of the step cycle.
+        let ankle =
+            |m: &CapturedMotion, t: f32| joint(&skeleton, &m.pose(&skeleton, t), "foot_l", false);
+        let shift = (0..120)
+            .map(|k| k as f32 / 120.0 * lying.period())
+            .min_by(|x, y| {
+                let d = |s: f32| ankle(&upright, 0.0).distance(ankle(&lying, s));
+                d(*x).total_cmp(&d(*y))
+            })
+            .unwrap();
+        for k in 0..10 {
+            let t = k as f32 * 0.1;
+            let a = upright.pose(&skeleton, t);
+            let b = lying.pose(&skeleton, t + shift);
+            // Wrists, ankles and the neck land where they do from the
+            // upright file (twists around the bones may differ).
+            for bone in ["hand_l", "hand_r", "foot_l", "foot_r", "head"] {
+                let (p, q) = (
+                    joint(&skeleton, &a, bone, false),
+                    joint(&skeleton, &b, bone, false),
+                );
+                assert!(p.distance(q) < 0.02, "{bone} at {t}: {p} {q}");
             }
         }
     }

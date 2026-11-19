@@ -7,7 +7,7 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-19 (pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
+Last updated: 2026-11-19 (captured motions whose rest pose lies flat play upright; pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
 hips, so trousers no longer slide with each step; a garment worn over
 trousers starts outside them; captured motions: Motion › Import a captured
 motion… plays a BVH motion capture on the avatar, Motion › Motion
@@ -459,7 +459,8 @@ size to size (its grade), and the other sizes follow.
   and repeated: Rustle3D finds the longest stretch that ends as it
   starts, such as one or two steps of a walk, and blends the end into
   the start. Most capture skeletons work (names such as Hips, LeftUpLeg,
-  LeftArm, LeftForeArm); the file needs at least about 1.5 s of motion.
+  LeftArm, LeftForeArm), whichever way up the file was written; the file
+  needs at least about 1.5 s of motion.
   Where the person's arms hung closer to the body than the avatar's hips
   allow, the avatar turns its arms out just enough to keep its hands and
   forearms clear of the body (and of the cloth on it).

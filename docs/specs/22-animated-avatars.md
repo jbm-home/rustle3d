@@ -52,7 +52,12 @@ whether the shirt rides up at the waist.
     leg or shin, foot, toe (optional), `Left`/`Right`, `l`/`r` before or
     after. The file's axes are found from its rest pose (up from the hips
     to the head, left from the right thigh to the left one), so Y-up and
-    Z-up files both work.
+    Z-up files both work. When the rest pose does not stand as the body
+    does in the motion (its trunk or thighs more than 45° off the
+    motion's up, the file axis nearest to the hips-to-head direction
+    over the capture), as in files that give each joint a frame of its
+    own and lay every bone along one axis, the sampled frame that stands
+    best is the rest pose instead.
   - Each of our bones takes the matching joint's rotation from its rest
     pose, after a fixed turn that lays our bone onto the captured one in
     the rest pose (a captured T pose plays on our A-pose body); a hand

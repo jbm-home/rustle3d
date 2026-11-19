@@ -231,6 +231,20 @@ impl Bvh {
         out
     }
 
+    /// Each joint's position at `frame`, the root at the origin (file
+    /// units): the rest offsets turned by the parents' rotations.
+    pub fn posed_positions(&self, frame: usize) -> Vec<Vec3> {
+        let rotations = self.world_rotations(frame);
+        let mut out: Vec<Vec3> = Vec::with_capacity(self.joints.len());
+        for j in &self.joints {
+            let at = j
+                .parent
+                .and_then(|p| Some((*out.get(p)?, *rotations.get(p)?)));
+            out.push(at.map_or(Vec3::ZERO, |(base, turn)| base + turn * j.offset));
+        }
+        out
+    }
+
     /// Each joint's rotation from the rest pose at `frame`, in the file's
     /// axes (forward kinematics).
     pub fn world_rotations(&self, frame: usize) -> Vec<Quat> {
