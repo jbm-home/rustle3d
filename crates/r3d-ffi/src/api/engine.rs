@@ -12,14 +12,15 @@ use flutter_rust_bridge::frb;
 
 use r3d_commands::actions::AvatarMotion;
 use r3d_commands::drape::{self, Animation, Drape, Form};
+use r3d_commands::fit::{self, FitMap, Probe};
 use r3d_commands::production;
 use r3d_commands::{Progress, Script, Status, Step, Workspace};
 use r3d_sim::{CpuSolver, SimScene, Solver};
 use r3d_sim_gpu::{GpuContext, GpuSolver};
 
 use crate::cloth::{
-    Adjust, CORNER_PICK_PX, ClothHit, EDGE_PICK_MM, EDGE_PICK_PX, Held, Hit, PICK_PX, RESYNC_EVERY,
-    SEAM_END, SNAP_PX, STROKE_STEP_MM, Sync, Tool, ray_triangle,
+    Adjust, CORNER_PICK_PX, ClothHit, EDGE_PICK_MM, EDGE_PICK_PX, Held, Hit, LiveBody, PICK_PX,
+    RESYNC_EVERY, SEAM_END, SNAP_PX, STROKE_STEP_MM, Sync, Tool, ray_triangle,
 };
 use crate::forms::Forms;
 use crate::photo::{PhotoJob, Subject};
@@ -29,6 +30,7 @@ use r3d_core::{
     Body, EdgeId, Fabric, GuideId, InternalLineId, Localizable, Message, PanelId, PointId, SeamSide,
 };
 use r3d_render::board::BoardView;
+use r3d_render::fitmap;
 use r3d_render::photo::{Lighting, Quality, Settings, Surface};
 use r3d_render::theme::PIECE_COLORS;
 use r3d_render::{
@@ -131,8 +133,13 @@ fn offset_along(polyline: &[r3d_geom::DVec2], at: r3d_geom::DVec2) -> f64 {
 }
 
 /// The cloth at `positions` (one per particle of `drape`): one mesh per
-/// piece, with normals.
-fn piece_meshes(drape: &Drape, positions: &[glam::Vec3]) -> Vec<(PanelId, Mesh)> {
+/// piece, with normals; painted with `paint` (one colour per particle, a
+/// fit map) if given.
+fn piece_meshes(
+    drape: &Drape,
+    positions: &[glam::Vec3],
+    paint: Option<&[[f32; 4]]>,
+) -> Vec<(PanelId, Mesh)> {
     drape
         .pieces
         .iter()
@@ -141,12 +148,29 @@ fn piece_meshes(drape: &Drape, positions: &[glam::Vec3]) -> Vec<(PanelId, Mesh)>
                 positions: positions.get(piece.particles.clone())?.to_vec(),
                 normals: Vec::new(),
                 indices: piece.indices.clone(),
-                colors: Vec::new(),
+                colors: paint
+                    .and_then(|c| c.get(piece.particles.clone()))
+                    .map(<[_]>::to_vec)
+                    .unwrap_or_default(),
             };
             mesh.recompute_normals();
             Some((piece.panel, mesh))
         })
         .collect()
+}
+
+/// The tape measure's loop as a band on the cloth: upright, lifted
+/// outward from the loop's centre.
+fn tape_band(points: &[glam::Vec3]) -> Mesh {
+    let centre = points.iter().copied().sum::<glam::Vec3>() / points.len().max(1) as f32;
+    let along: Vec<(glam::Vec3, glam::Vec3)> = points
+        .iter()
+        .map(|p| {
+            let out = glam::Vec3::new(p.x - centre.x, 0.0, p.z - centre.z);
+            (*p, out.normalize_or(glam::Vec3::Z))
+        })
+        .collect();
+    Mesh::ribbon(&along, TAPE_WIDTH_M, TAPE_LIFT_M)
 }
 
 /// Canvas colours as `0xAARRGGBB` (Flutter's `Color.toARGB32()`).
@@ -505,6 +529,10 @@ pub struct Engine {
     stroke: Mutex<Option<(PanelId, Vec<r3d_geom::DVec2>)>>,
     /// The photo shown in the 3D view instead of the live garment.
     photo: Mutex<Option<PhotoJob>>,
+    /// The fit map the 3D view colours the cloth by, if any.
+    fit_map: Mutex<Option<FitMap>>,
+    /// The loop of the last tape measure taken on the drape (m).
+    tape: Mutex<Option<Vec<glam::Vec3>>>,
 }
 
 /// Where a long step is, for the UI: `task` is a stable code
@@ -518,6 +546,38 @@ pub struct StepProgress {
     pub done: u32,
     pub total: u32,
     pub item: String,
+}
+
+/// The legend of a fit map (spec 24): `colors` from loose to tight
+/// (`0xAARRGGBB`, linear in between), the values at the `loose` and
+/// `tight` ends in `unit`s, and the tightest value on the cloth now with
+/// its piece.
+#[derive(Debug, Clone)]
+pub struct FitLegend {
+    /// `strain` or `gap`.
+    pub map: String,
+    pub colors: Vec<u32>,
+    pub loose: f64,
+    pub tight: f64,
+    /// `%` or `mm`.
+    pub unit: String,
+    pub tightest: Option<f64>,
+    pub tightest_piece: Option<String>,
+}
+
+/// A tape measure taken on the drape (spec 24): at `height_cm` above the
+/// floor, the garment's circumference along the cloth, the body's inside
+/// it (by tape), the ease between them (garment minus body; only when
+/// the cut goes all round, `closed`) and the gap from the clicked cloth
+/// to the body.
+#[derive(Debug, Clone)]
+pub struct TapeReading {
+    pub height_cm: f64,
+    pub garment_cm: Option<f64>,
+    pub closed: bool,
+    pub body_cm: Option<f64>,
+    pub ease_cm: Option<f64>,
+    pub gap_mm: Option<f64>,
 }
 
 fn poisoned() -> ApiError {
@@ -537,6 +597,10 @@ fn motion_name(m: AvatarMotion) -> String {
 const LINE_WIDTH_M: f32 = 0.003;
 const EDGE_WIDTH_M: f32 = 0.006;
 const LINE_LIFT_M: f32 = 0.0015;
+/// The tape measure's band on the cloth: its height and its lift off the
+/// cloth (m).
+const TAPE_WIDTH_M: f32 = 0.006;
+const TAPE_LIFT_M: f32 = 0.003;
 
 impl Engine {
     /// Open the project folder at `path`, creating it if it does not exist.
@@ -578,6 +642,8 @@ impl Engine {
             held: Mutex::new(None),
             stroke: Mutex::new(None),
             photo: Mutex::new(None),
+            fit_map: Mutex::new(None),
+            tape: Mutex::new(None),
         })
     }
 
@@ -1328,7 +1394,7 @@ impl Engine {
                 garment.and_then(|g| g.color.as_deref()),
             )
         };
-        let cloth_meshes = piece_meshes(drape, &positions)
+        let cloth_meshes = piece_meshes(drape, &positions, None)
             .into_iter()
             .map(|(panel, mesh)| (mesh, material(panel)))
             .collect();
@@ -1696,11 +1762,35 @@ impl Engine {
                 (lines, edge)
             })
             .unwrap_or_default();
+        let fit_map = *self.fit_map.lock().map_err(|_| poisoned())?;
+        let paint = match (fit_map, cloth.as_ref()) {
+            (Some(map), Some(d)) => {
+                let body = match map {
+                    FitMap::Gap => self.live_body(project, published.time)?,
+                    FitMap::Strain => None,
+                };
+                let body = body.as_ref().map(|(p, f)| (&p[..], &f.triangles[..]));
+                let values = map.values(d, &published.positions, body);
+                Some(
+                    values
+                        .iter()
+                        .map(|v| fitmap::color(map.level(*v)))
+                        .collect::<Vec<_>>(),
+                )
+            }
+            _ => None,
+        };
         let pieces = cloth
             .as_ref()
-            .map(|d| piece_meshes(d, &published.positions))
+            .map(|d| piece_meshes(d, &published.positions, paint.as_deref()))
             .unwrap_or_default();
         drop(cloth);
+        let tape = self
+            .tape
+            .lock()
+            .map_err(|_| poisoned())?
+            .as_deref()
+            .map(tape_band);
         let moving = self.moving_avatar(project, published.time)?;
         let mut draws = Vec::with_capacity(pieces.len() + 1);
         if let Some(avatar) = moving.as_ref().or(g.avatar.as_ref().map(|(_, m)| m)) {
@@ -1710,7 +1800,13 @@ impl Engine {
             });
         }
         for (panel, mesh) in &pieces {
-            let material = if selected.contains(panel) {
+            let material = if !mesh.colors.is_empty() {
+                // A fit map: its colours, no sheen over them.
+                Material {
+                    sheen_amount: 0.0,
+                    ..fabric(*panel)
+                }
+            } else if selected.contains(panel) {
                 fabric(*panel).tinted(theme.selection, 0.45)
             } else {
                 fabric(*panel)
@@ -1726,11 +1822,168 @@ impl Engine {
             mesh,
             material: ink(theme.panel_line),
         }));
-        draws.extend(edge_line.iter().map(|mesh| Draw {
+        draws.extend(edge_line.iter().chain(&tape).map(|mesh| Draw {
             mesh,
             material: ink(theme.selection),
         }));
         g.garment.render(&g.gpu, target, &g.camera, &draws, &theme);
+        Ok(())
+    }
+
+    /// The body's surface as it is at `time` of the drape (posed while it
+    /// moves), with its form; `None` without a body or while it is
+    /// being fitted.
+    fn live_body(
+        &self,
+        project: &r3d_core::Project,
+        time: f32,
+    ) -> Result<Option<LiveBody>, ApiError> {
+        let Some(body) = project.shown_body() else {
+            return Ok(None);
+        };
+        let Some(form) = self.form_soon(body)? else {
+            return Ok(None);
+        };
+        let animation = *self.animation.lock().map_err(|_| poisoned())?;
+        let surface = match animation.and_then(|a| a.settled(time)) {
+            Some(a) if time >= a.start => form.posed(Some(&a), time),
+            _ => form.positions.clone(),
+        };
+        Ok(Some((surface, form)))
+    }
+
+    /// Colour the cloth in the 3D view by a fit map: `strain` (stretch
+    /// beyond the pattern) or `gap` (distance to the body); `None` for
+    /// its fabric again.
+    #[frb(sync)]
+    pub fn set_fit_map(&self, map: Option<String>) -> Result<(), ApiError> {
+        let map = match map {
+            None => None,
+            Some(name) => Some(FitMap::from_name(&name).ok_or_else(|| {
+                ApiError::from(
+                    Message::new("malformed", format!("malformed `map`: {name}"))
+                        .arg("name", "map")
+                        .arg("detail", name),
+                )
+            })?),
+        };
+        *self.fit_map.lock().map_err(|_| poisoned())? = map;
+        Ok(())
+    }
+
+    /// The legend of the fit map shown, if any: its scale and the
+    /// tightest value on the cloth now, with its piece.
+    #[frb(sync)]
+    pub fn fit_legend(&self) -> Result<Option<FitLegend>, ApiError> {
+        let Some(map) = *self.fit_map.lock().map_err(|_| poisoned())? else {
+            return Ok(None);
+        };
+        let positions = self
+            .sim
+            .lock()
+            .map_err(|_| poisoned())?
+            .as_ref()
+            .map(SimThread::latest)
+            .unwrap_or_default();
+        let ws = self.workspace()?;
+        let project = ws.session().project();
+        let body = match map {
+            FitMap::Gap => self.live_body(project, positions.time)?,
+            FitMap::Strain => None,
+        };
+        let cloth = self.cloth.lock().map_err(|_| poisoned())?;
+        let tightest = cloth.as_ref().and_then(|d| {
+            let body = body.as_ref().map(|(p, f)| (&p[..], &f.triangles[..]));
+            let values = map.values(d, &positions.positions, body);
+            let (i, v) = values
+                .iter()
+                .enumerate()
+                .max_by(|a, b| map.level(*a.1).total_cmp(&map.level(*b.1)))?;
+            let piece = d
+                .pieces
+                .iter()
+                .find(|p| p.particles.contains(&i))
+                .and_then(|p| project.panel(p.panel))
+                .map(|p| p.name.clone());
+            Some((f64::from(*v), piece))
+        });
+        let (loose, tight) = map.range();
+        let argb = |c: [f32; 4]| {
+            c.iter()
+                .take(3)
+                .fold(0xFF, |acc, v| (acc << 8) | (v * 255.0).round() as u32)
+        };
+        Ok(Some(FitLegend {
+            map: map.name().to_owned(),
+            colors: (0..fitmap::STOPS.len())
+                .map(|i| argb(fitmap::color(i as f32 / (fitmap::STOPS.len() - 1) as f32)))
+                .collect(),
+            loose: f64::from(loose),
+            tight: f64::from(tight),
+            unit: map.unit().to_owned(),
+            tightest: tightest.as_ref().map(|(v, _)| *v),
+            tightest_piece: tightest.and_then(|(_, p)| p),
+        }))
+    }
+
+    /// Take the tape measure on the cloth under pixel (`x`, `y`) of a 3D
+    /// view: the circumference around the cloth at that height, the
+    /// body's inside it, the ease and the gap to the body there. The loop
+    /// is drawn on the cloth until [`Engine::clear_tape`]. `None` when no
+    /// cloth is under the pointer.
+    #[frb(sync)]
+    pub fn tape_at(&self, view: u32, x: f64, y: f64) -> Result<Option<TapeReading>, ApiError> {
+        let hit = {
+            let slot = self.graphics()?;
+            let Some(v) = slot.as_ref().and_then(|g| g.views.get(&view)) else {
+                return Ok(None);
+            };
+            self.cloth_hit(v, &slot, x, y)?
+        };
+        let Some(hit) = hit else {
+            return Ok(None);
+        };
+        let published = self
+            .sim
+            .lock()
+            .map_err(|_| poisoned())?
+            .as_ref()
+            .map(SimThread::latest)
+            .unwrap_or_default();
+        let ws = self.workspace()?;
+        let body = self.live_body(ws.session().project(), published.time)?;
+        drop(ws);
+        let cloth = self.cloth.lock().map_err(|_| poisoned())?;
+        let Some(drape) = cloth.as_ref() else {
+            return Ok(None);
+        };
+        let body = body.as_ref().map(|(p, f)| (&p[..], &f.triangles[..]));
+        let g = fit::girth(drape, &published.positions, body, Probe::Near(hit.point));
+        drop(cloth);
+        let cm = |m: f32| f64::from(m) * 100.0;
+        let reading = TapeReading {
+            height_cm: cm(g.height),
+            garment_cm: g.garment.as_ref().map(|l| cm(l.length())),
+            closed: g.garment.as_ref().is_some_and(|l| l.closed),
+            body_cm: g.body.map(cm),
+            ease_cm: g.ease().map(cm),
+            gap_mm: g.gap.map(|v| f64::from(v) * 1000.0),
+        };
+        *self.tape.lock().map_err(|_| poisoned())? = g.garment.map(|l| {
+            let mut points = l.points;
+            match points.first().copied() {
+                Some(first) if l.closed => points.push(first),
+                _ => {}
+            }
+            points
+        });
+        Ok(Some(reading))
+    }
+
+    /// Take the tape measure's loop off the cloth.
+    #[frb(sync)]
+    pub fn clear_tape(&self) -> Result<(), ApiError> {
+        *self.tape.lock().map_err(|_| poisoned())? = None;
         Ok(())
     }
 
@@ -1813,7 +2066,7 @@ impl Engine {
             .lock()
             .map_err(|_| poisoned())?
             .as_ref()
-            .map(|d| piece_meshes(d, &published.positions))
+            .map(|d| piece_meshes(d, &published.positions, None))
             .unwrap_or_default();
         let body = match self.moving_avatar(project, published.time)? {
             Some(moving) => Some(moving),
@@ -2475,6 +2728,7 @@ impl Engine {
                 best = Some((
                     dist,
                     ClothHit {
+                        point: *a * (1.0 - u - w) + *b * u + *c * w,
                         panel: piece.panel,
                         at: r3d_geom::DVec2::new(f64::from(at.x), f64::from(at.y)) * 1000.0,
                     },

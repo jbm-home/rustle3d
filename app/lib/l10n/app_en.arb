@@ -1163,5 +1163,35 @@
         "type": "String"
       }
     }
+  },
+  "fitTip": "Show where the garment is tight",
+  "fitOff": "Fabric colours",
+  "fitStrain": "Strain",
+  "fitGap": "Gap to the body",
+  "fitStrainTitle": "Strain: stretch beyond the pattern",
+  "fitGapTitle": "Gap to the body",
+  "fitLoose": "loose",
+  "fitTight": "tight",
+  "fitTightest": "Tightest: {value} on {piece}",
+  "toolTape": "Tape measure",
+  "toolTapeHint": "Click on the 3D garment: its circumference there, the body's and the ease",
+  "hintTape": "Tape measure: click on the 3D garment to measure around it there · drag to turn the view · V to stop",
+  "tapeHint": "Click on the draped garment.",
+  "tapeClose": "Put the tape away",
+  "tapeHeight": "Height",
+  "tapeGarment": "Garment",
+  "tapeBody": "Body",
+  "tapeEase": "Ease",
+  "tapeGap": "Gap here",
+  "tapeOpen": "The garment does not go all round here: no ease.",
+  "@fitTightest": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      },
+      "piece": {
+        "type": "String"
+      }
+    }
   }
 }

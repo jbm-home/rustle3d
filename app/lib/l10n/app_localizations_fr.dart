@@ -2416,4 +2416,69 @@ class LFr extends L {
   String garmentTotals(int pieces, String area, String mass) {
     return '$pieces pièces · $area m² de tissu coupé · $mass g';
   }
+
+  @override
+  String get fitTip => 'Voir où le vêtement serre';
+
+  @override
+  String get fitOff => 'Couleurs du tissu';
+
+  @override
+  String get fitStrain => 'Allongement';
+
+  @override
+  String get fitGap => 'Écart au corps';
+
+  @override
+  String get fitStrainTitle => 'Allongement par rapport au patron';
+
+  @override
+  String get fitGapTitle => 'Écart au corps';
+
+  @override
+  String get fitLoose => 'ample';
+
+  @override
+  String get fitTight => 'serré';
+
+  @override
+  String fitTightest(String value, String piece) {
+    return 'Le plus serré : $value sur $piece';
+  }
+
+  @override
+  String get toolTape => 'Mètre ruban';
+
+  @override
+  String get toolTapeHint =>
+      'Cliquez sur le vêtement 3D : son tour à cet endroit, celui du corps et l\'aisance';
+
+  @override
+  String get hintTape =>
+      'Mètre ruban : cliquez sur le vêtement 3D pour en mesurer le tour · faites glisser pour tourner la vue · V pour arrêter';
+
+  @override
+  String get tapeHint => 'Cliquez sur le vêtement drapé.';
+
+  @override
+  String get tapeClose => 'Ranger le mètre';
+
+  @override
+  String get tapeHeight => 'Hauteur';
+
+  @override
+  String get tapeGarment => 'Vêtement';
+
+  @override
+  String get tapeBody => 'Corps';
+
+  @override
+  String get tapeEase => 'Aisance';
+
+  @override
+  String get tapeGap => 'Écart ici';
+
+  @override
+  String get tapeOpen =>
+      'Le vêtement ne fait pas le tour ici : pas d\'aisance.';
 }

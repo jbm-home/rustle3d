@@ -76,6 +76,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   EdgeSpot dco_decode_box_autoadd_edge_spot(dynamic raw);
 
   @protected
+  double dco_decode_box_autoadd_f_64(dynamic raw);
+
+  @protected
+  FitLegend dco_decode_box_autoadd_fit_legend(dynamic raw);
+
+  @protected
   PatternChange dco_decode_box_autoadd_pattern_change(dynamic raw);
 
   @protected
@@ -92,6 +98,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   StepProgress dco_decode_box_autoadd_step_progress(dynamic raw);
+
+  @protected
+  TapeReading dco_decode_box_autoadd_tape_reading(dynamic raw);
 
   @protected
   int dco_decode_box_autoadd_u_32(dynamic raw);
@@ -116,6 +125,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   FabricSwatch dco_decode_fabric_swatch(dynamic raw);
+
+  @protected
+  FitLegend dco_decode_fit_legend(dynamic raw);
 
   @protected
   Gesture dco_decode_gesture(dynamic raw);
@@ -160,6 +172,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   EdgeSpot? dco_decode_opt_box_autoadd_edge_spot(dynamic raw);
 
   @protected
+  double? dco_decode_opt_box_autoadd_f_64(dynamic raw);
+
+  @protected
+  FitLegend? dco_decode_opt_box_autoadd_fit_legend(dynamic raw);
+
+  @protected
   PatternChange? dco_decode_opt_box_autoadd_pattern_change(dynamic raw);
 
   @protected
@@ -173,6 +191,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   StepProgress? dco_decode_opt_box_autoadd_step_progress(dynamic raw);
+
+  @protected
+  TapeReading? dco_decode_opt_box_autoadd_tape_reading(dynamic raw);
 
   @protected
   int? dco_decode_opt_box_autoadd_u_32(dynamic raw);
@@ -209,6 +230,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   StepProgress dco_decode_step_progress(dynamic raw);
+
+  @protected
+  TapeReading dco_decode_tape_reading(dynamic raw);
 
   @protected
   int dco_decode_u_32(dynamic raw);
@@ -278,6 +302,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   EdgeSpot sse_decode_box_autoadd_edge_spot(SseDeserializer deserializer);
 
   @protected
+  double sse_decode_box_autoadd_f_64(SseDeserializer deserializer);
+
+  @protected
+  FitLegend sse_decode_box_autoadd_fit_legend(SseDeserializer deserializer);
+
+  @protected
   PatternChange sse_decode_box_autoadd_pattern_change(
     SseDeserializer deserializer,
   );
@@ -302,6 +332,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  TapeReading sse_decode_box_autoadd_tape_reading(SseDeserializer deserializer);
+
+  @protected
   int sse_decode_box_autoadd_u_32(SseDeserializer deserializer);
 
   @protected
@@ -324,6 +357,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   FabricSwatch sse_decode_fabric_swatch(SseDeserializer deserializer);
+
+  @protected
+  FitLegend sse_decode_fit_legend(SseDeserializer deserializer);
 
   @protected
   Gesture sse_decode_gesture(SseDeserializer deserializer);
@@ -374,6 +410,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   EdgeSpot? sse_decode_opt_box_autoadd_edge_spot(SseDeserializer deserializer);
 
   @protected
+  double? sse_decode_opt_box_autoadd_f_64(SseDeserializer deserializer);
+
+  @protected
+  FitLegend? sse_decode_opt_box_autoadd_fit_legend(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   PatternChange? sse_decode_opt_box_autoadd_pattern_change(
     SseDeserializer deserializer,
   );
@@ -391,6 +435,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   StepProgress? sse_decode_opt_box_autoadd_step_progress(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  TapeReading? sse_decode_opt_box_autoadd_tape_reading(
     SseDeserializer deserializer,
   );
 
@@ -433,6 +482,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   StepProgress sse_decode_step_progress(SseDeserializer deserializer);
+
+  @protected
+  TapeReading sse_decode_tape_reading(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_32(SseDeserializer deserializer);
@@ -513,6 +565,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_f_64(double self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_fit_legend(
+    FitLegend self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_pattern_change(
     PatternChange self,
     SseSerializer serializer,
@@ -543,6 +604,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_tape_reading(
+    TapeReading self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_u_32(int self, SseSerializer serializer);
 
   @protected
@@ -565,6 +632,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_fabric_swatch(FabricSwatch self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_fit_legend(FitLegend self, SseSerializer serializer);
 
   @protected
   void sse_encode_gesture(Gesture self, SseSerializer serializer);
@@ -636,6 +706,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_f_64(double? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_fit_legend(
+    FitLegend? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_pattern_change(
     PatternChange? self,
     SseSerializer serializer,
@@ -659,6 +738,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_step_progress(
     StepProgress? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_tape_reading(
+    TapeReading? self,
     SseSerializer serializer,
   );
 
@@ -703,6 +788,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_step_progress(StepProgress self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_tape_reading(TapeReading self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_32(int self, SseSerializer serializer);

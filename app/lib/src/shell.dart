@@ -24,6 +24,7 @@ import 'start_screen.dart' show Logo;
 import 'views/rust_view.dart';
 
 part 'marker.dart';
+part 'fit.dart';
 part 'sketch.dart';
 
 class Shell extends StatefulWidget {
@@ -132,6 +133,15 @@ class _ShellState extends State<Shell> {
   /// old one meanwhile).
   bool _fitting = false;
 
+  /// The fit map colouring the cloth (`strain`, `gap`), its legend, and
+  /// the timer that refreshes the legend's tightest value.
+  String? _fitMap;
+  FitLegend? _fitLegend;
+  Timer? _fitPoll;
+
+  /// The tape measure's last reading (Tape measure tool).
+  TapeReading? _tape;
+
   /// The guided flow's current step, and whether the guide is shown.
   late GuideStep _step;
   bool _guide = true;
@@ -165,6 +175,7 @@ class _ShellState extends State<Shell> {
     FocusManager.instance.removeListener(_keepKeys);
     _keys.dispose();
     _agentPoll?.cancel();
+    _fitPoll?.cancel();
     widget.engine.dispose();
     super.dispose();
   }
@@ -575,7 +586,40 @@ class _ShellState extends State<Shell> {
   /// The construction line's first point, once clicked.
   Offset? _guideStart;
 
+  /// Colour the cloth by a fit map (`strain`, `gap`) or by its fabric
+  /// (`null`); the legend follows the drape once a second.
+  void _setFitMap(String? map) {
+    final set = _guard(() {
+      widget.engine.setFitMap(map: map);
+      return true;
+    });
+    if (set == null) return;
+    _fitPoll?.cancel();
+    _fitPoll = map == null
+        ? null
+        : Timer.periodic(const Duration(seconds: 1), (_) {
+            if (mounted) setState(() => _fitLegend = _legend());
+          });
+    setState(() {
+      _fitMap = map;
+      _fitLegend = map == null ? null : _legend();
+    });
+  }
+
+  /// The fit map's legend now, `null` without one or on an error.
+  FitLegend? _legend() {
+    try {
+      return widget.engine.fitLegend();
+    } on ApiError {
+      return null;
+    }
+  }
+
   void _setTool(String tool) => setState(() {
+    if (_tool == 'tape' && tool != 'tape') {
+      _guard(widget.engine.clearTape);
+      _tape = null;
+    }
     _tool = tool;
     for (final (group, tools) in _ToolRail.groups) {
       if (tools.contains(tool)) _groupShown[group] = tool;
@@ -2153,6 +2197,11 @@ class _ShellState extends State<Shell> {
                                             onMotion: _setMotion,
                                           ),
                                           const SizedBox(width: Space.s),
+                                          _FitButton(
+                                            map: _fitMap,
+                                            onMap: _setFitMap,
+                                          ),
+                                          const SizedBox(width: Space.s),
                                           _Pill(
                                             key: _spotPhoto,
                                             child: _IconAction(
@@ -2192,8 +2241,31 @@ class _ShellState extends State<Shell> {
                                           _refresh();
                                           _toast(l.toastLineAdded);
                                         },
+                                        onMeasure: _tool == 'tape'
+                                            ? (reading) => setState(
+                                                () => _tape = reading,
+                                              )
+                                            : null,
                                       ),
                                     ),
+                                    if (_tool == 'tape')
+                                      // Below the view's title and its
+                                      // controls.
+                                      Positioned(
+                                        left: Space.m,
+                                        top: 64,
+                                        child: _TapeCard(
+                                          reading: _tape,
+                                          onClose: () => _setTool('select'),
+                                        ),
+                                      ),
+                                    if (_fitLegend case final legend?)
+                                      // Above the view's size switch.
+                                      Positioned(
+                                        right: Space.m,
+                                        bottom: 64,
+                                        child: _FitLegendCard(legend: legend),
+                                      ),
                                     if (_fitting)
                                       const Positioned(
                                         left: Space.m,
@@ -2261,6 +2333,7 @@ class _ShellState extends State<Shell> {
                   'sew' when _sewFirst == null => context.keys(l.hintSewFirst),
                   'sew' => context.keys(l.hintSewSecond),
                   'draw' => l.hintDraw,
+                  'tape' => l.hintTape,
                   'polygon' => l.hintPolygon,
                   'curve' => l.hintCurve,
                   'bend' => l.hintBend,
@@ -2883,6 +2956,7 @@ class _ToolRail extends StatelessWidget {
     ('cut', Icons.content_cut_rounded, l.toolCut, 'K', l.toolCutHint),
     ('details', l.toolDetails, _details(l)),
     ('draw', Icons.brush_rounded, l.toolDraw, 'D', l.toolDrawHint),
+    ('tape', Icons.linear_scale_rounded, l.toolTape, '', l.toolTapeHint),
     (
       'notch',
       Icons.vertical_align_center_rounded,
@@ -2954,42 +3028,46 @@ class _ToolRail extends StatelessWidget {
         borderRadius: BorderRadius.circular(Tokens.radius(context)),
         border: Border.all(color: p.border),
       ),
-      child: Column(
-        children: [
-          for (final t in _tools(l))
-            if (t is _RailTool)
-              button(
-                t,
-                t.$3,
-                line(t, first: true),
-                active: t.$1 == active,
-                onTap: () => onSelect(t.$1),
-              )
-            else if (t case (
-              final String group,
-              final String name,
-              final List<_RailTool> tools,
-            ))
-              button(
-                tools.firstWhere(
-                  (x) => x.$1 == shown[group],
-                  orElse: () => tools.first,
+      // Scrolls in a short window rather than cut its last tools off.
+      child: SingleChildScrollView(
+        child: Column(
+          children: [
+            for (final t in _tools(l))
+              if (t is _RailTool)
+                button(
+                  t,
+                  t.$3,
+                  line(t, first: true),
+                  active: t.$1 == active,
+                  onTap: () => onSelect(t.$1),
+                )
+              else if (t case (
+                final String group,
+                final String name,
+                final List<_RailTool> tools,
+              ))
+                button(
+                  tools.firstWhere(
+                    (x) => x.$1 == shown[group],
+                    orElse: () => tools.first,
+                  ),
+                  name,
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: '$name\n',
+                        style: ts(fontWeight: FontWeight.w700),
+                      ),
+                      for (final (i, x) in tools.indexed)
+                        line(x, first: i == 0),
+                    ],
+                  ),
+                  active: tools.any((x) => x.$1 == active),
+                  onTap: null,
+                  onMenu: (context) => _openGroup(context, tools),
                 ),
-                name,
-                TextSpan(
-                  children: [
-                    TextSpan(
-                      text: '$name\n',
-                      style: ts(fontWeight: FontWeight.w700),
-                    ),
-                    for (final (i, x) in tools.indexed) line(x, first: i == 0),
-                  ],
-                ),
-                active: tools.any((x) => x.$1 == active),
-                onTap: null,
-                onMenu: (context) => _openGroup(context, tools),
-              ),
-        ],
+          ],
+        ),
       ),
     );
   }

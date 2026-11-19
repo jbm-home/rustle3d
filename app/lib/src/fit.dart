@@ -1,0 +1,218 @@
+// Fit maps and the tape measure over the 3D view
+// (docs/specs/24-fit-maps-tape.md): the menu that colours the cloth by
+// strain or by its gap to the body, the map's legend, and the reading of
+// the tape measure taken on the drape.
+
+part of 'shell.dart';
+
+/// Off, Strain or Gap: what the cloth in the 3D view is coloured by.
+class _FitButton extends StatelessWidget {
+  const _FitButton({required this.map, required this.onMap});
+
+  /// `strain`, `gap`, or `null` for the fabric.
+  final String? map;
+  final ValueChanged<String?> onMap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final l = context.l;
+    final choices = [
+      (null, l.fitOff),
+      ('strain', l.fitStrain),
+      ('gap', l.fitGap),
+    ];
+    // Menu values cannot be null: '' stands for the fabric.
+    return _Pill(
+      child: PopupMenuButton<String>(
+        key: const ValueKey('fitButton'),
+        tooltip: l.fitTip,
+        onSelected: (choice) => onMap(choice.isEmpty ? null : choice),
+        itemBuilder: (_) => [
+          for (final (value, label) in choices)
+            CheckedPopupMenuItem(
+              value: value ?? '',
+              checked: value == map,
+              child: Text(label),
+            ),
+        ],
+        icon: Icon(
+          Icons.thermostat_rounded,
+          size: 19,
+          color: map == null ? p.textMuted : p.accent,
+        ),
+      ),
+    );
+  }
+}
+
+/// The fit map's scale: a bar from loose to tight with its two ends, what
+/// the map shows, and the tightest value on the cloth now.
+class _FitLegendCard extends StatelessWidget {
+  const _FitLegendCard({required this.legend});
+
+  final FitLegend legend;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final l = context.l;
+    final strain = legend.map == 'strain';
+    String value(double v) =>
+        '${context.number(v, strain ? 1 : 0)} ${legend.unit}';
+    // The loose end is open-ended for the gap (50 mm and more), the tight
+    // one for the strain (20 % and more).
+    final loose = strain ? value(legend.loose) : '${value(legend.loose)}+';
+    final tight = strain ? '${value(legend.tight)}+' : value(legend.tight);
+    final small = ts(fontSize: 11.5, color: p.textMuted);
+    return Container(
+      key: const ValueKey('fitLegend'),
+      width: 220,
+      padding: const EdgeInsets.all(Space.m),
+      decoration: BoxDecoration(
+        color: p.surface.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(Tokens.radius(context, 0.75)),
+        border: Border.all(color: p.border),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            strain ? l.fitStrainTitle : l.fitGapTitle,
+            style: ts(fontSize: 12.5, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: Space.s),
+          Container(
+            height: 10,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(3),
+              gradient: LinearGradient(
+                colors: [for (final c in legend.colors) Color(c)],
+              ),
+            ),
+          ),
+          const SizedBox(height: Space.xs),
+          Row(
+            children: [
+              Text('$loose · ${l.fitLoose}', style: small),
+              const Spacer(),
+              Text('${l.fitTight} · $tight', style: small),
+            ],
+          ),
+          if (legend.tightest case final v?) ...[
+            const SizedBox(height: Space.s),
+            Text(
+              l.fitTightest(value(v), legend.tightestPiece ?? ''),
+              style: ts(fontSize: 12),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The tape measure's reading: the height, the garment's and the body's
+/// circumferences, the ease and the gap at the point clicked.
+class _TapeCard extends StatelessWidget {
+  const _TapeCard({required this.reading, required this.onClose});
+
+  /// `null` before the first click.
+  final TapeReading? reading;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final l = context.l;
+    String cm(double? v, [bool signed = false]) {
+      if (v == null) return '–';
+      final text = '${context.number(v, 1)} cm';
+      return signed && v > 0 ? '+$text' : text;
+    }
+
+    Widget row(String label, String value, {bool strong = false}) => Padding(
+      padding: const EdgeInsets.only(top: 3),
+      child: Row(
+        children: [
+          Text(label, style: ts(fontSize: 12, color: p.textMuted)),
+          const Spacer(),
+          Text(
+            value,
+            style: ts(
+              fontSize: 12.5,
+              fontWeight: strong ? FontWeight.w600 : FontWeight.w400,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    final r = reading;
+    return Container(
+      key: const ValueKey('tapeCard'),
+      width: 230,
+      padding: const EdgeInsets.fromLTRB(Space.m, Space.s, Space.xs, Space.m),
+      decoration: BoxDecoration(
+        color: p.surface.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(Tokens.radius(context, 0.75)),
+        border: Border.all(color: p.border),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.linear_scale_rounded, size: 16, color: p.accent),
+              const SizedBox(width: Space.s),
+              Text(
+                l.toolTape,
+                style: ts(fontSize: 12.5, fontWeight: FontWeight.w600),
+              ),
+              const Spacer(),
+              _IconAction(
+                icon: Icons.close_rounded,
+                tip: l.tapeClose,
+                onTap: onClose,
+              ),
+            ],
+          ),
+          if (r == null)
+            Padding(
+              padding: const EdgeInsets.only(right: Space.s),
+              child: Text(
+                l.tapeHint,
+                style: ts(fontSize: 12, color: p.textMuted),
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(right: Space.s),
+              child: Column(
+                children: [
+                  row(l.tapeHeight, cm(r.heightCm)),
+                  row(l.tapeGarment, cm(r.garmentCm)),
+                  row(l.tapeBody, cm(r.bodyCm)),
+                  row(l.tapeEase, cm(r.easeCm, true), strong: true),
+                  row(
+                    l.tapeGap,
+                    r.gapMm == null ? '–' : '${context.number(r.gapMm!)} mm',
+                  ),
+                  if (!r.closed && r.garmentCm != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: Space.xs),
+                      child: Text(
+                        l.tapeOpen,
+                        style: ts(fontSize: 11.5, color: p.textMuted),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}

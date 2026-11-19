@@ -2394,4 +2394,68 @@ class LEn extends L {
   String garmentTotals(int pieces, String area, String mass) {
     return '$pieces pieces · $area m² of fabric cut · $mass g';
   }
+
+  @override
+  String get fitTip => 'Show where the garment is tight';
+
+  @override
+  String get fitOff => 'Fabric colours';
+
+  @override
+  String get fitStrain => 'Strain';
+
+  @override
+  String get fitGap => 'Gap to the body';
+
+  @override
+  String get fitStrainTitle => 'Strain: stretch beyond the pattern';
+
+  @override
+  String get fitGapTitle => 'Gap to the body';
+
+  @override
+  String get fitLoose => 'loose';
+
+  @override
+  String get fitTight => 'tight';
+
+  @override
+  String fitTightest(String value, String piece) {
+    return 'Tightest: $value on $piece';
+  }
+
+  @override
+  String get toolTape => 'Tape measure';
+
+  @override
+  String get toolTapeHint =>
+      'Click on the 3D garment: its circumference there, the body\'s and the ease';
+
+  @override
+  String get hintTape =>
+      'Tape measure: click on the 3D garment to measure around it there · drag to turn the view · V to stop';
+
+  @override
+  String get tapeHint => 'Click on the draped garment.';
+
+  @override
+  String get tapeClose => 'Put the tape away';
+
+  @override
+  String get tapeHeight => 'Height';
+
+  @override
+  String get tapeGarment => 'Garment';
+
+  @override
+  String get tapeBody => 'Body';
+
+  @override
+  String get tapeEase => 'Ease';
+
+  @override
+  String get tapeGap => 'Gap here';
+
+  @override
+  String get tapeOpen => 'The garment does not go all round here: no ease.';
 }

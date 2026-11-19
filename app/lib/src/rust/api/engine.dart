@@ -7,9 +7,9 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `cloth_hit`, `corner_at`, `corner_landing`, `dressed_now`, `edge_spot`, `edited`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form_now`, `form_soon`, `frozen_board`, `gpu_solver`, `graphics`, `import_from`, `long`, `marker_spec`, `motion_name`, `moving_avatar`, `new`, `new`, `offset_along`, `parse_track`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `selected`, `set_busy`, `sim`, `solver`, `to_theme`, `workspace`
+// These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `cloth_hit`, `corner_at`, `corner_landing`, `dressed_now`, `edge_spot`, `edited`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form_now`, `form_soon`, `frozen_board`, `gpu_solver`, `graphics`, `import_from`, `live_body`, `long`, `marker_spec`, `motion_name`, `moving_avatar`, `new`, `new`, `offset_along`, `parse_track`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `selected`, `set_busy`, `sim`, `solver`, `tape_band`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`
 
 /// The GPU adapter the UI composites on (Windows: its LUID), so the views
 /// render on it and share their textures without a copy. Call it before
@@ -71,6 +71,9 @@ abstract class Engine implements RustOpaqueInterface {
   /// every size, a size range set): it then fails with `cancelled` and
   /// changes nothing.
   void cancel();
+
+  /// Take the tape measure's loop off the cloth.
+  void clearTape();
 
   /// A click at pixel (`x`, `y`) of a view. Updates the shared selection
   /// and returns it (panel ids).
@@ -155,6 +158,10 @@ abstract class Engine implements RustOpaqueInterface {
 
   /// Fit the board to the pattern again.
   void fitBoard({required int view});
+
+  /// The legend of the fit map shown, if any: its scale and the
+  /// tightest value on the cloth now, with its piece.
+  FitLegend? fitLegend();
 
   /// Import the pieces of a pattern from a file the user chose
   /// (anywhere; DXF, SVG or PDF): the file is copied into the project's
@@ -299,6 +306,11 @@ abstract class Engine implements RustOpaqueInterface {
   /// the 3D view match the app theme.
   void setCanvas({required CanvasColors colors});
 
+  /// Colour the cloth in the 3D view by a fit map: `strain` (stretch
+  /// beyond the pattern) or `gap` (distance to the body); `None` for
+  /// its fabric again.
+  void setFitMap({String? map});
+
   /// Make the avatar move (`walk`, `turn`, `raise_arms`) or stand still
   /// (`None`) while the garment drapes, and run the simulation. A motion
   /// starts once the garment has closed (after 1.5 s of draping); a body
@@ -369,6 +381,17 @@ abstract class Engine implements RustOpaqueInterface {
   /// Continue the line to (`x`, `y`): points on other pieces, or off the
   /// cloth, are skipped.
   void strokeTo({required int view, required double x, required double y});
+
+  /// Take the tape measure on the cloth under pixel (`x`, `y`) of a 3D
+  /// view: the circumference around the cloth at that height, the
+  /// body's inside it, the ease and the gap to the body there. The loop
+  /// is drawn on the cloth until [`Engine::clear_tape`]. `None` when no
+  /// cloth is under the pointer.
+  TapeReading? tapeAt({
+    required int view,
+    required double x,
+    required double y,
+  });
 
   /// The pattern point (mm) under pixel (`x`, `y`) of a board.
   Float64List? toPattern({
@@ -596,6 +619,56 @@ class FabricSwatch {
           runtimeType == other.runtimeType &&
           id == other.id &&
           argb == other.argb;
+}
+
+/// The legend of a fit map (spec 24): `colors` from loose to tight
+/// (`0xAARRGGBB`, linear in between), the values at the `loose` and
+/// `tight` ends in `unit`s, and the tightest value on the cloth now with
+/// its piece.
+class FitLegend {
+  /// `strain` or `gap`.
+  final String map;
+  final Uint32List colors;
+  final double loose;
+  final double tight;
+
+  /// `%` or `mm`.
+  final String unit;
+  final double? tightest;
+  final String? tightestPiece;
+
+  const FitLegend({
+    required this.map,
+    required this.colors,
+    required this.loose,
+    required this.tight,
+    required this.unit,
+    this.tightest,
+    this.tightestPiece,
+  });
+
+  @override
+  int get hashCode =>
+      map.hashCode ^
+      colors.hashCode ^
+      loose.hashCode ^
+      tight.hashCode ^
+      unit.hashCode ^
+      tightest.hashCode ^
+      tightestPiece.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FitLegend &&
+          runtimeType == other.runtimeType &&
+          map == other.map &&
+          colors == other.colors &&
+          loose == other.loose &&
+          tight == other.tight &&
+          unit == other.unit &&
+          tightest == other.tightest &&
+          tightestPiece == other.tightestPiece;
 }
 
 /// What a press on the garment does when dragged.
@@ -917,6 +990,50 @@ class StepProgress {
           done == other.done &&
           total == other.total &&
           item == other.item;
+}
+
+/// A tape measure taken on the drape (spec 24): at `height_cm` above the
+/// floor, the garment's circumference along the cloth, the body's inside
+/// it (by tape), the ease between them (garment minus body; only when
+/// the cut goes all round, `closed`) and the gap from the clicked cloth
+/// to the body.
+class TapeReading {
+  final double heightCm;
+  final double? garmentCm;
+  final bool closed;
+  final double? bodyCm;
+  final double? easeCm;
+  final double? gapMm;
+
+  const TapeReading({
+    required this.heightCm,
+    this.garmentCm,
+    required this.closed,
+    this.bodyCm,
+    this.easeCm,
+    this.gapMm,
+  });
+
+  @override
+  int get hashCode =>
+      heightCm.hashCode ^
+      garmentCm.hashCode ^
+      closed.hashCode ^
+      bodyCm.hashCode ^
+      easeCm.hashCode ^
+      gapMm.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TapeReading &&
+          runtimeType == other.runtimeType &&
+          heightCm == other.heightCm &&
+          garmentCm == other.garmentCm &&
+          closed == other.closed &&
+          bodyCm == other.bodyCm &&
+          easeCm == other.easeCm &&
+          gapMm == other.gapMm;
 }
 
 /// What a view shows.

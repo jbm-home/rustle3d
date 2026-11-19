@@ -41,9 +41,9 @@ can be tested through MCP as soon as they exist.
 | M32 | Editor finishing ✅ | 1–2 wk | A patch pocket sewn on its line and a dimension drawn on the board, all with the mouse |
 | M23 | Animated avatars ✅ | 3–4 wk | The avatar walks and the garment follows |
 | M30 | Production: marker, yardage, tech pack, projector ✅ | 3–4 wk | A graded shirt nested on a 150 cm fabric, its yardage and cost, its tech pack PDF |
+| M24 | Fit maps and virtual tape measure ✅ | 2 wk | Tight spots show in colour; the ease at the chest is read on the drape |
 | M20 | Trims: buttons and zippers | 2–3 wk | A shirt that buttons and trousers with a fly zipper, draped closed |
 | M21 | Textures and prints | 2–3 wk | A striped shirt whose stripes follow the grainline on every piece |
-| M24 | Fit maps and virtual tape measure | 2 wk | Tight spots show in colour; the ease at the chest is read on the drape |
 | M31 | Imported avatars | 2–3 wk | A body scan in OBJ/glTF is checked, the pieces placed around it and draped |
 | M15 | Game-ready export | 3–4 wk | LODs + baked wrinkle normal maps + skinning, imported in Godot/Unity/Unreal |
 
@@ -73,7 +73,9 @@ exist, the mouse cannot reach them yet. M23 came next (maintainer,
 2026-11-18): it could be done autonomously, the skeleton and weights
 shipping with the body we already use (CC0) and the motions being our
 own. M30 followed on 2026-11-18–19, before M20 and M21, for the same
-reason: production needs no new physics or assets.
+reason: production needs no new physics or assets. M24 came next
+(2026-11-19), also before M20 and M21: it reads the drape we already
+have.
 
 ---
 
@@ -850,6 +852,36 @@ tests below, in the real app):
   where it is tight or loose.
 - A tape measure on the drape: circumferences of the garment and ease
   (the gap between body and garment) read where the user clicks.
+- **Demo**: `./demos/m24/demo.sh`: a draped T-shirt rendered with its
+  strain and gap maps to PNG; strain per piece, the tight spots, and
+  the ease at the chest, waist and hips.
+- Delivered (2026-11-19, spec 24): `r3d_commands::fit`, computed from
+  positions only, so the app's live drape (GPU or CPU) and the cached
+  headless one read alike. Strain per triangle (largest principal
+  stretch of the deformation gradient against the pattern, Bonet &
+  Wood 1997), averaged at the vertices; gap per vertex to the body
+  (posed if it moves). One colour scale for both, viridis (dark loose,
+  yellow tight; colour-blind safe), fixed ranges (strain 0–20 %, gap
+  50–0 mm), drawn as per-vertex colours by the 3D view
+  (`r3d_render::fitmap`, `Mesh::colors`). The tape: a horizontal cut of
+  the cloth joined across seams, its length along the cloth; the body's
+  cut inside it by tape (convex hull); ease = garment − body; the gap
+  at a clicked point. Agents: `fit.report` (per piece max/mean strain,
+  share tight, mean gap, share touching; the tight spots with piece,
+  peak, area, height and pattern position; ease at chest, waist and
+  hips and at heights asked), `fit.tape` (at a height or a point),
+  `render_3d` / `r3d render --view 3d --fit-map strain|gap` (a scale bar
+  at the right edge), `r3d fit`. App: the gauge button over the 3D
+  view (Fabric colours, Strain, Gap to the body) with a legend and the
+  tightest value; the Tape measure tool (click the drape: the loop drawn
+  on the cloth, a card with height, garment, body, ease, gap). The
+  T-shirt on the women's M body: 11.7 cm of ease at the chest, sleeves
+  up to 20–40 % strain under the arms.
+- Open: a stress map (force per width: strain times the fabric's
+  stiffness per direction) and a pressure map; a tape around a loop that
+  is not horizontal (a sleeve on a raised arm, a neckline); measuring
+  between two clicked points on the drape; the tape following the cloth
+  as it moves (it is taken at the click).
 
 ## M15 — Game-ready export
 - Decimated LODs, wrinkle detail baked into normal maps, back faces or

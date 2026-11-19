@@ -98,6 +98,10 @@ pub(crate) struct Hit {
     pub panel: Option<PanelId>,
 }
 
+/// The body's surface as it is now (posed while it moves), with its
+/// form.
+pub(crate) type LiveBody = (Vec<glam::Vec3>, std::sync::Arc<r3d_commands::drape::Form>);
+
 /// A click near a contour edge selects it: on the board (physical pixels)
 /// and on the garment (mm on the pattern).
 pub(crate) const EDGE_PICK_PX: f64 = 10.0;
@@ -112,6 +116,8 @@ pub(crate) struct ClothHit {
     pub panel: PanelId,
     /// The point on the panel's pattern (mm).
     pub at: r3d_geom::DVec2,
+    /// The point in space (m).
+    pub point: glam::Vec3,
 }
 
 /// Ray / triangle intersection (Möller & Trumbore, "Fast, minimum storage

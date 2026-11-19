@@ -70,6 +70,7 @@ class RustView extends StatefulWidget {
     this.onPinned,
     this.drawing = false,
     this.onDrawn,
+    this.onMeasure,
     this.holding = true,
     this.pattern,
     this.overlay,
@@ -92,6 +93,11 @@ class RustView extends StatefulWidget {
 
   /// Called with the new internal line's id after a stroke.
   final ValueChanged<String>? onDrawn;
+
+  /// The Tape measure tool is active (3D view): a click takes the tape
+  /// on the cloth there and is called with the reading (`null`: no cloth
+  /// under the pointer); drags still turn the view.
+  final ValueChanged<TapeReading?>? onMeasure;
 
   /// A press may hold what is under the pointer to drag it (on the board:
   /// a corner or an edge). Off, drags only pan or turn the view.
@@ -358,6 +364,7 @@ class _RustViewState extends State<RustView>
             }
             final view = _viewId;
             // ⌥-click pins the cloth under the cursor.
+            if (widget.onMeasure != null) return;
             if (view != null && widget.drawing) {
               final started = widget.engine.strokeStart(
                 view: view,
@@ -465,6 +472,27 @@ class _RustViewState extends State<RustView>
               return;
             }
             if (widget.drawing) return;
+            if (widget.onMeasure case final measure?) {
+              final view = _viewId;
+              if (view == null || _dragged) return;
+              try {
+                measure(
+                  widget.engine.tapeAt(
+                    view: view,
+                    x: e.localPosition.dx * _ratio,
+                    y: e.localPosition.dy * _ratio,
+                  ),
+                );
+              } on ApiError catch (error) {
+                ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                  SnackBar(
+                    content: Text(context.error(error)),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+              return;
+            }
             if (_holding) {
               _holding = false;
               widget.engine.release();

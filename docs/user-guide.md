@@ -7,7 +7,8 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-19 (M30, the tech pack, the projector, a
+Last updated: 2026-11-19 (M24, fit maps and the tape measure; M30,
+the tech pack, the projector, a
 garment's notes; fabric as bought, area and mass of the
 pieces, the marker with its length and cost; M23, the avatar walks, turns and raises its arms;
 handles dragged with Select; Dimension tool, formulas typed in a value;
@@ -358,6 +359,27 @@ size to size (its grade), and the other sizes follow.
   swing, or a shirt ride up when the arms go up. You can keep editing the
   pattern meanwhile, and a photo or a 3D export shows the body where it
   is.
+- **Fit** (the gauge next to Motion) colours the garment by how it
+  fits, from dark violet (loose) to yellow (tight); a legend at the
+  bottom right gives the scale and the tightest spot:
+  - **Strain**: how much the cloth is stretched beyond its pattern, 0 %
+    to 20 % and more. A knit T-shirt reads a few percent and more under
+    the arms; a woven fabric barely stretches, so it stays dark except
+    where it pulls.
+  - **Gap to the body**: how far the cloth stands off the body, from
+    5 cm and more to touching (yellow).
+  - **Fabric colours** shows the garment as it is again. The colours
+    are chosen to read for colour-blind eyes and in grey.
+- **Tape measure** (the tool under Draw on garment): click on the draped
+  garment. The tape goes around the garment at that height and is drawn
+  on it; a card gives the height, the **garment's** circumference (along
+  the cloth, folds included), the **body's** inside it (as a tape around
+  the body reads it), the **ease** between them and the **gap** between
+  the cloth and the body where you clicked. Click on a sleeve to measure
+  around the arm. Where the garment does not go all round (an open
+  front, a hem), there is no ease. The tape is taken when you click:
+  click again after the drape has moved. Drag to turn the view; the ×
+  or another tool puts the tape away.
 - The drape runs on the graphics card, about five times faster than on
   the processor; the status bar says **GPU** and the time of a step.
   Without a usable graphics card, or if it fails, the drape carries on
@@ -524,6 +546,10 @@ Protocol):
 - An agent can look at its work: a picture of the pattern, of the 3D
   view, or a photo like the app's (`render_photo`). From the command
   line: `r3d render My.r3d --view photo --out photo.png`.
+- An agent can check the fit: `r3d render My.r3d --view 3d --fit-map
+  strain --out fit.png` colours the drape (or `gap`), and `r3d fit
+  My.r3d` lists each piece's strain, the tight spots and the ease at
+  the chest, waist and hips (`fit_report`, `fit_tape` for an agent).
 Everything the app does is a command that an agent can run too.
 
 ## Files
@@ -558,6 +584,10 @@ the tech pack as PDF: open formats only.
   interfacing, quilting and padding. Holes are cut on their line (no seam
   allowance inside them), and a mirrored or symmetric piece cannot have
   holes.
+- Fit maps show the stretch of the cloth, not the force in it (a stiff
+  woven pulls harder for the same stretch). The tape measures
+  horizontally only, and the body's circumference is read inside the
+  garment's loop: at a sleeve's hem cut on a slant there may be none.
 - Constraints apply to corners and edges of the outline, not to internal
   lines, notches or construction lines. A dimension stays where the
   board draws it (it cannot be moved by hand). A symmetric piece's axis

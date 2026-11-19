@@ -4098,6 +4098,126 @@ abstract class L {
   /// In en, this message translates to:
   /// **'{pieces} pieces · {area} m² of fabric cut · {mass} g'**
   String garmentTotals(int pieces, String area, String mass);
+
+  /// No description provided for @fitTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Show where the garment is tight'**
+  String get fitTip;
+
+  /// No description provided for @fitOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Fabric colours'**
+  String get fitOff;
+
+  /// No description provided for @fitStrain.
+  ///
+  /// In en, this message translates to:
+  /// **'Strain'**
+  String get fitStrain;
+
+  /// No description provided for @fitGap.
+  ///
+  /// In en, this message translates to:
+  /// **'Gap to the body'**
+  String get fitGap;
+
+  /// No description provided for @fitStrainTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Strain: stretch beyond the pattern'**
+  String get fitStrainTitle;
+
+  /// No description provided for @fitGapTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Gap to the body'**
+  String get fitGapTitle;
+
+  /// No description provided for @fitLoose.
+  ///
+  /// In en, this message translates to:
+  /// **'loose'**
+  String get fitLoose;
+
+  /// No description provided for @fitTight.
+  ///
+  /// In en, this message translates to:
+  /// **'tight'**
+  String get fitTight;
+
+  /// No description provided for @fitTightest.
+  ///
+  /// In en, this message translates to:
+  /// **'Tightest: {value} on {piece}'**
+  String fitTightest(String value, String piece);
+
+  /// No description provided for @toolTape.
+  ///
+  /// In en, this message translates to:
+  /// **'Tape measure'**
+  String get toolTape;
+
+  /// No description provided for @toolTapeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Click on the 3D garment: its circumference there, the body\'s and the ease'**
+  String get toolTapeHint;
+
+  /// No description provided for @hintTape.
+  ///
+  /// In en, this message translates to:
+  /// **'Tape measure: click on the 3D garment to measure around it there · drag to turn the view · V to stop'**
+  String get hintTape;
+
+  /// No description provided for @tapeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Click on the draped garment.'**
+  String get tapeHint;
+
+  /// No description provided for @tapeClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Put the tape away'**
+  String get tapeClose;
+
+  /// No description provided for @tapeHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Height'**
+  String get tapeHeight;
+
+  /// No description provided for @tapeGarment.
+  ///
+  /// In en, this message translates to:
+  /// **'Garment'**
+  String get tapeGarment;
+
+  /// No description provided for @tapeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Body'**
+  String get tapeBody;
+
+  /// No description provided for @tapeEase.
+  ///
+  /// In en, this message translates to:
+  /// **'Ease'**
+  String get tapeEase;
+
+  /// No description provided for @tapeGap.
+  ///
+  /// In en, this message translates to:
+  /// **'Gap here'**
+  String get tapeGap;
+
+  /// No description provided for @tapeOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'The garment does not go all round here: no ease.'**
+  String get tapeOpen;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {
