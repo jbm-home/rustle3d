@@ -81,7 +81,10 @@ Changes to the split suggested in the brief:
   owns the document, the undo history and the simulation thread handle. A
   separate crate can be split out later if it grows too big.
 - An `xtask` crate holds developer tasks: `cargo xtask gen-docs`
-  regenerates `docs/commands.md` from the registry.
+  regenerates `docs/commands.md` from the registry; `cargo xtask run|build
+  [--release]` launches or builds the desktop app for the current OS. The
+  root `Makefile` only gives these tasks short names (`make run`, …), so
+  nothing depends on make being installed.
 
 ## 3. Document model (`r3d-core`)
 

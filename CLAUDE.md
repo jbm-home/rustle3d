@@ -104,6 +104,8 @@ cargo test -p r3d-core                       # one crate
 cargo clippy --all-targets -- -D warnings    # lints, as in CI
 cargo fmt --all                              # format
 cargo run -p r3d-cli -- --help               # headless CLI (binary: r3d)
+cargo xtask run [--release] [-- <flutter args>]  # desktop app for this OS (or: make run / make run-release)
+cargo xtask build [--release]                # CLI + desktop app for this OS (or: make build / make build-release)
 cargo xtask gen-docs                         # regenerate docs/commands.md (a test checks it)
 UPDATE_GOLDEN=1 cargo test -p r3d-core       # regenerate current-version golden files
 ./demos/m15/demo.sh                          # latest milestone demo (one folder per milestone; files in demo-out/m15)

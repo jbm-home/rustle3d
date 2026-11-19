@@ -44,8 +44,19 @@ The core is a Rust workspace; the desktop app is Flutter (`app/`) over it.
 cargo build && cargo test                  # core, CLI, MCP server
 cargo run -p r3d-cli -- --help             # headless CLI
 ./scripts/check.sh                         # everything CI checks
-(cd app && flutter run -d macos)           # desktop app (or -d linux)
+cargo xtask run                            # desktop app for this OS, debug
+cargo xtask run --release                  # same, release (real frame rates)
+cargo xtask build [--release]              # build the CLI and the app
 ```
+
+`cargo xtask run` is `flutter run -d <your OS>` from `app/`; Flutter options
+go after `--`, e.g. `cargo xtask run -- --dart-define=R3D_DEMO=t_shirt`. The
+Rust core is built in the same mode as the app.
+
+With GNU make installed (on Windows: `winget install ezwinports.make`), the
+`Makefile` gives the same tasks short names: `make run`, `make run-release`,
+`make build`, `make build-release`, `make test`, `make check`,
+`make release`, `make docs`; Flutter options go in `ARGS=...`.
 
 Prerequisites: Rust stable (`rustup`), Flutter stable, and
 `cargo install flutter_rust_bridge_codegen --version 2.13.0` (to regenerate
