@@ -27,7 +27,8 @@ JSON
 "$R3D" export "$SRC" --format obj --avatar --out exports/body.obj >/dev/null
 # Metres, Y up, facing +Z  ->  centimetres, Z up, facing -Y; faces whose
 # three corners are within 1.5 cm of the floor are dropped (the soles).
-awk '
+# LC_ALL=C: awk reads and writes numbers in the locale (a comma in French).
+LC_ALL=C awk '
   /^v / { n++; h[n] = $3; printf "v %.4f %.4f %.4f\n", $2 * 100, -$4 * 100, $3 * 100; next }
   /^f / {
     low = 1
@@ -76,7 +77,7 @@ JSON
 echo "== 5. Rendered to PNG: the 3D view and a photo"
 "$R3D" render "$OUT" --view 3d --out "$DIR/scan-3d.png" >/dev/null
 "$R3D" render "$OUT" --view photo --quality quick --camera three-quarter \
-  --out "$DIR/scan-photo.png" | grep -E '"(samples|seconds)"' | tr -d ' ,' | paste -sd' ' \
+  --out "$DIR/scan-photo.png" | grep -E '"(samples|seconds)"' | tr -d ' ,' | paste -sd' ' - \
   | sed 's/^/   photo: /'
 echo "   the body file in the project: $(ls "$OUT/avatars")"
 ls -1 "$DIR"/scan-*.png

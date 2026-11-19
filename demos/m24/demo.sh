@@ -26,12 +26,12 @@ JSON
 "$R3D" run "$OUT" "$DIR/tee.json" >/dev/null
 
 echo "== 1. Drape the T-shirt (5 s of cloth)"
-"$R3D" simulate "$OUT" --frames 300 | grep -E '"(frames|max_seam_gap_mm|settled)"' | tr -d ' ,' | paste -sd' '
+"$R3D" simulate "$OUT" --frames 300 | grep -E '"(frames|max_seam_gap_mm|settled)"' | tr -d ' ,' | paste -sd' ' -
 
 echo "== 2. Fit maps rendered to PNG: strain and gap"
 for map in strain gap; do
   "$R3D" render "$OUT" --view 3d --fit-map "$map" --out "$DIR/tee-$map.png" \
-    | grep -E '"(piece|value|unit)"' | sed 's/^ *//; s/,$//' | paste -sd' ' \
+    | grep -E '"(piece|value|unit)"' | sed 's/^ *//; s/,$//' | paste -sd' ' - \
     | sed "s/^/   $map, the tightest: /"
 done
 
@@ -58,6 +58,6 @@ tr -d '",' < "$DIR/fit.json" | awk '
 
 echo "== 6. The tape at a height an agent chooses (110 cm)"
 "$R3D" run "$OUT" - <<<'[{"type": "fit.tape", "height_cm": 110}]' \
-  | tr -d '\n ' | grep -oE '"(garment_cm|body_cm|ease_cm)":[0-9.-]+' | paste -sd' ' | sed 's/^/   /'
+  | tr -d '\n ' | grep -oE '"(garment_cm|body_cm|ease_cm)":[0-9.-]+' | paste -sd' ' - | sed 's/^/   /'
 
 ls -1 "$DIR"/*.png

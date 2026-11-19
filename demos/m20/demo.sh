@@ -37,14 +37,14 @@ echo "== 2. Draped closed (4 s of cloth): buttons and zipper hold"
 for garment in shirt trousers; do
   "$R3D" simulate "$DIR/$garment.r3d" --frames 240 \
     | grep -E '"(closures|max_closure_gap_mm|max_seam_gap_mm|top_m|bottom_m)"' \
-    | tr -d ' ,' | paste -sd' ' | sed "s/^/   $garment: /"
+    | tr -d ' ,' | paste -sd' ' - | sed "s/^/   $garment: /"
   "$R3D" render "$DIR/$garment.r3d" --view board --out "$DIR/$garment-board.png" >/dev/null
   "$R3D" render "$DIR/$garment.r3d" --view 3d --out "$DIR/$garment-3d.png" >/dev/null
 done
 
 echo "== 3. Two top buttons undone, the fly opened, draped again"
 TOP=$(grep -B3 '"panel_name": "Front' "$DIR/shirt-trims.json" | grep -oE '"id": "button:[0-9]+"' \
-  | cut -d'"' -f4 | head -2 | sed 's/.*/"&"/' | paste -sd,)
+  | cut -d'"' -f4 | head -2 | sed 's/.*/"&"/' | paste -sd, -)
 "$R3D" run "$DIR/shirt.r3d" - >/dev/null <<JSON
 [{"type": "button.set_closed", "buttons": [$TOP], "closed": false}]
 JSON
@@ -54,7 +54,7 @@ ZIP=$(grep -oE '"id": "zipper:[0-9]+"' "$DIR/trousers-trims.json" | cut -d'"' -f
 JSON
 for garment in shirt trousers; do
   "$R3D" simulate "$DIR/$garment.r3d" --frames 240 \
-    | grep -E '"(closures|max_closure_gap_mm)"' | tr -d ' ,' | paste -sd' ' \
+    | grep -E '"(closures|max_closure_gap_mm)"' | tr -d ' ,' | paste -sd' ' - \
     | sed "s/^/   $garment: /"
   "$R3D" render "$DIR/$garment.r3d" --view 3d --out "$DIR/$garment-open-3d.png" >/dev/null
 done

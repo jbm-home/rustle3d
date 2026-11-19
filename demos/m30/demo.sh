@@ -43,12 +43,12 @@ echo "== 1. Indicators of size 40: each piece's cut area (mm2) and mass (g), the
 
 echo "== 2. Sizes 38, 40 and 42 nested on 150 cm"
 "$R3D" marker "$OUT" --sizes 38,40,42 --width-cm 150 --format svg \
-  | grep -E '"(length_mm|efficiency_pct|yardage_m|price_per_m|cost|pieces|path)"' | tr -d ' ,' | paste -sd' '
+  | grep -E '"(length_mm|efficiency_pct|yardage_m|price_per_m|cost|pieces|path)"' | tr -d ' ,' | paste -sd' ' -
 "$R3D" marker "$OUT" --sizes 38,40,42 --width-cm 150 --format pdf | grep '"path"'
 
 echo "== 3. The tech pack: drape (2.5 s of cloth), then front and back views and the rest"
-"$R3D" simulate "$OUT" --frames 150 | grep -E '"(frames|max_seam_gap_mm)"' | tr -d ' ,' | paste -sd' '
-"$R3D" techpack "$OUT" | grep -E '"(yardage_m|cost|images|path)"' | tr -d ' ,' | paste -sd' '
+"$R3D" simulate "$OUT" --frames 150 | grep -E '"(frames|max_seam_gap_mm)"' | tr -d ' ,' | paste -sd' ' -
+"$R3D" techpack "$OUT" | grep -E '"(yardage_m|cost|images|path)"' | tr -d ' ,' | paste -sd' ' -
 ls -1 "$OUT"/exports/
 
 cat <<'TEXT'

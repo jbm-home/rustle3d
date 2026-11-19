@@ -42,13 +42,13 @@ for id in $PANELS; do
 done
 
 echo "== 2. Drape it (5 s of cloth)"
-"$R3D" simulate "$OUT" --frames 300 | grep -E '"(frames|max_seam_gap_mm|settled)"' | tr -d ' ,' | paste -sd' '
+"$R3D" simulate "$OUT" --frames 300 | grep -E '"(frames|max_seam_gap_mm|settled)"' | tr -d ' ,' | paste -sd' ' -
 
 echo "== 3. Rendered to PNG: the pattern, the 3D view, a photo"
 "$R3D" render "$OUT" --view board --out "$DIR/shirt-board.png" >/dev/null
 "$R3D" render "$OUT" --view 3d --out "$DIR/shirt-3d.png" >/dev/null
 "$R3D" render "$OUT" --view photo --quality quick --camera front --out "$DIR/shirt-photo.png" \
-  | grep -E '"(samples|seconds)"' | tr -d ' ,' | paste -sd' ' | sed 's/^/   photo: /'
+  | grep -E '"(samples|seconds)"' | tr -d ' ,' | paste -sd' ' - | sed 's/^/   photo: /'
 
 echo "== 4. Exported: glTF with the print inside, OBJ with its material and image"
 "$R3D" export "$OUT" --format glb --avatar | grep -E '"path"' | sed 's/^ */   /'

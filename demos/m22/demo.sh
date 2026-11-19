@@ -23,7 +23,7 @@ JSON
 
 echo "== 1. The sizes and their bodies (bust cm)"
 "$R3D" query "$OUT" '{"type": "grading.get"}' \
-  | grep -E '"(name|bust_cm|base|graded_points)"' | grep -v '"bust_cm": -\?[0-9.]*,$' | tr -d ' ,' | paste -sd' '
+  | grep -E '"(name|bust_cm|base|graded_points)"' | grep -v '"bust_cm": -\?[0-9.]*,$' | tr -d ' ,' | paste -sd' ' -
 echo "== 2. Every seam matches in every size"
 "$R3D" query "$OUT" '{"type": "grading.check"}' | grep '"ok"'
 
@@ -31,7 +31,7 @@ for size in 36 40 52; do
   echo "== 3. Size $size: drape it on its body (3 s), then a photo"
   echo "[{\"type\": \"grading.show_size\", \"size\": \"$size\"}]" > "$DIR/show.json"
   "$R3D" run "$OUT" "$DIR/show.json" >/dev/null
-  "$R3D" simulate "$OUT" --frames 180 | grep -E '"(max_seam_gap_mm|settled)"' | tr -d ' ,' | paste -sd' '
+  "$R3D" simulate "$OUT" --frames 180 | grep -E '"(max_seam_gap_mm|settled)"' | tr -d ' ,' | paste -sd' ' -
   "$R3D" render "$OUT" --view photo --quality quick --camera front --frame body \
     --out "$DIR/shirt-$size.png" >/dev/null
 done

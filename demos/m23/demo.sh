@@ -30,7 +30,7 @@ JSON
   "$R3D" run "$OUT" "$DIR/$template.json" >/dev/null
   echo "== $step. $template, the avatar does '$motion' ($frames frames)"
   "$R3D" simulate "$OUT" --frames "$frames" --motion "$motion" \
-    | grep -E '"(motion|motion_s|max_seam_gap_mm|top_m|bottom_m)"' | tr -d ' ,' | paste -sd' '
+    | grep -E '"(motion|motion_s|max_seam_gap_mm|top_m|bottom_m)"' | tr -d ' ,' | paste -sd' ' -
   "$R3D" render "$OUT" --view 3d --out "$DIR/$template-$motion.png" >/dev/null
   step=$((step + 1))
 done
