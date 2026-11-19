@@ -64,6 +64,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BoardPick dco_decode_board_pick(dynamic raw);
 
   @protected
+  BodyPointView dco_decode_body_point_view(dynamic raw);
+
+  @protected
   bool dco_decode_bool(dynamic raw);
 
   @protected
@@ -140,6 +143,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
+  List<BodyPointView> dco_decode_list_body_point_view(dynamic raw);
 
   @protected
   List<FabricSwatch> dco_decode_list_fabric_swatch(dynamic raw);
@@ -288,6 +294,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BoardPick sse_decode_board_pick(SseDeserializer deserializer);
 
   @protected
+  BodyPointView sse_decode_body_point_view(SseDeserializer deserializer);
+
+  @protected
   bool sse_decode_bool(SseDeserializer deserializer);
 
   @protected
@@ -372,6 +381,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+  @protected
+  List<BodyPointView> sse_decode_list_body_point_view(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<FabricSwatch> sse_decode_list_fabric_swatch(
@@ -544,6 +558,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_board_pick(BoardPick self, SseSerializer serializer);
 
   @protected
+  void sse_encode_body_point_view(BodyPointView self, SseSerializer serializer);
+
+  @protected
   void sse_encode_bool(bool self, SseSerializer serializer);
 
   @protected
@@ -647,6 +664,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_body_point_view(
+    List<BodyPointView> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_fabric_swatch(

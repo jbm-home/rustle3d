@@ -23,12 +23,13 @@ use crate::cloth::{
     Adjust, CORNER_PICK_PX, ClothHit, ClothPiece, EDGE_PICK_MM, EDGE_PICK_PX, Held, Hit, LiveBody,
     PICK_PX, RESYNC_EVERY, SEAM_END, SNAP_PX, STROKE_STEP_MM, Sync, Tool, ray_triangle,
 };
-use crate::forms::Forms;
+use crate::forms::{FormKey, Forms};
 use crate::photo::{PhotoJob, Subject};
 use crate::sim::SimThread;
 use r3d_core::seam::Track;
 use r3d_core::{
-    Body, EdgeId, Fabric, GuideId, InternalLineId, Localizable, Message, PanelId, PointId, SeamSide,
+    BodyPoint, EdgeId, Fabric, GuideId, InternalLineId, Localizable, Message, PanelId, PointId,
+    SeamSide,
 };
 use r3d_render::board::BoardView;
 use r3d_render::fitmap;
@@ -368,8 +369,8 @@ struct Graphics {
     next_view: u32,
     camera: OrbitCamera,
     theme: Theme,
-    /// The fitted avatar mesh, for the body it was fitted to.
-    avatar: Option<(Body, Mesh)>,
+    /// The avatar mesh, for the form it was made from (`FormKey::id`).
+    avatar: Option<(u64, Mesh)>,
     /// Draws the photo into the 3D view, made on first use.
     blit: Option<ImageBlit>,
     /// The board's pan/zoom when its view went away (resized, or hidden
@@ -555,6 +556,18 @@ pub struct Engine {
     prints: Mutex<Prints>,
 }
 
+/// An arrangement point of the imported body as drawn in a 3D view.
+#[derive(Debug, Clone)]
+pub struct BodyPointView {
+    /// `chest`, `left_elbow`…
+    pub name: String,
+    /// Device pixels in the view.
+    pub x: f64,
+    pub y: f64,
+    /// The check flags it (outside the body, or on the wrong side).
+    pub flagged: bool,
+}
+
 /// Where a long step is, for the UI: `task` is a stable code
 /// (`template.sizes`: drafting a template in every size, `item` the size
 /// just drafted; `body.fit`: fitting the body to new measurements;
@@ -689,39 +702,39 @@ impl Engine {
         Ok(slot)
     }
 
-    /// The dress form for `body` (`None` without an avatar), fitted on
+    /// The dress form for `key` (`None` without an avatar), fitted on
     /// this thread if it is not ready (seconds; a fit of the same body
     /// running elsewhere is waited for, not done twice).
-    fn form_now(&self, body: Option<Body>) -> Result<Option<Arc<Form>>, ApiError> {
-        let Some(body) = body else {
+    fn form_now(&self, key: Option<FormKey>) -> Result<Option<Arc<Form>>, ApiError> {
+        let Some(key) = key else {
             return Ok(None);
         };
-        if let Some(form) = self.form.lock().map_err(|_| poisoned())?.of(body) {
+        if let Some(form) = self.form.lock().map_err(|_| poisoned())?.of(&key) {
             return Ok(Some(form));
         }
         self.report("body.fit");
-        let form = Arc::new(Form::of_body(&body).map_err(err)?);
-        self.form.lock().map_err(|_| poisoned())?.ready = Some((body, form.clone()));
+        let form = key.build().map_err(err)?;
+        self.form.lock().map_err(|_| poisoned())?.ready = Some((key, form.clone()));
         Ok(Some(form))
     }
 
-    /// The dress form for `body` if it is ready; otherwise `None`, and the
+    /// The dress form for `key` if it is ready; otherwise `None`, and the
     /// body is fitted on a thread of its own: never waits.
-    fn form_soon(&self, body: Body) -> Result<Option<Arc<Form>>, ApiError> {
+    fn form_soon(&self, key: FormKey) -> Result<Option<Arc<Form>>, ApiError> {
         let mut forms = self.form.lock().map_err(|_| poisoned())?;
-        if let Some(form) = forms.of(body) {
+        if let Some(form) = forms.of(&key) {
             return Ok(Some(form));
         }
-        if forms.fitting != Some(body) {
-            forms.fitting = Some(body);
+        if forms.fitting.as_ref() != Some(&key) {
+            forms.fitting = Some(key.clone());
             let slot = self.form.clone();
             std::thread::spawn(move || {
                 // A body that cannot be fitted stays `fitting`: not tried
                 // again on every frame.
-                if let Ok(form) = Form::of_body(&body)
+                if let Ok(form) = key.build()
                     && let Ok(mut forms) = slot.lock()
                 {
-                    forms.ready = Some((body, Arc::new(form)));
+                    forms.ready = Some((key, form));
                     forms.fitting = None;
                 }
             });
@@ -811,7 +824,7 @@ impl Engine {
     /// not wait for it.
     fn rebuild(&self, carry: bool) -> Result<(), ApiError> {
         let project = self.workspace()?.session().project().clone();
-        let form = self.form_now(project.shown_body())?;
+        let form = self.form_now(FormKey::of(&project))?;
         self.report("drape.prepare");
         let mut drape = drape::prepare(&project, form.as_deref()).map_err(err)?;
         let sim = self.sim()?;
@@ -936,6 +949,15 @@ impl Engine {
     /// in motion first comes back to rest. Can take seconds when the
     /// garment is not loaded yet (see [`Engine::reset_simulation`]).
     pub fn set_motion(&self, motion: Option<String>) -> Result<SimStatus, ApiError> {
+        let imported = self
+            .workspace()?
+            .session()
+            .project()
+            .avatar()
+            .is_some_and(|a| a.mesh.is_some());
+        if imported && motion.is_some() {
+            return Err(err(r3d_commands::CommandError::ImportedBodyStill));
+        }
         let to = match motion {
             Some(name) => {
                 let m: AvatarMotion = serde_json::from_value(serde_json::Value::String(name))
@@ -999,8 +1021,8 @@ impl Engine {
     pub fn run_long(&self, step_json: String) -> Result<String, ApiError> {
         self.long("step", |progress| {
             let out = self.run_with(&step_json, progress)?;
-            let body = self.workspace()?.session().project().shown_body();
-            self.form_now(body)?;
+            let key = FormKey::of(self.workspace()?.session().project());
+            self.form_now(key)?;
             Ok(out)
         })
     }
@@ -1199,7 +1221,7 @@ impl Engine {
                     // Locks in the engine's usual order: the simulation
                     // before the cloth.
                     let live = self.sim()?.as_ref().map(|t| t.latest());
-                    let form = self.form_now(project.shown_body())?;
+                    let form = self.form_now(FormKey::of(project))?;
                     let fresh;
                     let cloth = self.cloth.lock().map_err(|_| poisoned())?;
                     let drape = match cloth.as_ref() {
@@ -1417,7 +1439,7 @@ impl Engine {
         // Locks in the engine's usual order: the simulation before the
         // cloth.
         let live = self.sim()?.as_ref().map(|t| t.latest());
-        let form = self.form_now(project.shown_body())?;
+        let form = self.form_now(FormKey::of(&project))?;
         let fresh;
         let cloth = self.cloth.lock().map_err(|_| poisoned())?;
         let drape = match cloth.as_ref() {
@@ -1499,6 +1521,113 @@ impl Engine {
         }
         self.forget_missing(ws.session().project())?;
         Ok(result.to_string())
+    }
+
+    /// Drape on a body the user chose (anywhere; OBJ, glTF or GLB): copied
+    /// into the project's `avatars/` folder, read, its units, up axis and
+    /// facing detected, its arrangement points guessed (`avatar.import`,
+    /// one undo step). Returns that action's JSON result: `body` (the
+    /// measurements taken) and `check` (as `avatar.check`). Off the UI
+    /// thread (a large scan takes a while to read and prepare).
+    pub fn import_body(&self, path: String) -> Result<String, ApiError> {
+        self.long("import", |_| {
+            let result = {
+                let mut ws = self.workspace()?;
+                let rel = ws.adopt_body(Path::new(&path)).map_err(err)?;
+                let step =
+                    Step::from_value(serde_json::json!({ "type": "avatar.import", "path": rel }))
+                        .map_err(err)?;
+                let result = ws.run_step(&step).map_err(err)?;
+                ws.save().map_err(err)?;
+                result
+            };
+            self.edited()?;
+            let key = FormKey::of(self.workspace()?.session().project());
+            self.report("body.fit");
+            self.form_now(key)?;
+            Ok(result.to_string())
+        })
+    }
+
+    /// The imported body's arrangement points as seen in 3D view `view`:
+    /// where each one is drawn (device pixels) and whether the check flags
+    /// it. Empty with the built-in body, or before the view is drawn.
+    #[frb(sync)]
+    pub fn body_points(&self, view: u32) -> Result<Vec<BodyPointView>, ApiError> {
+        let Some(mesh) = self
+            .workspace()?
+            .session()
+            .project()
+            .avatar()
+            .and_then(|a| a.mesh.clone())
+        else {
+            return Ok(Vec::new());
+        };
+        let flagged = r3d_commands::bodies::flagged(&mesh);
+        let slot = self.graphics()?;
+        let (Some(g), Some(v)) = (
+            slot.as_ref(),
+            slot.as_ref()
+                .and_then(|g| g.views.get(&view))
+                .filter(|v| matches!(v.kind, ViewKind::Garment)),
+        ) else {
+            return Ok(Vec::new());
+        };
+        Ok(mesh
+            .points
+            .iter()
+            .filter_map(|(point, at)| {
+                let p = (glam::DVec3::from(*at) / 1000.0).as_vec3();
+                let (pixel, _) = g.camera.project(p, v.width, v.height)?;
+                Some(BodyPointView {
+                    name: point.name(),
+                    x: pixel.x.into(),
+                    y: pixel.y.into(),
+                    flagged: flagged.contains(point),
+                })
+            })
+            .collect())
+    }
+
+    /// Move the imported body's arrangement point `name` (`left_elbow`…)
+    /// under pixel (`x`, `y`) of 3D view `view`, in the plane facing the
+    /// camera through where it is (`avatar.set_point`; a drag is one undo
+    /// step once [`Engine::release`] ends it).
+    #[frb(sync)]
+    pub fn move_body_point(&self, view: u32, name: String, x: f64, y: f64) -> Result<(), ApiError> {
+        let point: BodyPoint = serde_json::from_value(serde_json::Value::String(name.clone()))
+            .map_err(|e| ApiError::new("malformed", e.to_string()))?;
+        let Some(at) = self
+            .workspace()?
+            .session()
+            .project()
+            .avatar()
+            .and_then(|a| a.mesh.as_ref())
+            .and_then(|m| m.points.get(&point).copied())
+        else {
+            return Ok(());
+        };
+        let anchor = (glam::DVec3::from(at) / 1000.0).as_vec3();
+        let target = {
+            let slot = self.graphics()?;
+            let (Some(g), Some(v)) = (
+                slot.as_ref(),
+                slot.as_ref().and_then(|g| g.views.get(&view)),
+            ) else {
+                return Ok(());
+            };
+            let (origin, dir) = g.camera.ray(x as f32, y as f32, v.width, v.height);
+            let normal = g.camera.forward();
+            let facing = dir.dot(normal);
+            if facing.abs() < 1e-6 {
+                return Ok(());
+            }
+            origin + dir * ((anchor - origin).dot(normal) / facing)
+        };
+        let mm = (target.as_dvec3() * 1000.0).to_array().map(|c| c.round());
+        let step = serde_json::json!({ "type": "avatar.set_point", "point": name, "at_mm": mm });
+        self.run(step.to_string())?;
+        Ok(())
     }
 
     /// Copy a print image the user chose (anywhere; PNG or JPEG) into the
@@ -1749,15 +1878,16 @@ impl Engine {
         g: &mut Graphics,
         project: &r3d_core::Project,
     ) -> Result<(), ApiError> {
-        let body = project.shown_body();
-        if body == g.avatar.as_ref().map(|(b, _)| *b) {
+        let key = FormKey::of(project);
+        if key.as_ref().map(FormKey::id) == g.avatar.as_ref().map(|(k, _)| *k) {
             return Ok(());
         }
-        let Some(body) = body else {
+        let Some(key) = key else {
             g.avatar = None;
             return Ok(());
         };
-        if let Some(form) = self.form_soon(body)? {
+        let id = key.id();
+        if let Some(form) = self.form_soon(key)? {
             let mut mesh = Mesh {
                 positions: form.positions.clone(),
                 normals: Vec::new(),
@@ -1766,7 +1896,7 @@ impl Engine {
                 uvs: Vec::new(),
             };
             mesh.recompute_normals();
-            g.avatar = Some((body, mesh));
+            g.avatar = Some((id, mesh));
         }
         Ok(())
     }
@@ -1785,10 +1915,10 @@ impl Engine {
         if time < animation.start {
             return Ok(None);
         }
-        let Some(body) = project.shown_body() else {
+        let Some(key) = FormKey::of(project) else {
             return Ok(None);
         };
-        let Some(form) = self.form_soon(body)? else {
+        let Some(form) = self.form_soon(key)? else {
             return Ok(None);
         };
         let mut mesh = Mesh {
@@ -1963,10 +2093,10 @@ impl Engine {
         project: &r3d_core::Project,
         time: f32,
     ) -> Result<Option<LiveBody>, ApiError> {
-        let Some(body) = project.shown_body() else {
+        let Some(key) = FormKey::of(project) else {
             return Ok(None);
         };
-        let Some(form) = self.form_soon(body)? else {
+        let Some(form) = self.form_soon(key)? else {
             return Ok(None);
         };
         let animation = *self.animation.lock().map_err(|_| poisoned())?;

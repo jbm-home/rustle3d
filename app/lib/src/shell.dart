@@ -9,6 +9,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'body_check.dart';
 import 'body_panel.dart';
 import 'busy.dart';
 import 'design/tokens.dart';
@@ -62,6 +63,13 @@ class Shell extends StatefulWidget {
 
 class _ShellState extends State<Shell> {
   Map<String, dynamic> _summary = const {};
+
+  /// The imported body's check (`avatar.check`); `null` with the
+  /// built-in body.
+  Map<String, dynamic>? _bodyCheck;
+
+  /// The imported body's arrangement points are drawn in the 3D view.
+  bool _showPoints = false;
   List<String> _selection = const [];
   Map<String, dynamic>? _panel;
   List<dynamic> _pins = const [];
@@ -254,6 +262,89 @@ class _ShellState extends State<Shell> {
   void _showBody() =>
       showBodyPanel(context, widget.engine, widget.libraryDir, _refresh);
 
+  void _showBodyCheck() => showBodyCheck(context, widget.engine, _refresh);
+
+  /// "The body has things to check", with a way to the check.
+  void _bodyNotice() {
+    final l = context.l;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(l.bodyHasWarnings),
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: l.bodyMenuCheck,
+            onPressed: _showBodyCheck,
+          ),
+        ),
+      );
+  }
+
+  /// The Body menu: `measurements`, `import`, `check`, `points` (show or
+  /// hide the arrangement points) or `builtin`.
+  void _onBodyMenu(String choice) {
+    switch (choice) {
+      case 'measurements':
+        _showBody();
+      case 'import':
+        _importBody();
+      case 'check':
+        _showBodyCheck();
+      case 'points':
+        setState(() => _showPoints = !_showPoints);
+      case 'builtin':
+        _builtinBody();
+    }
+  }
+
+  /// Ask for a body file (OBJ, glTF, GLB), import it, show its check.
+  Future<void> _importBody() async {
+    final l = context.l;
+    final file = await openFile(
+      acceptedTypeGroups: [
+        XTypeGroup(
+          label: l.bodyFiles,
+          extensions: const ['obj', 'gltf', 'glb'],
+        ),
+      ],
+    );
+    if (file == null || !mounted) return;
+    try {
+      await runBusy(
+        context,
+        widget.engine,
+        l.bodyMenuImport,
+        () => widget.engine.importBody(path: file.path),
+      );
+    } on ApiError catch (e) {
+      if (mounted) _toast(context.error(e));
+      return;
+    }
+    if (!mounted) return;
+    _refresh();
+    _toast(l.bodyImported);
+    _showBodyCheck();
+  }
+
+  /// Drape on the built-in body again.
+  Future<void> _builtinBody() async {
+    try {
+      await runBusy(
+        context,
+        widget.engine,
+        context.l.busyBodyTitle,
+        () => widget.engine.runLong(stepJson: '{"type":"avatar.remove_mesh"}'),
+      );
+    } on ApiError catch (e) {
+      if (mounted) _toast(context.error(e));
+      return;
+    }
+    if (!mounted) return;
+    _refresh();
+    _toast(context.l.bodyBuiltinBack);
+  }
+
   final _scaffold = GlobalKey<ScaffoldState>();
 
   // What the first-launch tour points at.
@@ -393,6 +484,15 @@ class _ShellState extends State<Shell> {
       _summary =
           (_run({'type': 'project.summary'}) as Map<String, dynamic>?) ??
           const {};
+      try {
+        _bodyCheck = jsonDecode(
+          widget.engine.run(stepJson: '{"type":"avatar.check"}'),
+        ) as Map<String, dynamic>;
+      } on ApiError {
+        // The built-in body: nothing to check.
+        _bodyCheck = null;
+        _showPoints = false;
+      }
       _selection = widget.engine.selection();
       _panel = _selection.length == 1
           ? _run({'type': 'panel.get', 'panel': _selection.first})
@@ -477,6 +577,13 @@ class _ShellState extends State<Shell> {
 
   /// Run or pause the drape; running it brings the 3D view back.
   void _setRunning(bool running) {
+    if (running) {
+      // An imported body with something to check says so; one that
+      // cannot be draped does not start.
+      final concern = checkConcern(_bodyCheck);
+      if (concern != null) _bodyNotice();
+      if (concern == 'error') return;
+    }
     if (running && _maximized == ViewKind.board) {
       _resumeDrape = false;
       setState(() => _maximized = null);
@@ -2016,7 +2123,9 @@ class _ShellState extends State<Shell> {
                 onUndo: _undo,
                 onRedo: _redo,
                 onGoTo: _goToStep,
-                onBody: _showBody,
+                onBody: _onBodyMenu,
+                bodyCheck: _bodyCheck,
+                showPoints: _showPoints,
                 onExport: _export,
                 onProduction: (what) => switch (what) {
                   'marker' => _openMarker(),
@@ -2261,6 +2370,7 @@ class _ShellState extends State<Shell> {
                                             onRun: _setRunning,
                                             onRestart: _restart,
                                             onMotion: _setMotion,
+                                            still: _bodyCheck != null,
                                           ),
                                           const SizedBox(width: Space.s),
                                           _FitButton(
@@ -2312,6 +2422,8 @@ class _ShellState extends State<Shell> {
                                                 () => _tape = reading,
                                               )
                                             : null,
+                                        bodyPoints: _showPoints,
+                                        onBodyPoint: _refresh,
                                       ),
                                     ),
                                     if (_tool == 'tape')
@@ -2448,6 +2560,8 @@ class _TopBar extends StatelessWidget {
     required this.onGoTo,
     required this.onRedo,
     required this.onBody,
+    required this.bodyCheck,
+    required this.showPoints,
     required this.onExport,
     required this.onProduction,
     required this.onImport,
@@ -2476,7 +2590,15 @@ class _TopBar extends StatelessWidget {
 
   /// Go back or forward until this many steps are done.
   final ValueChanged<int> onGoTo;
-  final VoidCallback onBody;
+
+  /// A choice of the Body menu (see `_onBodyMenu`).
+  final ValueChanged<String> onBody;
+
+  /// The imported body's check; `null` with the built-in body.
+  final Map<String, dynamic>? bodyCheck;
+
+  /// The arrangement points are shown in the 3D view.
+  final bool showPoints;
 
   /// Export in a format (with the avatar, for 3D formats).
   final void Function(ExportFormat format, bool avatar) onExport;
@@ -2583,11 +2705,11 @@ class _TopBar extends StatelessWidget {
               icon: const Icon(Icons.school_outlined, size: 18),
               label: Text(l.learn),
             ),
-            TextButton.icon(
+            _BodyMenu(
               key: bodyKey,
-              onPressed: onBody,
-              icon: const Icon(Icons.accessibility_new_rounded, size: 18),
-              label: Text(l.body),
+              check: bodyCheck,
+              showPoints: showPoints,
+              onChoice: onBody,
             ),
             _AgentButton(
               status: agent,
@@ -2685,6 +2807,87 @@ class _TopBar extends StatelessWidget {
               icon: dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
               tip: dark ? l.themeLight : l.themeDark,
               onTap: onToggleTheme,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The top bar's Body button: measurements, an imported body, its check
+/// and its arrangement points. A dot says the imported body has
+/// something to check.
+class _BodyMenu extends StatelessWidget {
+  const _BodyMenu({
+    super.key,
+    required this.check,
+    required this.showPoints,
+    required this.onChoice,
+  });
+
+  final Map<String, dynamic>? check;
+  final bool showPoints;
+  final ValueChanged<String> onChoice;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final l = context.l;
+    final imported = check != null;
+    final concern = checkConcern(check);
+    return PopupMenuButton<String>(
+      tooltip: l.body,
+      onSelected: onChoice,
+      itemBuilder: (_) => [
+        PopupMenuItem(
+          value: 'measurements',
+          child: Text(l.bodyMenuMeasurements),
+        ),
+        PopupMenuItem(
+          key: const Key('bodyMenuImport'),
+          value: 'import',
+          child: Text(l.bodyMenuImport),
+        ),
+        if (imported) ...[
+          const PopupMenuDivider(),
+          PopupMenuItem(
+            key: const Key('bodyMenuCheck'),
+            value: 'check',
+            child: Text(l.bodyMenuCheck),
+          ),
+          CheckedPopupMenuItem(
+            key: const Key('bodyMenuPoints'),
+            value: 'points',
+            checked: showPoints,
+            child: Text(l.bodyMenuPoints),
+          ),
+          PopupMenuItem(value: 'builtin', child: Text(l.bodyMenuBuiltin)),
+        ],
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: Space.s, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Badge(
+              isLabelVisible: concern != null,
+              backgroundColor: p.danger,
+              smallSize: 7,
+              child: Icon(
+                Icons.accessibility_new_rounded,
+                size: 18,
+                color: p.accent,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              l.body,
+              style: ts(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: p.accent,
+              ),
             ),
           ],
         ),
@@ -4482,11 +4685,15 @@ class _SimControls extends StatelessWidget {
     required this.onRun,
     required this.onRestart,
     required this.onMotion,
+    required this.still,
   });
 
   final SimStatus? status;
   final ValueChanged<bool> onRun;
   final VoidCallback onRestart;
+
+  /// The body cannot move (an imported one): the motion menu is off.
+  final bool still;
 
   /// A motion's name, or `null` to stand still.
   final ValueChanged<String?> onMotion;
@@ -4543,6 +4750,20 @@ class _SimControls extends StatelessWidget {
     final p = Tokens.of(context);
     final l = context.l;
     final current = status?.motion;
+    if (still) {
+      return Tooltip(
+        message: l.motionImportedTip,
+        child: IconButton(
+          key: const ValueKey('motionButton'),
+          onPressed: null,
+          icon: Icon(
+            Icons.directions_walk_rounded,
+            size: 19,
+            color: p.textMuted.withValues(alpha: 0.5),
+          ),
+        ),
+      );
+    }
     // Menu values cannot be null: '' stands for standing still.
     return PopupMenuButton<String>(
       key: const ValueKey('motionButton'),

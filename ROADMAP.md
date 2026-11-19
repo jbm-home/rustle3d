@@ -44,7 +44,7 @@ can be tested through MCP as soon as they exist.
 | M24 | Fit maps and virtual tape measure ✅ | 2 wk | Tight spots show in colour; the ease at the chest is read on the drape |
 | M20 | Trims: buttons and zippers ✅ | 2–3 wk | A shirt that buttons and trousers with a fly zipper, draped closed |
 | M21 | Textures and prints ✅ | 2–3 wk | A striped shirt whose stripes follow the grainline on every piece |
-| M31 | Imported avatars | 2–3 wk | A body scan in OBJ/glTF is checked, the pieces placed around it and draped |
+| M31 | Imported avatars ✅ | 2–3 wk | A body scan in OBJ/glTF is checked, the pieces placed around it and draped |
 | M15 | Game-ready export | 3–4 wk | LODs + baked wrinkle normal maps + skinning, imported in Godot/Unity/Unreal |
 
 M10 came before M9: the first-time user test, not the export, decided
@@ -78,7 +78,8 @@ reason: production needs no new physics or assets. M24 came next
 have. M21 followed the same night (2026-11-19): prints need no new
 physics either, and every later render and export shows them. M20
 closed the same night (2026-11-19), the first of these to touch both
-solvers.
+solvers. M31 closed after it (2026-11-19): imported bodies reuse the
+distance field both solvers read, and stand still.
 
 ---
 
@@ -882,15 +883,46 @@ tests below, in the real app):
   plies, a marker of several garments in one fabric, PDF pages longer
   than 5 m for Acrobat.
 
-## M31 — Imported avatars
+## M31 — Imported avatars ✅ (2026-11-19)
 - Import a body in OBJ, glTF or GLB (a scan, a game character); the
   user owns its licence.
 - A check of the collision mesh (closed, scale, orientation, holes)
   shown before draping; the arrangement points placed with help and
   checked before the simulation starts.
-- Later: automatic fit of the arrangement points to the body.
-- **Demo**: a scanned body is checked, a shirt placed around it and
-  draped.
+- **Demo**: `./demos/m31/demo.sh`: the built-in CC0 body exported to
+  OBJ, rewritten in centimetres, Z up, its soles cut open, is imported
+  (units, up axis and facing detected; the check reports the holes;
+  14 arrangement points guessed inside the body; measurements within
+  half a centimetre of the built-in body's), turned the wrong way and
+  flagged, corrected, a T-shirt sized from it draped and rendered.
+- Delivered (spec 27): schema v18, the avatar's `mesh` (file in
+  `avatars/` by relative path and fingerprint, scale, up axis, turn,
+  arrangement points); `r3d_io::model` (OBJ, glTF/GLB with embedded
+  buffers and node transforms); `r3d_geom::trimesh` (holes,
+  non-manifold edges, pieces, outward orientation fixed) and
+  `r3d_geom::winding` (generalized winding numbers, Jacobson et al.
+  2013, Barill et al. 2018's hierarchy) signing the distance field near
+  open or non-manifold edges, on the CPU and the GPU;
+  `r3d_commands::bodies` (files kept by fingerprint, detection of units
+  from a plausible height, up axis, facing from the shoulders and the
+  feet; points from the body's sections; measurements as the built-in
+  body's; the check report; the dress form with sleeves and trouser
+  legs through the points). Commands `avatar.import_mesh`,
+  `avatar.orient`, `avatar.set_point`, `avatar.guess_points`,
+  `avatar.remove_mesh`, query `avatar.check`, action `avatar.import`;
+  `r3d avatar import|check`; `simulate` refuses motions on an imported
+  body and reports `body_warnings`. App: Body menu (Measurements…,
+  Import body…, Check body…, Show arrangement points, Use the built-in
+  body), a dot on it when something needs a look, the check window
+  (units, up axis, turn, the items, the points in cm), the points drawn
+  over the 3D view and dragged, the Motion button off, a notice when
+  the drape starts; integration test `body_test.dart`.
+- Open: motions of an imported body (mapping its skeleton, if any,
+  onto ours), an imported body per size of a range, automatic fit of
+  the arrangement points as the garment drapes, points guessed on a
+  T pose (they assume arms down or an A pose), templates placing their
+  pieces from the points rather than from fractions of the height, a
+  disk cache of the distance field of large scans, compressed glTF.
 
 ## M23 — Animated avatars
 - A skeleton for the avatar and a few motions (walk, turn, raise arms);

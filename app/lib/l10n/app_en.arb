@@ -1260,5 +1260,211 @@
   "tpPlacement": "On",
   "tpButton": "Button",
   "tpZipper": "Zipper",
-  "errOutsidePiece": "Put it inside the piece."
+  "errOutsidePiece": "Put it inside the piece.",
+  "bodyMenuMeasurements": "Measurements…",
+  "bodyMenuImport": "Import body…",
+  "bodyMenuCheck": "Check body…",
+  "bodyMenuPoints": "Show arrangement points",
+  "bodyMenuBuiltin": "Use the built-in body",
+  "bodyFiles": "3D bodies (OBJ, glTF, GLB)",
+  "bodyImported": "Body imported: check it before draping.",
+  "bodyBuiltinBack": "Back to the built-in body.",
+  "bodyCheckTitle": "Check body",
+  "bodyCheckSummary": "{file} · {triangles} triangles · {height} m tall",
+  "@bodyCheckSummary": {
+    "placeholders": {
+      "file": {
+        "type": "String"
+      },
+      "triangles": {
+        "type": "String"
+      },
+      "height": {
+        "type": "String"
+      }
+    }
+  },
+  "bodyCheckReady": "It can be draped.",
+  "bodyCheckNotReady": "It cannot be draped yet: see below.",
+  "bodyCheckAllGood": "Nothing to fix.",
+  "bodyReading": "How the file is read",
+  "bodyUnits": "Units",
+  "unitMetres": "Metres",
+  "unitCentimetres": "Centimetres",
+  "unitMillimetres": "Millimetres",
+  "unitInches": "Inches",
+  "unitOther": "{metres} m per unit",
+  "@unitOther": {
+    "placeholders": {
+      "metres": {
+        "type": "String"
+      }
+    }
+  },
+  "bodyUp": "Up axis",
+  "bodyTurn": "Turn",
+  "bodyPoints": "Arrangement points",
+  "bodyPointsHint": "Inside the body, in cm: across (left +), height, depth (front +). Drag them in the 3D view with Body › Show arrangement points.",
+  "bodyGuessAgain": "Guess again",
+  "bodyHasWarnings": "The body has things to check.",
+  "motionImportedTip": "An imported body stands still",
+  "pointChest": "Chest",
+  "pointWaist": "Waist",
+  "pointHips": "Hips",
+  "pointCrotch": "Crotch",
+  "pointLeftShoulder": "Left shoulder",
+  "pointLeftElbow": "Left elbow",
+  "pointLeftWrist": "Left wrist",
+  "pointRightShoulder": "Right shoulder",
+  "pointRightElbow": "Right elbow",
+  "pointRightWrist": "Right wrist",
+  "pointLeftThigh": "Left thigh",
+  "pointLeftShin": "Left shin",
+  "pointRightThigh": "Right thigh",
+  "pointRightShin": "Right shin",
+  "checkFileUnavailable": "The body's file {file} is missing or was changed: import it again.",
+  "@checkFileUnavailable": {
+    "placeholders": {
+      "file": {
+        "type": "String"
+      }
+    }
+  },
+  "checkMeshOpen": "{holes} holes in the surface ({edges} open edges): closed for the cloth as well as possible.",
+  "@checkMeshOpen": {
+    "placeholders": {
+      "holes": {
+        "type": "String"
+      },
+      "edges": {
+        "type": "String"
+      }
+    }
+  },
+  "checkMeshNonManifold": "{edges} edges are shared by more than two triangles.",
+  "@checkMeshNonManifold": {
+    "placeholders": {
+      "edges": {
+        "type": "String"
+      }
+    }
+  },
+  "checkMeshPieces": "{pieces} loose parts besides the body.",
+  "@checkMeshPieces": {
+    "placeholders": {
+      "pieces": {
+        "type": "String"
+      }
+    }
+  },
+  "checkMeshHeavy": "{triangles} triangles: the views and the drape will be slower.",
+  "@checkMeshHeavy": {
+    "placeholders": {
+      "triangles": {
+        "type": "String"
+      }
+    }
+  },
+  "checkMeshCoarse": "Only {triangles} triangles: the body will look faceted.",
+  "@checkMeshCoarse": {
+    "placeholders": {
+      "triangles": {
+        "type": "String"
+      }
+    }
+  },
+  "checkMeshReoriented": "{triangles} triangles were turned to face out like their neighbours.",
+  "@checkMeshReoriented": {
+    "placeholders": {
+      "triangles": {
+        "type": "String"
+      }
+    }
+  },
+  "checkMeshInsideOut": "The surface faced inward: it was turned.",
+  "checkMeshDegenerate": "{triangles} flat triangles are ignored.",
+  "@checkMeshDegenerate": {
+    "placeholders": {
+      "triangles": {
+        "type": "String"
+      }
+    }
+  },
+  "checkScaleHeight": "{height} m tall: are the units right?",
+  "@checkScaleHeight": {
+    "placeholders": {
+      "height": {
+        "type": "String"
+      }
+    }
+  },
+  "checkOrientationUp": "The body is wider than it is tall: is the up axis right?",
+  "checkOrientationFacing": "The feet point backwards: turn the body 180°.",
+  "checkPointsOutside": "{point} is outside the body.",
+  "@checkPointsOutside": {
+    "placeholders": {
+      "point": {
+        "type": "String"
+      }
+    }
+  },
+  "checkPointsSide": "{point} is on the wrong side of the body.",
+  "@checkPointsSide": {
+    "placeholders": {
+      "point": {
+        "type": "String"
+      }
+    }
+  },
+  "checkMeasurementsClamped": "A measurement ({measurement}) was out of range and was brought into it.",
+  "@checkMeasurementsClamped": {
+    "placeholders": {
+      "measurement": {
+        "type": "String"
+      }
+    }
+  },
+  "checkMotionUnavailable": "An imported body stands still: motions are off.",
+  "errModelMalformed": "This {format} file cannot be read: {detail}",
+  "@errModelMalformed": {
+    "placeholders": {
+      "format": {
+        "type": "String"
+      },
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "errModelExternalBuffers": "This glTF keeps its data in separate files: save it as a single .glb.",
+  "errModelCompressed": "This glTF is compressed ({extension}): save it without compression.",
+  "@errModelCompressed": {
+    "placeholders": {
+      "extension": {
+        "type": "String"
+      }
+    }
+  },
+  "errModelEmpty": "This file holds no triangles.",
+  "errModelTooLarge": "This body has {triangles} triangles, more than {limit}: simplify it first.",
+  "@errModelTooLarge": {
+    "placeholders": {
+      "triangles": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "String"
+      }
+    }
+  },
+  "errBodyUnavailable": "The body's file {file} is missing or was changed: import it again.",
+  "@errBodyUnavailable": {
+    "placeholders": {
+      "file": {
+        "type": "String"
+      }
+    }
+  },
+  "errImportedBodyStill": "An imported body cannot move yet.",
+  "errNoImportedBody": "The avatar has no imported body."
 }

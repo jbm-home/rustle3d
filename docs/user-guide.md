@@ -7,7 +7,8 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-19 (M20, buttons and zippers: the Button and
+Last updated: 2026-11-19 (M31, imported bodies: Body › Import body…,
+the check, the arrangement points; M20, buttons and zippers: the Button and
 Zipper tools, buttoned or open while the garment drapes, the shirt
 buttoned and the trousers' fly zipper; M21, prints: stripes, gingham, dots, twill and
 your own images on the fabric; M24, fit maps and the tape measure; M30,
@@ -82,9 +83,44 @@ tour is shown on the first launch.
 English or French, from the language button in the top bar.
 
 ## The body
-**Body** opens the measurements: choose a size (women's or men's presets)
-or enter height, bust, waist and hips. Save your own presets. The garment
-drapes on the new body.
+**Body › Measurements…** opens the measurements: choose a size (women's
+or men's presets) or enter height, bust, waist and hips. Save your own
+presets. The garment drapes on the new body.
+
+### Your own body: a scan or a character
+**Body › Import body…** drapes on a body of your own: a 3D scan of a
+client, a character made in another program. Pick an OBJ, glTF or GLB
+file (a glTF must keep its data in one file: save it as GLB if it
+comes with a .bin). You must have the right to use it; it is copied
+into the project's `avatars` folder and never leaves it.
+
+Rustle3D works out the units (metres, centimetres, millimetres or
+inches, from a plausible height), which way is up and which way the body
+faces (its toes point forward), stands it on the floor and shows the
+**Check body** window. It lists what may go wrong when draping:
+- holes in the surface (a scan open under the feet or at the neck),
+  edges shared by more than two triangles, loose parts: the body still
+  drapes, holes are closed for the cloth as well as they can be;
+- a height that does not look human, a body lying down or facing
+  backwards: correct the **Units**, the **Up** axis or the **Turn**
+  there;
+- triangles facing inward, which are turned for you.
+The Body button shows a dot while something is worth a look.
+
+**Arrangement points** tell the drape where the chest, waist, hips and
+crotch are, and the shoulders, elbows, wrists, thighs and shins: sleeves
+wrap around the arms through them, trouser legs around the legs.
+They are placed for you on bodies standing with their arms down or in
+an A pose. **Body › Show arrangement points** draws them in the 3D view;
+drag one to move it (in the plane facing you), or type its position in
+the Check body window. A point outside the body shows red. Moving the
+chest, waist or hips point measures the body again there: these
+measurements size the templates. **Guess again** puts every point back
+where Rustle3D would place it.
+
+**Body › Use the built-in body** goes back to the built-in body, with
+the measurements taken on yours. An imported body stands still: the
+Motion button is off (see Known limits).
 
 ## The pattern (2D)
 
@@ -608,7 +644,9 @@ Renaming a project also renames its folder, when no other project has
 that name. A project exported as .zip holds its folder (pattern, body,
 exports), without the cache the app rebuilds by itself.
 Print images you add are kept in the project's `textures` folder;
-replacing a file there (same name) changes the print.
+replacing a file there (same name) changes the print. Bodies you import
+are kept in its `avatars` folder; if that file changes, import it again
+(the check says so).
 Patterns come in from DXF, SVG and PDF and go out as SVG, PDF and
 DXF-AAMA; garments go out as glTF and OBJ; the marker as SVG or PDF and
 the tech pack as PDF: open formats only.
@@ -630,7 +668,12 @@ the tech pack as PDF: open formats only.
   cloth keep about 2 cm apart in the simulation.
 - The avatar walks on the spot (not along a path), raises its arms to
   above the shoulders but not straight up, and only the built-in body
-  moves (not an imported one).
+  moves (not an imported one, even if its file has a skeleton).
+- An imported body is the same in every size of a size range. Its
+  arrangement points are guessed for arms down or in an A pose: on a
+  T pose, move the shoulder, elbow and wrist points. Compressed glTF
+  (Draco, meshopt) cannot be read; files over 2 million triangles are
+  refused, and above 300 000 the views and the drape slow down.
 - Not yet in the simulation: elastic and shirring, visible topstitching,
   interfacing, quilting and padding. Holes are cut on their line (no seam
   allowance inside them), and a mirrored or symmetric piece cannot have

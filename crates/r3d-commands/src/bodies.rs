@@ -41,6 +41,7 @@ const KEPT: usize = 4;
 static LOADED: Mutex<Vec<Arc<Loaded>>> = Mutex::new(Vec::new());
 static PLACED: Mutex<Vec<(String, Orientation, Arc<Placed>)>> = Mutex::new(Vec::new());
 static FORMS: Mutex<Vec<(AvatarMesh, Arc<Form>)>> = Mutex::new(Vec::new());
+static CHECKS: Mutex<Vec<(AvatarMesh, Report)>> = Mutex::new(Vec::new());
 
 fn lock<T>(m: &Mutex<T>) -> Result<MutexGuard<'_, T>, CommandError> {
     m.lock().map_err(|_| CommandError::Internal {
@@ -318,7 +319,8 @@ fn snap(deg: f64) -> f64 {
         deg.round()
     };
     let d = d.rem_euclid(360.0);
-    if d > 180.0 { d - 360.0 } else { d }
+    // (+ 0.0: never −0.)
+    if d > 180.0 { d - 360.0 } else { d + 0.0 }
 }
 
 /// The direction the body faces on the floor (x, z), if it can be told:
@@ -614,8 +616,38 @@ fn signed_distance(p: &Placed, winding: &Winding, q: Vec3) -> f64 {
     (sign * f64::from(d) * 1000.0 * 10.0).round() / 10.0
 }
 
-/// Check the imported body of `mesh`.
+/// The arrangement points the check flags (outside the body, or on the
+/// wrong side).
+pub fn flagged(mesh: &AvatarMesh) -> Vec<BodyPoint> {
+    check(mesh)
+        .items
+        .iter()
+        .filter(|i| i.code.starts_with("points."))
+        .filter_map(|i| serde_json::from_value(i.args.get("point")?.clone()).ok())
+        .collect()
+}
+
+/// Check the imported body of `mesh` (kept per body and points: the app
+/// asks after every edit, and draws the flagged points every frame).
 pub fn check(mesh: &AvatarMesh) -> Report {
+    if let Some((_, r)) = CHECKS
+        .lock()
+        .ok()
+        .and_then(|list| list.iter().find(|(m, _)| m == mesh).cloned())
+    {
+        return r;
+    }
+    let report = check_now(mesh);
+    // A body whose file is not read yet may be read later: not kept.
+    if report.ready
+        && let Ok(mut list) = CHECKS.lock()
+    {
+        keep(&mut list, (mesh.clone(), report.clone()));
+    }
+    report
+}
+
+fn check_now(mesh: &AvatarMesh) -> Report {
     let mut report = Report {
         file: mesh.file.clone(),
         ready: true,

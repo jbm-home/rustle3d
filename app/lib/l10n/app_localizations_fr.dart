@@ -2622,4 +2622,243 @@ class LFr extends L {
 
   @override
   String get errOutsidePiece => 'Placez-le à l\'intérieur de la pièce.';
+
+  @override
+  String get bodyMenuMeasurements => 'Mesures…';
+
+  @override
+  String get bodyMenuImport => 'Importer un corps…';
+
+  @override
+  String get bodyMenuCheck => 'Vérifier le corps…';
+
+  @override
+  String get bodyMenuPoints => 'Afficher les points de placement';
+
+  @override
+  String get bodyMenuBuiltin => 'Revenir au corps intégré';
+
+  @override
+  String get bodyFiles => 'Corps 3D (OBJ, glTF, GLB)';
+
+  @override
+  String get bodyImported => 'Corps importé : vérifiez-le avant de draper.';
+
+  @override
+  String get bodyBuiltinBack => 'Retour au corps intégré.';
+
+  @override
+  String get bodyCheckTitle => 'Vérifier le corps';
+
+  @override
+  String bodyCheckSummary(String file, String triangles, String height) {
+    return '$file · $triangles triangles · $height m de haut';
+  }
+
+  @override
+  String get bodyCheckReady => 'Il peut être drapé.';
+
+  @override
+  String get bodyCheckNotReady =>
+      'Il ne peut pas encore être drapé : voir ci-dessous.';
+
+  @override
+  String get bodyCheckAllGood => 'Rien à corriger.';
+
+  @override
+  String get bodyReading => 'Lecture du fichier';
+
+  @override
+  String get bodyUnits => 'Unités';
+
+  @override
+  String get unitMetres => 'Mètres';
+
+  @override
+  String get unitCentimetres => 'Centimètres';
+
+  @override
+  String get unitMillimetres => 'Millimètres';
+
+  @override
+  String get unitInches => 'Pouces';
+
+  @override
+  String unitOther(String metres) {
+    return '$metres m par unité';
+  }
+
+  @override
+  String get bodyUp => 'Axe vertical';
+
+  @override
+  String get bodyTurn => 'Rotation';
+
+  @override
+  String get bodyPoints => 'Points de placement';
+
+  @override
+  String get bodyPointsHint =>
+      'Dans le corps, en cm : largeur (gauche +), hauteur, profondeur (devant +). Déplacez-les dans la vue 3D avec Corps › Afficher les points de placement.';
+
+  @override
+  String get bodyGuessAgain => 'Replacer';
+
+  @override
+  String get bodyHasWarnings => 'Le corps a des points à vérifier.';
+
+  @override
+  String get motionImportedTip => 'Un corps importé reste immobile';
+
+  @override
+  String get pointChest => 'Poitrine';
+
+  @override
+  String get pointWaist => 'Taille';
+
+  @override
+  String get pointHips => 'Hanches';
+
+  @override
+  String get pointCrotch => 'Entrejambe';
+
+  @override
+  String get pointLeftShoulder => 'Épaule gauche';
+
+  @override
+  String get pointLeftElbow => 'Coude gauche';
+
+  @override
+  String get pointLeftWrist => 'Poignet gauche';
+
+  @override
+  String get pointRightShoulder => 'Épaule droite';
+
+  @override
+  String get pointRightElbow => 'Coude droit';
+
+  @override
+  String get pointRightWrist => 'Poignet droit';
+
+  @override
+  String get pointLeftThigh => 'Cuisse gauche';
+
+  @override
+  String get pointLeftShin => 'Tibia gauche';
+
+  @override
+  String get pointRightThigh => 'Cuisse droite';
+
+  @override
+  String get pointRightShin => 'Tibia droit';
+
+  @override
+  String checkFileUnavailable(String file) {
+    return 'Le fichier du corps $file manque ou a changé : importez-le à nouveau.';
+  }
+
+  @override
+  String checkMeshOpen(String holes, String edges) {
+    return '$holes trous dans la surface ($edges arêtes ouvertes) : refermés pour le tissu au mieux.';
+  }
+
+  @override
+  String checkMeshNonManifold(String edges) {
+    return '$edges arêtes sont partagées par plus de deux triangles.';
+  }
+
+  @override
+  String checkMeshPieces(String pieces) {
+    return '$pieces parties détachées en plus du corps.';
+  }
+
+  @override
+  String checkMeshHeavy(String triangles) {
+    return '$triangles triangles : les vues et le drapé seront plus lents.';
+  }
+
+  @override
+  String checkMeshCoarse(String triangles) {
+    return 'Seulement $triangles triangles : le corps paraîtra anguleux.';
+  }
+
+  @override
+  String checkMeshReoriented(String triangles) {
+    return '$triangles triangles ont été retournés vers l\'extérieur comme leurs voisins.';
+  }
+
+  @override
+  String get checkMeshInsideOut =>
+      'La surface était tournée vers l\'intérieur : elle a été retournée.';
+
+  @override
+  String checkMeshDegenerate(String triangles) {
+    return '$triangles triangles plats sont ignorés.';
+  }
+
+  @override
+  String checkScaleHeight(String height) {
+    return '$height m de haut : les unités sont-elles justes ?';
+  }
+
+  @override
+  String get checkOrientationUp =>
+      'Le corps est plus large que haut : l\'axe vertical est-il juste ?';
+
+  @override
+  String get checkOrientationFacing =>
+      'Les pieds pointent vers l\'arrière : tournez le corps de 180°.';
+
+  @override
+  String checkPointsOutside(String point) {
+    return '$point est hors du corps.';
+  }
+
+  @override
+  String checkPointsSide(String point) {
+    return '$point est du mauvais côté du corps.';
+  }
+
+  @override
+  String checkMeasurementsClamped(String measurement) {
+    return 'Une mesure ($measurement) était hors limites et y a été ramenée.';
+  }
+
+  @override
+  String get checkMotionUnavailable =>
+      'Un corps importé reste immobile : les mouvements sont désactivés.';
+
+  @override
+  String errModelMalformed(String format, String detail) {
+    return 'Ce fichier $format est illisible : $detail';
+  }
+
+  @override
+  String get errModelExternalBuffers =>
+      'Ce glTF range ses données dans des fichiers séparés : enregistrez-le en un seul .glb.';
+
+  @override
+  String errModelCompressed(String extension) {
+    return 'Ce glTF est compressé ($extension) : enregistrez-le sans compression.';
+  }
+
+  @override
+  String get errModelEmpty => 'Ce fichier ne contient aucun triangle.';
+
+  @override
+  String errModelTooLarge(String triangles, String limit) {
+    return 'Ce corps a $triangles triangles, plus de $limit : simplifiez-le d\'abord.';
+  }
+
+  @override
+  String errBodyUnavailable(String file) {
+    return 'Le fichier du corps $file manque ou a changé : importez-le à nouveau.';
+  }
+
+  @override
+  String get errImportedBodyStill =>
+      'Un corps importé ne peut pas encore bouger.';
+
+  @override
+  String get errNoImportedBody => 'L\'avatar n\'a pas de corps importé.';
 }

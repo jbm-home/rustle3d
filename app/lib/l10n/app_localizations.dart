@@ -4476,6 +4476,396 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Put it inside the piece.'**
   String get errOutsidePiece;
+
+  /// No description provided for @bodyMenuMeasurements.
+  ///
+  /// In en, this message translates to:
+  /// **'Measurements…'**
+  String get bodyMenuMeasurements;
+
+  /// No description provided for @bodyMenuImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Import body…'**
+  String get bodyMenuImport;
+
+  /// No description provided for @bodyMenuCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Check body…'**
+  String get bodyMenuCheck;
+
+  /// No description provided for @bodyMenuPoints.
+  ///
+  /// In en, this message translates to:
+  /// **'Show arrangement points'**
+  String get bodyMenuPoints;
+
+  /// No description provided for @bodyMenuBuiltin.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the built-in body'**
+  String get bodyMenuBuiltin;
+
+  /// No description provided for @bodyFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'3D bodies (OBJ, glTF, GLB)'**
+  String get bodyFiles;
+
+  /// No description provided for @bodyImported.
+  ///
+  /// In en, this message translates to:
+  /// **'Body imported: check it before draping.'**
+  String get bodyImported;
+
+  /// No description provided for @bodyBuiltinBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the built-in body.'**
+  String get bodyBuiltinBack;
+
+  /// No description provided for @bodyCheckTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Check body'**
+  String get bodyCheckTitle;
+
+  /// No description provided for @bodyCheckSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{file} · {triangles} triangles · {height} m tall'**
+  String bodyCheckSummary(String file, String triangles, String height);
+
+  /// No description provided for @bodyCheckReady.
+  ///
+  /// In en, this message translates to:
+  /// **'It can be draped.'**
+  String get bodyCheckReady;
+
+  /// No description provided for @bodyCheckNotReady.
+  ///
+  /// In en, this message translates to:
+  /// **'It cannot be draped yet: see below.'**
+  String get bodyCheckNotReady;
+
+  /// No description provided for @bodyCheckAllGood.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to fix.'**
+  String get bodyCheckAllGood;
+
+  /// No description provided for @bodyReading.
+  ///
+  /// In en, this message translates to:
+  /// **'How the file is read'**
+  String get bodyReading;
+
+  /// No description provided for @bodyUnits.
+  ///
+  /// In en, this message translates to:
+  /// **'Units'**
+  String get bodyUnits;
+
+  /// No description provided for @unitMetres.
+  ///
+  /// In en, this message translates to:
+  /// **'Metres'**
+  String get unitMetres;
+
+  /// No description provided for @unitCentimetres.
+  ///
+  /// In en, this message translates to:
+  /// **'Centimetres'**
+  String get unitCentimetres;
+
+  /// No description provided for @unitMillimetres.
+  ///
+  /// In en, this message translates to:
+  /// **'Millimetres'**
+  String get unitMillimetres;
+
+  /// No description provided for @unitInches.
+  ///
+  /// In en, this message translates to:
+  /// **'Inches'**
+  String get unitInches;
+
+  /// No description provided for @unitOther.
+  ///
+  /// In en, this message translates to:
+  /// **'{metres} m per unit'**
+  String unitOther(String metres);
+
+  /// No description provided for @bodyUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Up axis'**
+  String get bodyUp;
+
+  /// No description provided for @bodyTurn.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn'**
+  String get bodyTurn;
+
+  /// No description provided for @bodyPoints.
+  ///
+  /// In en, this message translates to:
+  /// **'Arrangement points'**
+  String get bodyPoints;
+
+  /// No description provided for @bodyPointsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Inside the body, in cm: across (left +), height, depth (front +). Drag them in the 3D view with Body › Show arrangement points.'**
+  String get bodyPointsHint;
+
+  /// No description provided for @bodyGuessAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Guess again'**
+  String get bodyGuessAgain;
+
+  /// No description provided for @bodyHasWarnings.
+  ///
+  /// In en, this message translates to:
+  /// **'The body has things to check.'**
+  String get bodyHasWarnings;
+
+  /// No description provided for @motionImportedTip.
+  ///
+  /// In en, this message translates to:
+  /// **'An imported body stands still'**
+  String get motionImportedTip;
+
+  /// No description provided for @pointChest.
+  ///
+  /// In en, this message translates to:
+  /// **'Chest'**
+  String get pointChest;
+
+  /// No description provided for @pointWaist.
+  ///
+  /// In en, this message translates to:
+  /// **'Waist'**
+  String get pointWaist;
+
+  /// No description provided for @pointHips.
+  ///
+  /// In en, this message translates to:
+  /// **'Hips'**
+  String get pointHips;
+
+  /// No description provided for @pointCrotch.
+  ///
+  /// In en, this message translates to:
+  /// **'Crotch'**
+  String get pointCrotch;
+
+  /// No description provided for @pointLeftShoulder.
+  ///
+  /// In en, this message translates to:
+  /// **'Left shoulder'**
+  String get pointLeftShoulder;
+
+  /// No description provided for @pointLeftElbow.
+  ///
+  /// In en, this message translates to:
+  /// **'Left elbow'**
+  String get pointLeftElbow;
+
+  /// No description provided for @pointLeftWrist.
+  ///
+  /// In en, this message translates to:
+  /// **'Left wrist'**
+  String get pointLeftWrist;
+
+  /// No description provided for @pointRightShoulder.
+  ///
+  /// In en, this message translates to:
+  /// **'Right shoulder'**
+  String get pointRightShoulder;
+
+  /// No description provided for @pointRightElbow.
+  ///
+  /// In en, this message translates to:
+  /// **'Right elbow'**
+  String get pointRightElbow;
+
+  /// No description provided for @pointRightWrist.
+  ///
+  /// In en, this message translates to:
+  /// **'Right wrist'**
+  String get pointRightWrist;
+
+  /// No description provided for @pointLeftThigh.
+  ///
+  /// In en, this message translates to:
+  /// **'Left thigh'**
+  String get pointLeftThigh;
+
+  /// No description provided for @pointLeftShin.
+  ///
+  /// In en, this message translates to:
+  /// **'Left shin'**
+  String get pointLeftShin;
+
+  /// No description provided for @pointRightThigh.
+  ///
+  /// In en, this message translates to:
+  /// **'Right thigh'**
+  String get pointRightThigh;
+
+  /// No description provided for @pointRightShin.
+  ///
+  /// In en, this message translates to:
+  /// **'Right shin'**
+  String get pointRightShin;
+
+  /// No description provided for @checkFileUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The body\'s file {file} is missing or was changed: import it again.'**
+  String checkFileUnavailable(String file);
+
+  /// No description provided for @checkMeshOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'{holes} holes in the surface ({edges} open edges): closed for the cloth as well as possible.'**
+  String checkMeshOpen(String holes, String edges);
+
+  /// No description provided for @checkMeshNonManifold.
+  ///
+  /// In en, this message translates to:
+  /// **'{edges} edges are shared by more than two triangles.'**
+  String checkMeshNonManifold(String edges);
+
+  /// No description provided for @checkMeshPieces.
+  ///
+  /// In en, this message translates to:
+  /// **'{pieces} loose parts besides the body.'**
+  String checkMeshPieces(String pieces);
+
+  /// No description provided for @checkMeshHeavy.
+  ///
+  /// In en, this message translates to:
+  /// **'{triangles} triangles: the views and the drape will be slower.'**
+  String checkMeshHeavy(String triangles);
+
+  /// No description provided for @checkMeshCoarse.
+  ///
+  /// In en, this message translates to:
+  /// **'Only {triangles} triangles: the body will look faceted.'**
+  String checkMeshCoarse(String triangles);
+
+  /// No description provided for @checkMeshReoriented.
+  ///
+  /// In en, this message translates to:
+  /// **'{triangles} triangles were turned to face out like their neighbours.'**
+  String checkMeshReoriented(String triangles);
+
+  /// No description provided for @checkMeshInsideOut.
+  ///
+  /// In en, this message translates to:
+  /// **'The surface faced inward: it was turned.'**
+  String get checkMeshInsideOut;
+
+  /// No description provided for @checkMeshDegenerate.
+  ///
+  /// In en, this message translates to:
+  /// **'{triangles} flat triangles are ignored.'**
+  String checkMeshDegenerate(String triangles);
+
+  /// No description provided for @checkScaleHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'{height} m tall: are the units right?'**
+  String checkScaleHeight(String height);
+
+  /// No description provided for @checkOrientationUp.
+  ///
+  /// In en, this message translates to:
+  /// **'The body is wider than it is tall: is the up axis right?'**
+  String get checkOrientationUp;
+
+  /// No description provided for @checkOrientationFacing.
+  ///
+  /// In en, this message translates to:
+  /// **'The feet point backwards: turn the body 180°.'**
+  String get checkOrientationFacing;
+
+  /// No description provided for @checkPointsOutside.
+  ///
+  /// In en, this message translates to:
+  /// **'{point} is outside the body.'**
+  String checkPointsOutside(String point);
+
+  /// No description provided for @checkPointsSide.
+  ///
+  /// In en, this message translates to:
+  /// **'{point} is on the wrong side of the body.'**
+  String checkPointsSide(String point);
+
+  /// No description provided for @checkMeasurementsClamped.
+  ///
+  /// In en, this message translates to:
+  /// **'A measurement ({measurement}) was out of range and was brought into it.'**
+  String checkMeasurementsClamped(String measurement);
+
+  /// No description provided for @checkMotionUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'An imported body stands still: motions are off.'**
+  String get checkMotionUnavailable;
+
+  /// No description provided for @errModelMalformed.
+  ///
+  /// In en, this message translates to:
+  /// **'This {format} file cannot be read: {detail}'**
+  String errModelMalformed(String format, String detail);
+
+  /// No description provided for @errModelExternalBuffers.
+  ///
+  /// In en, this message translates to:
+  /// **'This glTF keeps its data in separate files: save it as a single .glb.'**
+  String get errModelExternalBuffers;
+
+  /// No description provided for @errModelCompressed.
+  ///
+  /// In en, this message translates to:
+  /// **'This glTF is compressed ({extension}): save it without compression.'**
+  String errModelCompressed(String extension);
+
+  /// No description provided for @errModelEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'This file holds no triangles.'**
+  String get errModelEmpty;
+
+  /// No description provided for @errModelTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'This body has {triangles} triangles, more than {limit}: simplify it first.'**
+  String errModelTooLarge(String triangles, String limit);
+
+  /// No description provided for @errBodyUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The body\'s file {file} is missing or was changed: import it again.'**
+  String errBodyUnavailable(String file);
+
+  /// No description provided for @errImportedBodyStill.
+  ///
+  /// In en, this message translates to:
+  /// **'An imported body cannot move yet.'**
+  String get errImportedBodyStill;
+
+  /// No description provided for @errNoImportedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The avatar has no imported body.'**
+  String get errNoImportedBody;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

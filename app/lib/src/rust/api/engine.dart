@@ -9,7 +9,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `cloth_hit`, `corner_at`, `corner_landing`, `dressed_now`, `edge_spot`, `edited`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form_now`, `form_soon`, `frozen_board`, `gpu_solver`, `graphics`, `import_from`, `live_body`, `long`, `marker_spec`, `motion_name`, `moving_avatar`, `new`, `new`, `offset_along`, `parse_track`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `prints_of`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `selected`, `set_busy`, `sim`, `solver`, `tape_band`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`
 
 /// The GPU adapter the UI composites on (Windows: its LUID), so the views
 /// render on it and share their textures without a copy. Call it before
@@ -72,6 +72,11 @@ abstract class Engine implements RustOpaqueInterface {
   /// Whether the body is being fitted to new measurements: the 3D view
   /// shows the old body until it is done.
   bool bodyFitting();
+
+  /// The imported body's arrangement points as seen in 3D view `view`:
+  /// where each one is drawn (device pixels) and whether the check flags
+  /// it. Empty with the built-in body, or before the view is drawn.
+  List<BodyPointView> bodyPoints({required int view});
 
   /// Stop the long step running, if it can stop (a template drafted in
   /// every size, a size range set): it then fails with `cancelled` and
@@ -169,6 +174,14 @@ abstract class Engine implements RustOpaqueInterface {
   /// tightest value on the cloth now, with its piece.
   FitLegend? fitLegend();
 
+  /// Drape on a body the user chose (anywhere; OBJ, glTF or GLB): copied
+  /// into the project's `avatars/` folder, read, its units, up axis and
+  /// facing detected, its arrangement points guessed (`avatar.import`,
+  /// one undo step). Returns that action's JSON result: `body` (the
+  /// measurements taken) and `check` (as `avatar.check`). Off the UI
+  /// thread (a large scan takes a while to read and prepare).
+  Future<String> importBody({required String path});
+
   /// Import the pieces of a pattern from a file the user chose
   /// (anywhere; DXF, SVG or PDF): the file is copied into the project's
   /// `imports/` folder, then read, as one undo step. `units` (`mm`, `cm`,
@@ -185,6 +198,17 @@ abstract class Engine implements RustOpaqueInterface {
   /// (garment, sizes, width_mm…). Returns its JSON result with the
   /// pieces' outlines. Off the UI thread: many sizes take a while.
   Future<String> marker({required String specJson});
+
+  /// Move the imported body's arrangement point `name` (`left_elbow`…)
+  /// under pixel (`x`, `y`) of 3D view `view`, in the plane facing the
+  /// camera through where it is (`avatar.set_point`; a drag is one undo
+  /// step once [`Engine::release`] ends it).
+  void moveBodyPoint({
+    required int view,
+    required String name,
+    required double x,
+    required double y,
+  });
 
   /// Open the project folder at `path`, creating it if it does not exist.
   static Engine open({required String path}) =>
@@ -498,6 +522,40 @@ class BoardPick {
           id == other.id &&
           panel == other.panel &&
           points == other.points;
+}
+
+/// An arrangement point of the imported body as drawn in a 3D view.
+class BodyPointView {
+  /// `chest`, `left_elbow`…
+  final String name;
+
+  /// Device pixels in the view.
+  final double x;
+  final double y;
+
+  /// The check flags it (outside the body, or on the wrong side).
+  final bool flagged;
+
+  const BodyPointView({
+    required this.name,
+    required this.x,
+    required this.y,
+    required this.flagged,
+  });
+
+  @override
+  int get hashCode =>
+      name.hashCode ^ x.hashCode ^ y.hashCode ^ flagged.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BodyPointView &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          x == other.x &&
+          y == other.y &&
+          flagged == other.flagged;
 }
 
 /// Where the 3D view looks at the body from.

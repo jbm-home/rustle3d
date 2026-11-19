@@ -74,6 +74,8 @@ class RustView extends StatefulWidget {
     this.holding = true,
     this.pattern,
     this.overlay,
+    this.bodyPoints = false,
+    this.onBodyPoint,
   });
 
   final Engine engine;
@@ -109,6 +111,13 @@ class RustView extends StatefulWidget {
 
   /// Drawn over the board every frame.
   final BoardOverlay? overlay;
+
+  /// The imported body's arrangement points are drawn over the 3D view;
+  /// dragging one moves it (in the plane facing the camera).
+  final bool bodyPoints;
+
+  /// Called after an arrangement point was moved.
+  final VoidCallback? onBodyPoint;
 
   @override
   State<RustView> createState() => _RustViewState();
@@ -160,6 +169,38 @@ class _RustViewState extends State<RustView>
 
   /// Ticks every frame, to repaint the overlay.
   final _frames = ValueNotifier<int>(0);
+
+  /// The arrangement point being dragged, and where to (local).
+  String? _pointHeld;
+  Offset _pointAt = Offset.zero;
+
+  /// The arrangement points as drawn now (local positions).
+  List<(BodyPointView, Offset)> _bodyPoints() {
+    final view = _viewId;
+    if (!widget.bodyPoints || view == null) return const [];
+    try {
+      return [
+        for (final p in widget.engine.bodyPoints(view: view))
+          (p, Offset(p.x / _ratio, p.y / _ratio)),
+      ];
+    } on ApiError {
+      return const [];
+    }
+  }
+
+  /// The arrangement point within a few pixels of `local`, if any.
+  String? _pointNear(Offset local) {
+    String? best;
+    var nearest = 12.0;
+    for (final (p, at) in _bodyPoints()) {
+      final d = (at - local).distance;
+      if (d < nearest) {
+        nearest = d;
+        best = p.name;
+      }
+    }
+    return best;
+  }
 
   /// The pattern point (mm) under a local position of a board.
   Offset? _toPattern(Offset local) {
@@ -273,7 +314,7 @@ class _RustViewState extends State<RustView>
   void _renderFrame() {
     final view = _viewId;
     if (view == null) return;
-    if (widget.overlay != null) _frames.value++;
+    if (widget.overlay != null || widget.bodyPoints) _frames.value++;
     if (!_shared) {
       if (!_reading) _readBack(view);
       return;
@@ -356,6 +397,13 @@ class _RustViewState extends State<RustView>
           onPointerDown: (e) {
             _downAt = e.localPosition;
             _dragged = false;
+            if (_pointNear(e.localPosition) case final name?) {
+              setState(() {
+                _pointHeld = name;
+                _pointAt = e.localPosition;
+              });
+              return;
+            }
             final press = widget.pattern?.onPress;
             if (press != null) {
               final mm = _toPattern(e.localPosition);
@@ -407,6 +455,10 @@ class _RustViewState extends State<RustView>
           onPointerMove: (e) {
             final view = _viewId;
             if (view == null) return;
+            if (_pointHeld != null) {
+              setState(() => _pointAt = e.localPosition);
+              return;
+            }
             if ((e.localPosition - _downAt).distance > 3) _dragged = true;
             if (_patternHeld) {
               if (_toPattern(e.localPosition) case final mm?) {
@@ -445,6 +497,31 @@ class _RustViewState extends State<RustView>
             );
           },
           onPointerUp: (e) {
+            if (_pointHeld case final name?) {
+              setState(() => _pointHeld = null);
+              final view = _viewId;
+              if (view == null || (e.localPosition - _downAt).distance < 3) {
+                return;
+              }
+              try {
+                widget.engine.moveBodyPoint(
+                  view: view,
+                  name: name,
+                  x: e.localPosition.dx * _ratio,
+                  y: e.localPosition.dy * _ratio,
+                );
+                widget.engine.release();
+                widget.onBodyPoint?.call();
+              } on ApiError catch (error) {
+                ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                  SnackBar(
+                    content: Text(context.error(error)),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+              return;
+            }
             if (_patternHeld) {
               _patternHeld = false;
               widget.pattern?.onRelease?.call();
@@ -573,6 +650,21 @@ class _RustViewState extends State<RustView>
                     ),
                   ),
                 ),
+              if (widget.bodyPoints)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: CustomPaint(
+                      painter: _PointsPainter(
+                        _bodyPoints,
+                        held: _pointHeld,
+                        heldAt: _pointAt,
+                        color: Tokens.of(context).accent,
+                        flagged: Tokens.of(context).danger,
+                        frames: _frames,
+                      ),
+                    ),
+                  ),
+                ),
               if (_change case final change?)
                 Positioned(
                   left: _labelAt.dx + 14,
@@ -658,6 +750,45 @@ class _StrokePainter extends CustomPainter {
 }
 
 /// A board overlay, repainted every frame (the board may pan or zoom).
+/// The imported body's arrangement points over the 3D view: a dot each
+/// (flagged ones in the warning colour), the one dragged at the pointer.
+class _PointsPainter extends CustomPainter {
+  _PointsPainter(
+    this.points, {
+    required this.held,
+    required this.heldAt,
+    required this.color,
+    required this.flagged,
+    required Listenable frames,
+  }) : super(repaint: frames);
+
+  final List<(BodyPointView, Offset)> Function() points;
+  final String? held;
+  final Offset heldAt;
+  final Color color;
+  final Color flagged;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final ring = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..color = const Color(0xFFFFFFFF);
+    for (final (p, at) in points()) {
+      final centre = p.name == held ? heldAt : at;
+      canvas.drawCircle(
+        centre,
+        6,
+        Paint()..color = p.flagged ? flagged : color,
+      );
+      canvas.drawCircle(centre, 6, ring);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PointsPainter old) => true;
+}
+
 class _OverlayPainter extends CustomPainter {
   _OverlayPainter(this.overlay, this.toScreen, Listenable frames)
     : super(repaint: frames);
