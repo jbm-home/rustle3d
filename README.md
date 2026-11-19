@@ -194,7 +194,7 @@ Type `make` alone to list them; this list comes from the `Makefile`.
 | `make build-release` | `cargo xtask build --release` | the same, release |
 | `make test` | `cargo test --workspace` | the Rust tests |
 | `make check` | `./scripts/check.sh` | everything CI checks; run it before every commit |
-| `make release` | `./scripts/release.sh` | a packaged, unsigned release in `dist/` |
+| `make release` | `./scripts/release.sh` | a packaged, unsigned release in `dist/`: a universal `.dmg` on macOS, an installer on Windows (needs Inno Setup 6), a `.tar.gz` on Linux |
 | `make docs` | `cargo xtask gen-docs` | regenerates `docs/commands.md` |
 | `make version` | `cargo xtask version` | sets the version to today's date (see below) |
 

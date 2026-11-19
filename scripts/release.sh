@@ -1,56 +1,104 @@
 #!/usr/bin/env bash
 # Build the desktop app and the CLI in release mode for this machine's OS
 # and package them in dist/ (unsigned):
-#   macOS   dist/Rustle3D-<version>-macos.zip        (Rustle3D.app + r3d)
-#   Linux   dist/Rustle3D-<version>-linux-x64.tar.gz (app bundle + r3d)
-#   Windows dist/Rustle3D-<version>-windows-x64.zip  (app folder + r3d.exe; Git Bash)
+#   macOS   dist/Rustle3D-<version>-macos-universal.dmg   (Intel and Apple
+#           silicon; Rustle3D.app with r3d in Contents/MacOS, to drag to
+#           Applications)
+#   Windows dist/Rustle3D-<version>-windows-x64-setup.exe (installer, Inno
+#           Setup; app folder + r3d.exe; Git Bash)
+#   Linux   dist/Rustle3D-<version>-linux-x64.tar.gz      (app bundle + r3d)
 # Each package also holds what the GPL and the dependencies' licences ask
 # for: LICENSE, THIRD_PARTY_NOTICES.md, the licences of the Rust crates
 # (LICENSES-rust.html, by cargo-about) and of the Flutter packages
-# (LICENSES-flutter.txt), and README.txt with the source code's address.
+# (LICENSES-flutter.txt), and README.txt with the source code's address
+# (inside Rustle3D.app/Contents/Resources on macOS).
 # Needs Rust, Flutter, cargo-about (cargo install cargo-about --locked
-# --features cli), Python 3 and the platform toolchain (see README "Building").
+# --features cli), Python 3 and the platform toolchain (see README
+# "Building"); on macOS the x86_64 and aarch64 Rust targets (added with
+# rustup when missing); on Windows Inno Setup 6 (ISCC on PATH or in its
+# default folder).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 version="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)"
 command -v cargo-about >/dev/null || { echo "cargo-about is missing (cargo install cargo-about --locked --features cli)" >&2; exit 1; }
 python="$(command -v python3 || command -v python || true)"
 [ -n "$python" ] || { echo "Python 3 is missing" >&2; exit 1; }
+os="$(uname -s)"
+case "$os" in
+  MINGW*|MSYS*|CYGWIN*)
+    iscc="$(command -v iscc || true)"
+    for candidate in "/c/Program Files (x86)/Inno Setup 6/ISCC.exe" "/c/Program Files/Inno Setup 6/ISCC.exe" \
+      "$(cygpath -u "${LOCALAPPDATA:-C:/}")/Programs/Inno Setup 6/ISCC.exe"; do
+      if [ -z "$iscc" ] && [ -f "$candidate" ]; then iscc="$candidate"; fi
+    done
+    [ -n "$iscc" ] || { echo "Inno Setup 6 is missing (winget install JRSoftware.InnoSetup)" >&2; exit 1; }
+    ;;
+esac
 mkdir -p dist
-cargo build --release -p r3d-cli
-stage="$(mktemp -d)/Rustle3D-$version"
-mkdir -p "$stage"
+work="$(mktemp -d)"
+stage="$work/Rustle3D-$version"
+legal="$work/legal"
+mkdir -p "$stage" "$legal"
 
-case "$(uname -s)" in
+# The command-line tool; universal (x86_64 + arm64) on macOS.
+case "$os" in
   Darwin)
+    rustup target add aarch64-apple-darwin x86_64-apple-darwin
+    cargo build --release -p r3d-cli --target aarch64-apple-darwin
+    cargo build --release -p r3d-cli --target x86_64-apple-darwin
+    r3d="$work/r3d"
+    lipo -create -output "$r3d" target/aarch64-apple-darwin/release/r3d target/x86_64-apple-darwin/release/r3d
+    ;;
+  MINGW*|MSYS*|CYGWIN*)
+    cargo build --release -p r3d-cli
+    r3d=target/release/r3d.exe
+    ;;
+  *)
+    cargo build --release -p r3d-cli
+    r3d=target/release/r3d
+    ;;
+esac
+
+# The app.
+case "$os" in
+  Darwin)
+    # A release build has both architectures (Xcode's ARCHS; cargokit builds
+    # the Rust core for each): check every binary has them.
     (cd app && flutter build macos --release)
-    cp -R app/build/macos/Build/Products/Release/Rustle3D.app "$stage/"
-    cp target/release/r3d "$stage/"
+    built=app/build/macos/Build/Products/Release
+    while IFS= read -r -d '' f; do
+      if file -b "$f" | grep -q Mach-O; then
+        archs="$(lipo -archs "$f")"
+        case " $archs " in
+          *" x86_64 "*" arm64 "*|*" arm64 "*" x86_64 "*) ;;
+          *) echo "$f is not universal ($archs)" >&2; exit 1 ;;
+        esac
+      fi
+    done < <(find "$built/Rustle3D.app" -type f -print0)
     ;;
   Linux)
     (cd app && flutter build linux --release)
-    cp -R app/build/linux/x64/release/bundle/. "$stage/"
-    cp target/release/r3d "$stage/"
-    ;;
-  MINGW*|MSYS*|CYGWIN*)
-    (cd app && flutter build windows --release)
-    cp -R app/build/windows/x64/runner/Release/. "$stage/"
-    cp target/release/r3d.exe "$stage/"
+    built=app/build/linux/x64/release/bundle
     ;;
   *)
-    echo "unsupported OS: $(uname -s)" >&2
-    exit 1
+    (cd app && flutter build windows --release)
+    built=app/build/windows/x64/runner/Release
     ;;
 esac
 
 # Licences and source code.
-cp LICENSE THIRD_PARTY_NOTICES.md "$stage/"
-cargo about generate about.hbs -o "$stage/LICENSES-rust.html"
-notices="$(find "$stage" -name NOTICES.Z | head -n 1)"
+cp LICENSE THIRD_PARTY_NOTICES.md "$legal/"
+cargo about generate about.hbs -o "$legal/LICENSES-rust.html"
+notices="$(find "$built" -name NOTICES.Z | head -n 1)"
 [ -n "$notices" ] || { echo "Flutter's NOTICES.Z not found in the build" >&2; exit 1; }
 "$python" -c 'import sys, zlib; sys.stdout.buffer.write(zlib.decompress(open(sys.argv[1], "rb").read(), 47))' \
-  "$notices" > "$stage/LICENSES-flutter.txt"
-cat > "$stage/README.txt" <<EOF
+  "$notices" > "$legal/LICENSES-flutter.txt"
+case "$os" in
+  Darwin) cli_where="It is inside the app: /Applications/Rustle3D.app/Contents/MacOS/r3d" ;;
+  Linux) cli_where="It is in this folder" ;;
+  *) cli_where="It is in the folder where Rustle3D is installed" ;;
+esac
+cat > "$legal/README.txt" <<EOF
 Rustle3D $version - 3D garment design: draft patterns, sew, drape.
 https://rustle3d.com
 
@@ -62,26 +110,45 @@ Code and assets from other projects: THIRD_PARTY_NOTICES.md.
 Licences of the libraries it is built with: LICENSES-rust.html (Rust
 crates) and LICENSES-flutter.txt (Flutter and its packages).
 
-r3d is the command-line tool (r3d --help). The packages are not signed
-yet: the first launch needs one extra step, explained in the user guide,
-https://rustle3d.com/en/guide/ (Installing).
+r3d is the command-line tool (r3d --help). $cli_where.
+
+The packages are not signed yet: the first launch needs one extra step,
+explained in the user guide, https://rustle3d.com/en/guide/ (Installing).
 EOF
 
-case "$(uname -s)" in
+case "$os" in
   Darwin)
-    out="dist/Rustle3D-$version-macos.zip"
+    # Rustle3D.app with r3d and the licences inside, signed again ad hoc
+    # (adding files breaks the seal Xcode made; Apple silicon refuses to run
+    # unsigned code), and a link to Applications to drag it onto.
+    app="$stage/Rustle3D.app"
+    cp -R "$built/Rustle3D.app" "$app"
+    cp "$r3d" "$app/Contents/MacOS/r3d"
+    cp "$legal"/* "$app/Contents/Resources/"
+    codesign --force --sign - "$app/Contents/MacOS/r3d"
+    codesign --force --sign - --preserve-metadata=entitlements,requirements,flags,runtime "$app"
+    codesign --verify --deep --strict "$app"
+    cp "$legal/README.txt" "$stage/"
+    ln -s /Applications "$stage/Applications"
+    out="dist/Rustle3D-$version-macos-universal.dmg"
     rm -f "$out"
-    ditto -c -k --keepParent "$stage" "$out"
+    hdiutil create -volname "Rustle3D $version" -srcfolder "$stage" -fs HFS+ -format UDZO -ov "$out"
     ;;
   Linux)
+    cp -R "$built/." "$stage/"
+    cp "$r3d" "$legal"/* "$stage/"
     out="dist/Rustle3D-$version-linux-x64.tar.gz"
-    tar -C "$(dirname "$stage")" -czf "$out" "$(basename "$stage")"
+    tar -C "$work" -czf "$out" "$(basename "$stage")"
     ;;
   *)
-    out="dist/Rustle3D-$version-windows-x64.zip"
+    cp -R "$built/." "$stage/"
+    cp "$r3d" "$legal"/* "$stage/"
+    name="Rustle3D-$version-windows-x64-setup"
+    out="dist/$name.exe"
     rm -f "$out"
-    (cd "$(dirname "$stage")" && powershell -NoProfile -Command \
-      "Compress-Archive -Path '$(basename "$stage")' -DestinationPath '$(cygpath -w "$OLDPWD/$out")'")
+    # No MSYS path conversion: it would take ISCC's /Q and /D options for paths.
+    MSYS2_ARG_CONV_EXCL='*' "$iscc" /Q "/DAppVersion=$version" "/DSourceDir=$(cygpath -w "$stage")" \
+      "/DOutputDir=$(cygpath -w "$PWD/dist")" "/DOutputName=$name" "$(cygpath -w packaging/windows/rustle3d.iss)"
     ;;
 esac
 echo "$out"
