@@ -43,7 +43,7 @@ can be tested through MCP as soon as they exist.
 | M30 | Production: marker, yardage, tech pack, projector ✅ | 3–4 wk | A graded shirt nested on a 150 cm fabric, its yardage and cost, its tech pack PDF |
 | M24 | Fit maps and virtual tape measure ✅ | 2 wk | Tight spots show in colour; the ease at the chest is read on the drape |
 | M20 | Trims: buttons and zippers | 2–3 wk | A shirt that buttons and trousers with a fly zipper, draped closed |
-| M21 | Textures and prints | 2–3 wk | A striped shirt whose stripes follow the grainline on every piece |
+| M21 | Textures and prints ✅ | 2–3 wk | A striped shirt whose stripes follow the grainline on every piece |
 | M31 | Imported avatars | 2–3 wk | A body scan in OBJ/glTF is checked, the pieces placed around it and draped |
 | M15 | Game-ready export | 3–4 wk | LODs + baked wrinkle normal maps + skinning, imported in Godot/Unity/Unreal |
 
@@ -75,7 +75,8 @@ shipping with the body we already use (CC0) and the motions being our
 own. M30 followed on 2026-11-18–19, before M20 and M21, for the same
 reason: production needs no new physics or assets. M24 came next
 (2026-11-19), also before M20 and M21: it reads the drape we already
-have.
+have. M21 followed the same night (2026-11-19): prints need no new
+physics either, and every later render and export shows them.
 
 ---
 
@@ -501,11 +502,38 @@ Plan as written:
 - Buttons and buttonholes, zippers, placed on the pattern and simulated
   as closures; open and close them in 3D.
 
-## M21 — Textures and prints
+## M21 — Textures and prints ✅ (2026-11-19)
 - UVs from the pattern pieces, aligned with the grainline.
 - Users add their own textures (prints, weaves) and the app offers a
   default set; they show in the 3D view, the photo renderer and the
   exports.
+- **Demo**: `./demos/m21/demo.sh`: a navy-striped shirt (2 cm repeat)
+  whose stripes run along every piece's grainline, draped, rendered to
+  PNG (board, 3D view, photo), exported to glTF (validated) and OBJ with
+  its MTL and image; then a check image of its own, 30 cm wide, turned
+  45° on one front.
+- Delivered (spec 25): schema v16, a garment's print (built-in
+  `stripes`, `gingham`, `dots`, `twill` drawn by our code in the
+  garment's colour, or a PNG/JPEG copied into the project's `textures/`
+  folder), its repeat (mm) and angle; a piece's shift and turn of it.
+  Texture coordinates computed from the pattern in the print's frame
+  turned to each piece's grainline (`Project::print_frame`), so the
+  print has its real size on every piece and in every size. Commands
+  `garment.set_print`, `garment.remove_print`,
+  `panel.set_print_placement`; `r3d texture FILE|builtin`. Shown in the
+  3D view (mip-mapped, sheen tinted by the print's average), the board
+  (pieces filled with their print), photos (albedo read from the print
+  in the tracer, the denoiser guided by it), glTF (image embedded,
+  repeating sampler; Khronos validator clean) and OBJ (MTL with
+  `map_Kd`, images beside it). App: Print in the garment's card (none,
+  the four built-ins as swatches, your image), repeat width and angle,
+  a preview tile; Print on this piece (shift, turn) with a piece
+  selected. JPEG decoding with `zune-jpeg` (MIT/Apache-2.0/Zlib).
+- Open: placing pieces on the print by dragging them over it, stripe and
+  check matching in the marker (pieces are nested as on a plain
+  fabric), weave relief (normal and roughness maps), transparency, a
+  different print on the inside of the cloth, a user library of prints
+  shared across projects.
 
 ## M22 — Grading and sizes ✅ (2026-11-18)
 Done ahead of M20–M21 (maintainer, 2026-11-17), with the range up to 52

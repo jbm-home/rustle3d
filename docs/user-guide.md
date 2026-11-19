@@ -7,7 +7,8 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-19 (M24, fit maps and the tape measure; M30,
+Last updated: 2026-11-19 (M21, prints: stripes, gingham, dots, twill and
+your own images on the fabric; M24, fit maps and the tape measure; M30,
 the tech pack, the projector, a
 garment's notes; fabric as bought, area and mass of the
 pieces, the marker with its length and cost; M23, the avatar walks, turns and raises its arms;
@@ -294,6 +295,21 @@ garment's totals: how many pieces, the fabric they take once cut (with
 their seam allowances) and what they weigh. With a piece selected, its
 area, perimeter, cut area and mass are in the inspector.
 
+Under the fabric, **Print** puts a print on the garment: none, one of
+four built-in prints drawn in the garment's colour (**Stripes**,
+**Gingham**, **Dots**, **Twill**), or **your own image** (a PNG or JPEG
+photo or scan of a fabric; it is copied into the project's `textures`
+folder). The print lies along each piece's grainline at its real size,
+like a fabric laid out for cutting: stripes run down the fronts, the
+back and along the sleeves, wherever each piece's grainline points. Set
+the **Repeat width** (cm, how wide one tile of the print is on the
+fabric; the height follows the image) and its **Angle to the grain**
+(turn it 45° for a bias effect). The print shows in the 3D view, on the
+pattern pieces, in photos and in the 3D exports. With a piece selected,
+**Print on this piece** shifts it across or up and turns it on that
+piece only: to centre a motif on a front, or to match stripes across a
+seam.
+
 Under them, **Notes** takes free text for whoever sews or produces the
 garment (interfacing, pressing, topstitching, labels). It is saved when
 you leave the field and printed in the tech pack.
@@ -423,7 +439,9 @@ true colour under neutral light.
   each piece with its cutting and sewing lines, notches, grainline,
   internal lines and name.
 - **Garment, GLB** (glTF) or **OBJ**, with or without the body, as the 3D
-  view shows it, for Blender, game engines and other 3D tools.
+  view shows it, for Blender, game engines and other 3D tools. A print
+  goes with it: inside the GLB file, or for OBJ as a material file
+  (`.mtl`) and the print's image saved next to the OBJ.
 
 Every pattern export shows the cutting line, the sewing line (dashed,
 when the piece has a seam allowance), notches, internal lines, the
@@ -558,6 +576,8 @@ folders with plain JSON files, so they work with version control.
 Renaming a project also renames its folder, when no other project has
 that name. A project exported as .zip holds its folder (pattern, body,
 exports), without the cache the app rebuilds by itself.
+Print images you add are kept in the project's `textures` folder;
+replacing a file there (same name) changes the print.
 Patterns come in from DXF, SVG and PDF and go out as SVG, PDF and
 DXF-AAMA; garments go out as glTF and OBJ; the marker as SVG or PDF and
 the tech pack as PDF: open formats only.
@@ -597,8 +617,11 @@ the tech pack as PDF: open formats only.
   drapes with folds at the sides in the largest sizes (from about 48).
   A template's pieces graded after they were laid out keep their place
   on the board: the largest sizes of neighbouring pieces can touch.
-- Photos: the fabric has no visible weave or print yet, and the cloth
-  is a single thin layer (no thickness at the hem). Your own studio
+- Prints colour the fabric only: no relief of the weave yet, and the
+  same print shows on both sides of the cloth. Transparent parts of an
+  image are shown as they are, not see-through. The marker does not
+  match stripes or checks between pieces yet.
+- Photos: the cloth is a single thin layer (no thickness at the hem). Your own studio
   lighting (an HDRI image) cannot be loaded yet.
 - Import: a PDF whose pages each hold a different part of the pattern
   (rather than the same drawing shifted) cannot be put back together;

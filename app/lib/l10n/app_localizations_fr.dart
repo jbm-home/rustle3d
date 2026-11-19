@@ -2481,4 +2481,64 @@ class LFr extends L {
   @override
   String get tapeOpen =>
       'Le vêtement ne fait pas le tour ici : pas d\'aisance.';
+
+  @override
+  String get printTitle => 'Imprimé';
+
+  @override
+  String get printHint =>
+      'Suit le droit-fil de chaque pièce, à sa taille réelle.';
+
+  @override
+  String get printNone => 'Sans imprimé';
+
+  @override
+  String get printStripes => 'Rayures';
+
+  @override
+  String get printGingham => 'Vichy';
+
+  @override
+  String get printDots => 'Pois';
+
+  @override
+  String get printTwill => 'Sergé';
+
+  @override
+  String get printImage => 'Votre image (PNG, JPEG)…';
+
+  @override
+  String get printImages => 'Images';
+
+  @override
+  String get printMissing =>
+      'L\'image est illisible : la couleur unie est affichée.';
+
+  @override
+  String get printWidth => 'Largeur du motif';
+
+  @override
+  String get printAngle => 'Angle au droit-fil';
+
+  @override
+  String get piecePrint => 'Imprimé sur cette pièce';
+
+  @override
+  String get piecePrintAcross => 'Décalage en largeur';
+
+  @override
+  String get piecePrintUp => 'Décalage en hauteur';
+
+  @override
+  String get piecePrintTurn => 'Rotation';
+
+  @override
+  String get errTextureFormat => 'Ce fichier n\'est pas une image PNG ou JPEG.';
+
+  @override
+  String get errTextureBad => 'Cette image est illisible.';
+
+  @override
+  String get errTextureTooLarge =>
+      'Cette image est trop grande (16384 pixels de côté au plus).';
 }

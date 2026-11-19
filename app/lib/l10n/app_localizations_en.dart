@@ -2458,4 +2458,64 @@ class LEn extends L {
 
   @override
   String get tapeOpen => 'The garment does not go all round here: no ease.';
+
+  @override
+  String get printTitle => 'Print';
+
+  @override
+  String get printHint =>
+      'Lies along each piece\'s grainline, at its real size.';
+
+  @override
+  String get printNone => 'No print';
+
+  @override
+  String get printStripes => 'Stripes';
+
+  @override
+  String get printGingham => 'Gingham';
+
+  @override
+  String get printDots => 'Dots';
+
+  @override
+  String get printTwill => 'Twill';
+
+  @override
+  String get printImage => 'Your image (PNG, JPEG)…';
+
+  @override
+  String get printImages => 'Images';
+
+  @override
+  String get printMissing =>
+      'The image cannot be read: the plain colour is shown.';
+
+  @override
+  String get printWidth => 'Repeat width';
+
+  @override
+  String get printAngle => 'Angle to the grain';
+
+  @override
+  String get piecePrint => 'Print on this piece';
+
+  @override
+  String get piecePrintAcross => 'Shift across';
+
+  @override
+  String get piecePrintUp => 'Shift up';
+
+  @override
+  String get piecePrintTurn => 'Turn';
+
+  @override
+  String get errTextureFormat => 'This file is not a PNG or JPEG image.';
+
+  @override
+  String get errTextureBad => 'This image cannot be read.';
+
+  @override
+  String get errTextureTooLarge =>
+      'This image is too large (16384 pixels a side at most).';
 }

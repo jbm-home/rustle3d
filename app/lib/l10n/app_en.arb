@@ -1193,5 +1193,24 @@
         "type": "String"
       }
     }
-  }
+  },
+  "printTitle": "Print",
+  "printHint": "Lies along each piece's grainline, at its real size.",
+  "printNone": "No print",
+  "printStripes": "Stripes",
+  "printGingham": "Gingham",
+  "printDots": "Dots",
+  "printTwill": "Twill",
+  "printImage": "Your image (PNG, JPEG)…",
+  "printImages": "Images",
+  "printMissing": "The image cannot be read: the plain colour is shown.",
+  "printWidth": "Repeat width",
+  "printAngle": "Angle to the grain",
+  "piecePrint": "Print on this piece",
+  "piecePrintAcross": "Shift across",
+  "piecePrintUp": "Shift up",
+  "piecePrintTurn": "Turn",
+  "errTextureFormat": "This file is not a PNG or JPEG image.",
+  "errTextureBad": "This image cannot be read.",
+  "errTextureTooLarge": "This image is too large (16384 pixels a side at most)."
 }

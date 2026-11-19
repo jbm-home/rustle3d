@@ -4218,6 +4218,120 @@ abstract class L {
   /// In en, this message translates to:
   /// **'The garment does not go all round here: no ease.'**
   String get tapeOpen;
+
+  /// No description provided for @printTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Print'**
+  String get printTitle;
+
+  /// No description provided for @printHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Lies along each piece\'s grainline, at its real size.'**
+  String get printHint;
+
+  /// No description provided for @printNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No print'**
+  String get printNone;
+
+  /// No description provided for @printStripes.
+  ///
+  /// In en, this message translates to:
+  /// **'Stripes'**
+  String get printStripes;
+
+  /// No description provided for @printGingham.
+  ///
+  /// In en, this message translates to:
+  /// **'Gingham'**
+  String get printGingham;
+
+  /// No description provided for @printDots.
+  ///
+  /// In en, this message translates to:
+  /// **'Dots'**
+  String get printDots;
+
+  /// No description provided for @printTwill.
+  ///
+  /// In en, this message translates to:
+  /// **'Twill'**
+  String get printTwill;
+
+  /// No description provided for @printImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your image (PNG, JPEG)…'**
+  String get printImage;
+
+  /// No description provided for @printImages.
+  ///
+  /// In en, this message translates to:
+  /// **'Images'**
+  String get printImages;
+
+  /// No description provided for @printMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'The image cannot be read: the plain colour is shown.'**
+  String get printMissing;
+
+  /// No description provided for @printWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat width'**
+  String get printWidth;
+
+  /// No description provided for @printAngle.
+  ///
+  /// In en, this message translates to:
+  /// **'Angle to the grain'**
+  String get printAngle;
+
+  /// No description provided for @piecePrint.
+  ///
+  /// In en, this message translates to:
+  /// **'Print on this piece'**
+  String get piecePrint;
+
+  /// No description provided for @piecePrintAcross.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift across'**
+  String get piecePrintAcross;
+
+  /// No description provided for @piecePrintUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift up'**
+  String get piecePrintUp;
+
+  /// No description provided for @piecePrintTurn.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn'**
+  String get piecePrintTurn;
+
+  /// No description provided for @errTextureFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'This file is not a PNG or JPEG image.'**
+  String get errTextureFormat;
+
+  /// No description provided for @errTextureBad.
+  ///
+  /// In en, this message translates to:
+  /// **'This image cannot be read.'**
+  String get errTextureBad;
+
+  /// No description provided for @errTextureTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'This image is too large (16384 pixels a side at most).'**
+  String get errTextureTooLarge;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

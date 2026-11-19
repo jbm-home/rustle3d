@@ -2283,6 +2283,7 @@ class _ShellState extends State<Shell> {
                         width: 264,
                         child: _Inspector(
                           key: _spotInspector,
+                          engine: widget.engine,
                           selection: _selection,
                           points: _points,
                           edges: _edges,
@@ -3330,6 +3331,7 @@ class _ViewCard extends StatelessWidget {
 class _Inspector extends StatelessWidget {
   const _Inspector({
     super.key,
+    required this.engine,
     required this.selection,
     required this.points,
     required this.edges,
@@ -3349,6 +3351,8 @@ class _Inspector extends StatelessWidget {
     required this.onDelete,
   });
 
+  /// For the prints' previews and images.
+  final Engine engine;
   final List<String> selection;
   final List<PickedPoint> points;
 
@@ -3398,6 +3402,7 @@ class _Inspector extends StatelessWidget {
           key: ValueKey(selection.join(',')),
           child: switch (selection.length) {
             0 => _EmptyInspector(
+              engine: engine,
               summary: summary,
               indicators: indicators,
               run: run,
@@ -3442,6 +3447,7 @@ class _Inspector extends StatelessWidget {
 
 class _EmptyInspector extends StatelessWidget {
   const _EmptyInspector({
+    required this.engine,
     required this.summary,
     required this.indicators,
     required this.run,
@@ -3453,6 +3459,7 @@ class _EmptyInspector extends StatelessWidget {
     required this.onUnpin,
   });
 
+  final Engine engine;
   final Map<String, dynamic> summary;
 
   /// `production.indicators`' garments: fabric details and totals.
@@ -3507,6 +3514,7 @@ class _EmptyInspector extends StatelessWidget {
         Divider(color: p.border, height: 1),
         const SizedBox(height: Space.l),
         _GarmentList(
+          engine: engine,
           garments: (summary['garments'] as List<dynamic>?) ?? const [],
           indicators: indicators,
           run: run,
@@ -3820,6 +3828,12 @@ class _PanelInspector extends StatelessWidget {
             'angle_deg': v.roundToDouble(),
           }),
         ),
+        if (garments.any(
+          (g) => g['id'] == panel['garment'] && g['print'] != null,
+        )) ...[
+          const SizedBox(height: Space.xl),
+          _PiecePrint(panel: panel, run: run),
+        ],
         if (garments.length > 1) ...[
           const SizedBox(height: Space.xl),
           DropdownButtonFormField<String>(
@@ -4458,10 +4472,13 @@ class _SimControls extends StatelessWidget {
 /// layer, and a way to delete it; and a way to add one.
 class _GarmentList extends StatelessWidget {
   const _GarmentList({
+    required this.engine,
     required this.garments,
     required this.indicators,
     required this.run,
   });
+
+  final Engine engine;
 
   /// As `project.summary` lists them, next to the body first.
   final List<dynamic> garments;
@@ -4492,6 +4509,7 @@ class _GarmentList extends StatelessWidget {
         for (final (i, g) in garments.indexed) ...[
           const SizedBox(height: Space.m),
           _GarmentCard(
+            engine: engine,
             garment: g as Map<String, dynamic>,
             figures: indicators.where((f) => f['id'] == g['id']).firstOrNull,
             layer: i,
@@ -4517,6 +4535,7 @@ class _GarmentList extends StatelessWidget {
 /// deleted, and its fabric.
 class _GarmentCard extends StatelessWidget {
   const _GarmentCard({
+    required this.engine,
     required this.garment,
     required this.figures,
     required this.layer,
@@ -4524,6 +4543,7 @@ class _GarmentCard extends StatelessWidget {
     required this.run,
   });
 
+  final Engine engine;
   final Map<String, dynamic> garment;
 
   /// Its `production.indicators` entry: fabric details and totals.
@@ -4605,6 +4625,8 @@ class _GarmentCard extends StatelessWidget {
               'fabric': fabric,
             }),
           ),
+          const SizedBox(height: Space.m),
+          _PrintPicker(engine: engine, garment: garment, run: run),
           if (figures case final f?) ...[
             const SizedBox(height: Space.m),
             _FabricDetails(garment: id, figures: f, run: run),
@@ -4869,6 +4891,337 @@ class _FabricDetailsState extends State<_FabricDetails> {
             style: ts(fontSize: 12, height: 1.4, color: p.textMuted),
           ),
         ],
+      ],
+    );
+  }
+}
+
+/// Previews of prints already drawn, by what they show (garment, print,
+/// colour), so rebuilding the inspector does not draw them again.
+final _printPreviews = <String, Uint8List?>{};
+
+/// The garment's print (spec 25): none, a built-in drawn in its colour,
+/// or an image the user adds; one repeat's size and the angle to the
+/// grainline.
+class _PrintPicker extends StatelessWidget {
+  const _PrintPicker({
+    required this.engine,
+    required this.garment,
+    required this.run,
+  });
+
+  final Engine engine;
+
+  /// As `project.summary` lists it.
+  final Map<String, dynamic> garment;
+  final ValueChanged<Map<String, Object?>> run;
+
+  static const builtins = ['stripes', 'gingham', 'dots', 'twill'];
+
+  static String _name(L l, String id) => switch (id) {
+    'stripes' => l.printStripes,
+    'gingham' => l.printGingham,
+    'dots' => l.printDots,
+    'twill' => l.printTwill,
+    _ => id,
+  };
+
+  String get _id => garment['id'] as String;
+  Map<String, dynamic>? get _print => garment['print'] as Map<String, dynamic>?;
+
+  /// One repeat of `builtin` in the garment's colour, or of its own
+  /// print; null when there is none or it cannot be read.
+  Uint8List? _preview(String? builtin) {
+    final key = [
+      _id,
+      builtin ?? jsonEncode(_print?['source']),
+      garment['color'],
+      garment['fabric'],
+    ].join('|');
+    if (_printPreviews.length > 64) _printPreviews.clear();
+    return _printPreviews.putIfAbsent(key, () {
+      try {
+        final png = engine.printPreview(garment: _id, builtin: builtin);
+        return png.isEmpty ? null : png;
+      } on ApiError {
+        return null;
+      }
+    });
+  }
+
+  /// Set the print: `source` (or the current one), keeping what is not
+  /// given.
+  void _set({
+    Map<String, Object?>? source,
+    double? width,
+    double? angle,
+    bool keepSize = true,
+  }) {
+    final now = _print;
+    run({
+      'type': 'garment.set_print',
+      'garment': _id,
+      'print': source ?? now?['source'],
+      if (width != null)
+        'width_mm': width
+      else if (keepSize && now?['width_mm'] != null)
+        'width_mm': now!['width_mm'],
+      if (keepSize && now?['height_mm'] != null && width == null)
+        'height_mm': now!['height_mm'],
+      'angle_deg': angle ?? (now?['angle_deg'] as num?)?.toDouble() ?? 0,
+    });
+  }
+
+  Future<void> _addImage(BuildContext context) async {
+    final l = context.l;
+    final messenger = ScaffoldMessenger.of(context);
+    final file = await openFile(
+      acceptedTypeGroups: [
+        XTypeGroup(
+          label: l.printImages,
+          extensions: const ['png', 'jpg', 'jpeg'],
+        ),
+      ],
+    );
+    if (file == null || !context.mounted) return;
+    try {
+      final path = await engine.adoptTexture(path: file.path);
+      _set(source: {'image': path}, keepSize: false);
+    } on ApiError catch (e) {
+      if (!context.mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(context.error(e)),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final l = context.l;
+    final print = _print;
+    final source = print?['source'] as Map<String, dynamic>?;
+    final current = source?['builtin'] as String?;
+    final image = source?['image'] as String?;
+    Widget swatch({
+      required String tip,
+      required bool on,
+      required VoidCallback onTap,
+      required Widget child,
+      Key? key,
+    }) => Tooltip(
+      message: tip,
+      child: InkWell(
+        key: key,
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: AnimatedContainer(
+          duration: Motion.fast,
+          width: 34,
+          height: 34,
+          padding: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: on ? p.accent : p.border,
+              width: on ? 2 : 1,
+            ),
+          ),
+          child: ClipOval(child: child),
+        ),
+      ),
+    );
+    final tile = print == null ? null : _preview(null);
+    final width = (print?['width_mm'] as num?)?.toDouble() ?? 20;
+    final angle = (print?['angle_deg'] as num?)?.toDouble() ?? 0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l.printTitle,
+          style: ts(fontSize: 13, fontWeight: FontWeight.w600, color: p.text),
+        ),
+        const SizedBox(height: Space.xs),
+        Text(l.printHint, style: ts(fontSize: 12, color: p.textMuted)),
+        const SizedBox(height: Space.s),
+        Wrap(
+          spacing: Space.s,
+          runSpacing: Space.s,
+          children: [
+            swatch(
+              key: const ValueKey('print-none'),
+              tip: l.printNone,
+              on: print == null,
+              onTap: () =>
+                  run({'type': 'garment.remove_print', 'garment': _id}),
+              child: Icon(Icons.block_rounded, size: 18, color: p.textMuted),
+            ),
+            for (final b in builtins)
+              swatch(
+                key: ValueKey('print-$b'),
+                tip: _name(l, b),
+                on: current == b,
+                onTap: () => _set(source: {'builtin': b}, keepSize: false),
+                child: switch (_preview(b)) {
+                  final png? => Image.memory(
+                    png,
+                    fit: BoxFit.cover,
+                    gaplessPlayback: true,
+                  ),
+                  null => const SizedBox.shrink(),
+                },
+              ),
+            swatch(
+              key: const ValueKey('print-image'),
+              tip: l.printImage,
+              on: image != null,
+              onTap: () => _addImage(context),
+              child: Icon(
+                Icons.add_photo_alternate_outlined,
+                size: 18,
+                color: p.textMuted,
+              ),
+            ),
+          ],
+        ),
+        if (print != null) ...[
+          const SizedBox(height: Space.m),
+          Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  border: Border.all(color: p.border),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: tile == null
+                    ? Icon(Icons.broken_image_outlined, color: p.textMuted)
+                    : Image.memory(
+                        tile,
+                        fit: BoxFit.cover,
+                        gaplessPlayback: true,
+                      ),
+              ),
+              const SizedBox(width: Space.s),
+              Expanded(
+                child: Text(
+                  tile == null
+                      ? l.printMissing
+                      : image?.split('/').last ?? _name(l, current ?? ''),
+                  style: ts(fontSize: 12, color: p.textMuted),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: Space.m),
+          _SliderRow(
+            label: l.printWidth,
+            fieldKey: const ValueKey('print-width'),
+            value: (width / 10).clamp(0.2, 50),
+            min: 0.2,
+            max: 50,
+            digits: 1,
+            typedMin: 0.1,
+            typedMax: 500,
+            unit: l.cm,
+            enabled: true,
+            onChanged: (v) => _set(width: v * 10),
+          ),
+          const SizedBox(height: Space.l),
+          _SliderRow(
+            label: l.printAngle,
+            value: angle.clamp(-90, 90),
+            min: -90,
+            max: 90,
+            typedMin: -180,
+            typedMax: 180,
+            unit: '°',
+            enabled: true,
+            onChanged: (v) => _set(angle: v.roundToDouble()),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// How the selected piece shifts and turns its garment's print, e.g. to
+/// centre a motif or match stripes across a seam.
+class _PiecePrint extends StatelessWidget {
+  const _PiecePrint({required this.panel, required this.run});
+
+  /// As `panel.get` returns it.
+  final Map<String, dynamic> panel;
+  final ValueChanged<Map<String, Object?>> run;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final l = context.l;
+    final print = panel['print'] as Map<String, dynamic>? ?? const {};
+    final offset = (print['offset_mm'] as List?) ?? const [0, 0];
+    final x = (offset[0] as num).toDouble();
+    final y = (offset[1] as num).toDouble();
+    final angle = (print['angle_deg'] as num?)?.toDouble() ?? 0;
+    void set({double? dx, double? dy, double? turn}) => run({
+      'type': 'panel.set_print_placement',
+      'panel': panel['id'],
+      'offset_mm': [dx ?? x, dy ?? y],
+      'angle_deg': turn ?? angle,
+    });
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l.piecePrint,
+          style: ts(fontSize: 13, fontWeight: FontWeight.w600, color: p.text),
+        ),
+        const SizedBox(height: Space.s),
+        _SliderRow(
+          label: l.piecePrintAcross,
+          value: (x / 10).clamp(-20, 20),
+          min: -20,
+          max: 20,
+          digits: 1,
+          typedMin: -500,
+          typedMax: 500,
+          unit: l.cm,
+          enabled: true,
+          onChanged: (v) => set(dx: v * 10),
+        ),
+        const SizedBox(height: Space.l),
+        _SliderRow(
+          label: l.piecePrintUp,
+          value: (y / 10).clamp(-20, 20),
+          min: -20,
+          max: 20,
+          digits: 1,
+          typedMin: -500,
+          typedMax: 500,
+          unit: l.cm,
+          enabled: true,
+          onChanged: (v) => set(dy: v * 10),
+        ),
+        const SizedBox(height: Space.l),
+        _SliderRow(
+          label: l.piecePrintTurn,
+          fieldKey: const ValueKey('piece-print-turn'),
+          value: angle.clamp(-90, 90),
+          min: -90,
+          max: 90,
+          typedMin: -180,
+          typedMax: 180,
+          unit: '°',
+          enabled: true,
+          onChanged: (v) => set(turn: v.roundToDouble()),
+        ),
       ],
     );
   }
