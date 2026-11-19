@@ -2,8 +2,22 @@
 
 Thanks for your interest! Rustle3D is licensed under the GNU General Public
 License, version 3 or (at your option) any later version (GPL-3.0-or-later,
-see `LICENSE`). By contributing, you agree that your contributions are
-licensed under the same terms.
+see `LICENSE`).
+
+## Contributor License Agreement
+
+Before your first pull request can be merged, you sign the
+[Contributor License Agreement](CLA.md), once, by posting the comment the
+CLA bot asks for. In short:
+
+- you keep the copyright on what you write;
+- you give the maintainer a broad licence to use your contributions,
+  including under other licences than the GPL (for example a commercial
+  licence), which helps fund the project;
+- in return, every version that includes your contribution stays
+  available as free software, with its source code (CLA §5);
+- you confirm the contribution is yours to give, including what an AI
+  assistant helped you write (you reviewed it and answer for it).
 
 ## Clean-room policy (please read first)
 

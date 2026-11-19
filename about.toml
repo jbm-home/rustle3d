@@ -1,0 +1,23 @@
+# cargo-about: the licences of the Rust crates built into the release
+# binaries (scripts/release.sh writes them to LICENSES-rust.html).
+accepted = [
+    "Apache-2.0",
+    "MIT",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "CDLA-Permissive-2.0",
+    "GPL-3.0-or-later",
+]
+ignore-build-dependencies = true
+ignore-dev-dependencies = true
+
+# No `license` field in its Cargo.toml; the crate ships the Apache-2.0 text.
+[allo-isolate.clarify]
+license = "Apache-2.0"
+[[allo-isolate.clarify.files]]
+path = "LICENSE"
+license = "Apache-2.0"
+checksum = "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"

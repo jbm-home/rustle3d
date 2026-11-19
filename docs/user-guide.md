@@ -7,7 +7,7 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-19 (the shirt, T-shirt and dress take their shoulders, neckline and armholes from the avatar's body, and their hem fits over the hips: large sizes no longer have drooping shoulders; the avatar now takes the measurements given in every size of the charts, up to the women's 54: large sizes came out too slim and trousers fell off them; changing the size or the body while draping starts the drape again around the new body; trousers end just above the floor whatever the body; garments worn in layers lie close together: a shirt worn under trousers is tucked into them, and nothing shows through a garment worn over another; the trousers template is a little shorter; a selected piece's panel shows its garment's fabric; the Construction line and Tape measure tools have new icons; the tool rail in four sections, drawing, measuring, sewing and trims, with Dart and Pleat under Darts and pleats and Hole a tool of its own; the guided flow's step bar and banner removed; a more natural walk and a new motion, Stand at ease; captured motions whose rest pose lies flat play upright; pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
+Last updated: 2026-11-19 (Installing: the downloads and their first launch, as they are not signed yet; the shirt, T-shirt and dress take their shoulders, neckline and armholes from the avatar's body, and their hem fits over the hips: large sizes no longer have drooping shoulders; the avatar now takes the measurements given in every size of the charts, up to the women's 54: large sizes came out too slim and trousers fell off them; changing the size or the body while draping starts the drape again around the new body; trousers end just above the floor whatever the body; garments worn in layers lie close together: a shirt worn under trousers is tucked into them, and nothing shows through a garment worn over another; the trousers template is a little shorter; a selected piece's panel shows its garment's fabric; the Construction line and Tape measure tools have new icons; the tool rail in four sections, drawing, measuring, sewing and trims, with Dart and Pleat under Darts and pleats and Hole a tool of its own; the guided flow's step bar and banner removed; a more natural walk and a new motion, Stand at ease; captured motions whose rest pose lies flat play upright; pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
 hips, so trousers no longer slide with each step; a garment worn over
 trousers starts outside them; captured motions: Motion › Import a captured
 motion… plays a BVH motion capture on the avatar, Motion › Motion
@@ -41,6 +41,25 @@ on a body in 3D, with real-time cloth physics. It runs on macOS, Windows
 and Linux, and an AI agent can drive it too.
 
 ## Getting started
+
+### Installing
+Download the package for your system from rustle3d.com, unzip it, and
+keep the folder where you like. It holds the app, `r3d` (the command-line
+tool, for scripts and AI agents), the licences and a README.
+
+The packages are not signed yet, so your system asks you to confirm the
+first launch:
+
+- **macOS**: move **Rustle3D.app** to Applications, then right-click it
+  and choose **Open**, and **Open** again in the dialog. If macOS says the
+  app is damaged, run `xattr -dr com.apple.quarantine
+  /Applications/Rustle3D.app` in Terminal, then open it.
+- **Windows**: open **rustle3d.exe** in the folder. If Windows protected
+  your PC, click **More info**, then **Run anyway**.
+- **Linux**: run `./rustle3d` in the folder (x64, with GTK 3).
+
+You only do this once. Each download comes with a checksum in
+`SHA256SUMS.txt` on the release page, to check the file arrived intact.
 
 ### The start screen
 - **What will you make?** Pick a template: T-shirt, shirt (buttoned down

@@ -266,4 +266,6 @@ GNU General Public License v3.0 or later (GPL-3.0-or-later), see
 Rustle3D is free to use for any purpose, including commercial work; the
 garments, patterns and images you make with it are yours, under any terms
 you choose. If you distribute a modified version of Rustle3D, it must stay
-under the GPL with its source code available.
+under the GPL with its source code available. Contributions are welcome
+under the [Contributor License Agreement](CLA.md), see
+[`CONTRIBUTING.md`](CONTRIBUTING.md).
