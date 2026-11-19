@@ -4,10 +4,11 @@
 # it; in the app, the start screen offers both (New → Shirt, Trousers).
 # Run from the repository root: ./demos/m18/demo.sh
 set -euo pipefail
+. "$(dirname "$0")/../out.sh"
 
 cargo build --quiet --release -p r3d-cli
 R3D=./target/release/r3d
-DIR="$(mktemp -d)"
+DIR="$(demo_out m18)"
 
 for garment in shirt trousers; do
   OUT="$DIR/$garment.r3d"

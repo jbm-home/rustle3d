@@ -6,10 +6,11 @@
 # own measurements. A wrong formula is refused with a code.
 # Run from the repository root: ./demos/m28/demo.sh
 set -euo pipefail
+. "$(dirname "$0")/../out.sh"
 
 cargo build --quiet --release -p r3d-cli
 R3D=./target/release/r3d
-DIR="$(mktemp -d)"
+DIR="$(demo_out m28)"
 P="$DIR/Skirt.r3d"
 "$R3D" new "$P" >/dev/null
 

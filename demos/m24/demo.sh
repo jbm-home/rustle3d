@@ -9,10 +9,11 @@
 # the gauge button over the 3D view, and the Tape measure tool (M).
 # Run from the repository root: ./demos/m24/demo.sh
 set -euo pipefail
+. "$(dirname "$0")/../out.sh"
 
 cargo build --quiet --release -p r3d-cli
 R3D=./target/release/r3d
-DIR="$(mktemp -d)"
+DIR="$(demo_out m24)"
 OUT="$DIR/Tee.r3d"
 
 "$R3D" new "$OUT" >/dev/null

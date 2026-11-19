@@ -9,10 +9,11 @@
 # in the inspector (nothing selected), Print.
 # Run from the repository root: ./demos/m21/demo.sh
 set -euo pipefail
+. "$(dirname "$0")/../out.sh"
 
 cargo build --quiet --release -p r3d-cli
 R3D=./target/release/r3d
-DIR="$(mktemp -d)"
+DIR="$(demo_out m21)"
 OUT="$DIR/Striped shirt.r3d"
 
 "$R3D" new "$OUT" >/dev/null

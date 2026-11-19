@@ -5,10 +5,11 @@
 # garment; the same flow is the app's start screen (New T-shirt).
 # Run from the repository root: ./demos/m10/demo.sh
 set -euo pipefail
+. "$(dirname "$0")/../out.sh"
 
 cargo build --quiet --release -p r3d-cli
 R3D=./target/release/r3d
-OUT="$(mktemp -d)/Shirt.r3d"
+OUT="$(demo_out m10)/Shirt.r3d"
 
 "$R3D" new "$OUT" >/dev/null
 "$R3D" run "$OUT" demos/m10/body.json >/dev/null

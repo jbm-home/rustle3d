@@ -10,10 +10,11 @@
 # piece's card (Buttoned, Unbutton all, a zipper's Open slider).
 # Run from the repository root: ./demos/m20/demo.sh
 set -euo pipefail
+. "$(dirname "$0")/../out.sh"
 
 cargo build --quiet --release -p r3d-cli
 R3D=./target/release/r3d
-DIR="$(mktemp -d)"
+DIR="$(demo_out m20)"
 BODY='{"type": "avatar.set", "preset": "Men M", "body": {"masculinity": 1,
   "height_cm": 178, "bust_cm": 100, "waist_cm": 86, "hips_cm": 100}}'
 

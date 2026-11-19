@@ -11,10 +11,11 @@
 # Garment for a game engine (glTF)…
 # Run from the repository root: ./demos/m15/demo.sh
 set -euo pipefail
+. "$(dirname "$0")/../out.sh"
 
 cargo build --quiet --release -p r3d-cli
 R3D=./target/release/r3d
-DIR="$(mktemp -d)"
+DIR="$(demo_out m15)"
 OUT="$DIR/tee.r3d"
 
 "$R3D" new "$OUT" >/dev/null

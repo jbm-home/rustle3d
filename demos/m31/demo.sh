@@ -11,10 +11,11 @@
 # points.
 # Run from the repository root: ./demos/m31/demo.sh
 set -euo pipefail
+. "$(dirname "$0")/../out.sh"
 
 cargo build --quiet --release -p r3d-cli
 R3D=./target/release/r3d
-DIR="$(mktemp -d)"
+DIR="$(demo_out m31)"
 OUT="$DIR/My scan.r3d"
 
 echo "== 1. A body file of our own: the built-in body, in cm, Z up, soles open"

@@ -8,10 +8,11 @@
 # Edit curves group (Bend B, Straighten L, Add point A). Run from the
 # repository root.
 set -euo pipefail
+. "$(dirname "$0")/../out.sh"
 
 cargo build --quiet --release -p r3d-cli
 R3D=./target/release/r3d
-OUT="$(mktemp -d)/Princess.r3d"
+OUT="$(demo_out m12)/Princess.r3d"
 
 "$R3D" new "$OUT" >/dev/null
 # A skirt hangs from the hips: a women's body (on the men's preset the

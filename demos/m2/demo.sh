@@ -4,10 +4,11 @@
 # AI-agent-style MCP session on the same project, then 1:1 exports.
 # Run from the repository root: ./demos/m2/demo.sh
 set -euo pipefail
+. "$(dirname "$0")/../out.sh"
 
 cargo build --quiet -p r3d-cli
 R3D=./target/debug/r3d
-OUT="$(mktemp -d)/Skirt.r3d"
+OUT="$(demo_out m2)/Skirt.r3d"
 
 echo "== 1. Build the pattern with a script"
 "$R3D" new "$OUT" >/dev/null

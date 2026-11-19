@@ -5,10 +5,11 @@
 # option-click to pin).
 # Run from the repository root: ./demos/m4/demo.sh
 set -euo pipefail
+. "$(dirname "$0")/../out.sh"
 
 cargo build --quiet --release -p r3d-cli
 R3D=./target/release/r3d
-OUT="$(mktemp -d)/Skirt.r3d"
+OUT="$(demo_out m4)/Skirt.r3d"
 
 echo "== 1. A standard body (fitted MakeHuman avatar), measurements achieved"
 "$R3D" new "$OUT" >/dev/null

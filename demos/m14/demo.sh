@@ -5,10 +5,11 @@
 # and by an agent over MCP (render_photo). In the app: the camera button
 # over the 3D view. Run from the repository root: ./demos/m14/demo.sh
 set -euo pipefail
+. "$(dirname "$0")/../out.sh"
 
 cargo build --quiet --release -p r3d-cli
 R3D=./target/release/r3d
-DIR="$(mktemp -d)"
+DIR="$(demo_out m14)"
 OUT="$DIR/Shirt.r3d"
 
 "$R3D" new "$OUT" >/dev/null

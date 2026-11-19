@@ -7,10 +7,11 @@
 # the length. The board is rendered to PNG.
 # Run from the repository root: ./demos/m27/demo.sh
 set -euo pipefail
+. "$(dirname "$0")/../out.sh"
 
 cargo build --quiet --release -p r3d-cli
 R3D=./target/release/r3d
-DIR="$(mktemp -d)"
+DIR="$(demo_out m27)"
 P="$DIR/Bodice.r3d"
 "$R3D" new "$P" >/dev/null
 

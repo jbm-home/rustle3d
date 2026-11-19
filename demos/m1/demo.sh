@@ -3,9 +3,10 @@
 # script (including undo/redo and an atomic batch), query it, and show a
 # structured error. Run from the repository root: ./demos/m1/demo.sh
 set -euo pipefail
+. "$(dirname "$0")/../out.sh"
 
 R3D=(cargo run --quiet -p r3d-cli --)
-OUT="$(mktemp -d)/Skirt.r3d"
+OUT="$(demo_out m1)/Skirt.r3d"
 
 echo "== 1. New project"
 "${R3D[@]}" new "$OUT"

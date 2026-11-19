@@ -3,10 +3,11 @@
 # and an agent works on the project open in the app.
 # Run from the repository root: ./demos/m9/demo.sh
 set -euo pipefail
+. "$(dirname "$0")/../out.sh"
 
 cargo build --quiet --release -p r3d-cli
 R3D=./target/release/r3d
-OUT="$(mktemp -d)/Skirt.r3d"
+OUT="$(demo_out m9)/Skirt.r3d"
 
 "$R3D" new "$OUT" >/dev/null
 "$R3D" run "$OUT" demos/m10/body.json >/dev/null

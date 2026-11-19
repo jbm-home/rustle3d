@@ -6,10 +6,11 @@
 # picked with Select (⇧-click a second for the distance), and the
 # Gathered switch on a seam. Run from the repository root.
 set -euo pipefail
+. "$(dirname "$0")/../out.sh"
 
 cargo build --quiet --release -p r3d-cli
 R3D=./target/release/r3d
-OUT="$(mktemp -d)/Draft.r3d"
+OUT="$(demo_out m11)/Draft.r3d"
 
 "$R3D" new "$OUT" >/dev/null
 "$R3D" run "$OUT" demos/m10/body.json >/dev/null

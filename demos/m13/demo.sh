@@ -6,15 +6,16 @@
 # of the tests (crates/r3d-commands/tests/data). In the app: Import in the
 # top bar, Export → "Pattern, DXF-AAMA". Run from the repository root.
 set -euo pipefail
+. "$(dirname "$0")/../out.sh"
 
 cargo build --quiet --release -p r3d-cli
 R3D=./target/release/r3d
 DATA=crates/r3d-commands/tests/data
-TMP="$(mktemp -d)"
+TMP="$(demo_out m13)"
 OUT="$TMP/Imported.r3d"
 
 "$R3D" new "$OUT" >/dev/null
-"$R3D" run "$OUT" /dev/stdin >/dev/null <<'JSON'
+"$R3D" run "$OUT" - >/dev/null <<'JSON'
 [{"type": "avatar.set", "preset": "Women M",
   "body": {"masculinity": 0, "height_cm": 168, "bust_cm": 90, "waist_cm": 73, "hips_cm": 98}}]
 JSON
@@ -24,7 +25,7 @@ echo "== 1. Import a skirt drawn elsewhere: DXF-AAMA in inches (r3d import copie
 "$R3D" query "$OUT" '{"type": "panel.list"}' | grep -E '"(name|area_mm2)"'
 
 echo "== 2. Sew and edit, as an agent would: side seams, around the body, 5 cm longer"
-"$R3D" run "$OUT" /dev/stdin >/dev/null <<'JSON'
+"$R3D" run "$OUT" - >/dev/null <<'JSON'
 [{"type": "panel.list"},
  {"type": "panel.get", "panel": "$0[0].id"},
  {"type": "panel.get", "panel": "$0[1].id"},

@@ -9,10 +9,11 @@
 # walking figure next to Simulate.
 # Run from the repository root: ./demos/m23/demo.sh
 set -euo pipefail
+. "$(dirname "$0")/../out.sh"
 
 cargo build --quiet --release -p r3d-cli
 R3D=./target/release/r3d
-DIR="$(mktemp -d)"
+DIR="$(demo_out m23)"
 
 step=1
 for case in "dress walk 225" "a_line_skirt turn 240" "t_shirt raise_arms 200"; do

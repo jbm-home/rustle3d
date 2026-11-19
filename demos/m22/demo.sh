@@ -6,10 +6,11 @@
 # measurements, and exports the graded nest as PDF and DXF-AAMA.
 # Run from the repository root: ./demos/m22/demo.sh
 set -euo pipefail
+. "$(dirname "$0")/../out.sh"
 
 cargo build --quiet --release -p r3d-cli
 R3D=./target/release/r3d
-DIR="$(mktemp -d)"
+DIR="$(demo_out m22)"
 OUT="$DIR/Shirt.r3d"
 
 "$R3D" new "$OUT" >/dev/null

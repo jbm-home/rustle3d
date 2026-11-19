@@ -8,10 +8,11 @@
 # shift-drag the hem, shift-drag a seam near the waist.
 # Run from the repository root: ./demos/m8/demo.sh
 set -euo pipefail
+. "$(dirname "$0")/../out.sh"
 
 cargo build --quiet --release -p r3d-cli
 R3D=./target/release/r3d
-OUT="$(mktemp -d)/Skirt.r3d"
+OUT="$(demo_out m8)/Skirt.r3d"
 
 "$R3D" new "$OUT" >/dev/null
 "$R3D" run "$OUT" demos/m4/body.json >/dev/null

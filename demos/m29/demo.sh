@@ -6,10 +6,11 @@
 # then a hole is cut and two pieces are joined.
 # Run from the repository root: ./demos/m29/demo.sh
 set -euo pipefail
+. "$(dirname "$0")/../out.sh"
 
 cargo build --quiet --release -p r3d-cli
 R3D=./target/release/r3d
-DIR="$(mktemp -d)"
+DIR="$(demo_out m29)"
 P="$DIR/Skirt.r3d"
 "$R3D" new "$P" >/dev/null
 
