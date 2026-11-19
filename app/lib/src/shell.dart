@@ -25,6 +25,7 @@ import 'start_screen.dart' show Logo;
 import 'views/rust_view.dart';
 
 part 'marker.dart';
+part 'game_export.dart';
 part 'fit.dart';
 part 'sketch.dart';
 
@@ -1790,6 +1791,19 @@ class _ShellState extends State<Shell> {
     );
   }
 
+  /// The game-engine export dialog; a toast once the file is written.
+  Future<void> _openGameExport() async {
+    final saved = await showDialog<String>(
+      context: context,
+      builder: (_) => _GameExportDialog(
+        engine: widget.engine,
+        name: (_summary['name'] as String?) ?? 'Rustle3D',
+        importedBody: _bodyCheck != null,
+      ),
+    );
+    if (saved != null && mounted) _toast(context.l.exported(saved));
+  }
+
   /// Ask where to save, then write the tech pack: the garment as the 3D
   /// view shows it now, front and back, then the production details, in
   /// the user's language.
@@ -2130,6 +2144,7 @@ class _ShellState extends State<Shell> {
                 onProduction: (what) => switch (what) {
                   'marker' => _openMarker(),
                   'techpack' => _exportTechpack(),
+                  'game' => _openGameExport(),
                   _ => _openProjector(),
                 },
                 onImport: _importPattern,
@@ -2747,6 +2762,11 @@ class _TopBar extends StatelessWidget {
                     value: (format, avatar, ''),
                     child: Text(label),
                   ),
+                PopupMenuItem(
+                  key: const Key('export-game'),
+                  value: (null, false, 'game'),
+                  child: Text(l.exportGame),
+                ),
                 const PopupMenuDivider(),
                 for (final (what, label) in [
                   ('marker', l.exportMarker),

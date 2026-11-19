@@ -4866,6 +4866,144 @@ abstract class L {
   /// In en, this message translates to:
   /// **'The avatar has no imported body.'**
   String get errNoImportedBody;
+
+  /// No description provided for @exportGame.
+  ///
+  /// In en, this message translates to:
+  /// **'Garment for a game engine (glTF)…'**
+  String get exportGame;
+
+  /// No description provided for @gameTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Export for a game engine'**
+  String get gameTitle;
+
+  /// No description provided for @gameIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'The garment as the 3D view shows it, in one GLB file: lighter levels of detail, its wrinkles baked into normal maps, and moving with the body\'s skeleton.'**
+  String get gameIntro;
+
+  /// No description provided for @gameEngine.
+  ///
+  /// In en, this message translates to:
+  /// **'Engine'**
+  String get gameEngine;
+
+  /// No description provided for @gameGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Generic'**
+  String get gameGeneric;
+
+  /// No description provided for @gameLods.
+  ///
+  /// In en, this message translates to:
+  /// **'Levels of detail'**
+  String get gameLods;
+
+  /// No description provided for @gameLodsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Percentages of the triangles, the first 100: for example 100, 50, 20. The edges of the pieces never move.'**
+  String get gameLodsHint;
+
+  /// No description provided for @gameNormalMap.
+  ///
+  /// In en, this message translates to:
+  /// **'Normal map'**
+  String get gameNormalMap;
+
+  /// No description provided for @gameNoMap.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get gameNoMap;
+
+  /// No description provided for @gameNormalMapHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The full garment\'s wrinkles, baked for each lighter level.'**
+  String get gameNormalMapHint;
+
+  /// No description provided for @gameSides.
+  ///
+  /// In en, this message translates to:
+  /// **'Back faces'**
+  String get gameSides;
+
+  /// No description provided for @gameDoubleSided.
+  ///
+  /// In en, this message translates to:
+  /// **'Double-sided'**
+  String get gameDoubleSided;
+
+  /// No description provided for @gameThickness.
+  ///
+  /// In en, this message translates to:
+  /// **'Thickness'**
+  String get gameThickness;
+
+  /// No description provided for @gameThicknessMm.
+  ///
+  /// In en, this message translates to:
+  /// **'Thickness'**
+  String get gameThicknessMm;
+
+  /// No description provided for @gameSkin.
+  ///
+  /// In en, this message translates to:
+  /// **'Skin to the body\'s skeleton'**
+  String get gameSkin;
+
+  /// No description provided for @gameSkinHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The garment moves with the body, with the walk, turn and raise-arms motions as animations.'**
+  String get gameSkinHint;
+
+  /// No description provided for @gameSkinImported.
+  ///
+  /// In en, this message translates to:
+  /// **'An imported body has no skeleton.'**
+  String get gameSkinImported;
+
+  /// No description provided for @gameAvatar.
+  ///
+  /// In en, this message translates to:
+  /// **'Include the body'**
+  String get gameAvatar;
+
+  /// No description provided for @gameExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export…'**
+  String get gameExport;
+
+  /// No description provided for @mm.
+  ///
+  /// In en, this message translates to:
+  /// **'mm'**
+  String get mm;
+
+  /// No description provided for @errLods.
+  ///
+  /// In en, this message translates to:
+  /// **'Levels of detail: start at 100 and go down, each above 0, at most five.'**
+  String get errLods;
+
+  /// No description provided for @errTextureSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose no map, or a power of two from 256 to 4096.'**
+  String get errTextureSize;
+
+  /// No description provided for @errNoSkeleton.
+  ///
+  /// In en, this message translates to:
+  /// **'This body has no skeleton: export without skinning.'**
+  String get errNoSkeleton;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

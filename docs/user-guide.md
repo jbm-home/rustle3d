@@ -7,7 +7,7 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-19 (M15, game-engine export: Export › Game
+Last updated: 2026-11-19 (M15, game-engine export: Export › Garment for a game
 engine (glTF)…, levels of detail, normal maps, skinning to the body's
 skeleton with its motions; M31, imported bodies: Body › Import body…,
 the check, the arrangement points; M20, buttons and zippers: the Button and
@@ -510,11 +510,11 @@ true colour under neutral light.
   view shows it, for Blender, game engines and other 3D tools. A print
   goes with it: inside the GLB file, or for OBJ as a material file
   (`.mtl`) and the print's image saved next to the OBJ.
-- **Game engine (glTF)…**: the garment ready for Godot, Unity, Unreal or
+- **Garment for a game engine (glTF)…**: the garment ready for Godot, Unity, Unreal or
   Blender, in one GLB file (see below).
 
 ### Game engines
-**Export › Game engine (glTF)…** opens a window:
+**Export › Garment for a game engine (glTF)…** opens a window:
 - **Engine**: Generic, Godot, Unity or Unreal. It fills the other
   settings with what suits that engine, and names things its way (for
   Unreal `SK_`, `M_` and `T_` names).

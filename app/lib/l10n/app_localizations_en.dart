@@ -2835,4 +2835,80 @@ class LEn extends L {
 
   @override
   String get errNoImportedBody => 'The avatar has no imported body.';
+
+  @override
+  String get exportGame => 'Garment for a game engine (glTF)…';
+
+  @override
+  String get gameTitle => 'Export for a game engine';
+
+  @override
+  String get gameIntro =>
+      'The garment as the 3D view shows it, in one GLB file: lighter levels of detail, its wrinkles baked into normal maps, and moving with the body\'s skeleton.';
+
+  @override
+  String get gameEngine => 'Engine';
+
+  @override
+  String get gameGeneric => 'Generic';
+
+  @override
+  String get gameLods => 'Levels of detail';
+
+  @override
+  String get gameLodsHint =>
+      'Percentages of the triangles, the first 100: for example 100, 50, 20. The edges of the pieces never move.';
+
+  @override
+  String get gameNormalMap => 'Normal map';
+
+  @override
+  String get gameNoMap => 'None';
+
+  @override
+  String get gameNormalMapHint =>
+      'The full garment\'s wrinkles, baked for each lighter level.';
+
+  @override
+  String get gameSides => 'Back faces';
+
+  @override
+  String get gameDoubleSided => 'Double-sided';
+
+  @override
+  String get gameThickness => 'Thickness';
+
+  @override
+  String get gameThicknessMm => 'Thickness';
+
+  @override
+  String get gameSkin => 'Skin to the body\'s skeleton';
+
+  @override
+  String get gameSkinHint =>
+      'The garment moves with the body, with the walk, turn and raise-arms motions as animations.';
+
+  @override
+  String get gameSkinImported => 'An imported body has no skeleton.';
+
+  @override
+  String get gameAvatar => 'Include the body';
+
+  @override
+  String get gameExport => 'Export…';
+
+  @override
+  String get mm => 'mm';
+
+  @override
+  String get errLods =>
+      'Levels of detail: start at 100 and go down, each above 0, at most five.';
+
+  @override
+  String get errTextureSize =>
+      'Choose no map, or a power of two from 256 to 4096.';
+
+  @override
+  String get errNoSkeleton =>
+      'This body has no skeleton: export without skinning.';
 }

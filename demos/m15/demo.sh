@@ -8,7 +8,7 @@
 # walk, turn and raise-arms motions as animations, the body included.
 # Then the same for Unreal, as a 1.5 mm shell. Both files are checked by
 # the Khronos glTF Validator when Node.js is there. In the app: Export ›
-# Game engine (glTF)…
+# Garment for a game engine (glTF)…
 # Run from the repository root: ./demos/m15/demo.sh
 set -euo pipefail
 

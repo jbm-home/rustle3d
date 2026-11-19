@@ -1288,6 +1288,69 @@ impl Engine {
         })
     }
 
+    /// Write the game-ready GLB (spec 15) to `path`, a file the user
+    /// chose (anywhere): the garment as the 3D view shows it now (the
+    /// running drape, or its starting positions). `options_json` holds
+    /// `export.game`'s options (`preset`, `lods`, `normal_map`, `sides`,
+    /// `thickness_mm`, `skin`, `animations`, `avatar`; no `path`).
+    /// Returns its result as JSON (each LOD's triangles, the map size,
+    /// whether it is skinned, the animations). Off the UI thread.
+    pub fn export_game(&self, path: String, options_json: String) -> Result<String, ApiError> {
+        use r3d_commands::game::{Dressed, ExportGame, game_scene};
+        self.long("export", |_| {
+            let request: ExportGame =
+                serde_json::from_str(&options_json).map_err(|e| ApiError {
+                    code: "malformed".into(),
+                    args: HashMap::from([("detail".into(), e.to_string())]),
+                    text: format!("malformed options: {e}"),
+                })?;
+            let (bytes, report) = {
+                let ws = self.workspace()?;
+                let project = ws.session().project();
+                // Locks in the engine's usual order: the simulation
+                // before the cloth.
+                let live = self.sim()?.as_ref().map(|t| t.latest());
+                let form = self.form_now(FormKey::of(project))?;
+                let fresh;
+                let cloth = self.cloth.lock().map_err(|_| poisoned())?;
+                let drape = match cloth.as_ref() {
+                    Some(d) => d,
+                    None => {
+                        fresh = drape::prepare(project, form.as_deref()).map_err(err)?;
+                        &fresh
+                    }
+                };
+                let start: Vec<glam::Vec3> =
+                    drape.scene.particles.iter().map(|p| p.position).collect();
+                let time = live.as_ref().map_or(0.0, |now| now.time);
+                let positions = match live {
+                    Some(now) if now.loaded && now.positions.len() == start.len() => now.positions,
+                    _ => start,
+                };
+                let animation = *self.animation.lock().map_err(|_| poisoned())?;
+                let prints = self.prints_of(project, ws.dir())?;
+                let dressed = Dressed {
+                    project,
+                    drape,
+                    positions: &positions,
+                    form: form.as_deref(),
+                    animation: animation.as_ref(),
+                    time,
+                    prints: &prints,
+                };
+                let (scene, report) = game_scene(&dressed, &request).map_err(err)?;
+                (r3d_io::game::to_glb(&scene), report)
+            };
+            std::fs::write(&path, bytes).map_err(|e| {
+                ApiError::from(
+                    Message::new("write_failed", format!("cannot write {path}: {e}"))
+                        .arg("path", &path),
+                )
+            })?;
+            Ok(report.to_json().to_string())
+        })
+    }
+
     /// Lay a marker out: `spec_json` is `marker.compute`'s `marker`
     /// (garment, sizes, width_mm…). Returns its JSON result with the
     /// pieces' outlines. Off the UI thread: many sizes take a while.

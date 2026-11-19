@@ -2861,4 +2861,80 @@ class LFr extends L {
 
   @override
   String get errNoImportedBody => 'L\'avatar n\'a pas de corps importé.';
+
+  @override
+  String get exportGame => 'Vêtement pour moteur de jeu (glTF)…';
+
+  @override
+  String get gameTitle => 'Exporter pour un moteur de jeu';
+
+  @override
+  String get gameIntro =>
+      'Le vêtement tel que la vue 3D le montre, dans un fichier GLB : des niveaux de détail plus légers, ses plis enregistrés dans des normal maps, et il bouge avec le squelette du corps.';
+
+  @override
+  String get gameEngine => 'Moteur';
+
+  @override
+  String get gameGeneric => 'Générique';
+
+  @override
+  String get gameLods => 'Niveaux de détail';
+
+  @override
+  String get gameLodsHint =>
+      'Pourcentages des triangles, le premier à 100 : par exemple 100, 50, 20. Les bords des pièces ne bougent jamais.';
+
+  @override
+  String get gameNormalMap => 'Normal map';
+
+  @override
+  String get gameNoMap => 'Aucune';
+
+  @override
+  String get gameNormalMapHint =>
+      'Les plis du vêtement complet, enregistrés pour chaque niveau plus léger.';
+
+  @override
+  String get gameSides => 'Faces arrière';
+
+  @override
+  String get gameDoubleSided => 'Double face';
+
+  @override
+  String get gameThickness => 'Épaisseur';
+
+  @override
+  String get gameThicknessMm => 'Épaisseur';
+
+  @override
+  String get gameSkin => 'Lier au squelette du corps';
+
+  @override
+  String get gameSkinHint =>
+      'Le vêtement bouge avec le corps, avec la marche, le demi-tour et les bras levés en animations.';
+
+  @override
+  String get gameSkinImported => 'Un corps importé n\'a pas de squelette.';
+
+  @override
+  String get gameAvatar => 'Inclure le corps';
+
+  @override
+  String get gameExport => 'Exporter…';
+
+  @override
+  String get mm => 'mm';
+
+  @override
+  String get errLods =>
+      'Niveaux de détail : commencer à 100 puis décroître, chacun au-dessus de 0, cinq au plus.';
+
+  @override
+  String get errTextureSize =>
+      'Choisissez aucune map, ou une puissance de deux de 256 à 4096.';
+
+  @override
+  String get errNoSkeleton =>
+      'Ce corps n\'a pas de squelette : exportez sans le lier.';
 }

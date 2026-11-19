@@ -21,7 +21,7 @@ tangent-space normal map per lower LOD, a base-colour atlas for prints,
 double-sided cloth or a thin shell, skinning to the avatar's skeleton
 with the three motions as animations, and presets for Godot, Unity and
 Unreal; `r3d export --format game`, the MCP tool `export_game`, and the
-app's Export menu (Game engine…). Checked by the glTF validator in
+app's Export menu (Garment for a game engine…). Checked by the glTF validator in
 `check.sh`.
 
 Not yet: imports checked by hand in the engines (the presets follow
@@ -119,7 +119,7 @@ one object per panel, UVs and normals, geometry only.
 - **Blender**: File › Import › glTF 2.0.
 
 ## UX
-- Export menu › **Game engine (glTF)…** opens a dialog: preset (Generic,
+- Export menu › **Garment for a game engine (glTF)…** opens a dialog: preset (Generic,
   Godot, Unity, Unreal), LODs (a field such as `100, 50, 20` in %),
   normal map size (none, 512, 1024, 2048, 4096), back faces (double-sided
   or thickness, with the thickness in mm), skin to the avatar's skeleton

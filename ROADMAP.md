@@ -45,7 +45,7 @@ can be tested through MCP as soon as they exist.
 | M20 | Trims: buttons and zippers ✅ | 2–3 wk | A shirt that buttons and trousers with a fly zipper, draped closed |
 | M21 | Textures and prints ✅ | 2–3 wk | A striped shirt whose stripes follow the grainline on every piece |
 | M31 | Imported avatars ✅ | 2–3 wk | A body scan in OBJ/glTF is checked, the pieces placed around it and draped |
-| M15 | Game-ready export | 3–4 wk | LODs + baked wrinkle normal maps + skinning, imported in Godot/Unity/Unreal |
+| M15 | Game-ready export ✅ | 3–4 wk | LODs + baked wrinkle normal maps + skinning, imported in Godot/Unity/Unreal |
 
 M10 came before M9: the first-time user test, not the export, decided
 what v0.1 needed. After v0.1 the order is M9, M11, M12, M13, M14, M16,
@@ -79,7 +79,9 @@ have. M21 followed the same night (2026-11-19): prints need no new
 physics either, and every later render and export shows them. M20
 closed the same night (2026-11-19), the first of these to touch both
 solvers. M31 closed after it (2026-11-19): imported bodies reuse the
-distance field both solvers read, and stand still.
+distance field both solvers read, and stand still. M15 closed last
+(2026-11-19): it exports what all of these build, skinned to M23's
+skeleton.
 
 ---
 
@@ -980,7 +982,7 @@ tests below, in the real app):
   between two clicked points on the drape; the tape following the cloth
   as it moves (it is taken at the click).
 
-## M15 — Game-ready export
+## M15 — Game-ready export ✅ (2026-11-19)
 - Decimated LODs, wrinkle detail baked into normal maps, back faces or
   thickness; skinning to the avatar skeleton (M23); presets for Godot,
   Unity and Unreal.
@@ -990,7 +992,7 @@ tests below, in the real app):
   to the 24-bone skeleton with walk, turn and raise_arms as animations
   and the body; then for Unreal as a 1.5 mm shell; both files pass the
   Khronos glTF Validator with no error or warning.
-- Delivered so far (2026-11-19, spec 15): action `export.game` (MCP
+- Delivered (2026-11-19, spec 15): action `export.game` (MCP
   `export_game`), `r3d export --format game` (`--preset`, `--lods`,
   `--normal-map`, `--shell`, `--thickness-mm`, `--no-skin`,
   `--no-animations`); `r3d_geom::decimate` (quadric error metrics,
@@ -1003,7 +1005,18 @@ tests below, in the real app):
   smoothed over the garment, a drape that ended mid-motion carried back
   to the rest pose, the motions baked at 30 fps, presets and names).
   `scripts/validate-exports.sh` validates two game exports.
-- Open: the app's Export dialog (next step).
+  App: Export › Garment for a game engine (glTF)… opens a dialog
+  (engine, levels of detail in %, normal map size, double-sided or
+  thickness, skin to the skeleton, include the body; the engine fills
+  the fields; skinning off and explained for an imported body);
+  `Engine::export_game` exports the drape the 3D view shows. Strings in
+  en and fr, error codes translated; integration test `game_test.dart`.
+- Open: imports checked by hand in Godot, Unity and Unreal (the presets
+  follow their documented glTF importers; no engine was run); the
+  `MSFT_lod` extension (LODs are separate `_LODn` nodes); skinning an
+  imported body (no skeleton, spec 27); dual-quaternion skinning; the
+  inside of a shell shows the outside's wrinkles reversed; roughness or
+  sheen maps.
 
 ## Later (architecture kept ready, not scheduled)
 Material calibration from measurements (a home protocol: a strip

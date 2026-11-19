@@ -140,6 +140,18 @@ abstract class Engine implements RustOpaqueInterface {
     required bool avatar,
   });
 
+  /// Write the game-ready GLB (spec 15) to `path`, a file the user
+  /// chose (anywhere): the garment as the 3D view shows it now (the
+  /// running drape, or its starting positions). `options_json` holds
+  /// `export.game`'s options (`preset`, `lods`, `normal_map`, `sides`,
+  /// `thickness_mm`, `skin`, `animations`, `avatar`; no `path`).
+  /// Returns its result as JSON (each LOD's triangles, the map size,
+  /// whether it is skinned, the animations). Off the UI thread.
+  Future<String> exportGame({
+    required String path,
+    required String optionsJson,
+  });
+
   /// Write a marker (`spec_json` as in [`Engine::marker`]) to `path`, a
   /// file the user chose (anywhere): SVG, or with `pdf` a PDF on one
   /// page, at 1:1.
