@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // test code
 //! Every starter garment drapes on the GPU as on the CPU: the template
 //! checks of `r3d-commands` (nothing inside the body, triangles not cut
-//! into it, seams closed, the T-shirt at rest), and the same extent as the
-//! CPU drape within a couple of centimetres.
+//! into it, seams and closures closed, the T-shirt at rest), and the same
+//! extent as the CPU drape within a couple of centimetres.
 
 mod gpu;
 
@@ -60,6 +60,7 @@ fn drape(solver: &mut dyn Solver, scene: &SimScene, frames: u32) -> (f32, f32) {
     assert!(sunk < 0.001, "triangles cut {sunk} m into the body");
     let stats = solver.stats();
     assert!(stats.max_seam_gap < 0.005, "seams open: {stats:?}");
+    assert!(stats.max_closure_gap < 0.005, "unbuttoned: {stats:?}");
     let low = p.iter().map(|v| v.y).fold(f32::MAX, f32::min);
     let high = p.iter().map(|v| v.y).fold(f32::MIN, f32::max);
     (low, high)

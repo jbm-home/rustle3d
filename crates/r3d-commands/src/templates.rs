@@ -21,9 +21,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::commands::{
-    CurveSpec, EdgeSetCurve, GarmentAdd, GarmentRename, GarmentSetFabric, NotchAdd,
+    ButtonAdd, CurveSpec, EdgeSetCurve, GarmentAdd, GarmentRename, GarmentSetFabric, NotchAdd,
     PanelCreatePolygon, PanelMirror, PanelPlace, PanelSetGarment, PanelSetSeamAllowance, PinAdd,
-    ProjectRename, SeamAdd, SeamSideSpec, mirrored_source, waist_height_cm,
+    ProjectRename, SeamAdd, SeamSideSpec, ZipperAdd, mirrored_source, waist_height_cm,
 };
 use crate::drape::arm_drop;
 use crate::error::{CommandError, positive};
@@ -247,14 +247,22 @@ struct Draft<'a, 'b> {
 }
 
 /// A drafted panel: its id, its contour edges in drawing order, and
-/// where the draft's x = 0 lies on the board (mm).
+/// where the draft's x = 0 lies on the board (mm), the draft reflected
+/// for a mirror copy.
 struct Piece {
     id: PanelId,
     edges: Vec<EdgeId>,
     origin_x: f64,
+    mirrored: bool,
 }
 
 impl Piece {
+    /// A point of the draft (mm) on the board.
+    fn board(&self, q: DVec2) -> [f64; 2] {
+        let x = if self.mirrored { -q.x } else { q.x };
+        [self.origin_x + x, q.y]
+    }
+
     fn edge(&self, k: usize) -> Result<EdgeId, CommandError> {
         self.edges
             .get(k)
@@ -334,6 +342,7 @@ impl Draft<'_, '_> {
             id,
             edges,
             origin_x: shift.x,
+            mirrored: false,
         })
     }
 
@@ -391,6 +400,7 @@ impl Draft<'_, '_> {
             id,
             edges,
             origin_x,
+            mirrored: !source.mirrored,
         })
     }
 
@@ -413,6 +423,54 @@ impl Draft<'_, '_> {
                 ..SeamSideSpec::default()
             },
             ease_mm: None,
+        }
+        .apply(self.tx)?;
+        self.created.extend(out.created);
+        Ok(())
+    }
+
+    /// Sew two stretches given as `seam.add` takes them.
+    fn sew_sides(&mut self, a: SeamSideSpec, b: SeamSideSpec) -> Result<(), CommandError> {
+        let out = SeamAdd {
+            a,
+            b,
+            ease_mm: None,
+        }
+        .apply(self.tx)?;
+        self.created.extend(out.created);
+        Ok(())
+    }
+
+    /// A closed zipper between two stretches, each from its bottom stop.
+    fn zip(&mut self, a: SeamSideSpec, b: SeamSideSpec) -> Result<(), CommandError> {
+        let out = ZipperAdd {
+            a,
+            b,
+            open_mm: None,
+        }
+        .apply(self.tx)?;
+        self.created.extend(out.created);
+        Ok(())
+    }
+
+    /// A buttoned button at draft point `at` of `on`, through a
+    /// buttonhole at `hole` of `hole_on` (its slit towards the piece's
+    /// middle).
+    fn button(
+        &mut self,
+        on: &Piece,
+        at: DVec2,
+        hole_on: &Piece,
+        hole: DVec2,
+    ) -> Result<(), CommandError> {
+        let out = ButtonAdd {
+            panel: on.id,
+            at: on.board(at),
+            diameter_mm: Some(BUTTON_MM),
+            hole_panel: hole_on.id,
+            hole_at: hole_on.board(hole),
+            hole_angle_deg: None,
+            closed: None,
         }
         .apply(self.tx)?;
         self.created.extend(out.created);
@@ -461,6 +519,18 @@ impl Draft<'_, '_> {
 
 fn p(x: f64, y: f64) -> DVec2 {
     DVec2::new(x, y)
+}
+
+/// A stretch of `edge`, from `from` to `to` mm along it (its ends when
+/// omitted), walked backwards if `reversed`.
+fn stretch(edge: EdgeId, from: Option<f64>, to: Option<f64>, reversed: bool) -> SeamSideSpec {
+    SeamSideSpec {
+        edge: Some(edge),
+        from_mm: from,
+        to_mm: to,
+        reversed: Some(reversed),
+        ..SeamSideSpec::default()
+    }
 }
 
 /// Draft `template` into the project. Returns the created panels and
@@ -1069,12 +1139,23 @@ fn quarter_neck(neck: f64, top: f64, depth: f64) -> [DVec2; 2] {
 
 /// Collar and cuff heights (mm).
 const COLLAR_MM: f64 = 35.0;
+/// How far a shirt front's band reaches past the centre front (mm): the
+/// fronts lap over each other by twice this.
+const BAND_MM: f64 = 15.0;
+/// How much longer a cuff is than the wrist it closes around (mm).
+const CUFF_LAP_MM: f64 = 20.0;
+/// The shirt's buttons (mm).
+const BUTTON_MM: f64 = 11.0;
+/// A trouser fly's zipper (mm), at most 60 % of the centre front.
+const FLY_MM: f64 = 180.0;
 const CUFF_MM: f64 = 60.0;
 
-/// A shirt: two fronts meeting at the centre front, a whole back, long
-/// sleeves ending in cuffs, and a stand collar around the neckline. The
-/// body's block is the T-shirt's, longer and looser; the fronts are
-/// sewn at the centre front (no buttons yet).
+/// A shirt: two fronts buttoned at the centre front, a whole back, long
+/// sleeves ending in buttoned cuffs, and a stand collar around the
+/// neckline. The body's block is the T-shirt's, longer and looser. Each
+/// front has a band past the centre front; buttons on one front's centre
+/// line, buttonholes on the other's, which laps over it (the left front
+/// over the right on a men's body, the right over the left otherwise).
 fn shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
     let chest = mm("chest_cm", s.chest_cm)?;
     let len = mm("length_cm", s.length_cm)?;
@@ -1092,18 +1173,20 @@ fn shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
             p(sign * shoulder, y_a + 0.45 * (y_s - y_a)),
         ]
     };
-    // The body's left front, centre front at x = 0. Edges: 0 hem, 1 side,
-    // 2 armhole, 3 shoulder, 4 neckline, 5 centre front.
+    // The body's left front, centre front at x = 0, its band past it.
+    // Edges: 0 hem, 1 side, 2 armhole, 3 shoulder, 4 neckline, 5 the
+    // band's top, 6 the front edge.
     let neck_depth = neck + 10.0;
     let front = d.panel(
         "Front left",
         &[
-            (p(0.0, 0.0), None),
+            (p(-BAND_MM, 0.0), None),
             (p(w, 0.0), None),
             (p(w, y_a), Some(hole(1.0))),
             (p(shoulder, y_s), None),
             (p(neck, len), Some(quarter_neck(neck, len, neck_depth))),
             (p(0.0, len - neck_depth), None),
+            (p(-BAND_MM, len - neck_depth), None),
         ],
     )?;
     let front_right = d.mirror(&front, "Front right")?;
@@ -1128,13 +1211,14 @@ fn shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
     let half = (0.33 * chest + 70.0) / 2.0;
     let left = sleeve_piece(d, "Sleeve left", hole_len, half, cuff / 2.0, sleeve)?;
     let right = d.mirror(&left, "Sleeve right")?;
-    // Cuffs: edges 0 wrist, 1 right end, 2 top, 3 left end.
+    // Cuffs, with a lap to button: edges 0 wrist, 1 right end, 2 top
+    // (sewn to the sleeve but for the lap), 3 left end.
     let cuff_left = d.panel(
         "Cuff left",
         &[
             (p(0.0, 0.0), None),
-            (p(cuff, 0.0), None),
-            (p(cuff, CUFF_MM), None),
+            (p(cuff + CUFF_LAP_MM, 0.0), None),
+            (p(cuff + CUFF_LAP_MM, CUFF_MM), None),
             (p(0.0, CUFF_MM), None),
         ],
     )?;
@@ -1156,7 +1240,6 @@ fn shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
             (p(0.0, COLLAR_MM), None),
         ],
     )?;
-    d.sew(front.edge(5)?, front_right.edge(5)?)?;
     d.sew(front.edge(1)?, back.edge(7)?)?;
     d.sew(front_right.edge(1)?, back.edge(1)?)?;
     d.sew(front.edge(3)?, back.edge(5)?)?;
@@ -1167,18 +1250,45 @@ fn shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
     d.sew(right.edge(2)?, back.edge(2)?)?;
     d.sew(left.edge(1)?, left.edge(4)?)?;
     d.sew(right.edge(1)?, right.edge(4)?)?;
-    d.sew(cuff_left.edge(2)?, left.edge(0)?)?;
-    d.sew(cuff_right.edge(2)?, right.edge(0)?)?;
-    d.sew(cuff_left.edge(1)?, cuff_left.edge(3)?)?;
-    d.sew(cuff_right.edge(1)?, cuff_right.edge(3)?)?;
+    // Each cuff's top, but the lap, to its sleeve's wrist; one button
+    // closes the cuff around the wrist, the lap over its other end.
+    for (c, s) in [(&cuff_left, &left), (&cuff_right, &right)] {
+        d.sew_sides(
+            stretch(c.edge(2)?, Some(CUFF_LAP_MM), None, false),
+            stretch(s.edge(0)?, None, None, true),
+        )?;
+        let y = CUFF_MM / 2.0;
+        d.button(
+            c,
+            p(CUFF_LAP_MM / 2.0, y),
+            c,
+            p(cuff + CUFF_LAP_MM / 2.0, y),
+        )?;
+    }
+    // The fronts: buttons down the centre line of the under front,
+    // buttonholes on the one lapped over it, from below the collar to
+    // a tenth of the length above the hem, about 9 cm apart.
+    let (under, over) = if body.masculinity >= 0.5 {
+        (&front_right, &front)
+    } else {
+        (&front, &front_right)
+    };
+    let (y_top, y_low) = (len - neck_depth - 20.0, 0.1 * len);
+    let count = ((y_top - y_low) / 90.0).round().max(1.0) as usize + 1;
+    for k in 0..count {
+        let y = y_top - (y_top - y_low) * k as f64 / (count - 1) as f64;
+        d.button(under, p(0.0, y), over, p(0.0, y))?;
+    }
     d.sew(collar.edge(0)?, front.edge(4)?)?;
     d.sew(collar.edge(1)?, back.edge(4)?)?;
     d.sew(collar.edge(2)?, front_right.edge(4)?)?;
     let h = body.height_cm;
     let top = NECK_HEIGHT * h + TOP_LIFT_CM;
-    let (cf_left, cf_right) = (front.origin_x, front_right.origin_x);
-    d.place_at(&front, Around::Body, 0.0, top, 30.0, Some(cf_left))?;
-    d.place_at(&front_right, Around::Body, 0.0, top, 30.0, Some(cf_right))?;
+    // The front that laps over starts a little further out.
+    for f in [&front, &front_right] {
+        let offset = if f.id == over.id { 38.0 } else { 30.0 };
+        d.place_at(f, Around::Body, 0.0, top, offset, Some(f.origin_x))?;
+    }
     d.place(&back, Around::Body, 180.0, top)?;
     // The collar's lower edge at the back neck, 2 cm below the shoulders'
     // tops.
@@ -1282,7 +1392,23 @@ fn trousers(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
         d.sew(f.edge(1)?, b.edge(4)?)?;
         d.sew(f.edge(4)?, b.edge(1)?)?;
     }
-    d.sew(front.edge(3)?, front_right.edge(3)?)?;
+    // The fly: a zipper from the waist down the centre front, the crotch
+    // seam closed below it. The left front's centre front runs down from
+    // the waist, its mirror image up to it; both sides of the zipper
+    // start at its bottom stop.
+    let cf_len =
+        d.tx.project()
+            .edge_length(front.edge(3)?)
+            .unwrap_or_default();
+    let fly = FLY_MM.min(0.6 * cf_len);
+    d.zip(
+        stretch(front.edge(3)?, None, Some(fly), true),
+        stretch(front_right.edge(3)?, Some(cf_len - fly), None, false),
+    )?;
+    d.sew_sides(
+        stretch(front.edge(3)?, Some(fly), None, false),
+        stretch(front_right.edge(3)?, None, Some(cf_len - fly), true),
+    )?;
     d.sew(back.edge(2)?, back_right.edge(2)?)?;
     // Each piece's crease goes to the front or the back of its leg; the
     // backs' tops are their raised centres.

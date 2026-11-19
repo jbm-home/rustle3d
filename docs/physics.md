@@ -110,8 +110,8 @@ correction let the momentum build: a 3 cm gap shut in one frame at
 - Opening or closing a trim is a document edit: the app rebuilds the
   scene and carries the cloth over (§7.8 of the architecture), so the
   drape goes on; the closures are the only constraints that change.
-- A button holds two layers on top of each other: cloth within 6 cm of
-  the button and cloth within 6 cm of its buttonhole (along the cloth)
+- A button holds two layers on top of each other: cloth within 8 cm of
+  the button and cloth within 8 cm of its buttonhole (along the cloth)
   never repel (self-collision would keep a front band 2 cm off the one
   under it). Closures join the cloth graph for self-collision as seams
   do (neighbours excluded, closed pairs pushed as one).

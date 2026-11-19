@@ -1491,8 +1491,8 @@ pub fn build(
 
 /// Around a buttoned button and its buttonhole, the cloth within this
 /// distance (m) lies on the other band on purpose: a front band buttoned
-/// over the other, its buttons 6–10 cm apart. They do not repel there.
-const BUTTON_OVERLAP_M: f32 = 0.06;
+/// over the other, its buttons up to 10 cm apart. They do not repel there.
+const BUTTON_OVERLAP_M: f32 = 0.08;
 
 /// The buttons (end 0) and buttonholes (end 1) on `panel`, where the
 /// closure holds them (mm).

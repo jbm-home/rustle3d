@@ -51,6 +51,7 @@ fn drape(s: &Session, frames: u32) -> (f32, f32) {
     assert!(sunk < 0.001, "triangles cut {sunk} m into the body");
     let stats = solver.stats();
     assert!(stats.max_seam_gap < 0.005, "seams open: {stats:?}");
+    assert!(stats.max_closure_gap < 0.005, "unbuttoned: {stats:?}");
     let low = p.iter().map(|v| v.y).fold(f32::MAX, f32::min);
     let high = p.iter().map(|v| v.y).fold(f32::MIN, f32::max);
     (low, high)
@@ -160,9 +161,12 @@ fn a_shirt_has_a_collar_and_cuffs() {
     let s = draft("shirt");
     let p = s.project();
     assert_eq!(p.name(), "Shirt");
-    // Two fronts, a back, two sleeves, two cuffs, a collar.
+    // Two fronts, a back, two sleeves, two cuffs, a collar; the fronts
+    // and the cuffs buttoned.
     assert_eq!(p.panels().len(), 8);
-    assert_eq!(p.seams().len(), 18);
+    assert_eq!(p.seams().len(), 15);
+    assert_eq!(p.buttons().len(), 9);
+    assert!(p.buttons().values().all(|b| b.closed));
     let (low, high) = drape(&s, 180);
     eprintln!("shirt: {low:.3}..{high:.3}");
     // The collar stands at the base of the neck; the hem below the hips.
@@ -180,6 +184,11 @@ fn trousers_hang_from_the_waist_one_leg_in_each_leg() {
     assert_eq!(p.name(), "Trousers");
     assert_eq!(p.panels().len(), 4);
     assert_eq!(p.seams().len(), 6);
+    // A fly zipper, closed, above the crotch seam.
+    assert_eq!(p.zippers().len(), 1);
+    let fly = p.zippers().values().next().unwrap();
+    assert!((p.zipper_length(fly).unwrap() - 180.0).abs() < 1.0);
+    assert_eq!(p.zipper_closed(fly), 1.0);
     let form = Form::of_project(p).unwrap().unwrap();
     let built = build(p, Some(&form), DEFAULT_SPACING_MM).unwrap();
     let mut solver = CpuSolver::new(built.scene.clone());

@@ -312,6 +312,9 @@ fn the_graded_shirt_has_a_tech_pack() {
         "Bill of materials",
         "Size chart",
         "Topstitch the collar",
+        // The shirt's buttons in the bill of materials.
+        "Button",
+        "11 mm",
     ] {
         assert!(text.contains(word), "{word}");
     }

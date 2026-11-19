@@ -58,7 +58,7 @@ starting the drape again. The tech pack lists 7 buttons of 11 mm and one
   fraction of a second without a jolt (docs/physics.md, "Closures").
 - Opening or closing a trim during a drape rebuilds the scene and the
   cloth carries on from where it is.
-- Around a buttoned button and its buttonhole (6 cm), the two layers
+- Around a buttoned button and its buttonhole (8 cm), the two layers
   may lie on each other: they do not push each other away.
 - `simulate` reports how many points closures hold
   (`closures`) and the widest gap between them (`max_closure_gap_mm`).
