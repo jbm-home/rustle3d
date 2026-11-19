@@ -239,3 +239,92 @@ fn a_captured_motion_is_played_from_its_file_and_cached_with_it() {
     assert_eq!(r3d_core::Localizable::message(&err).code, "motion.format");
     assert!(ws.adopt_motion(&path.join("motions/bad.bvh")).is_err());
 }
+
+/// A capture whose arms hang a little inwards (5° past vertical, as on a
+/// slimmer person) puts the avatar's hands into its hips; the avatar turns
+/// its arms out just enough that its forearms and hands clear the body by
+/// a layer of cloth. Without that, cloth caught between a hand and a hip
+/// was squeezed out or dragged along: trousers slid down and up with every
+/// swing of the arms.
+#[test]
+fn hands_are_kept_clear_of_the_hips() {
+    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/walk.bvh");
+    let text = std::fs::read_to_string(source).unwrap();
+    let hierarchy = text.split("MOTION").next().unwrap();
+    // Hips (6 channels), spine, neck, head, then each arm's three joints
+    // and each leg's three joints (Z X Y rotations).
+    let mut frame = vec![0.0f32; 51];
+    frame[1] = 90.0;
+    frame[15] = -95.0; // LeftArm, from a T pose down past vertical
+    frame[24] = 95.0; // RightArm
+    let line = frame
+        .iter()
+        .map(|v| v.to_string())
+        .collect::<Vec<_>>()
+        .join(" ");
+    let bvh = format!(
+        "{hierarchy}MOTION\nFrames: 60\nFrame Time: 0.033333\n{}",
+        format!("{line}\n").repeat(60)
+    );
+    let motion = r3d_commands::drape::captured_motion("hang.bvh", bvh.as_bytes()).unwrap();
+    let s = dressed("trousers");
+    let form = r3d_commands::drape::Form::of_project(s.project())
+        .unwrap()
+        .unwrap();
+    let (skeleton, weights) = form.rig().unwrap();
+    let bone = |name: &str| skeleton.find(name).unwrap();
+    let arm_bones = ["upper_arm", "forearm", "hand"]
+        .iter()
+        .flat_map(|b| [bone(&format!("{b}_l")), bone(&format!("{b}_r"))])
+        .fold(0u32, |m, b| m | 1 << b);
+    let hands: Vec<usize> = weights
+        .iter()
+        .enumerate()
+        .filter(|(_, w)| {
+            let heaviest = w
+                .bones
+                .iter()
+                .zip(w.weights)
+                .max_by(|a, b| a.1.total_cmp(&b.1))
+                .map(|(b, _)| usize::from(*b));
+            heaviest == Some(bone("hand_l")) || heaviest == Some(bone("hand_r"))
+        })
+        .map(|(i, _)| i)
+        .collect();
+    let drape = r3d_commands::drape::build(
+        s.project(),
+        Some(&form),
+        r3d_commands::drape::DEFAULT_SPACING_MM,
+    )
+    .unwrap();
+    let body = drape.scene.collider.as_ref().unwrap();
+    // How deep the hands come into the rest of the body, the skin posed
+    // by `transforms`.
+    let deepest = |transforms: Vec<r3d_geom::Rigid>| {
+        let skin = r3d_avatar::skeleton::skin(&form.positions, weights, &transforms);
+        let posed = Posed::new(transforms.clone(), transforms);
+        hands
+            .iter()
+            .filter_map(|i| r3d_sim::motion::touch_parts(body, &posed, skin[*i], !arm_bones))
+            .map(|(c, _)| c.distance)
+            .fold(f32::MAX, f32::min)
+    };
+    let animation = Animation::starting(motion.clone(), 0.0);
+    let t = MOTION_START_S + 1.5;
+    let as_captured = skeleton.transforms(&motion.pose(skeleton, t - MOTION_START_S));
+    assert!(
+        deepest(as_captured) < 0.0,
+        "the capture should reach into the hips"
+    );
+    let played = deepest(form.transforms(&animation, t).unwrap());
+    assert!(played > 0.012, "the hands are {played} m from the body");
+    // At rest the arms are clear already: nothing jumps when a motion
+    // starts.
+    let walk = Animation::starting(Motion::Walk, 0.0);
+    let rest = form.transforms(&walk, 0.0).unwrap();
+    let identity = skeleton.transforms(&r3d_avatar::skeleton::Pose::rest(skeleton.bones.len()));
+    for (a, b) in rest.iter().zip(&identity) {
+        assert!(a.rotation.angle_between(b.rotation) < 1e-4);
+        assert!(a.translation.distance(b.translation) < 1e-5);
+    }
+}

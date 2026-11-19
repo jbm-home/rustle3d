@@ -160,3 +160,57 @@ fn each_garment_drapes_in_its_own_fabric_and_starts_over_the_one_under_it() {
     let stats = solver.stats();
     assert!(stats.max_seam_gap < 0.005, "seams open: {stats:?}");
 }
+
+/// A T-shirt over trousers starts outside them at every height and angle
+/// where both are: loose trousers start wider than the body plus a layer
+/// gap at the front and back of the hips, and the T-shirt's hem started
+/// inside them there (it then drapes tangled in them).
+#[test]
+fn a_t_shirt_starts_outside_the_trousers_all_around() {
+    let mut s = Session::new(Project::new("Untitled"));
+    common::women_m(&mut s);
+    for template in ["trousers", "t_shirt"] {
+        run(
+            &mut s,
+            json!({"type": "template.apply", "template": template}),
+        )
+        .unwrap();
+    }
+    let p = s.project();
+    let form = Form::of_project(p).unwrap().unwrap();
+    let drape = build(p, Some(&form), DEFAULT_SPACING_MM).unwrap();
+    let trousers = garment(&s, "Trousers");
+    // Per 2 cm of height and 15° of angle, the trousers' farthest
+    // particle and the T-shirt's nearest one from the body's axis.
+    let cell = |q: glam::Vec3| {
+        let angle = q.x.atan2(q.z).rem_euclid(std::f32::consts::TAU);
+        ((q.y / 0.02) as i32, (angle / 15f32.to_radians()) as i32)
+    };
+    let mut out = std::collections::BTreeMap::new();
+    let mut inn = std::collections::BTreeMap::new();
+    for pc in &drape.pieces {
+        let is_trousers = p.panel(pc.panel).unwrap().garment == trousers;
+        for q in &drape.scene.particles[pc.particles.clone()] {
+            let (c, r) = (cell(q.position), q.position.x.hypot(q.position.z));
+            if r > 0.3 {
+                continue; // sleeves
+            }
+            if is_trousers {
+                let m = out.entry(c).or_insert(0.0f32);
+                *m = m.max(r);
+            } else {
+                let m = inn.entry(c).or_insert(f32::MAX);
+                *m = m.min(r);
+            }
+        }
+    }
+    let worst = inn
+        .iter()
+        .filter_map(|(c, r)| out.get(c).map(|t| (r - t, *c)))
+        .min_by(|a, b| a.0.total_cmp(&b.0))
+        .unwrap();
+    assert!(
+        worst.0 > 0.02,
+        "the T-shirt starts inside the trousers: {worst:?}"
+    );
+}

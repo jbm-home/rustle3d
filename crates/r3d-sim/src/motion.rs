@@ -117,11 +117,26 @@ pub fn touch(body: &StaticMesh, posed: Option<&Posed>, p: Vec3) -> Option<(Conta
     let Some(posed) = posed else {
         return body.sample(p).map(|c| (c, Vec3::ZERO));
     };
+    touch_parts(body, posed, p, u32::MAX)
+}
+
+/// As [`touch`] on a moving body, seeing only the skin led by the parts
+/// in `parts` (bit `k` for part `k`): where a hand is, seen past the arm
+/// it belongs to.
+pub fn touch_parts(
+    body: &StaticMesh,
+    posed: &Posed,
+    p: Vec3,
+    parts: u32,
+) -> Option<(Contact, Vec3)> {
     let mut best: Option<(Contact, Vec3)> = None;
     for (bone, (lo, hi)) in body.part_boxes().iter().enumerate() {
         let Some(back) = posed.back.get(bone) else {
             break;
         };
+        if bone >= 32 || parts & (1 << bone) == 0 {
+            continue;
+        }
         let mut q = back.apply(p);
         if q.cmplt(*lo).any() || q.cmpgt(*hi).any() {
             continue;

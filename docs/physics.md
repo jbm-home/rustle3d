@@ -295,6 +295,24 @@ rest pose's field is queried through the skinning (our own scheme,
 - **Friction** cancels the sliding relative to the touched surface,
   which moved by `p − (M_before q + T_before)` during the substep: the
   cloth is carried along with the body.
+- **Arms kept clear of the body** (`r3d_commands::drape::clearance`, our
+  own scheme). A captured motion is played by a body of other
+  proportions: a slow walk of the CMU database, whose arms hang close to
+  the person's hips, put the avatar's hands 2–3 cm into its hips. Cloth
+  caught there was squeezed out at 20–37 m/s and dragged by the hands:
+  trousers slid 7–10 cm down the pelvis and back up with every swing
+  (measured relative to the pelvis, CPU and GPU alike). Each pose is now
+  checked: forearm and hand skin points (64 per arm) are seen against
+  the rest of the body only (`r3d_sim::motion::touch_parts`, the inverse
+  skinning restricted to the bones that are not arms), and where one
+  comes closer than 15 mm the upper arm is turned out about the forward
+  axis by the smallest angle that clears it (7 bisections up to 0.5 rad).
+  Trousers then stay within about 1.5 cm of where they settled, and the
+  fastest cloth drops to 6–8 m/s (substep jitter, not seen in frames).
+  The rest pose is clear already, so nothing jumps when a motion starts;
+  sampling a motion for the solver takes ≈ 30–50 ms instead of 2 ms.
+  Checked: `r3d-commands` `tests/motion.rs`
+  `hands_are_kept_clear_of_the_hips`.
 - The motion is sampled 60 times a second and interpolated per substep
   (rotations by slerp); the GPU gets it once per frame (per substep and
   bone: the motion at its end, its inverse and the motion at its start).
@@ -379,6 +397,17 @@ starts:
   apart and pulled the waist down to the hips on a male body;
 - blended over 8 cm above the crotch; cloth that would cross the median
   plane is pressed flat 6 mm from it, in front of (or behind) the body.
+- Known issue: above the front's top, a trouser back (which rises higher)
+  is the whole circumference of its leg, narrowing to nothing at its top,
+  so its share of the half turn explodes there: the back's waist starts
+  in front of the body (edges stretched 10–15 times) and is dragged back
+  round it. That drag cinches the waist. Measuring the share against the
+  circumference no higher than the lowest top of the leg's pieces places
+  it right, but then the trousers settle where the body is as wide as
+  their waist (drafted at the body's, without ease, the denim stretched
+  a little by its weight): 1.6 cm lower on the men's L body, whose hem
+  then touches the floor, and 2.7 cm on the women's M. The waist needs a
+  better hold before that fix goes in.
 Trousers hold at the waist by friction alone (no ease there): the CPU and
 GPU contact solvers settle them about 3 cm apart, both at rest.
 
@@ -386,7 +415,16 @@ GPU contact solvers settle them about 3 cm apart, both at rest.
 
 Each garment has its fabric (one `FabricParams` per garment, triangles
 indexed by their piece's garment). Garments start in layer order, each
-`LAYER_GAP_M` (25 mm) further out per garment under it; with several
+`LAYER_GAP_M` (25 mm) further out per garment under it, and at least
+`LAYER_GAP_M` outside where the garments under it start (a profile of
+their start positions around the body's axis, as the body's). Loose
+trousers start wider than the body plus 25 mm at the front and back of
+the hips: a T-shirt over them started only 6 mm outside there, within
+the 20 mm particles keep apart, and was pushed through them on the
+first frame (`tests/garments.rs`
+`a_t_shirt_starts_outside_the_trousers_all_around`). A T-shirt about
+as wide as the trousers at the hips then starts stretched around them
+and still shows through them in places once draped. With several
 garments, pieces around the body start just outside it (5 mm) near their
 own height, not at their placement offset outside everything above them:
 both open the side seams (12–22 cm on the shirt), and a seam closing

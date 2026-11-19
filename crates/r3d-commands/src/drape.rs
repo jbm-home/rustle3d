@@ -36,6 +36,8 @@ use r3d_sim::motion::BodyMotion;
 use r3d_sim::scene::{Closure, Particle, Triangle};
 use r3d_sim::{CpuSolver, FabricPreset, SUBSTEPS, SimScene, Solver, StepStats};
 
+mod clearance;
+
 use crate::error::CommandError;
 use crate::progress::{Progress, Status};
 use crate::queries::{body_model, fitted};
@@ -111,6 +113,8 @@ pub struct Parts {
 struct Rig {
     skeleton: Skeleton,
     weights: Vec<Influences>,
+    /// The arms, kept clear of the body in every pose.
+    arms: clearance::Arms,
 }
 
 /// The solver gets a motion sampled this many times a second.
@@ -745,6 +749,8 @@ impl Form {
             },
             _ => animation.motion.pose(&rig.skeleton, since(time)),
         };
+        let mut pose = pose;
+        rig.arms.clear(&rig.skeleton, &self.collider, &mut pose);
         Some(rig.skeleton.transforms(&pose))
     }
 
@@ -802,9 +808,12 @@ impl Form {
     pub fn of_body(body: &r3d_core::Body) -> Result<Self, CommandError> {
         let model = body_model()?;
         let shaped = fitted_body(model, &fitted(body)?);
+        let skeleton = Skeleton::new(model, &shaped);
+        let arms = clearance::Arms::new(&skeleton, &shaped.positions, model.weights());
         let rig = Rig {
-            skeleton: Skeleton::new(model, &shaped),
+            skeleton,
             weights: model.weights().to_vec(),
+            arms,
         };
         Ok(Self::with_rig(
             shaped.positions,
@@ -849,6 +858,11 @@ struct Under<'a> {
     /// the seams (the panels keep their widths), and a seam closing across
     /// a gap cuts straight through the other garments.
     several: bool,
+    /// How far the garments under it start from the body's axis (their
+    /// pieces around the body and the legs). Loose trousers start wider
+    /// than the body plus a layer gap at the front and back of the hips,
+    /// and a T-shirt started inside them there.
+    worn: Profile,
 }
 
 /// A garment starts this much farther out per garment worn under it (m),
@@ -870,6 +884,16 @@ impl Under<'_> {
     /// The leg on `side` (+1 left).
     fn leg(&self, side: f32) -> Option<&Leg> {
         self.form.and_then(|f| f.legs.get(usize::from(side < 0.0)))
+    }
+
+    /// How far out a piece starts at angle `theta` between heights `top`
+    /// and `top - below` (m), `alone` being where it would start with
+    /// nothing under it: a layer gap per garment under it farther out,
+    /// and a layer gap outside where those garments start.
+    fn outside(&self, alone: f32, top: f32, below: f32, theta: f32) -> f32 {
+        let worn = self.worn.reach(top, below, theta);
+        let worn = if worn > 0.0 { worn + LAYER_GAP_M } else { 0.0 };
+        (alone + self.layered()).max(worn)
     }
 
     /// How much farther out than alone the garment starts (m).
@@ -971,7 +995,9 @@ fn wrap_body(l: &Laid, under: &Under, around: &dyn Fn(f32) -> f32) -> Vec<Vec3> 
                 (top_y, below)
             };
             for _ in 0..2 {
-                r = (under.radius(from, span, angle0 + arc / r) + gap).max(own) + under.layered();
+                let theta = angle0 + arc / r;
+                let alone = (under.radius(from, span, theta) + gap).max(own);
+                r = under.outside(alone, from, span, theta);
             }
             let theta = angle0 + arc / r;
             Vec3::new(r * theta.sin(), y, r * theta.cos())
@@ -1071,9 +1097,13 @@ fn wrap_leg(
     // at the back: the inner edge lies on +x where that is the median.
     let inner_on_plus = side * angle0.cos() < 0.0;
     let outside = |y: f32, angle: f32| {
-        under.radius(y + LEG_REACH_SPAN_M, 2.0 * LEG_REACH_SPAN_M, angle)
-            + LIMB_CLEARANCE_M
-            + under.layered()
+        let (top, span) = (y + LEG_REACH_SPAN_M, 2.0 * LEG_REACH_SPAN_M);
+        under.outside(
+            under.radius(top, span, angle) + LIMB_CLEARANCE_M,
+            top,
+            span,
+            angle,
+        )
     };
     l.mesh
         .vertices
@@ -1452,7 +1482,27 @@ pub fn build(
     // Start positions, garment by garment, each a little farther out
     // than the ones under it.
     let mut starts: Vec<Vec<Vec3>> = vec![Vec::new(); laid.len()];
+    let height = form.map_or(DEFAULT_HEIGHT_M, |f| {
+        f.positions.iter().map(|p| p.y).fold(0.0, f32::max)
+    });
     for layer in 0..worn.len() {
+        // Where the garments under this one start, around the body.
+        let below = laid
+            .iter()
+            .zip(&starts)
+            .filter(|(l, _)| {
+                l.layer < layer
+                    && matches!(
+                        l.place.around,
+                        Around::Body | Around::LeftLeg | Around::RightLeg
+                    )
+            })
+            .flat_map(|(_, s)| s.iter().map(|p| (p.y, Vec2::new(p.x, p.z))));
+        let worn_under = if layer > 0 {
+            Profile::new(height, below)
+        } else {
+            Profile::default()
+        };
         let sleeves_under = (0..layer)
             .filter(|below| {
                 laid.iter().any(|l| {
@@ -1466,6 +1516,7 @@ pub fn build(
             depth: layer,
             sleeves_under,
             several: worn.len() > 1,
+            worn: worn_under,
         };
         let around_hips =
             |y: f32| around(layer, Around::LeftLeg, y) + around(layer, Around::RightLeg, y);

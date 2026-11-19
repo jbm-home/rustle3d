@@ -499,6 +499,15 @@ fabric and colour.
   (particle radius 0.4 × spacing). Three start poses were measured and
   failed (physics.md, "Several garments"). Next: thin cloth–cloth
   contacts (vertex–triangle) between garments, CPU and GPU.
+- 2026-11-19 (maintainer: a T-shirt over trousers sits wrong): the
+  T-shirt started inside loose trousers at the hips; fixed (physics.md,
+  Several garments). A T-shirt as wide as the trousers at the hips still
+  shows them through in places: that needs the thin contacts above.
+- Open: the trousers' back waist starts in front of the body and is
+  dragged round it, which happens to cinch the waist; placed right, the
+  trousers settle 1.6–2.7 cm lower and the men's hem touches the floor
+  (physics.md, Starting positions, Known issue). Needs a better waist
+  hold first.
 
 Plan as written:
 - Several garments per project, each with its own fabric and colour;
@@ -952,9 +961,13 @@ tests below, in the real app):
   (maintainer: a good start). A motion library shared by all projects:
   add to it after an import, manage it in a dialog (add files, play,
   rename, delete), its motions in the Motion menu.
-- To fix (maintainer, 2026-11-19, seen with a captured walk): the hands
-  pass through the body and catch the garment, which gets pulled;
-  trousers slide down and up again as the avatar walks.
+- Fixed (2026-11-19; maintainer, seen with a captured walk): the hands
+  passed through the hips and caught the garment, which got pulled, and
+  trousers slid down and up again as the avatar walked. One cause: the
+  capture's arms hang closer than the avatar's hips allow. Each pose now
+  turns the arms out just enough for the forearms and hands to clear
+  the body by 15 mm (physics.md §5, Moving body); the trousers stay
+  within about 1.5 cm instead of sliding 7–10 cm.
 
 ## M24 — Fit maps and virtual tape measure
 - Stress and strain shown in colour on the draped garment, to find
