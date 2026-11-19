@@ -254,5 +254,9 @@ fn a_shirt_under_trousers_is_tucked_in_on_the_gpu() {
         .map(|p| p.y)
         .fold(0.0f32, f32::max);
     let seen = common::seen_through(&scene, x, 0, 1, 0.85, top - 0.03);
-    assert_eq!(seen, 0, "shirt showing through the trousers below {top}");
+    assert!(
+        seen.is_empty(),
+        "shirt showing through the trousers below {top}: {:?}",
+        seen.iter().map(|i| (i, x[*i])).collect::<Vec<_>>()
+    );
 }

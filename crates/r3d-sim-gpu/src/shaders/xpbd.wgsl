@@ -570,9 +570,6 @@ fn collide(@builtin(global_invocation_id) id: vec3u) {
     if i >= scene.counts.x {
         return;
     }
-    if scene.layers.x > 0.0 {
-        apply_layers(i);
-    }
     near[i] = 0u;
     let d = pdata[i];
     if d.x == 0.0 {
@@ -1193,7 +1190,11 @@ fn layer_find(@builtin(global_invocation_id) id: vec3u) {
             }
         }
         if keep {
-            touches[row + 1u + kept] = e & 0x7fffffffu;
+            // Bit 31 now: the particle belongs on the side the triangle
+            // faces (`layer_solve` needs no garments then).
+            let tk = e & 0x7fffffffu;
+            let above = layer_side(own, triangles[tk]) > 0.0;
+            touches[row + 1u + kept] = tk | select(0u, 0x80000000u, above);
             kept += 1u;
         }
     }
@@ -1216,8 +1217,11 @@ fn scatter(i: u32, v: vec3f, w: f32) {
 
 // Inverse mass of i in a contact: 0 if it is the inner side and rests on
 // the body (shock propagation, Guendelman et al. 2003).
+// With the particles sewn to it that are closed to within OPEN_SEAM, as
+// one particle of their summed mass (they move together, see
+// `layer_average`).
 fn held_w(i: u32, inner: bool) -> f32 {
-    return select(pdata[i].x, 0.0, inner && near[i] != 0u);
+    return select(welded_w(i, OPEN_SEAM * OPEN_SEAM), 0.0, inner && near[i] != 0u);
 }
 
 // Each candidate that came too close: XPBD on side·(p − q)·n ≥ gap (q the
@@ -1230,15 +1234,12 @@ fn layer_solve(@builtin(global_invocation_id) id: vec3u) {
     if i >= scene.counts.x {
         return;
     }
-    let own = garment_of(i);
-    if own == NONE {
-        return;
-    }
     let row = i * (MAX_TOUCHES + 1u);
     let p = x[i].xyz;
     let h = step.gravity_h.w;
     for (var s = 0u; s < touches[row]; s++) {
-        let t = triangles[touches[row + 1u + s]];
+        let e = touches[row + 1u + s];
+        let t = triangles[e & 0x7fffffffu];
         if !holds(t) {
             continue;
         }
@@ -1250,7 +1251,7 @@ fn layer_solve(@builtin(global_invocation_id) id: vec3u) {
         if !o.ok {
             continue;
         }
-        let side = layer_side(own, t);
+        let side = select(-1.0, 1.0, (e & 0x80000000u) != 0u);
         var depth = layer_gap(i, t) - side * o.d;
         if depth <= 0.0 {
             continue;
@@ -1294,21 +1295,38 @@ fn layer_solve(@builtin(global_invocation_id) id: vec3u) {
     }
 }
 
-// A particle moves by the average of its pushes from contacts between
-// garments, over-relaxed by LAYER_RELAXATION (constraint averaging with
-// successive over-relaxation, Macklin et al. 2014 §4.2): averaged alone,
-// a tucked shirt pressed between the trousers and the body slipped out
-// through them over a few substeps, where the CPU's sweep (Gauss–Seidel)
-// held it. The sums are cleared. Called by `collide`, which runs next (a
-// dispatch of its own cost as much as the pushes).
-fn apply_layers(i: u32) {
+// Each particle's push from contacts between garments: the average of
+// its pushes, over-relaxed by LAYER_RELAXATION (constraint averaging with
+// successive over-relaxation, Macklin et al. 2014 §4.2: averaged alone, a
+// tucked shirt pressed between the trousers and the body slipped out
+// through them over a few substeps, where the CPU's sweep held it), into
+// `delta` with the mask of the seam partners closed to within OPEN_SEAM
+// (as `self_gather`); `self_apply` then moves each particle with them, so
+// a push does not open a seam or a fastened zipper. The sums are cleared.
+@compute @workgroup_size(WG)
+fn layer_average(@builtin(global_invocation_id) id: vec3u) {
+    let i = id.x;
+    if i >= scene.counts.x {
+        return;
+    }
     let count = atomicExchange(&layer_delta[4u * i + 3u], 0);
     let q = vec3i(
         atomicExchange(&layer_delta[4u * i], 0),
         atomicExchange(&layer_delta[4u * i + 1u], 0),
         atomicExchange(&layer_delta[4u * i + 2u], 0),
     );
-    if count > 0 {
-        x[i] = vec4f(x[i].xyz + vec3f(q) * (FIXED * LAYER_RELAXATION / f32(count)), 0.0);
+    let p = x[i].xyz;
+    var mask = 0u;
+    let first = sewn_csr[i];
+    for (var k = first; k < sewn_csr[i + 1u] && k - first < 24u; k++) {
+        let d = x[sewn_csr[k]].xyz - p;
+        if dot(d, d) <= OPEN_SEAM * OPEN_SEAM {
+            mask |= 1u << (k - first);
+        }
     }
+    var push = vec3f(0.0);
+    if count > 0 {
+        push = vec3f(q) * (FIXED * LAYER_RELAXATION / f32(count));
+    }
+    delta[i] = vec4f(push, f32(mask));
 }

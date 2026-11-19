@@ -112,6 +112,12 @@ pub struct LayerContact {
     pub cloth: usize,
     /// Per bridge (triangle `cloth + k`), the cloth triangle it continues.
     pub bridged: Vec<u32>,
+    /// For each particle, the others sewn or fastened to it (its seam
+    /// group, empty for most particles): those closed to within
+    /// [`OPEN_SEAM`] of it move with it when a contact pushes it, as one
+    /// particle of their summed mass. Pushed alone, the top of a fly
+    /// zipper over a tucked shirt opened by 8 mm.
+    pub sewn: Vec<Vec<u32>>,
     pub triangle_garment: Vec<u16>,
     /// Per triangle, its free edges: bit k for the edge opposite corner
     /// k, when no other triangle and no seam continue the cloth there;
@@ -287,6 +293,7 @@ impl LayerContact {
             triangles: all,
             cloth,
             bridged,
+            sewn: Vec::new(),
             free,
             incident,
             reach,
@@ -309,6 +316,38 @@ impl LayerContact {
     pub fn gap(&self, thickness: &[f32], p: usize, t: [u32; 3]) -> f32 {
         let sheet = t.iter().map(|v| thickness[*v as usize]).sum::<f32>() / 3.0;
         thickness[p] + sheet + LAYER_SKIN
+    }
+
+    /// The particles that move with `i` when a contact pushes it: itself
+    /// and those sewn to it that are closed to within [`OPEN_SEAM`].
+    fn welded<'a>(&'a self, x: &'a [Vec3], i: usize) -> impl Iterator<Item = usize> + 'a {
+        let partners = self.sewn.get(i).map(Vec::as_slice).unwrap_or_default();
+        std::iter::once(i).chain(
+            partners
+                .iter()
+                .map(|j| *j as usize)
+                .filter(move |j| x[*j].distance_squared(x[i]) <= OPEN_SEAM * OPEN_SEAM),
+        )
+    }
+
+    /// Inverse mass of `i` with what is welded to it (0 if any is pinned).
+    fn welded_w(&self, x: &[Vec3], w: &[f32], i: usize) -> f32 {
+        let mut mass = 0.0;
+        for j in self.welded(x, i) {
+            if w[j] == 0.0 {
+                return 0.0;
+            }
+            mass += 1.0 / w[j];
+        }
+        1.0 / mass
+    }
+
+    /// Move `i` and what is welded to it by `delta`.
+    fn shift(&self, x: &mut [Vec3], i: usize, delta: Vec3) {
+        let moved: Vec<usize> = self.welded(x, i).collect();
+        for j in moved {
+            x[j] += delta;
+        }
     }
 
     /// Whether triangle `k` holds cloth off now: always for the cloth's
@@ -488,13 +527,13 @@ impl LayerContact {
                 }
             }
             let corners = t.map(|v| v as usize);
-            // Inverse masses, the inner side's 0 where it rests on the
-            // body.
+            // Inverse masses (with what is welded to each), the inner
+            // side's 0 where it rests on the body.
             let held = |i: usize, inner: bool| {
                 if inner && cloth.on_body.get(i).copied().unwrap_or(false) {
                     0.0
                 } else {
-                    cloth.w[i]
+                    self.welded_w(x, cloth.w, i)
                 }
             };
             let wp = held(p, side < 0.0);
@@ -507,9 +546,9 @@ impl LayerContact {
             // normal held constant (Bridson et al. 2002, §7.2), no
             // compliance.
             let push = n * (side * depth / denom);
-            x[p] += push * wp;
+            self.shift(x, p, push * wp);
             for ((v, wv), b) in corners.iter().zip(wc).zip(bary) {
-                x[*v] -= push * (b * wv);
+                self.shift(x, *v, -push * (b * wv));
             }
             // Friction: the sliding of the particle over the triangle
             // this substep, cancelled up to μ × the push.
@@ -528,9 +567,9 @@ impl LayerContact {
             }
             let mu = (friction[p] + corners.iter().map(|v| friction[*v]).sum::<f32>() / 3.0) / 2.0;
             let cancel = tangential * ((mu * depth / sliding).min(1.0) / denom);
-            x[p] -= cancel * wp;
+            self.shift(x, p, -cancel * wp);
             for ((v, wv), b) in corners.iter().zip(wc).zip(bary) {
-                x[*v] += cancel * (b * wv);
+                self.shift(x, *v, cancel * (b * wv));
             }
         }
     }

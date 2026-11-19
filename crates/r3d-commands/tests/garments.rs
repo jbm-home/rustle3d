@@ -266,7 +266,11 @@ fn a_shirt_under_trousers_is_tucked_in() {
         .map(|p| p.y)
         .fold(0.0f32, f32::max);
     let seen = common::seen_through(&scene, &x, 0, 1, 0.85, top - 0.03);
-    assert_eq!(seen, 0, "shirt showing through the trousers below {top}");
+    assert!(
+        seen.is_empty(),
+        "shirt showing through the trousers below {top}: {:?}",
+        seen.iter().map(|i| (i, x[*i])).collect::<Vec<_>>()
+    );
 }
 
 /// A T-shirt worn over trousers hides them where it covers them: the
@@ -285,5 +289,8 @@ fn trousers_do_not_show_through_a_t_shirt_over_them() {
         .map(|p| p.y)
         .fold(f32::MAX, f32::min);
     let seen = common::seen_through(&scene, &x, 0, 1, hem + 0.03, 1.15);
-    assert_eq!(seen, 0, "trousers showing through the T-shirt above {hem}");
+    assert!(
+        seen.is_empty(),
+        "trousers showing through the T-shirt above {hem}: {seen:?}"
+    );
 }

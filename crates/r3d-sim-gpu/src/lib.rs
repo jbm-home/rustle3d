@@ -196,8 +196,9 @@ mod kernel {
     pub const LAYER_FIND: usize = 21;
     pub const LAYER_SOLVE: usize = 22;
     pub const LAYER_TURNED: usize = 23;
+    pub const LAYER_AVERAGE: usize = 24;
 
-    pub const ALL: [(&str, &[u32]); 24] = [
+    pub const ALL: [(&str, &[u32]); 25] = [
         ("predict", &[X, PREV, VEL, PDATA]),
         ("membrane", &[X, PDATA, MEMBRANES]),
         ("hinge", &[X, PDATA, HINGES]),
@@ -205,16 +206,7 @@ mod kernel {
         ("pull", &[X, PDATA, GRAB]),
         (
             "collide",
-            &[
-                X,
-                PREV,
-                PDATA,
-                NEARBY,
-                SDF_SLOTS,
-                SDF_VALUES,
-                BODY,
-                LAYER_DELTA,
-            ],
+            &[X, PREV, PDATA, NEARBY, SDF_SLOTS, SDF_VALUES, BODY],
         ),
         (
             "edges",
@@ -267,7 +259,7 @@ mod kernel {
                 PREV,
                 PDATA,
                 NEARBY,
-                INCIDENT,
+                SEWN,
                 TRIANGLES,
                 TOUCHES,
                 LAYER_DELTA,
@@ -277,6 +269,7 @@ mod kernel {
             "layer_turned",
             &[X, TRIANGLES, TOUCHES, SDF_SLOTS, SDF_VALUES, BODY],
         ),
+        ("layer_average", &[X, LAYER_DELTA, DELTA, SEWN]),
     ];
 }
 
@@ -1095,10 +1088,11 @@ impl GpuSolver {
             substep_passes.push(all(SELF_APPLY));
         }
         if layered {
-            // The pushes are applied by `collide`.
             frame_passes.push(turned);
             frame_passes.push(all(LAYER_FIND));
             substep_passes.push(all(LAYER_SOLVE));
+            substep_passes.push(all(LAYER_AVERAGE));
+            substep_passes.push(all(SELF_APPLY));
         }
         if self_collision || layered {
             frame_passes.push(one(LAYER_RESET));

@@ -44,8 +44,8 @@ pub fn women_m(s: &mut Session) {
     s.run_step(&Step::from_value(body).unwrap()).unwrap();
 }
 
-/// How many particles of garment `inner` (as numbered in the scene's
-/// triangles) show past garment `outer` from the front or the back, between
+/// The particles of garment `inner` (as numbered in the scene's
+/// triangles) that show past garment `outer` from the front or the back, between
 /// heights `low` and `high` (m) and within 10 cm of the median plane: in
 /// front of the outer cloth's frontmost surface at their height and
 /// across, or behind its backmost one, by more than a millimetre.
@@ -56,7 +56,7 @@ pub fn seen_through(
     outer: u16,
     low: f32,
     high: f32,
-) -> usize {
+) -> Vec<usize> {
     let mut garment = vec![u16::MAX; x.len()];
     for t in &scene.triangles {
         for v in t.vertices {
@@ -89,8 +89,9 @@ pub fn seen_through(
     };
     x.iter()
         .zip(&garment)
-        .filter(|(p, g)| **g == inner && (low..high).contains(&p.y) && p.x.abs() < 0.1)
-        .filter(|(p, _)| {
+        .enumerate()
+        .filter(|(_, (p, g))| **g == inner && (low..high).contains(&p.y) && p.x.abs() < 0.1)
+        .filter(|(_, (p, _))| {
             let front = p.z > 0.0;
             surface(p.x, p.y, front).is_some_and(|z| {
                 if front {
@@ -100,5 +101,6 @@ pub fn seen_through(
                 }
             })
         })
-        .count()
+        .map(|(i, _)| i)
+        .collect()
 }

@@ -487,6 +487,13 @@ particles that did, substep by substep:
   garment belongs on is not known. Taken by the layer order, the turned
   sheet of a shirt's fold at the centre back was pushed out through the
   trousers, a few millimetres a substep.
+- **Seams and fastenings pushed as one.** A pushed particle moves with
+  the particles sewn or fastened to it that have closed to within 5 mm,
+  as one particle of their summed mass (as in self-collision): pushed
+  alone, the top of a fly zipper over a tucked shirt opened by 8 mm.
+  On the GPU the push is computed with the group's mass too, and the
+  averaged pushes go through `self_apply`, which adds a particle's
+  welded partners' pushes to its own.
 - **Shock propagation.** The inner cloth of a contact that rests on the
   body does not move; the outer one takes the whole push (Guendelman et
   al. [23]). Pushed by its share, a light shirt went into the body, the
@@ -642,7 +649,8 @@ substep), not per particle: the dress meshed at 2.3k, 4.4k and 6.5k
 particles steps in 5.4, 5.7 and 6.2 ms. Fewer substeps (VBD [12]) or
 fewer colours (one kernel over all constraint kinds) are the next levers.
 
-Contacts between garments (M19) cost one dispatch per substep, and the
+Contacts between garments (M19) cost three dispatches per substep (the
+pushes, their average, their application with seam partners), and the
 check whether to gather their candidates again six more; checked every
 substep it made a shirt and trousers (5 052 particles) 6 ms slower, so
 the GPU checks every substep only while sewing (0.6 s) and every fifth

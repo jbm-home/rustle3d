@@ -207,7 +207,7 @@ impl Model {
             sewn[*a as usize] = true;
             sewn[*b as usize] = true;
         }
-        let layers = LayerContact::new(
+        let mut layers = LayerContact::new(
             n,
             &corners,
             &garments,
@@ -218,6 +218,7 @@ impl Model {
         );
         let self_contact =
             SelfContact::new(&rest_positions, &corners, &ties, &overlaps, &layers.garment);
+        layers.sewn = self_contact.sewn.clone();
         Self {
             positions: scene.particles.iter().map(|p| p.position).collect(),
             inv_mass,
