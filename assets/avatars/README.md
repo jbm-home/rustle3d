@@ -13,6 +13,7 @@ source files is stored in the pack's provenance text.
 Only MakeHuman's **assets** are used. Its source code is AGPL and is not used:
 the body model, the measurements, the fitting, the posing and skinning, and
 the motions (walk, turn, raise arms) in `crates/r3d-avatar` are our own. No
-motion capture data is used.
+motion capture data is shipped: a user can import a BVH file into a
+project (spec 22), under that file's own licence.
 
 Forbidden: SMPL, SMPL-X and any body model with a non-commercial license.

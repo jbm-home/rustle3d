@@ -1489,5 +1489,87 @@
   "mm": "mm",
   "errLods": "Levels of detail: start at 100 and go down, each above 0, at most five.",
   "errTextureSize": "Choose no map, or a power of two from 256 to 4096.",
-  "errNoSkeleton": "This body has no skeleton: export without skinning."
+  "errNoSkeleton": "This body has no skeleton: export without skinning.",
+  "motionImport": "Import a captured motion…",
+  "motionFiles": "Motion captures (BVH)",
+  "errMotionFormat": "This BVH file cannot be read: {detail}",
+  "@errMotionFormat": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "errMotionSkeleton": "The skeleton of this motion has no joint for the {bone}.",
+  "@errMotionSkeleton": {
+    "placeholders": {
+      "bone": {
+        "type": "String"
+      }
+    }
+  },
+  "errMotionTooShort": "This motion is too short: it needs at least {seconds} s.",
+  "@errMotionTooShort": {
+    "placeholders": {
+      "seconds": {
+        "type": "String"
+      }
+    }
+  },
+  "motionLibrary": "Motion library",
+  "motionLibraryMenu": "Motion library…",
+  "motionLibrarySubtitle": "Captured motions (BVH files) you can use in every project.",
+  "motionLibraryEmpty": "No motion yet: add BVH files here, or add a motion to the library when you import it.",
+  "motionLibraryAdd": "Add files…",
+  "motionLibraryPlay": "Play on the avatar",
+  "motionLibraryDeleteConfirm": "Delete “{name}” from the library? Projects that use it keep their copy.",
+  "@motionLibraryDeleteConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "motionImported": "Motion imported into the project.",
+  "motionAddToLibrary": "Add to library",
+  "motionAddedToLibrary": "Added to the library: {name}",
+  "@motionAddedToLibrary": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "errLibraryName": "“{name}” cannot name a motion: avoid / \\ : * ? \" < > | and a leading or trailing dot.",
+  "@errLibraryName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "errLibraryExists": "The library already has a motion named “{name}”.",
+  "@errLibraryExists": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "errLibraryMissing": "The library has no motion named “{name}” any more.",
+  "@errLibraryMissing": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "errLibraryIo": "The motion library cannot be read or written: {detail}",
+  "@errLibraryIo": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  }
 }

@@ -84,6 +84,8 @@ pub enum Invalid {
     Lods,
     #[error("must be 0 or a power of two from 256 to 4096")]
     TextureSize,
+    #[error("cannot be given with `motion`")]
+    WithMotion,
 }
 
 impl Invalid {
@@ -128,6 +130,7 @@ impl Invalid {
             Invalid::OutsidePiece => "invalid.outside_piece",
             Invalid::Lods => "invalid.lods",
             Invalid::TextureSize => "invalid.texture_size",
+            Invalid::WithMotion => "invalid.with_motion",
         }
     }
 }
@@ -194,6 +197,8 @@ pub enum CommandError {
     BodyUnavailable { file: String },
     #[error("an imported body cannot move yet: drape it standing still")]
     ImportedBodyStill,
+    #[error(transparent)]
+    Motion(#[from] r3d_avatar::captured::MotionError),
     #[error("the avatar has no skeleton (an imported body, or no avatar): export without skinning")]
     NoSkeleton,
     #[error("internal error: {detail}")]
@@ -274,6 +279,7 @@ impl Localizable for CommandError {
                 Message::new("avatar.mesh_unavailable", text).arg("file", file)
             }
             Self::ImportedBodyStill => Message::new("motion.imported_body", text),
+            Self::Motion(e) => e.message(),
             Self::NoSkeleton => Message::new("export.no_skeleton", text),
             Self::Internal { detail } => Message::new("internal", text).arg("detail", detail),
         }

@@ -2911,4 +2911,81 @@ class LEn extends L {
   @override
   String get errNoSkeleton =>
       'This body has no skeleton: export without skinning.';
+
+  @override
+  String get motionImport => 'Import a captured motion…';
+
+  @override
+  String get motionFiles => 'Motion captures (BVH)';
+
+  @override
+  String errMotionFormat(String detail) {
+    return 'This BVH file cannot be read: $detail';
+  }
+
+  @override
+  String errMotionSkeleton(String bone) {
+    return 'The skeleton of this motion has no joint for the $bone.';
+  }
+
+  @override
+  String errMotionTooShort(String seconds) {
+    return 'This motion is too short: it needs at least $seconds s.';
+  }
+
+  @override
+  String get motionLibrary => 'Motion library';
+
+  @override
+  String get motionLibraryMenu => 'Motion library…';
+
+  @override
+  String get motionLibrarySubtitle =>
+      'Captured motions (BVH files) you can use in every project.';
+
+  @override
+  String get motionLibraryEmpty =>
+      'No motion yet: add BVH files here, or add a motion to the library when you import it.';
+
+  @override
+  String get motionLibraryAdd => 'Add files…';
+
+  @override
+  String get motionLibraryPlay => 'Play on the avatar';
+
+  @override
+  String motionLibraryDeleteConfirm(String name) {
+    return 'Delete “$name” from the library? Projects that use it keep their copy.';
+  }
+
+  @override
+  String get motionImported => 'Motion imported into the project.';
+
+  @override
+  String get motionAddToLibrary => 'Add to library';
+
+  @override
+  String motionAddedToLibrary(String name) {
+    return 'Added to the library: $name';
+  }
+
+  @override
+  String errLibraryName(String name) {
+    return '“$name” cannot name a motion: avoid / \\ : * ? \" < > | and a leading or trailing dot.';
+  }
+
+  @override
+  String errLibraryExists(String name) {
+    return 'The library already has a motion named “$name”.';
+  }
+
+  @override
+  String errLibraryMissing(String name) {
+    return 'The library has no motion named “$name” any more.';
+  }
+
+  @override
+  String errLibraryIo(String detail) {
+    return 'The motion library cannot be read or written: $detail';
+  }
 }

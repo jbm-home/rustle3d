@@ -5004,6 +5004,120 @@ abstract class L {
   /// In en, this message translates to:
   /// **'This body has no skeleton: export without skinning.'**
   String get errNoSkeleton;
+
+  /// No description provided for @motionImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Import a captured motion…'**
+  String get motionImport;
+
+  /// No description provided for @motionFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Motion captures (BVH)'**
+  String get motionFiles;
+
+  /// No description provided for @errMotionFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'This BVH file cannot be read: {detail}'**
+  String errMotionFormat(String detail);
+
+  /// No description provided for @errMotionSkeleton.
+  ///
+  /// In en, this message translates to:
+  /// **'The skeleton of this motion has no joint for the {bone}.'**
+  String errMotionSkeleton(String bone);
+
+  /// No description provided for @errMotionTooShort.
+  ///
+  /// In en, this message translates to:
+  /// **'This motion is too short: it needs at least {seconds} s.'**
+  String errMotionTooShort(String seconds);
+
+  /// No description provided for @motionLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Motion library'**
+  String get motionLibrary;
+
+  /// No description provided for @motionLibraryMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Motion library…'**
+  String get motionLibraryMenu;
+
+  /// No description provided for @motionLibrarySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Captured motions (BVH files) you can use in every project.'**
+  String get motionLibrarySubtitle;
+
+  /// No description provided for @motionLibraryEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No motion yet: add BVH files here, or add a motion to the library when you import it.'**
+  String get motionLibraryEmpty;
+
+  /// No description provided for @motionLibraryAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add files…'**
+  String get motionLibraryAdd;
+
+  /// No description provided for @motionLibraryPlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Play on the avatar'**
+  String get motionLibraryPlay;
+
+  /// No description provided for @motionLibraryDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete “{name}” from the library? Projects that use it keep their copy.'**
+  String motionLibraryDeleteConfirm(String name);
+
+  /// No description provided for @motionImported.
+  ///
+  /// In en, this message translates to:
+  /// **'Motion imported into the project.'**
+  String get motionImported;
+
+  /// No description provided for @motionAddToLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to library'**
+  String get motionAddToLibrary;
+
+  /// No description provided for @motionAddedToLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Added to the library: {name}'**
+  String motionAddedToLibrary(String name);
+
+  /// No description provided for @errLibraryName.
+  ///
+  /// In en, this message translates to:
+  /// **'“{name}” cannot name a motion: avoid / \\ : * ? \" < > | and a leading or trailing dot.'**
+  String errLibraryName(String name);
+
+  /// No description provided for @errLibraryExists.
+  ///
+  /// In en, this message translates to:
+  /// **'The library already has a motion named “{name}”.'**
+  String errLibraryExists(String name);
+
+  /// No description provided for @errLibraryMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'The library has no motion named “{name}” any more.'**
+  String errLibraryMissing(String name);
+
+  /// No description provided for @errLibraryIo.
+  ///
+  /// In en, this message translates to:
+  /// **'The motion library cannot be read or written: {detail}'**
+  String errLibraryIo(String detail);
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

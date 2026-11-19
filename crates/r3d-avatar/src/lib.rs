@@ -11,12 +11,19 @@
 //! - [`fit`]: the shape that matches given measurements.
 //! - [`presets`]: built-in sizes and the user's own presets.
 //! - [`skeleton`]: the body's bones, poses and skinning.
-//! - [`motion`]: walking, turning, raising the arms.
+//! - [`motion`]: walking, turning, raising the arms, captured motions.
+//! - [`bvh`], [`captured`]: motions captured on real people, from BVH
+//!   files, played by our skeleton.
+//! - [`motion_library`]: the user's captured motions, shared by every
+//!   project.
 
+pub mod bvh;
+pub mod captured;
 pub mod fit;
 pub mod measure;
 pub mod model;
 pub mod motion;
+pub mod motion_library;
 pub mod pack;
 pub mod presets;
 pub mod skeleton;

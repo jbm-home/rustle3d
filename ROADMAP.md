@@ -945,6 +945,16 @@ tests below, in the real app):
 - Left for later: walking along a path, arms straight overhead (needs a
   skinning that does not fold the armpit, e.g. dual quaternions),
   imported avatars' motions (M31), a timeline and a video of a motion.
+- Captured motions (2026-11-19, spec 22): a BVH motion capture imported
+  into the project plays on the avatar, retargeted to its skeleton and
+  looped on the spot; the Motion menu's import, `simulate`'s
+  `motion_file`. First tried with a slow walk of the CMU database
+  (maintainer: a good start). A motion library shared by all projects:
+  add to it after an import, manage it in a dialog (add files, play,
+  rename, delete), its motions in the Motion menu.
+- To fix (maintainer, 2026-11-19, seen with a captured walk): the hands
+  pass through the body and catch the garment, which gets pulled;
+  trousers slide down and up again as the avatar walks.
 
 ## M24 — Fit maps and virtual tape measure
 - Stress and strain shown in colour on the draped garment, to find

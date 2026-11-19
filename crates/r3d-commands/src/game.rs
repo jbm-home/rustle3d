@@ -283,7 +283,7 @@ pub struct GameReport {
     pub lods: Vec<(f64, usize)>,
     pub normal_map: u32,
     pub skinned: bool,
-    pub animations: Vec<&'static str>,
+    pub animations: Vec<String>,
 }
 
 impl GameReport {
@@ -369,9 +369,9 @@ pub fn game_scene(
             }
         }
         if s.animations {
-            for motion in Motion::ALL {
+            for motion in &Motion::BUILT_IN {
                 scene.clips.push(clip(skeleton, motion, shift));
-                animations.push(motion_name(motion));
+                animations.push(motion.name().to_owned());
             }
         }
         if s.avatar
@@ -396,14 +396,6 @@ pub fn game_scene(
         animations,
     };
     Ok((scene, report))
-}
-
-fn motion_name(m: Motion) -> &'static str {
-    match m {
-        Motion::Walk => "walk",
-        Motion::Turn => "turn",
-        Motion::RaiseArms => "raise_arms",
-    }
 }
 
 /// Each garment's pieces as one mesh, with the pieces packed in an atlas.
@@ -1239,7 +1231,7 @@ fn joints(skeleton: &Skeleton) -> (Vec<Joint>, u8) {
 
 /// One cycle of `motion` at full amplitude, from phase 0, as local joint
 /// rotations (and the root bones' translations), looping.
-fn clip(skeleton: &Skeleton, motion: Motion, shift: u8) -> Clip {
+fn clip(skeleton: &Skeleton, motion: &Motion, shift: u8) -> Clip {
     let period = motion.period();
     let frames = (period * CLIP_FPS).round().max(2.0) as usize;
     // The first cycle start after the motion has fully grown in.
@@ -1298,7 +1290,7 @@ fn clip(skeleton: &Skeleton, motion: Motion, shift: u8) -> Clip {
         }
     }
     Clip {
-        name: motion_name(motion).into(),
+        name: motion.name().into(),
         times,
         channels,
     }

@@ -17,9 +17,11 @@
 use std::collections::{BTreeMap, HashMap};
 use std::ops::Range;
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Instant;
 
 use glam::{Vec2, Vec3};
+use r3d_avatar::captured::CapturedMotion;
 use r3d_avatar::fit::{fitted_body, fitted_positions};
 use r3d_avatar::motion::{EASE_IN_S, Motion, ease};
 use r3d_avatar::pack::Influences;
@@ -120,7 +122,7 @@ pub const MOTION_START_S: f32 = 1.5;
 pub const STOP_S: f32 = 1.0;
 
 /// The avatar's motion over simulated time.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Animation {
     pub motion: Motion,
     /// When it starts (simulated time, s).
@@ -150,7 +152,7 @@ impl Animation {
     pub fn switch(current: Option<Self>, to: Option<Motion>, now: f32) -> Option<Self> {
         match current.and_then(|a| a.settled(now)) {
             None => to.map(|m| Self::starting(m, now)),
-            Some(a) if a.stop.is_none() && to == Some(a.motion) => Some(a),
+            Some(a) if a.stop.is_none() && to.as_ref() == Some(&a.motion) => Some(a),
             Some(a) if now < a.start => to.map(|m| Self::starting(m, now)),
             Some(a) => Some(Self {
                 stop: Some(a.stop.unwrap_or(now)),
@@ -182,8 +184,8 @@ impl Animation {
     /// The motion chosen last, if any: playing, or next after a stop.
     pub fn chosen(&self) -> Option<Motion> {
         match self.stop {
-            None => Some(self.motion),
-            Some(_) => self.then,
+            None => Some(self.motion.clone()),
+            Some(_) => self.then.clone(),
         }
     }
 }
@@ -732,7 +734,7 @@ impl Form {
         let rig = self.rig.as_ref()?;
         let since = |t: f32| (t - animation.start).max(0.0);
         let pose = match animation.stop {
-            Some(stop) if time >= stop => match animation.then {
+            Some(stop) if time >= stop => match &animation.then {
                 Some(next) if time >= stop + STOP_S => {
                     next.pose(&rig.skeleton, time - stop - STOP_S)
                 }
@@ -762,7 +764,7 @@ impl Form {
                 .map(|k| self.transforms(animation, from + k as f32 / MOTION_FPS))
                 .collect()
         };
-        let (start, intro, cycle) = match (animation.stop, animation.then) {
+        let (start, intro, cycle) = match (animation.stop, &animation.then) {
             // Back to rest, then the next motion.
             (Some(stop), Some(next)) => (
                 stop,
@@ -2032,24 +2034,35 @@ const PROGRESS_FRAMES: u32 = 10;
 
 /// Where the last headless drape is cached, relative to the project folder.
 pub const CACHE_FILE: &str = ".r3d-cache/drape.bin";
-const CACHE_MAGIC: &[u8; 8] = b"R3DDRP02";
-/// Bytes before the positions: magic, fingerprint, motion, time.
-const CACHE_HEAD: usize = 8 + 8 + 4 + 4;
+const CACHE_MAGIC: &[u8; 8] = b"R3DDRP03";
+/// The cache's motion tag for a captured motion (after the built-in ones).
+const CAPTURED_TAG: u32 = Motion::BUILT_IN.len() as u32 + 1;
 
 /// Fingerprint of everything a drape depends on: the document (schema
 /// JSON), the mesh spacing and the solver's substeps. FNV-1a, stable
 /// across runs and platforms.
 pub fn fingerprint(project: &Project) -> Result<u64, CommandError> {
     let json = r3d_core::file::to_json(project).map_err(|e| internal(e.to_string()))?;
-    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
     let tail = [
         DEFAULT_SPACING_MM.to_le_bytes(),
         u64::from(SUBSTEPS).to_le_bytes(),
     ];
-    for b in json.as_bytes().iter().chain(tail.iter().flatten()) {
+    Ok(fnv(json.as_bytes().iter().chain(tail.iter().flatten())))
+}
+
+fn fnv<'a>(bytes: impl Iterator<Item = &'a u8>) -> u64 {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in bytes {
         hash = (hash ^ u64::from(*b)).wrapping_mul(0x0100_0000_01b3);
     }
-    Ok(hash)
+    hash
+}
+
+/// The motion captured in the BVH file at `path` (its name), read from
+/// `bytes`.
+pub fn captured_motion(path: &str, bytes: &[u8]) -> Result<Motion, CommandError> {
+    let motion = CapturedMotion::from_bvh(path, &String::from_utf8_lossy(bytes))?;
+    Ok(Motion::Captured(Arc::new(motion)))
 }
 
 /// A cached drape: where the cloth was at `time`, and how the avatar
@@ -2062,21 +2075,36 @@ pub struct Cached {
     pub time: f32,
 }
 
-/// Encode a drape for [`CACHE_FILE`]: the fingerprint, the motion (its
-/// index in [`Motion::ALL`] plus one, 0 for none; it started at
-/// [`MOTION_START_S`]), the time, the positions.
-pub fn encode_cache(fingerprint: u64, out: &Simulated) -> Vec<u8> {
+/// Encode a drape for [`CACHE_FILE`]: the fingerprint, the time, the
+/// motion (0 for none, a built-in one's index in [`Motion::BUILT_IN`]
+/// plus one, or a captured one's file, relative to the project folder,
+/// and a hash of its bytes: `motion_file`; it started at
+/// [`MOTION_START_S`]), the positions.
+pub fn encode_cache(
+    fingerprint: u64,
+    out: &Simulated,
+    motion_file: Option<(&str, &[u8])>,
+) -> Vec<u8> {
     let positions = &out.positions;
-    let motion = out
-        .animation
-        .and_then(|a| Motion::ALL.iter().position(|m| *m == a.motion))
-        .map_or(0, |i| i as u32 + 1);
-    let time = out.frames as f32 / 60.0;
-    let mut bytes = Vec::with_capacity(CACHE_HEAD + positions.len() * 12);
+    let mut bytes = Vec::with_capacity(64 + positions.len() * 12);
     bytes.extend_from_slice(CACHE_MAGIC);
     bytes.extend_from_slice(&fingerprint.to_le_bytes());
-    bytes.extend_from_slice(&motion.to_le_bytes());
-    bytes.extend_from_slice(&time.to_le_bytes());
+    bytes.extend_from_slice(&(out.frames as f32 / 60.0).to_le_bytes());
+    let motion = out.animation.as_ref().map(|a| &a.motion);
+    match (motion, motion_file) {
+        (Some(Motion::Captured(_)), Some((path, file))) => {
+            bytes.extend_from_slice(&CAPTURED_TAG.to_le_bytes());
+            bytes.extend_from_slice(&(path.len() as u32).to_le_bytes());
+            bytes.extend_from_slice(path.as_bytes());
+            bytes.extend_from_slice(&fnv(file.iter()).to_le_bytes());
+        }
+        (m, _) => {
+            let tag = m
+                .and_then(|m| Motion::BUILT_IN.iter().position(|b| b == m))
+                .map_or(0, |i| i as u32 + 1);
+            bytes.extend_from_slice(&tag.to_le_bytes());
+        }
+    }
     for p in positions {
         for c in p.to_array() {
             bytes.extend_from_slice(&c.to_le_bytes());
@@ -2085,28 +2113,50 @@ pub fn encode_cache(fingerprint: u64, out: &Simulated) -> Vec<u8> {
     bytes
 }
 
+/// Reads a cache front to back.
+struct Reader<'a>(&'a [u8]);
+
+impl<'a> Reader<'a> {
+    fn take(&mut self, n: usize) -> Option<&'a [u8]> {
+        let (head, rest) = self.0.split_at_checked(n)?;
+        self.0 = rest;
+        Some(head)
+    }
+
+    fn u32(&mut self) -> Option<u32> {
+        Some(u32::from_le_bytes(self.take(4)?.try_into().ok()?))
+    }
+}
+
 /// The cached drape in the project folder `dir`, if it was made from this
-/// exact document; `None` otherwise (stale, missing or damaged cache: it
-/// is only a cache).
+/// exact document (and motion file); `None` otherwise (stale, missing or
+/// damaged cache: it is only a cache).
 pub fn load_cache(dir: &Path, project: &Project, particles: usize) -> Option<Cached> {
     let bytes = std::fs::read(dir.join(CACHE_FILE)).ok()?;
-    let (head, body) = bytes.split_at_checked(CACHE_HEAD)?;
-    let (magic, rest) = head.split_at(8);
-    let (print, rest) = rest.split_at(8);
-    let (motion, time) = rest.split_at(4);
-    if magic != CACHE_MAGIC
-        || print != fingerprint(project).ok()?.to_le_bytes()
-        || body.len() != particles * 12
-    {
+    let mut r = Reader(&bytes);
+    if r.take(8)? != CACHE_MAGIC || r.take(8)? != fingerprint(project).ok()?.to_le_bytes() {
         return None;
     }
-    let motion = u32::from_le_bytes(motion.try_into().ok()?) as usize;
-    let time = f32::from_le_bytes(time.try_into().ok()?);
-    let animation = match motion {
+    let time = f32::from_le_bytes(r.take(4)?.try_into().ok()?);
+    let motion = match r.u32()? {
         0 => None,
-        i => Some(Animation::starting(*Motion::ALL.get(i - 1)?, 0.0)),
+        CAPTURED_TAG => {
+            let len = r.u32()? as usize;
+            let path = std::str::from_utf8(r.take(len)?).ok()?;
+            let hash = r.take(8)?;
+            let file = std::fs::read(dir.join(path)).ok()?;
+            if fnv(file.iter()).to_le_bytes() != hash {
+                return None;
+            }
+            Some(captured_motion(path, &file).ok()?)
+        }
+        i => Some(Motion::BUILT_IN.get(i as usize - 1)?.clone()),
     };
-    let positions = body
+    if r.0.len() != particles * 12 {
+        return None;
+    }
+    let positions = r
+        .0
         .as_chunks::<12>()
         .0
         .iter()
@@ -2118,7 +2168,7 @@ pub fn load_cache(dir: &Path, project: &Project, particles: usize) -> Option<Cac
         .collect();
     Some(Cached {
         positions,
-        animation,
+        animation: motion.map(|m| Animation::starting(m, 0.0)),
         time,
     })
 }
@@ -2155,7 +2205,7 @@ impl Latest {
         let simulated = cached.is_some();
         let (animation, time) = cached
             .as_ref()
-            .map_or((None, 0.0), |c| (c.animation, c.time));
+            .map_or((None, 0.0), |c| (c.animation.clone(), c.time));
         Ok(Self {
             positions: cached.map_or(start, |c| c.positions),
             drape,

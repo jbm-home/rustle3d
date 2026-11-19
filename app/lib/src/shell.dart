@@ -16,11 +16,13 @@ import 'design/tokens.dart';
 import 'guide.dart';
 import 'i18n.dart';
 import 'learn.dart';
+import 'motion_library.dart';
 import 'photo.dart';
 import 'projector.dart';
 import 'techpack.dart';
 import 'tour.dart';
 import 'rust/api/engine.dart';
+import 'rust/api/library.dart';
 import 'start_screen.dart' show Logo;
 import 'views/rust_view.dart';
 
@@ -601,6 +603,70 @@ class _ShellState extends State<Shell> {
     }
     _drape(() => widget.engine.setMotion(motion: motion));
   }
+
+  /// Ask for a BVH motion capture, copy it into the project and play it.
+  Future<void> _importMotion() async {
+    final l = context.l;
+    final file = await openFile(
+      acceptedTypeGroups: [
+        XTypeGroup(label: l.motionFiles, extensions: const ['bvh']),
+      ],
+    );
+    if (file == null || !mounted) return;
+    final String motion;
+    try {
+      motion = await widget.engine.importMotion(path: file.path);
+    } on ApiError catch (e) {
+      if (mounted) _toast(context.error(e));
+      return;
+    }
+    if (!mounted) return;
+    _setMotion(motion);
+    // Offered after the import rather than asked before it.
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(l.motionImported),
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: l.motionAddToLibrary,
+            onPressed: () {
+              try {
+                final name = addLibraryMotion(
+                  libraryDir: widget.libraryDir,
+                  path: file.path,
+                );
+                if (mounted) _toast(context.l.motionAddedToLibrary(name));
+              } on ApiError catch (e) {
+                if (mounted) _toast(context.error(e));
+              }
+            },
+          ),
+        ),
+      );
+  }
+
+  /// Play the motion `name` of the library: the project gets a copy.
+  Future<void> _useLibraryMotion(String name) async {
+    final String motion;
+    try {
+      motion = await widget.engine.useLibraryMotion(
+        libraryDir: widget.libraryDir,
+        name: name,
+      );
+    } on ApiError catch (e) {
+      if (mounted) _toast(context.error(e));
+      return;
+    }
+    if (mounted) _setMotion(motion);
+  }
+
+  void _showMotionLibrary() => showMotionLibrary(
+    context,
+    libraryDir: widget.libraryDir,
+    onPlay: _useLibraryMotion,
+  );
 
   /// Rebuild the simulation from the pattern, keeping it running if it was.
   Future<void> _restart() async {
@@ -2385,6 +2451,19 @@ class _ShellState extends State<Shell> {
                                             onRun: _setRunning,
                                             onRestart: _restart,
                                             onMotion: _setMotion,
+                                            captured: () {
+                                              try {
+                                                return widget.engine.motions();
+                                              } on ApiError {
+                                                return const <String>[];
+                                              }
+                                            },
+                                            library: () => libraryMotions(
+                                              libraryDir: widget.libraryDir,
+                                            ),
+                                            onLibraryMotion: _useLibraryMotion,
+                                            onImportMotion: _importMotion,
+                                            onMotionLibrary: _showMotionLibrary,
                                             still: _bodyCheck != null,
                                           ),
                                           const SizedBox(width: Space.s),
@@ -4705,6 +4784,11 @@ class _SimControls extends StatelessWidget {
     required this.onRun,
     required this.onRestart,
     required this.onMotion,
+    required this.captured,
+    required this.library,
+    required this.onLibraryMotion,
+    required this.onImportMotion,
+    required this.onMotionLibrary,
     required this.still,
   });
 
@@ -4717,6 +4801,30 @@ class _SimControls extends StatelessWidget {
 
   /// A motion's name, or `null` to stand still.
   final ValueChanged<String?> onMotion;
+
+  /// The project's captured motions (their paths in the project), read
+  /// when the menu opens.
+  final List<String> Function() captured;
+
+  /// The user's library's motions, by name, read when the menu opens.
+  final List<String> Function() library;
+  final ValueChanged<String> onLibraryMotion;
+  final VoidCallback onImportMotion;
+  final VoidCallback onMotionLibrary;
+
+  /// The menu's values for importing a motion and for the library (never
+  /// a motion's path), and the prefix of a library motion's value.
+  static const _import = '*import';
+  static const _manage = '*library';
+  static const _fromLibrary = '*library:';
+
+  /// A captured motion's label: its file name without `.bvh`.
+  static String _label(String path) {
+    final name = path.split('/').last;
+    return name.toLowerCase().endsWith('.bvh')
+        ? name.substring(0, name.length - 4)
+        : name;
+  }
 
   static List<(String?, String)> _motions(L l) => [
     (null, l.motionStill),
@@ -4788,15 +4896,56 @@ class _SimControls extends StatelessWidget {
     return PopupMenuButton<String>(
       key: const ValueKey('motionButton'),
       tooltip: l.motionTip,
-      onSelected: (choice) => onMotion(choice.isEmpty ? null : choice),
-      itemBuilder: (_) => [
-        for (final (motion, label) in _motions(l))
-          CheckedPopupMenuItem(
-            value: motion ?? '',
-            checked: motion == current,
-            child: Text(label),
+      onSelected: (choice) {
+        if (choice == _import) {
+          onImportMotion();
+        } else if (choice == _manage) {
+          onMotionLibrary();
+        } else if (choice.startsWith(_fromLibrary)) {
+          onLibraryMotion(choice.substring(_fromLibrary.length));
+        } else {
+          onMotion(choice.isEmpty ? null : choice);
+        }
+      },
+      itemBuilder: (_) {
+        final files = captured();
+        // Library motions the project already has a copy of are listed
+        // once, as the project's.
+        final names = {for (final f in files) _label(f)};
+        final library = this.library().where((n) => !names.contains(n));
+        return [
+          for (final (motion, label) in _motions(l))
+            CheckedPopupMenuItem(
+              value: motion ?? '',
+              checked: motion == current,
+              child: Text(label),
+            ),
+          if (files.isNotEmpty || library.isNotEmpty) const PopupMenuDivider(),
+          for (final path in files)
+            CheckedPopupMenuItem(
+              value: path,
+              checked: path == current,
+              child: Text(_label(path)),
+            ),
+          for (final name in library)
+            CheckedPopupMenuItem(
+              value: '$_fromLibrary$name',
+              checked: false,
+              child: Text(name),
+            ),
+          const PopupMenuDivider(),
+          PopupMenuItem(
+            key: const ValueKey('motionImport'),
+            value: _import,
+            child: Text(l.motionImport),
           ),
-      ],
+          PopupMenuItem(
+            key: const ValueKey('motionLibrary'),
+            value: _manage,
+            child: Text(l.motionLibraryMenu),
+          ),
+        ];
+      },
       icon: Icon(
         Icons.directions_walk_rounded,
         size: 19,

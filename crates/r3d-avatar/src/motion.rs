@@ -1,7 +1,7 @@
 //! The avatar's motions: walking on the spot, turning around, raising the
-//! arms.
+//! arms, and motions captured on real people ([`crate::captured`]).
 //!
-//! Our own procedural motions: joint angles over a cycle, written from
+//! The built-in ones are our own procedural motions: joint angles over a cycle, written from
 //! general knowledge of human gait and movement (hip, knee and ankle
 //! ranges of a normal walk, the arms swinging against the legs, the
 //! pelvis and the chest turning against each other); no motion capture
@@ -10,16 +10,18 @@
 //! pose.
 
 use std::f32::consts::TAU;
+use std::sync::Arc;
 
 use glam::{Quat, Vec3};
 
+use crate::captured::CapturedMotion;
 use crate::skeleton::{Pose, Skeleton};
 
 /// Time over which a motion grows from the rest pose (s).
 pub const EASE_IN_S: f32 = 1.0;
 
 /// A motion of the avatar.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Motion {
     /// Walking on the spot.
     Walk,
@@ -27,6 +29,8 @@ pub enum Motion {
     Turn,
     /// Raising both arms overhead and lowering them.
     RaiseArms,
+    /// A motion captured on a real person, from a file.
+    Captured(Arc<CapturedMotion>),
 }
 
 /// How far the arms come down from the rest (A) pose to hang relaxed
@@ -34,19 +38,34 @@ pub enum Motion {
 const ARMS_DOWN: f32 = 20.0;
 
 impl Motion {
-    pub const ALL: [Motion; 3] = [Motion::Walk, Motion::Turn, Motion::RaiseArms];
+    pub const BUILT_IN: [Motion; 3] = [Motion::Walk, Motion::Turn, Motion::RaiseArms];
+
+    /// The name agents and the app call it by: `walk`, `turn`,
+    /// `raise_arms`, or a captured motion's own.
+    pub fn name(&self) -> &str {
+        match self {
+            Motion::Walk => "walk",
+            Motion::Turn => "turn",
+            Motion::RaiseArms => "raise_arms",
+            Motion::Captured(m) => &m.name,
+        }
+    }
 
     /// Length of one cycle (s).
-    pub fn period(self) -> f32 {
+    pub fn period(&self) -> f32 {
         match self {
             Motion::Walk => 1.1,
             Motion::Turn => 6.0,
             Motion::RaiseArms => 4.0,
+            Motion::Captured(m) => m.period(),
         }
     }
 
     /// The pose `t` seconds after the motion started.
-    pub fn pose(self, skeleton: &Skeleton, t: f32) -> Pose {
+    pub fn pose(&self, skeleton: &Skeleton, t: f32) -> Pose {
+        if let Motion::Captured(m) = self {
+            return m.pose(skeleton, t.max(0.0)).scaled(ease(t / EASE_IN_S));
+        }
         let mut b = Builder {
             skeleton,
             pose: Pose::rest(skeleton.bones.len()),
@@ -56,6 +75,7 @@ impl Motion {
             Motion::Walk => walk(&mut b, u),
             Motion::Turn => turn(&mut b, u),
             Motion::RaiseArms => raise_arms(&mut b, u),
+            Motion::Captured(_) => {}
         }
         b.pose.scaled(ease(t / EASE_IN_S))
     }
@@ -220,7 +240,7 @@ mod tests {
             let i = skeleton.find(&format!("hand_{side}")).unwrap();
             skeleton.transforms(pose)[i].apply(skeleton.bones[i].head)
         };
-        for motion in Motion::ALL {
+        for motion in Motion::BUILT_IN {
             for k in 0..60 {
                 let t = k as f32 * 0.1;
                 let pose = motion.pose(&skeleton, t);

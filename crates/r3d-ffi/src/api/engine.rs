@@ -617,14 +617,6 @@ fn poisoned() -> ApiError {
     ApiError::new("internal", "engine lock poisoned")
 }
 
-/// A motion's name as agents and the UI write it (`raise_arms`).
-fn motion_name(m: AvatarMotion) -> String {
-    serde_json::to_value(m)
-        .ok()
-        .and_then(|v| v.as_str().map(str::to_owned))
-        .unwrap_or_default()
-}
-
 /// Width of the pattern lines drawn on the garment, and how far they sit
 /// off the cloth (m).
 const LINE_WIDTH_M: f32 = 0.003;
@@ -840,9 +832,9 @@ impl Engine {
             // again with the drape.
             let mut animation = self.animation.lock().map_err(|_| poisoned())?;
             *animation = if carry {
-                animation.and_then(|a| a.settled(now.time))
+                animation.take().and_then(|a| a.settled(now.time))
             } else {
-                animation.and_then(Animation::restarted)
+                animation.take().and_then(Animation::restarted)
             };
             if let (Some(f), Some(a)) = (form.as_deref(), animation.as_ref()) {
                 drape.scene.motion = f.body_motion(a);
@@ -943,8 +935,10 @@ impl Engine {
         self.simulation_status()
     }
 
-    /// Make the avatar move (`walk`, `turn`, `raise_arms`) or stand still
-    /// (`None`) while the garment drapes, and run the simulation. A motion
+    /// Make the avatar move (`walk`, `turn`, `raise_arms`, or a captured
+    /// motion: a BVH file in the project folder, see
+    /// [`Engine::import_motion`]) or stand still (`None`) while the
+    /// garment drapes, and run the simulation. A motion
     /// starts once the garment has closed (after 1.5 s of draping); a body
     /// in motion first comes back to rest. Can take seconds when the
     /// garment is not loaded yet (see [`Engine::reset_simulation`]).
@@ -959,6 +953,9 @@ impl Engine {
             return Err(err(r3d_commands::CommandError::ImportedBodyStill));
         }
         let to = match motion {
+            Some(path) if path.to_ascii_lowercase().ends_with(".bvh") => {
+                Some(self.workspace()?.captured_motion(&path).map_err(err)?)
+            }
             Some(name) => {
                 let m: AvatarMotion = serde_json::from_value(serde_json::Value::String(name))
                     .map_err(|e| ApiError::new("invalid_motion", e.to_string()))?;
@@ -974,7 +971,7 @@ impl Engine {
         {
             let mut animation = self.animation.lock().map_err(|_| poisoned())?;
             let time = if now.loaded { now.time } else { 0.0 };
-            *animation = Animation::switch(*animation, to, time);
+            *animation = Animation::switch(animation.take(), to, time);
         }
         self.long("drape.prepare", |_| self.rebuild(true))?;
         self.run_simulation(true)
@@ -992,9 +989,10 @@ impl Engine {
             .animation
             .lock()
             .map_err(|_| poisoned())?
+            .clone()
             .and_then(|a| a.settled(p.time))
             .and_then(|a| a.chosen())
-            .map(|m| motion_name(m.into()));
+            .map(|m| m.name().to_owned());
         Ok(SimStatus {
             loaded: p.loaded,
             running: p.running,
@@ -1240,7 +1238,7 @@ impl Engine {
                         }
                         _ => start,
                     };
-                    let animation = *self.animation.lock().map_err(|_| poisoned())?;
+                    let animation = self.animation.lock().map_err(|_| poisoned())?.clone();
                     let surface = form
                         .as_deref()
                         .filter(|_| avatar)
@@ -1327,7 +1325,7 @@ impl Engine {
                     Some(now) if now.loaded && now.positions.len() == start.len() => now.positions,
                     _ => start,
                 };
-                let animation = *self.animation.lock().map_err(|_| poisoned())?;
+                let animation = self.animation.lock().map_err(|_| poisoned())?.clone();
                 let prints = self.prints_of(project, ws.dir())?;
                 let dressed = Dressed {
                     project,
@@ -1533,7 +1531,7 @@ impl Engine {
             .collect();
         let trims = r3d_render::trims::meshes(&on.buttons(&project), &on.zippers(&project));
         drop(cloth);
-        let animation = *self.animation.lock().map_err(|_| poisoned())?;
+        let animation = self.animation.lock().map_err(|_| poisoned())?.clone();
         let body = form.as_deref().map(|f| {
             let mut mesh = Mesh {
                 positions: f.posed(animation.as_ref(), time),
@@ -1610,6 +1608,48 @@ impl Engine {
             self.form_now(key)?;
             Ok(result.to_string())
         })
+    }
+
+    /// Copy the BVH motion capture at `path` into the project's `motions/`
+    /// folder after checking that the avatar can play it; returns its
+    /// path in the project, the name [`Engine::set_motion`] takes.
+    pub fn import_motion(&self, path: String) -> Result<String, ApiError> {
+        self.workspace()?
+            .adopt_motion(Path::new(&path))
+            .map_err(err)
+    }
+
+    /// Copy the motion `name` of the user's library (in `library_dir`)
+    /// into the project, as [`Engine::import_motion`] does; returns its
+    /// path in the project.
+    pub fn use_library_motion(
+        &self,
+        library_dir: String,
+        name: String,
+    ) -> Result<String, ApiError> {
+        let file = super::library::motions(&library_dir)
+            .path(&name)
+            .map_err(err)?;
+        self.workspace()?.adopt_motion(&file).map_err(err)
+    }
+
+    /// The captured motions in the project's `motions/` folder, by path
+    /// in the project, sorted.
+    #[frb(sync)]
+    pub fn motions(&self) -> Result<Vec<String>, ApiError> {
+        let dir = self.workspace()?.dir().join("motions");
+        let mut out: Vec<String> = std::fs::read_dir(dir)
+            .map(|entries| {
+                entries
+                    .filter_map(Result::ok)
+                    .filter_map(|e| e.file_name().to_str().map(str::to_owned))
+                    .filter(|n| n.to_ascii_lowercase().ends_with(".bvh"))
+                    .map(|n| format!("motions/{n}"))
+                    .collect()
+            })
+            .unwrap_or_default();
+        out.sort();
+        Ok(out)
     }
 
     /// The imported body's arrangement points as seen in 3D view `view`:
@@ -1971,7 +2011,7 @@ impl Engine {
         project: &r3d_core::Project,
         time: f32,
     ) -> Result<Option<Mesh>, ApiError> {
-        let animation = *self.animation.lock().map_err(|_| poisoned())?;
+        let animation = self.animation.lock().map_err(|_| poisoned())?.clone();
         let Some(animation) = animation.and_then(|a| a.settled(time)) else {
             return Ok(None);
         };
@@ -2162,7 +2202,7 @@ impl Engine {
         let Some(form) = self.form_soon(key)? else {
             return Ok(None);
         };
-        let animation = *self.animation.lock().map_err(|_| poisoned())?;
+        let animation = self.animation.lock().map_err(|_| poisoned())?.clone();
         let surface = match animation.and_then(|a| a.settled(time)) {
             Some(a) if time >= a.start => form.posed(Some(&a), time),
             _ => form.positions.clone(),

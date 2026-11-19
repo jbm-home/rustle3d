@@ -2937,4 +2937,81 @@ class LFr extends L {
   @override
   String get errNoSkeleton =>
       'Ce corps n\'a pas de squelette : exportez sans le lier.';
+
+  @override
+  String get motionImport => 'Importer un mouvement capturé…';
+
+  @override
+  String get motionFiles => 'Captures de mouvement (BVH)';
+
+  @override
+  String errMotionFormat(String detail) {
+    return 'Ce fichier BVH est illisible : $detail';
+  }
+
+  @override
+  String errMotionSkeleton(String bone) {
+    return 'Le squelette de ce mouvement n\'a pas d\'articulation pour : $bone.';
+  }
+
+  @override
+  String errMotionTooShort(String seconds) {
+    return 'Ce mouvement est trop court : il faut au moins $seconds s.';
+  }
+
+  @override
+  String get motionLibrary => 'Bibliothèque de mouvements';
+
+  @override
+  String get motionLibraryMenu => 'Bibliothèque de mouvements…';
+
+  @override
+  String get motionLibrarySubtitle =>
+      'Les mouvements capturés (fichiers BVH) utilisables dans tous vos projets.';
+
+  @override
+  String get motionLibraryEmpty =>
+      'Aucun mouvement pour l\'instant : ajoutez ici des fichiers BVH, ou ajoutez un mouvement à la bibliothèque en l\'important.';
+
+  @override
+  String get motionLibraryAdd => 'Ajouter des fichiers…';
+
+  @override
+  String get motionLibraryPlay => 'Jouer sur l\'avatar';
+
+  @override
+  String motionLibraryDeleteConfirm(String name) {
+    return 'Supprimer « $name » de la bibliothèque ? Les projets qui l\'utilisent gardent leur copie.';
+  }
+
+  @override
+  String get motionImported => 'Mouvement importé dans le projet.';
+
+  @override
+  String get motionAddToLibrary => 'Ajouter à la bibliothèque';
+
+  @override
+  String motionAddedToLibrary(String name) {
+    return 'Ajouté à la bibliothèque : $name';
+  }
+
+  @override
+  String errLibraryName(String name) {
+    return '« $name » ne peut pas nommer un mouvement : évitez / \\ : * ? \" < > | et un point au début ou à la fin.';
+  }
+
+  @override
+  String errLibraryExists(String name) {
+    return 'La bibliothèque a déjà un mouvement nommé « $name ».';
+  }
+
+  @override
+  String errLibraryMissing(String name) {
+    return 'La bibliothèque n\'a plus de mouvement nommé « $name ».';
+  }
+
+  @override
+  String errLibraryIo(String detail) {
+    return 'La bibliothèque de mouvements ne peut pas être lue ou écrite : $detail';
+  }
 }

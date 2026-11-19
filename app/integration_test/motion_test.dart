@@ -1,6 +1,8 @@
 // The avatar's motion (spec 22): the Motion menu next to Simulate makes
 // the avatar walk while the garment drapes, ticks what it does, and makes
-// it stand still again.
+// it stand still again; a motion captured in a BVH file, once imported,
+// is in the menu and plays the same way; so does one of the user's
+// motion library, which the library dialog manages.
 
 import 'dart:convert';
 import 'dart:io';
@@ -11,6 +13,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:rustle3d/main.dart';
 import 'package:rustle3d/src/projects.dart';
 import 'package:rustle3d/src/rust/api/engine.dart';
+import 'package:rustle3d/src/rust/api/library.dart';
 import 'package:rustle3d/src/rust/frb_generated.dart';
 
 void main() {
@@ -87,5 +90,43 @@ void main() {
     await frames();
     await idle();
     expect(engine.simulationStatus().motion, isNull);
+
+    // A captured motion (the file picker is skipped: the engine imports
+    // it as the menu's "Import" does) is listed by its file name.
+    final bvh = File('../crates/r3d-commands/tests/data/walk.bvh').absolute;
+    final imported = await engine.importMotion(path: bvh.path);
+    expect(imported, 'motions/walk.bvh');
+    expect(engine.motions(), ['motions/walk.bvh']);
+    await choose('walk');
+    status = engine.simulationStatus();
+    expect(status.motion, 'motions/walk.bvh');
+    expect(status.running, isTrue);
+
+    // A motion of the library is in the menu (the project gets a copy).
+    addLibraryMotion(libraryDir: dir, path: bvh.path);
+    renameLibraryMotion(libraryDir: dir, name: 'walk', to: 'Stroll');
+    await choose('Stroll');
+    expect(engine.simulationStatus().motion, 'motions/Stroll.bvh');
+    expect(engine.motions(), ['motions/Stroll.bvh', 'motions/walk.bvh']);
+
+    // The library dialog lists it and deletes it; the project keeps its
+    // copy.
+    await tester.tap(find.byKey(const ValueKey('motionButton')));
+    await frames();
+    await tester.tap(find.byKey(const ValueKey('motionLibrary')));
+    await frames();
+    expect(find.byKey(const ValueKey('motion:Stroll')), findsOneWidget);
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('motion:Stroll')),
+        matching: find.byIcon(Icons.delete_outline_rounded),
+      ),
+    );
+    await frames();
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await frames();
+    expect(find.byKey(const ValueKey('motion:Stroll')), findsNothing);
+    expect(libraryMotions(libraryDir: dir), isEmpty);
+    expect(engine.motions().length, 2);
   });
 }

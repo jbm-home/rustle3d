@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `cloth_hit`, `corner_at`, `corner_landing`, `dressed_now`, `edge_spot`, `edited`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form_now`, `form_soon`, `frozen_board`, `gpu_solver`, `graphics`, `import_from`, `live_body`, `long`, `marker_spec`, `motion_name`, `moving_avatar`, `new`, `new`, `offset_along`, `parse_track`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `prints_of`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `selected`, `set_busy`, `sim`, `solver`, `tape_band`, `to_theme`, `workspace`
+// These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `cloth_hit`, `corner_at`, `corner_landing`, `dressed_now`, `edge_spot`, `edited`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form_now`, `form_soon`, `frozen_board`, `gpu_solver`, `graphics`, `import_from`, `live_body`, `long`, `marker_spec`, `moving_avatar`, `new`, `new`, `offset_along`, `parse_track`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `prints_of`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `selected`, `set_busy`, `sim`, `solver`, `tape_band`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`
 
@@ -194,6 +194,11 @@ abstract class Engine implements RustOpaqueInterface {
   /// thread (a large scan takes a while to read and prepare).
   Future<String> importBody({required String path});
 
+  /// Copy the BVH motion capture at `path` into the project's `motions/`
+  /// folder after checking that the avatar can play it; returns its
+  /// path in the project, the name [`Engine::set_motion`] takes.
+  Future<String> importMotion({required String path});
+
   /// Import the pieces of a pattern from a file the user chose
   /// (anywhere; DXF, SVG or PDF): the file is copied into the project's
   /// `imports/` folder, then read, as one undo step. `units` (`mm`, `cm`,
@@ -210,6 +215,10 @@ abstract class Engine implements RustOpaqueInterface {
   /// (garment, sizes, width_mm…). Returns its JSON result with the
   /// pieces' outlines. Off the UI thread: many sizes take a while.
   Future<String> marker({required String specJson});
+
+  /// The captured motions in the project's `motions/` folder, by path
+  /// in the project, sorted.
+  List<String> motions();
 
   /// Move the imported body's arrangement point `name` (`left_elbow`…)
   /// under pixel (`x`, `y`) of 3D view `view`, in the plane facing the
@@ -363,8 +372,10 @@ abstract class Engine implements RustOpaqueInterface {
   /// its fabric again.
   void setFitMap({String? map});
 
-  /// Make the avatar move (`walk`, `turn`, `raise_arms`) or stand still
-  /// (`None`) while the garment drapes, and run the simulation. A motion
+  /// Make the avatar move (`walk`, `turn`, `raise_arms`, or a captured
+  /// motion: a BVH file in the project folder, see
+  /// [`Engine::import_motion`]) or stand still (`None`) while the
+  /// garment drapes, and run the simulation. A motion
   /// starts once the garment has closed (after 1.5 s of draping); a body
   /// in motion first comes back to rest. Can take seconds when the
   /// garment is not loaded yet (see [`Engine::reset_simulation`]).
@@ -461,6 +472,14 @@ abstract class Engine implements RustOpaqueInterface {
 
   /// Remove a pin (`pin.remove`); the cloth there moves again.
   void unpin({required String pin});
+
+  /// Copy the motion `name` of the user's library (in `library_dir`)
+  /// into the project, as [`Engine::import_motion`] does; returns its
+  /// path in the project.
+  Future<String> useLibraryMotion({
+    required String libraryDir,
+    required String name,
+  });
 
   /// A scroll of `amount` (positive = zoom in) at pixel (`x`, `y`).
   void zoom({

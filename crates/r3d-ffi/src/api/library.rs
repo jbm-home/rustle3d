@@ -1,13 +1,49 @@
-//! The user's own libraries, shared by every project: body presets. They
-//! live in a folder the UI chooses (the app's support folder).
+//! The user's own libraries, shared by every project: body presets and
+//! captured motions. They live in a folder the UI chooses (the app's
+//! support folder).
 
 use std::path::Path;
 
 use flutter_rust_bridge::frb;
+use r3d_avatar::motion_library::MotionLibrary;
 use r3d_avatar::presets::{BodyPreset, PresetLibrary};
 use r3d_core::Body;
 
-use super::engine::ApiError;
+use super::engine::{ApiError, err};
+
+/// The motion library in `library_dir` (its `motions` folder).
+pub(crate) fn motions(library_dir: &str) -> MotionLibrary {
+    MotionLibrary::new(&Path::new(library_dir).join("motions"))
+}
+
+/// The captured motions in the user's library, by name, sorted.
+#[frb(sync)]
+pub fn library_motions(library_dir: String) -> Vec<String> {
+    motions(&library_dir).names()
+}
+
+/// Add the BVH file at `path` to the motion library, after checking that
+/// the avatar can play it. Returns its name there.
+#[frb(sync)]
+pub fn add_library_motion(library_dir: String, path: String) -> Result<String, ApiError> {
+    motions(&library_dir).add(Path::new(&path)).map_err(err)
+}
+
+/// Rename a motion of the library; returns its new name.
+#[frb(sync)]
+pub fn rename_library_motion(
+    library_dir: String,
+    name: String,
+    to: String,
+) -> Result<String, ApiError> {
+    motions(&library_dir).rename(&name, &to).map_err(err)
+}
+
+/// Remove a motion from the library (projects keep their copies).
+#[frb(sync)]
+pub fn delete_library_motion(library_dir: String, name: String) -> Result<(), ApiError> {
+    motions(&library_dir).remove(&name).map_err(err)
+}
 
 fn presets_file(library_dir: &str) -> std::path::PathBuf {
     Path::new(library_dir).join("body-presets.json")
@@ -92,5 +128,35 @@ mod tests {
         assert_eq!(blank.err().unwrap().code, "invalid.empty");
         delete_body_preset(lib.clone(), "Me".into()).unwrap();
         assert_eq!(list().len(), builtin);
+    }
+
+    #[test]
+    fn library_motions_are_added_renamed_used_and_deleted() {
+        let tmp = tempfile::tempdir().unwrap();
+        let lib = tmp.path().join("lib").to_string_lossy().into_owned();
+        let walk =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../r3d-commands/tests/data/walk.bvh");
+        let walk = walk.to_string_lossy().into_owned();
+        assert!(library_motions(lib.clone()).is_empty());
+        assert_eq!(add_library_motion(lib.clone(), walk).unwrap(), "walk");
+        assert_eq!(
+            rename_library_motion(lib.clone(), "walk".into(), "Stroll".into()).unwrap(),
+            "Stroll"
+        );
+        assert_eq!(library_motions(lib.clone()), ["Stroll"]);
+        // A project plays a copy of it.
+        let engine =
+            super::super::engine::Engine::open(tmp.path().join("P.r3d").to_string_lossy().into())
+                .unwrap();
+        let used = engine
+            .use_library_motion(lib.clone(), "Stroll".into())
+            .unwrap();
+        assert_eq!(used, "motions/Stroll.bvh");
+        assert_eq!(engine.motions().unwrap(), [used]);
+        delete_library_motion(lib.clone(), "Stroll".into()).unwrap();
+        assert!(library_motions(lib.clone()).is_empty());
+        assert_eq!(engine.motions().unwrap().len(), 1);
+        let missing = delete_library_motion(lib, "Stroll".into());
+        assert_eq!(missing.err().unwrap().code, "library.missing");
     }
 }

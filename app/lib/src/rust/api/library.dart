@@ -8,7 +8,37 @@ import 'engine.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `load`, `presets_file`, `save`
+// These functions are ignored because they are not marked as `pub`: `load`, `motions`, `presets_file`, `save`
+
+/// The captured motions in the user's library, by name, sorted.
+List<String> libraryMotions({required String libraryDir}) =>
+    RustLib.instance.api.crateApiLibraryLibraryMotions(libraryDir: libraryDir);
+
+/// Add the BVH file at `path` to the motion library, after checking that
+/// the avatar can play it. Returns its name there.
+String addLibraryMotion({required String libraryDir, required String path}) =>
+    RustLib.instance.api.crateApiLibraryAddLibraryMotion(
+      libraryDir: libraryDir,
+      path: path,
+    );
+
+/// Rename a motion of the library; returns its new name.
+String renameLibraryMotion({
+  required String libraryDir,
+  required String name,
+  required String to,
+}) => RustLib.instance.api.crateApiLibraryRenameLibraryMotion(
+  libraryDir: libraryDir,
+  name: name,
+  to: to,
+);
+
+/// Remove a motion from the library (projects keep their copies).
+void deleteLibraryMotion({required String libraryDir, required String name}) =>
+    RustLib.instance.api.crateApiLibraryDeleteLibraryMotion(
+      libraryDir: libraryDir,
+      name: name,
+    );
 
 /// Body presets as JSON: `[{name, body, builtin}]`, standard sizes first,
 /// then the user's own from `library_dir`.

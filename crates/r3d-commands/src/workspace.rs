@@ -255,6 +255,30 @@ impl Workspace {
         self.adopt(source, "avatars")
     }
 
+    /// The captured motion in the BVH file at `relative` in the project
+    /// folder.
+    pub fn captured_motion(
+        &self,
+        relative: &str,
+    ) -> Result<r3d_avatar::motion::Motion, WorkspaceError> {
+        Ok(crate::drape::captured_motion(
+            relative,
+            &self.read(relative)?,
+        )?)
+    }
+
+    /// Copy a BVH motion capture from anywhere into the project's
+    /// `motions/` folder, as [`Self::adopt`] does, after checking that the
+    /// avatar can play it (spec 22). Returns its relative path.
+    pub fn adopt_motion(&self, source: &Path) -> Result<String, WorkspaceError> {
+        let bytes = fs::read(source).map_err(|e| WorkspaceError::Read {
+            path: source.display().to_string(),
+            detail: e.to_string(),
+        })?;
+        crate::drape::captured_motion(&source.display().to_string(), &bytes)?;
+        self.adopt(source, "motions")
+    }
+
     /// Copy a file from anywhere (one the user picked) into the project's
     /// `folder` (`imports` for patterns), so the project keeps what it was
     /// made from. Returns its path relative to the project; a different

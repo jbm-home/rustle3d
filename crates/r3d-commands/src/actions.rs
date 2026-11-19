@@ -181,6 +181,11 @@ pub struct Simulate {
     /// stands still.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub motion: Option<AvatarMotion>,
+    /// Instead of `motion`: a BVH file of a motion captured on a person,
+    /// relative to the project folder, retargeted to the avatar and
+    /// played in a loop on the spot.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub motion_file: Option<String>,
 }
 
 /// A motion of the avatar.
@@ -205,22 +210,12 @@ impl From<AvatarMotion> for r3d_avatar::motion::Motion {
     }
 }
 
-impl From<r3d_avatar::motion::Motion> for AvatarMotion {
-    fn from(m: r3d_avatar::motion::Motion) -> Self {
-        match m {
-            r3d_avatar::motion::Motion::Walk => Self::Walk,
-            r3d_avatar::motion::Motion::Turn => Self::Turn,
-            r3d_avatar::motion::Motion::RaiseArms => Self::RaiseArms,
-        }
-    }
-}
-
 fn default_frames() -> u32 {
     300
 }
 
 impl Described for Simulate {
-    const SUMMARY: &'static str = "Drape the placed and sewn panels on the avatar for a number of frames (1/60 s each, deterministic) and cache the result in the project, so `r3d render --view 3d` shows it. With `motion`, the avatar walks, turns or raises its arms after 1.5 s and the cloth follows; renders and exports then show the body and the garment as they are at the last frame. Returns the garment's extent, how open the seams are, how many points buttons and closed zippers hold and how far apart they still are, and whether the cloth has settled.";
+    const SUMMARY: &'static str = "Drape the placed and sewn panels on the avatar for a number of frames (1/60 s each, deterministic) and cache the result in the project, so `r3d render --view 3d` shows it. With `motion`, the avatar walks, turns or raises its arms after 1.5 s and the cloth follows (or, with `motion_file`, plays a motion captured on a person from a BVH file in the project folder); renders and exports then show the body and the garment as they are at the last frame. Returns the garment's extent, how open the seams are, how many points buttons and closed zippers hold and how far apart they still are, and whether the cloth has settled.";
 }
 
 impl ActionSpec for Simulate {
@@ -234,13 +229,28 @@ impl ActionSpec for Simulate {
         }
         let project = ws.session().project();
         let imported = project.avatar().and_then(|a| a.mesh.as_ref());
-        if imported.is_some() && self.motion.is_some() {
+        if imported.is_some() && (self.motion.is_some() || self.motion_file.is_some()) {
             return Err(CommandError::ImportedBodyStill.into());
         }
+        let file = match &self.motion_file {
+            Some(_) if self.motion.is_some() => {
+                return Err(CommandError::invalid("motion_file", Invalid::WithMotion).into());
+            }
+            Some(path) => Some((path.as_str(), ws.read(path)?)),
+            None => None,
+        };
+        let motion = match &file {
+            Some((path, bytes)) => Some(drape::captured_motion(path, bytes)?),
+            None => self.motion.map(Into::into),
+        };
+        let project = ws.session().project();
         let body_warnings = imported.map(|m| crate::bodies::check(m).warnings());
-        let motion = self.motion.map(Into::into);
         let out = drape::simulate(project, self.frames, motion, progress)?;
-        let cache = drape::encode_cache(drape::fingerprint(project)?, &out);
+        let cache = drape::encode_cache(
+            drape::fingerprint(project)?,
+            &out,
+            file.as_ref().map(|(p, b)| (*p, b.as_slice())),
+        );
         ws.write(drape::CACHE_FILE, &cache)?;
         let ys = out.positions.iter().map(|p| p.y);
         let top = ys.clone().fold(f32::MIN, f32::max);
@@ -259,9 +269,10 @@ impl ActionSpec for Simulate {
             "max_closure_gap_mm": r3(f64::from(out.stats.max_closure_gap) * 1000.0),
             "max_speed_m_s": r3(out.stats.max_speed.into()),
             "settled": out.stats.max_speed < SETTLED_SPEED,
-            "motion": out.animation.map(|a| AvatarMotion::from(a.motion)),
+            "motion": out.animation.as_ref().map(|a| a.motion.name()),
             "motion_s": out
                 .animation
+                .as_ref()
                 .map(|a| r3((f64::from(out.frames) / 60.0 - f64::from(a.start)).max(0.0))),
             "body_warnings": body_warnings,
         }))

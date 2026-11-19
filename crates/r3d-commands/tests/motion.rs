@@ -4,6 +4,8 @@
 mod common;
 
 use glam::Vec3;
+use std::path::Path;
+
 use r3d_avatar::motion::Motion;
 use r3d_commands::drape::{Animation, MOTION_START_S, STOP_S, load_cache, simulate};
 use r3d_commands::{Progress, Session, Step, Workspace};
@@ -26,20 +28,20 @@ fn choosing_motions_never_makes_the_body_jump() {
     assert_eq!(walk.start, MOTION_START_S);
     // Chosen again: nothing changes.
     assert_eq!(
-        Animation::switch(Some(walk), Some(Motion::Walk), 3.0),
-        Some(walk)
+        Animation::switch(Some(walk.clone()), Some(Motion::Walk), 3.0),
+        Some(walk.clone())
     );
     // Not begun yet: replaced at once.
-    let turn = Animation::switch(Some(walk), Some(Motion::Turn), 1.0).unwrap();
+    let turn = Animation::switch(Some(walk.clone()), Some(Motion::Turn), 1.0).unwrap();
     assert_eq!((turn.motion, turn.stop), (Motion::Turn, None));
     // Walking: back to rest first, then turning.
-    let next = Animation::switch(Some(walk), Some(Motion::Turn), 5.0).unwrap();
+    let next = Animation::switch(Some(walk.clone()), Some(Motion::Turn), 5.0).unwrap();
     assert_eq!(
-        (next.motion, next.stop, next.then),
+        (next.motion.clone(), next.stop, next.then.clone()),
         (Motion::Walk, Some(5.0), Some(Motion::Turn))
     );
     assert_eq!(next.chosen(), Some(Motion::Turn));
-    let later = next.settled(5.0 + STOP_S).unwrap();
+    let later = next.clone().settled(5.0 + STOP_S).unwrap();
     assert_eq!(
         (later.motion, later.start, later.stop),
         (Motion::Turn, 5.0 + STOP_S, None)
@@ -47,10 +49,10 @@ fn choosing_motions_never_makes_the_body_jump() {
     // Standing still: back to rest, then nothing.
     let still = Animation::switch(Some(walk), None, 5.0).unwrap();
     assert_eq!(still.chosen(), None);
-    assert!(still.settled(5.5).is_some());
-    assert!(still.settled(5.0 + STOP_S).is_none());
+    assert!(still.clone().settled(5.5).is_some());
+    assert!(still.clone().settled(5.0 + STOP_S).is_none());
     // Changing one's mind while coming back to rest keeps the way back.
-    let again = Animation::switch(Some(still), Some(Motion::RaiseArms), 5.5).unwrap();
+    let again = Animation::switch(Some(still.clone()), Some(Motion::RaiseArms), 5.5).unwrap();
     assert_eq!(
         (again.stop, again.then),
         (Some(5.0), Some(Motion::RaiseArms))
@@ -67,7 +69,13 @@ fn choosing_motions_never_makes_the_body_jump() {
 /// the cloth stays out of the moving body, the seams closed.
 fn follows(template: &str, motion: Motion, frames: u32) -> r3d_commands::drape::Simulated {
     let s = dressed(template);
-    let out = simulate(s.project(), frames, Some(motion), &Progress::default()).unwrap();
+    let out = simulate(
+        s.project(),
+        frames,
+        Some(motion.clone()),
+        &Progress::default(),
+    )
+    .unwrap();
     assert!(out.positions.iter().all(|p| p.is_finite()), "{template}");
     let scene = &out.drape.scene;
     let (body, moving) = (
@@ -185,4 +193,49 @@ fn a_drape_with_a_motion_is_cached_with_it() {
     // An unknown motion is refused.
     let bad = json!({"type": "simulate", "frames": 10, "motion": "dance"});
     assert!(Step::from_value(bad).is_err());
+}
+
+#[test]
+fn a_captured_motion_is_played_from_its_file_and_cached_with_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("p.r3d");
+    let mut ws = Workspace::create(&path, "p").unwrap();
+    for step in [
+        json!({"type": "avatar.set", "preset": "Women M", "body": {"masculinity": 0,
+            "height_cm": 168, "bust_cm": 90, "waist_cm": 73, "hips_cm": 98}}),
+        json!({"type": "template.apply", "template": "a_line_skirt"}),
+    ] {
+        ws.run_step(&Step::from_value(step).unwrap()).unwrap();
+    }
+    // The file is copied into the project's motions/ folder.
+    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/walk.bvh");
+    let file = ws.adopt_motion(&source).unwrap();
+    assert_eq!(file, "motions/walk.bvh");
+    let step = json!({"type": "simulate", "frames": 120, "motion_file": file});
+    let out = ws.run_step(&Step::from_value(step).unwrap()).unwrap();
+    assert_eq!(out["motion"], "motions/walk.bvh");
+    assert_eq!(out["motion_s"], 0.5);
+    let particles = simulate(ws.session().project(), 1, None, &Progress::default())
+        .unwrap()
+        .positions
+        .len();
+    let cached = load_cache(&path, ws.session().project(), particles).unwrap();
+    let motion = cached.animation.unwrap().motion;
+    assert_eq!(motion.name(), "motions/walk.bvh");
+    assert_eq!(motion, ws.captured_motion("motions/walk.bvh").unwrap());
+    // A changed file makes the cache stale.
+    std::fs::write(
+        path.join(&file),
+        std::fs::read_to_string(&source).unwrap() + " ",
+    )
+    .unwrap();
+    assert!(load_cache(&path, ws.session().project(), particles).is_none());
+    // Not with a built-in motion, nor a file that is not a capture.
+    let both = json!({"type": "simulate", "frames": 10, "motion": "walk", "motion_file": file});
+    assert!(ws.run_step(&Step::from_value(both).unwrap()).is_err());
+    std::fs::write(path.join("motions/bad.bvh"), "HIERARCHY").unwrap();
+    let bad = json!({"type": "simulate", "frames": 10, "motion_file": "motions/bad.bvh"});
+    let err = ws.run_step(&Step::from_value(bad).unwrap()).unwrap_err();
+    assert_eq!(r3d_core::Localizable::message(&err).code, "motion.format");
+    assert!(ws.adopt_motion(&path.join("motions/bad.bvh")).is_err());
 }

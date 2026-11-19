@@ -7,7 +7,9 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-19 (M15, game-engine export: Export › Garment for a game
+Last updated: 2026-11-19 (captured motions: Motion › Import a captured
+motion… plays a BVH motion capture on the avatar, Motion › Motion
+library… keeps them for every project; M15, game-engine export: Export › Garment for a game
 engine (glTF)…, levels of detail, normal maps, skinning to the body's
 skeleton with its motions; M31, imported bodies: Body › Import body…,
 the check, the arrangement points; M20, buttons and zippers: the Button and
@@ -443,6 +445,24 @@ size to size (its grade), and the other sizes follow.
   swing, or a shirt ride up when the arms go up. You can keep editing the
   pattern meanwhile, and a photo or a 3D export shows the body where it
   is.
+- **Motion › Import a captured motion…** plays a motion recorded on a
+  real person, from a BVH file (the usual motion capture format). The
+  file is copied into the project's `motions` folder and listed in the
+  menu under its file name. The motion is fitted to the avatar's
+  skeleton and size, played on the spot (the avatar does not travel)
+  and repeated: Rustle3D finds the longest stretch that ends as it
+  starts, such as one or two steps of a walk, and blends the end into
+  the start. Most capture skeletons work (names such as Hips, LeftUpLeg,
+  LeftArm, LeftForeArm); the file needs at least about 1.5 s of motion.
+  Use files whose licence lets you use them.
+- After an import, **Add to library** (in the message at the bottom)
+  keeps the motion in your **motion library**, shared by all your
+  projects. Its motions are listed in the Motion menu too; choosing one
+  copies it into the project and plays it. **Motion › Motion library…**
+  manages it: **Add files…** (several BVH files at once), play a motion
+  on the avatar, rename or delete it. Deleting a motion from the
+  library leaves the projects that use it unchanged: they keep their
+  copy.
 - **Fit** (the gauge next to Motion) colours the garment by how it
   fits, from dark violet (loose) to yellow (tight); a legend at the
   bottom right gives the scale and the tightest spot:
@@ -670,7 +690,8 @@ Protocol):
   headless. Drapes made there (and with `r3d simulate`) run on the
   processor, so they give the same result every time. A drape can make
   the avatar move: `r3d simulate My.r3d --frames 300 --motion walk`
-  (`walk`, `turn` or `raise_arms`); pictures and exports then show the
+  (`walk`, `turn`, `raise_arms`, or a `.bvh` file, copied into the
+  project's `motions` folder); pictures and exports then show the
   body and the garment at the last frame.
 - An agent can look at its work: a picture of the pattern, of the 3D
   view, or a photo like the app's (`render_photo`). From the command
@@ -715,7 +736,10 @@ the tech pack as PDF: open formats only.
   thickness shows the wrinkles of the outside reversed.
 - The avatar walks on the spot (not along a path), raises its arms to
   above the shoulders but not straight up, and only the built-in body
-  moves (not an imported one, even if its file has a skeleton).
+  moves (not an imported one, even if its file has a skeleton). A
+  captured motion that travels or turns is played on the spot, facing
+  forward; its fingers are not used; the game export includes only the
+  built-in motions.
 - An imported body is the same in every size of a size range. Its
   arrangement points are guessed for arms down or in an A pose: on a
   T pose, move the shoulder, elbow and wrist points. Compressed glTF

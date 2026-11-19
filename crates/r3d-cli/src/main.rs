@@ -416,8 +416,9 @@ enum Cmd {
         /// Frames of 1/60 s (default 300 = 5 s).
         #[arg(long, default_value_t = 300)]
         frames: u32,
-        /// Move the avatar after 1.5 s of draping: walk, turn or
-        /// raise_arms.
+        /// Move the avatar after 1.5 s of draping: walk, turn,
+        /// raise_arms, or a BVH motion capture file (copied into the
+        /// project's motions/ folder).
         #[arg(long)]
         motion: Option<String>,
     },
@@ -813,8 +814,12 @@ fn cmd_texture(
 fn cmd_simulate(project: &Path, frames: u32, motion: Option<String>) -> Result<(), Failure> {
     let mut ws = Workspace::open(project)?;
     let mut step = json!({ "type": "simulate", "frames": frames });
-    if let Some(m) = motion {
-        step["motion"] = json!(m);
+    match motion {
+        Some(m) if m.to_ascii_lowercase().ends_with(".bvh") => {
+            step["motion_file"] = json!(ws.adopt_motion(Path::new(&m))?);
+        }
+        Some(m) => step["motion"] = json!(m),
+        None => {}
     }
     let step = Step::from_value(step)?;
     print_json(&ws.run_step_with(&step, &progress())?)
