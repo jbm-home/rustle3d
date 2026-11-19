@@ -160,6 +160,56 @@ const CROTCH_HEIGHT: f64 = 0.455;
 /// Gap between pieces on the pattern board (mm).
 const BOARD_GAP: f64 = 80.0;
 const SEAM_ALLOWANCE_MM: f64 = 10.0;
+/// What a shirt-like pattern takes from the upper body (mm), measured on
+/// the avatar (or the standard body without one): proportions of the
+/// chest made a size 52's shoulders 26 cm wide each side for 19 on the
+/// body, and its neckline as wide.
+struct Upper(r3d_avatar::fit::UpperBody);
+
+/// From the shoulder joint to the shoulder's tip (mm).
+const JOINT_TO_TIP_MM: f64 = 20.0;
+/// Ease at the shoulder's tip, at the neck (on its radius) and under
+/// the arm (mm).
+const SHOULDER_EASE_MM: f64 = 10.0;
+const NECK_EASE_MM: f64 = 10.0;
+const ARMHOLE_EASE_MM: f64 = 70.0;
+/// The body model's shoulders do not widen with its weight; a size chart
+/// widens them by about 0.4 cm per size (4 cm of chest): each shoulder
+/// takes this many mm per mm of chest over the body's at neutral weight.
+const SHOULDER_PER_CHEST: f64 = 0.05;
+
+impl Upper {
+    /// The upper body of `p`'s avatar: its measured body fitted (an
+    /// imported body's measurements, too).
+    fn of(p: &Project) -> Result<Self, CommandError> {
+        let body = p.avatar().map_or(STANDARD, |a| a.body);
+        let fit = crate::queries::fitted(&body)?;
+        r3d_avatar::fit::upper_body(crate::queries::body_model()?, &fit)
+            .map(Self)
+            .ok_or_else(|| internal("the body's shoulders and neck were not found".into()))
+    }
+
+    /// From the centre line to the shoulder's tip, for a pattern of chest
+    /// `chest` (mm).
+    fn shoulder_half(&self, chest: f64) -> f64 {
+        let u = &self.0;
+        f64::from(u.shoulder_joint_cm) * 10.0
+            + JOINT_TO_TIP_MM
+            + SHOULDER_EASE_MM
+            + SHOULDER_PER_CHEST * (chest - f64::from(u.neutral_bust_cm) * 10.0).max(0.0)
+    }
+
+    /// Half the neckline's width at the base of the neck.
+    fn neck_half(&self) -> f64 {
+        f64::from(self.0.neck_cm) * 10.0 / std::f64::consts::TAU + NECK_EASE_MM
+    }
+
+    /// From the shoulder's tip down to the bottom of the armhole.
+    fn armhole_depth(&self) -> f64 {
+        f64::from(self.0.shoulder_top_cm - self.0.armpit_cm) * 10.0 + ARMHOLE_EASE_MM
+    }
+}
+
 /// Trousers end this far above the floor by default (cm): their length
 /// is the waist's height less this. A fraction of the stature left the
 /// hem on the floor of one body and 19 cm above it on another.
@@ -1025,14 +1075,15 @@ fn t_shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
     let len = mm("length_cm", s.length_cm)?;
     let sleeve = mm("sleeve_cm", s.sleeve_cm)?;
     let ease = s.ease_cm.unwrap_or_default() * 10.0;
-    // Half widths from the chest: body, shoulder, neck.
+    // Half widths: the body from the chest, the hem from the hips (the
+    // larger), shoulder and neck measured on the body.
     let w = (chest + ease) / 4.0;
-    let shoulder = 0.21 * chest;
-    let neck = chest / 12.0;
-    let drop = 40.0;
-    let armhole = 0.22 * chest + 20.0;
-    let y_s = len - drop;
-    let y_a = len - armhole;
+    let hem = w.max((body.hips_cm * 10.0 + ease) / 4.0);
+    let upper = Upper::of(d.tx.project())?;
+    let shoulder = upper.shoulder_half(chest);
+    let neck = upper.neck_half();
+    let y_s = len - 40.0;
+    let y_a = y_s - upper.armhole_depth();
     let bodice = |d: &mut Draft, name: &str, neck_depth: f64| {
         let k = 4.0 / 3.0 * neck_depth;
         // Armhole: leaves the underarm going in, reaches the shoulder
@@ -1046,8 +1097,8 @@ fn t_shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
         d.panel(
             name,
             &[
-                (p(-w, 0.0), None),
-                (p(w, 0.0), None),
+                (p(-hem, 0.0), None),
+                (p(hem, 0.0), None),
                 (p(w, y_a), Some(hole(1.0))),
                 (p(shoulder, y_s), None),
                 (p(neck, len), Some([p(neck, len - k), p(-neck, len - k)])),
@@ -1173,10 +1224,15 @@ fn shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
     positive("sleeve_cm", sleeve)?;
     let ease = s.ease_cm.unwrap_or_default() * 10.0;
     let w = (chest + ease) / 4.0;
-    let shoulder = 0.21 * chest + 5.0;
-    let neck = chest / 12.0;
+    let upper = Upper::of(d.tx.project())?;
+    let shoulder = upper.shoulder_half(chest);
+    let neck = upper.neck_half();
     let y_s = len - 40.0;
-    let y_a = len - (0.22 * chest + 30.0);
+    let y_a = y_s - upper.armhole_depth();
+    // The hem takes the hips with the same ease, the side seam flaring
+    // from the armhole: drafted on the chest alone, a women's 52 shirt
+    // (hips 8 cm over the bust) opened at its front over the hips.
+    let hem = w.max((body.hips_cm * 10.0 + ease) / 4.0);
     let hole = |sign: f64| {
         [
             p(sign * (shoulder + 0.3 * (w - shoulder)), y_a),
@@ -1191,7 +1247,7 @@ fn shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
         "Front left",
         &[
             (p(-BAND_MM, 0.0), None),
-            (p(w, 0.0), None),
+            (p(hem, 0.0), None),
             (p(w, y_a), Some(hole(1.0))),
             (p(shoulder, y_s), None),
             (p(neck, len), Some(quarter_neck(neck, len, neck_depth))),
@@ -1206,8 +1262,8 @@ fn shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
     let back = d.panel(
         "Back",
         &[
-            (p(-w, 0.0), None),
-            (p(w, 0.0), None),
+            (p(-hem, 0.0), None),
+            (p(hem, 0.0), None),
             (p(w, y_a), Some(hole(1.0))),
             (p(shoulder, y_s), None),
             (p(neck, len), Some([p(neck, len - k), p(-neck, len - k)])),
@@ -1452,10 +1508,11 @@ fn dress(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
     let w = (chest + ease) / 4.0;
     let a = (waist + 2.0 * ease) / 4.0;
     let b = (hips + ease) / 4.0;
-    let shoulder = 0.21 * chest;
-    let neck = chest / 12.0;
+    let upper = Upper::of(d.tx.project())?;
+    let shoulder = upper.shoulder_half(chest);
+    let neck = upper.neck_half();
     let y_s = len - 40.0;
-    let y_a = len - (0.22 * chest + 20.0);
+    let y_a = y_s - upper.armhole_depth();
     // Neck to waist on the body, then waist to hips.
     let y_w = (len - (NECK_HEIGHT * h - waist_height_cm(d.tx.project())?) * 10.0).max(0.4 * len);
     let depth = (HIP_DEPTH * h * 10.0).min(0.5 * y_w);

@@ -625,9 +625,16 @@ instead of 46.
   body (size shown, measurements) starts the drape again around it: the
   cloth carried over onto a larger body left arms out of their sleeves.
   Trousers' default length is the waist's height less 4 cm.
-- Open: the shirt, T-shirt and dress take shoulders, neck and armhole
-  from the chest (too wide in large sizes): to be measured on the
-  avatar; trousers hold at the waist by friction only (a 52 settles
+- Done (2026-11-19): the shirt, T-shirt and dress take shoulders, neck
+  and armhole depth from the avatar (`r3d_avatar::fit::upper_body`: the
+  skeleton's shoulder joint and neck base, the armpit where the torso's
+  girth drops) with ease, the shoulders widened by 0.05 mm per mm of
+  chest over the neutral body (the body model's shoulders do not widen
+  with its weight); their hem takes the hips (a women's 52 shirt opened
+  at the front). Drafted from the chest, a 52's shoulders were 26 cm
+  each side for 19 on the body.
+- Open: a women's 52 shirt parts a little below its last button over
+  the belly (no darts); trousers hold at the waist by friction only (a 52 settles
   under the belly, its hem on the floor); notches graded on their own; an ASTM rule
   table (`.rul`) and grading read from imported files. A graded
   template takes about 6 s to add on 9 sizes (one body fit per size, in

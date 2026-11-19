@@ -213,3 +213,73 @@ pub fn fitted_body(model: &BodyModel, fit: &Fit) -> Shaped {
     }
     shaped
 }
+
+/// The upper body of a fitted body as a shirt pattern reads it
+/// (centimetres; heights above the floor, widths from the median plane).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct UpperBody {
+    /// The shoulder joint's distance from the median plane.
+    pub shoulder_joint_cm: f32,
+    /// The top of the shoulder over the joint.
+    pub shoulder_top_cm: f32,
+    /// Where the arm parts from the torso (in the A pose).
+    pub armpit_cm: f32,
+    /// The base of the neck, and the neck's girth there.
+    pub neck_base_cm: f32,
+    pub neck_cm: f32,
+    /// The bust of the same body at neutral weight and girths: the
+    /// shoulders of the body model do not widen with its weight.
+    pub neutral_bust_cm: f32,
+}
+
+/// A girth this much smaller than the one just above marks where the arm
+/// parted from the torso (the section loop around the body stops taking
+/// the arm in).
+const ARMPIT_DROP: f32 = 0.15;
+
+/// Measure the upper body of `fit` on its skeleton and skin.
+pub fn upper_body(model: &BodyModel, fit: &Fit) -> Option<UpperBody> {
+    let shaped = fitted_body(model, fit);
+    let skeleton = crate::skeleton::Skeleton::new(model, &shaped);
+    let head = |name: &str| {
+        skeleton
+            .bones
+            .iter()
+            .find(|b| b.name == name)
+            .map(|b| b.head)
+    };
+    let (joint, neck) = (head("upper_arm_l")?, head("neck")?);
+    let (p, t) = (&shaped.positions, model.triangles());
+    let shoulder_top = p
+        .iter()
+        .filter(|v| (v.x - joint.x).abs() < 0.015 && (v.z - joint.z).abs() < 0.04)
+        .map(|v| v.y)
+        .fold(joint.y, f32::max);
+    // Down from the joint every 5 mm until the girth drops.
+    let girth = |y: f32| crate::measure::girth_at(p, t, y, 0.0);
+    let mut armpit = None;
+    let mut above = girth(joint.y)?;
+    for k in 1..=60 {
+        let y = joint.y - 0.005 * k as f32;
+        let g = girth(y)?;
+        if g < (1.0 - ARMPIT_DROP) * above {
+            armpit = Some(y);
+            break;
+        }
+        above = g;
+    }
+    let neutral = BodyShape {
+        weight: 0.0,
+        girths: [0.0; 3],
+        ..fit.shape
+    };
+    let (m, _) = scaled(model, &neutral, fit.achieved.height_cm);
+    Some(UpperBody {
+        shoulder_joint_cm: joint.x * 100.0,
+        shoulder_top_cm: shoulder_top * 100.0,
+        armpit_cm: armpit? * 100.0,
+        neck_base_cm: neck.y * 100.0,
+        neck_cm: girth(neck.y)?,
+        neutral_bust_cm: m.bust_cm,
+    })
+}
