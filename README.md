@@ -5,136 +5,253 @@
   </picture>
 </p>
 
-# Rustle3D
+<p align="center">
+  <strong>3D garment design and cloth simulation, written in Rust.</strong><br>
+  Draft sewing patterns in 2D, sew them, and drape them on an avatar with real-time cloth physics.
+</p>
 
-3D garment design and cloth simulation, written in Rust.
+<p align="center">
+  <a href="LICENSE"><img alt="License: GPL-3.0-or-later" src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue"></a>
+  <img alt="Platforms: Windows, macOS, Linux" src="https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey">
+  <img alt="Rust stable" src="https://img.shields.io/badge/rust-stable-orange">
+</p>
 
-Draft sewing patterns in 2D, sew them together and drape them on an avatar
-with real-time cloth physics. Rustle3D aims to cover the core workflow of
-professional 3D fashion tools with a simpler, more approachable UI, and to be
-fully drivable by AI agents through an MCP server.
+---
 
-> **Status:** v0.1, the first release: a first-time user makes a skirt or
-> a T-shirt in minutes. See [`ROADMAP.md`](ROADMAP.md) for what comes next
-> (glTF export and live agents, drafting tools, DXF/SVG/PDF import).
+Rustle3D covers the core workflow of professional 3D fashion tools with a
+simpler, more approachable interface. Everything the app does is also
+available to scripts and AI agents, through a command-line tool and an
+MCP server.
 
-## In v0.1
+- [Features](#features)
+- [Getting started](#getting-started): install the tools, get the code, run the app
+- [Everyday commands](#everyday-commands)
+- [Troubleshooting](#troubleshooting)
+- [Project layout and documentation](#project-layout-and-documentation)
+- [License](#license)
 
-- Garments from templates drafted to the body's measurements (T-shirt,
-  dress, straight and A-line skirts, tote bag), or from blank pieces.
-- 2D pattern editor: drag corners and edges, type an edge's length, mirror
-  copies, seam allowance and grain line, undo/redo.
-- Sewing between edges, with direction and length mismatch shown, and both
-  sides of a seam made the same length in one click.
-- Real-time drape (XPBD) on a parametric avatar, with collisions,
-  self-collision, pins and pulling the cloth; lengthen a hem or take in a
-  seam directly in 3D.
-- Fabric presets: cotton, denim, jersey, silk, wool.
-- A guided flow, short how-tos and a first-launch tour; English and French.
-- Open formats only: project folders with JSON, SVG/PDF patterns at 1:1
-  scale.
-- A headless CLI and an MCP server for AI agents, including offscreen
-  renders.
+## Features
 
-## Building
+| Area | What you can do |
+|---|---|
+| **Patterns (2D)** | Start from templates drafted to the body's measurements (T-shirt, shirt, dress, skirts, trousers, tote bag) or draw pieces with polygon, curve and cut tools. Constraints, dimensions, formulas (`waist / 4 + 10 mm`), darts, pleats, holes, symmetric half pieces, notches and internal lines. |
+| **Sewing** | Sew edges together, see direction and length mismatches, gather, add ease, match both sides in one click. Buttons and zippers close the garment. |
+| **Drape (3D)** | Real-time XPBD cloth simulation on the GPU, with collisions, self-collision, pins and pulling the cloth with the mouse. Several garments in layers. Fabric presets (cotton, denim, jersey, silk, wool) and prints that follow the grainline. |
+| **Avatars** | A parametric body set by its measurements, imported scans and characters (OBJ, glTF), walking motions and captured motions (BVH). |
+| **Sizes and fit** | Grading over a size range, each size draped on a matching body; fit maps and a virtual tape measure. |
+| **Production** | Markers with yardage and cost, a tech pack PDF, a projector mode for cutting on the table. |
+| **Images** | Path-traced studio photos of the draped garment. |
+| **Exchange** | Open formats only: patterns in SVG, PDF (1:1, tiled), DXF-AAMA; DXF, SVG and PDF import; the draped garment in glTF/GLB and OBJ, and game-ready exports (LODs, normal maps, skinning). |
+| **Automation** | A headless CLI (`r3d`) and an MCP server, headless or attached live to the open app. |
 
-The core is a Rust workspace; the desktop app is Flutter (`app/`) over it.
+The app is in English and French. Full user documentation:
+[`docs/user-guide.md`](docs/user-guide.md).
+
+## Getting started
+
+Rustle3D is built from source for now. The steps below assume you have
+never set up a Rust or Flutter project: follow the section for your
+system, from top to bottom. Plan about an hour for the installs, and
+10–15 minutes for the very first build (later ones take seconds).
+
+You need, on every system:
+
+| Tool | Why | Version |
+|---|---|---|
+| [Git](https://git-scm.com) | to download the code | any recent |
+| [Rust](https://rustup.rs) (through `rustup`) | the core: geometry, simulation, rendering | stable (picked up automatically) |
+| [Flutter](https://docs.flutter.dev/get-started/install) | the desktop interface | 3.47 or newer |
+| A C/C++ toolchain | to build the desktop app around Flutter | see your system below |
+| GNU make (optional) | short commands like `make run` | any |
+
+The 3D view needs a graphics card with Direct3D 12 (Windows), Metal
+(macOS) or Vulkan (Linux); any card from the last ten years should do.
+
+### Windows 10 / 11
+
+1. **Git**: install [Git for Windows](https://git-scm.com/download/win)
+   (default options are fine). It also gives you *Git Bash*, used by a few
+   scripts.
+2. **Visual Studio**: install
+   [Visual Studio 2022 Community](https://visualstudio.microsoft.com/downloads/)
+   and, in the installer, tick the **Desktop development with C++**
+   workload.
+3. **Rust**: download and run
+   [`rustup-init.exe`](https://rustup.rs), and accept the defaults (the
+   MSVC toolchain).
+4. **Flutter**: open *PowerShell* and run
+
+   ```powershell
+   git clone --depth 1 -b stable https://github.com/flutter/flutter.git C:\dev\flutter
+   ```
+
+   then add `C:\dev\flutter\bin` to your `PATH`: Start menu → *Edit the
+   environment variables for your account* → *Path* → *Edit* → *New* →
+   `C:\dev\flutter\bin` → OK.
+5. **make** (optional): `winget install ezwinports.make`.
+6. **Close and reopen PowerShell** so it sees the new tools, then check:
+
+   ```powershell
+   flutter doctor
+   ```
+
+   Only the **Windows** and **Visual Studio** lines need a ✓ (Android,
+   Chrome and Android Studio are not needed).
+
+Keep the code on a Windows drive (for example `C:\dev\rustle3d`), not
+inside WSL.
+
+### macOS 12 or newer
+
+1. **Xcode**: install it from the App Store, open it once, then in
+   *Terminal*:
+
+   ```sh
+   sudo xcode-select --switch /Applications/Xcode.app
+   sudo xcodebuild -runFirstLaunch
+   ```
+
+   This also installs Git and make.
+2. **Rust**:
+
+   ```sh
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   ```
+
+   Accept the defaults, then open a new Terminal window.
+3. **Flutter**:
+
+   ```sh
+   git clone --depth 1 -b stable https://github.com/flutter/flutter.git ~/development/flutter
+   echo 'export PATH="$HOME/development/flutter/bin:$PATH"' >> ~/.zshrc
+   source ~/.zshrc
+   flutter doctor
+   ```
+
+   Only the **macOS** and **Xcode** lines need a ✓; install CocoaPods if
+   `flutter doctor` asks for it.
+
+### Linux (Ubuntu, Debian and derivatives)
+
+1. **System packages** (compiler, make, GTK, Vulkan):
+
+   ```sh
+   sudo apt install git curl unzip xz-utils zip build-essential clang cmake \
+     ninja-build pkg-config libgtk-3-dev mesa-vulkan-drivers libvulkan1
+   ```
+
+2. **Rust**:
+
+   ```sh
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   ```
+
+   Accept the defaults, then open a new terminal.
+3. **Flutter**:
+
+   ```sh
+   git clone --depth 1 -b stable https://github.com/flutter/flutter.git ~/development/flutter
+   echo 'export PATH="$HOME/development/flutter/bin:$PATH"' >> ~/.bashrc
+   source ~/.bashrc
+   flutter doctor
+   ```
+
+   Only the **Linux toolchain** line needs a ✓.
+
+Under WSL2, clone the code inside the Linux file system (for example
+`~/dev`), not under `/mnt/c`: builds there are much slower. The app runs
+through WSLg with software or Mesa graphics, so expect lower frame rates
+than a native install.
+
+### Get the code and run the app
+
+The same on every system:
 
 ```sh
-cargo build && cargo test                  # core, CLI, MCP server
-cargo run -p r3d-cli -- --help             # headless CLI
-./scripts/check.sh                         # everything CI checks
-cargo xtask run                            # desktop app for this OS, debug
-cargo xtask run --release                  # same, release (real frame rates)
-cargo xtask build [--release]              # build the CLI and the app
+git clone https://github.com/jbm-home/rustle3d.git
+cd rustle3d
+make run
 ```
 
-`cargo xtask run` is `flutter run -d <your OS>` from `app/`; Flutter options
-go after `--`, e.g. `cargo xtask run -- --dart-define=R3D_DEMO=t_shirt`. The
-Rust core is built in the same mode as the app.
+Without make, `cargo xtask run` does exactly the same. The first run
+downloads dependencies and builds everything, then the app window opens.
+In the terminal, `r` reloads the interface after a change to its Dart
+code and `q` quits.
 
-With GNU make installed (on Windows: `winget install ezwinports.make`), the
-`Makefile` gives the same tasks short names; `make` alone lists them
-(`make run`, `make run-release`, `make build`, …). Flutter options go in
-`ARGS=...`.
+`make run` starts a **debug** build: quick to rebuild, with hot reload,
+but the 3D view is slower. To try the app at its real speed, use
+`make run-release`.
 
-Prerequisites: Rust stable (`rustup`), Flutter stable, and
-`cargo install flutter_rust_bridge_codegen --version 2.13.0` (to regenerate
-the Dart bindings). macOS needs Xcode.
+## Everyday commands
 
-### Installing Flutter
+Type `make` alone to list them; this list comes from the `Makefile`.
 
-The app needs Flutter ≥ 3.47 (Dart ≥ 3.14, see `app/pubspec.lock`). On
-macOS and Linux, a clone of the stable channel is the simplest install:
+| make | without make | What it does |
+|---|---|---|
+| `make run` | `cargo xtask run` | the app, debug build (hot reload) |
+| `make run-release` | `cargo xtask run --release` | the app, release build (real speed) |
+| `make build` | `cargo xtask build` | builds the `r3d` CLI and the app, debug |
+| `make build-release` | `cargo xtask build --release` | the same, release |
+| `make test` | `cargo test --workspace` | the Rust tests |
+| `make check` | `./scripts/check.sh` | everything CI checks; run it before every commit |
+| `make release` | `./scripts/release.sh` | a packaged, unsigned release in `dist/` |
+| `make docs` | `cargo xtask gen-docs` | regenerates `docs/commands.md` |
+
+Flutter options go in `ARGS` (or after `--` with `cargo xtask`), for
+example to open the app on a fresh T-shirt project:
 
 ```sh
-sudo apt install git curl unzip xz-utils zip   # Linux only
-git clone --depth 1 -b stable https://github.com/flutter/flutter.git ~/development/flutter
-echo 'export PATH="$HOME/development/flutter/bin:$PATH"' >> ~/.zshrc   # or ~/.bashrc
-export PATH="$HOME/development/flutter/bin:$PATH"
-flutter --disable-analytics
-flutter doctor          # only the line for your desktop OS has to be ✓
+make run ARGS=--dart-define=R3D_DEMO=t_shirt
+cargo xtask run -- --dart-define=R3D_DEMO=t_shirt
 ```
 
-`flutter doctor` also lists Android, Chrome and Android Studio; they are
-not needed. Update later with `flutter upgrade`.
-
-### Linux (and WSL2 on Windows)
-
-Install Flutter as above, then the desktop toolchain:
+The command-line tool works without the app:
 
 ```sh
-sudo apt install build-essential clang cmake ninja-build pkg-config \
-  libgtk-3-dev mesa-vulkan-drivers libvulkan1
-(cd app && flutter run -d linux)
+cargo run -p r3d-cli -- --help                     # all commands
+cargo run -p r3d-cli -- new Skirt.r3d              # a new project
+cargo run -p r3d-cli -- mcp --project Skirt.r3d    # serve it to an AI agent
 ```
 
-Under WSL2, clone the repository inside the Linux file system (e.g.
-`~/Git`), not under `/mnt/c`: builds there are much slower.
+Contributors also need `cargo install flutter_rust_bridge_codegen --version 2.13.0`
+to regenerate the Dart bindings after changing `crates/r3d-ffi/src/api`;
+see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
-### Windows (native)
+## Troubleshooting
 
-Run everything from Windows itself: Flutter inside WSL only builds the
-Linux app. Prerequisites:
+| Symptom | What to do |
+|---|---|
+| `flutter`, `cargo` or `make` is "not recognized" / "command not found" | Open a new terminal after installing; check that the tool's folder is in `PATH`. |
+| `flutter doctor` shows ✗ for Android or Chrome | Ignore it: only your desktop line matters. |
+| Windows: `LNK1104: cannot open file … build_script_build.exe` | An antivirus is scanning the build. Set the user environment variable `CARGO_PROFILE_DEV_DEBUG` to `line-tables-only`, or exclude the `target` folder from scanning. |
+| Windows: `make check` runs in WSL | Fixed in the `Makefile`, which uses Git Bash; make sure Git for Windows is installed. |
+| The 3D view is slow | Use `make run-release`; debug builds are much slower. |
+| Linux: no 3D view, Vulkan errors | Install your GPU's Vulkan driver (`mesa-vulkan-drivers` for AMD and Intel, the proprietary driver for NVIDIA). |
 
-- Visual Studio 2022 (Community is enough) with the "Desktop development
-  with C++" workload.
-- Rust through `rustup-init.exe`, default MSVC toolchain
-  (`stable-x86_64-pc-windows-msvc`).
-- Flutter: `git clone --depth 1 -b stable https://github.com/flutter/flutter.git C:\dev\flutter`,
-  add `C:\dev\flutter\bin` to `PATH`; `flutter doctor` must show ✓ for
-  Visual Studio.
-- Git for Windows (Git Bash runs `scripts/release.sh`).
+## Project layout and documentation
 
-Clone the repository on the Windows side (e.g. `C:\dev\rustle3d`), not
-under `\\wsl$\`, then:
+The core is a Rust workspace (`crates/`); the desktop app is Flutter
+(`app/`) over it, through `flutter_rust_bridge`.
 
-```powershell
-cd C:\dev\rustle3d\app
-flutter run -d windows
-```
+| Path | Contents |
+|---|---|
+| `crates/r3d-geom` | 2D geometry: Bézier curves, offsets, polygon operations, triangulation |
+| `crates/r3d-core` | Document model, typed IDs, versioned JSON with migrations |
+| `crates/r3d-commands` | Every operation as a typed command, with validation and undo |
+| `crates/r3d-sim`, `r3d-sim-gpu` | XPBD cloth solver, on the CPU and on the GPU |
+| `crates/r3d-render` | 2D board, 3D view and path-traced photos (wgpu) |
+| `crates/r3d-io` | OBJ, glTF, SVG, PDF and DXF import and export |
+| `crates/r3d-cli`, `r3d-mcp` | The `r3d` command-line tool and the MCP server |
+| `crates/r3d-ffi`, `app/` | The bridge and the Flutter desktop app |
 
-The GPU is used natively, so the 3D view is much faster than under WSL2.
-
-On Linux and Windows the views are rendered by the GPU and copied to the
-UI (shared textures are macOS-only for now). Under WSL2 the app runs
-through WSLg; the GPU is Mesa's Vulkan driver (or its software fallback),
-so expect lower frame rates than native.
-
-### Release packages
-
-`./scripts/release.sh` builds the app and the CLI in release mode for the
-current OS and packages them in `dist/` (unsigned: a zip of `Rustle3D.app`
-on macOS, a tarball of the app bundle on Linux, a zip on Windows from Git
-Bash). The manual GitHub workflow "Release builds" runs it on all three.
-
-## Documentation
-
+- [`docs/user-guide.md`](docs/user-guide.md): the user guide.
 - [`docs/architecture.md`](docs/architecture.md): crates, data flow, threading.
-- [`docs/physics.md`](docs/physics.md): cloth solver and fabric model.
-- [`docs/ux.md`](docs/ux.md): UX and visual design principles.
+- [`docs/physics.md`](docs/physics.md) and [`docs/rendering.md`](docs/rendering.md): cloth solver and photo renderer.
+- [`docs/commands.md`](docs/commands.md): every command, for scripts and agents.
 - [`docs/specs/`](docs/specs/): one spec per feature.
-- [`CONTRIBUTING.md`](CONTRIBUTING.md): including the **clean-room policy**.
+- [`ROADMAP.md`](ROADMAP.md): milestones, done and coming.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md): how to contribute, including the
+  **clean-room policy**.
 
 ## License
 
