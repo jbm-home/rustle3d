@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
-use r3d_render::photo::{PhotoRenderer, PhotoScene, Settings, Surface};
+use r3d_render::photo::{Cloth, PhotoRenderer, PhotoScene, Settings, Surface};
 use r3d_render::{Gpu, Mesh, OrbitCamera};
 
 /// GPU time each batch of samples aims for: short enough that the 3D
@@ -39,7 +39,12 @@ struct Shared {
 
 /// What a photo shows, gathered on the caller's thread.
 pub(crate) struct Subject {
-    pub cloth: Vec<(Mesh, Surface)>,
+    /// Each piece with its surface and its print.
+    pub cloth: Vec<(
+        Mesh,
+        Surface,
+        Option<std::sync::Arc<r3d_commands::prints::PrintImage>>,
+    )>,
     pub body: Option<Mesh>,
     pub camera: OrbitCamera,
 }
@@ -127,7 +132,18 @@ fn run(
     shared: &Shared,
     started: Instant,
 ) -> Result<(), String> {
-    let cloth: Vec<(&Mesh, Surface)> = subject.cloth.iter().map(|(m, s)| (m, *s)).collect();
+    let cloth: Vec<Cloth<'_>> = subject
+        .cloth
+        .iter()
+        .map(|(mesh, surface, print)| Cloth {
+            mesh,
+            surface: *surface,
+            print: print.as_ref().map(|p| r3d_render::Printed {
+                key: p.key,
+                texture: &p.texture,
+            }),
+        })
+        .collect();
     let scene = PhotoScene::new(&cloth, subject.body.as_ref());
     let mut photo = PhotoRenderer::new(gpu, &scene, &subject.camera, settings, width, height)
         .map_err(|e| e.to_string())?;

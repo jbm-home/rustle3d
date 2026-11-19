@@ -14,6 +14,9 @@ pub struct Mesh {
     /// Per-vertex colours (sRGB) drawn instead of the material's base
     /// colour, e.g. a fit map; empty for the material's.
     pub colors: Vec<Rgba>,
+    /// Texture coordinates on the surface's print (spec 25), one per
+    /// position; empty without a print.
+    pub uvs: Vec<[f32; 2]>,
 }
 
 impl Mesh {
@@ -78,6 +81,7 @@ mod tests {
             normals: Vec::new(),
             indices: vec![0, 1, 2, 0, 2, 3],
             colors: Vec::new(),
+            uvs: Vec::new(),
         };
         quad.recompute_normals();
         assert!(quad.normals.iter().all(|n| (*n - Vec3::Y).length() < 1e-6));

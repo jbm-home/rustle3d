@@ -89,6 +89,12 @@ fn every_command_round_trips() {
         "width_mm": 1450, "price_per_m": 12.5}),
     );
     h.round_trip(json!({"type": "garment.set_notes", "notes": "Press seams open.\n"}));
+    h.round_trip(json!({"type": "garment.set_print", "print": {"builtin": "stripes"}}));
+    h.round_trip(json!({"type": "garment.set_print",
+        "print": {"image": "textures/liberty.jpg"}, "width_mm": 320, "angle_deg": 30}));
+    h.round_trip(json!({"type": "panel.set_print_placement", "panel": panel,
+        "offset_mm": [12.5, -4], "angle_deg": 90}));
+    h.round_trip(json!({"type": "garment.remove_print"}));
     let jacket = h.round_trip(json!({"type": "garment.add", "name": "Jacket",
         "fabric": "wool", "color": "#223344"}));
     let jacket = jacket.created[0].to_string();

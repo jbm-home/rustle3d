@@ -17,6 +17,7 @@ pub mod gpu;
 pub mod mesh;
 pub mod offscreen;
 pub mod photo;
+pub mod print;
 pub mod theme;
 pub mod view3d;
 
@@ -27,6 +28,7 @@ pub use board::{BoardRenderer, BoardScene};
 pub use camera::OrbitCamera;
 pub use gpu::{Gpu, RenderError};
 pub use mesh::Mesh;
+pub use print::Printed;
 pub use theme::Theme;
 pub use view3d::{Draw, Material, ViewRenderer3d};
 

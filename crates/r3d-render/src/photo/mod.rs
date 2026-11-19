@@ -18,6 +18,9 @@
 //! - Shading normals: shadow rays leave from the surface the vertex
 //!   normals describe (Hanika 2021, "Hacking the Shadow Terminator", Ray
 //!   Tracing Gems II), so coarse cloth has no jagged terminator.
+//! - Prints (spec 25): the cloth's albedo is read from its print at the
+//!   hit's texture coordinates (bilinear, repeating, sRGB decoded), from
+//!   one storage buffer holding every print's texels.
 //! - Denoising: an edge-avoiding à-trous wavelet filter (Dammertz et al.
 //!   2010) guided by normals, depth and the luminance variance, as in the
 //!   spatial part of SVGF (Schied et al. 2017), on the light reaching the
@@ -37,6 +40,7 @@ use crate::camera::OrbitCamera;
 use crate::gpu::{Gpu, RenderError};
 use crate::mesh::Mesh;
 use crate::offscreen;
+use crate::print::Printed;
 use r3d_core::Fabric;
 
 /// How long to refine: samples per pixel and light bounces.
@@ -219,13 +223,26 @@ impl Surface {
 const CLOTH_LEVEL: u32 = 3;
 const BODY_LEVEL: u32 = 2;
 
+/// One piece of cloth in a photo: its mesh (with texture coordinates
+/// when it has a print), its surface and its print.
+#[derive(Clone, Copy, Debug)]
+pub struct Cloth<'a> {
+    pub mesh: &'a Mesh,
+    pub surface: Surface,
+    pub print: Option<Printed<'a>>,
+}
+
 /// What a photo shows: surfaces as triangles, before the studio is added.
 #[derive(Clone, Debug)]
 pub struct PhotoScene {
-    triangles: Vec<([Vec3; 3], [Vec3; 3])>,
+    triangles: Vec<tessellate::Corners>,
     /// Surface index of each triangle (into `surfaces`).
     surface_of: Vec<u32>,
     surfaces: Vec<Surface>,
+    /// The print of each surface that has one (by surface index), and
+    /// the prints' pixels.
+    print_of: Vec<(u32, usize)>,
+    prints: Vec<(u64, r3d_core::Texture)>,
 }
 
 impl Default for PhotoScene {
@@ -239,18 +256,33 @@ impl PhotoScene {
     /// The garment's pieces with their surfaces, on the avatar's `body`.
     /// The coarse simulation meshes are cut into curved triangles; meshes
     /// without normals get them computed.
-    pub fn new(cloth: &[(&Mesh, Surface)], body: Option<&Mesh>) -> Self {
+    pub fn new(cloth: &[Cloth<'_>], body: Option<&Mesh>) -> Self {
         let mut scene = Self {
             triangles: Vec::new(),
             surface_of: Vec::new(),
             // Slot 0 is the backdrop, set per lighting.
             surfaces: vec![Surface::backdrop(Vec3::ONE)],
+            print_of: Vec::new(),
+            prints: Vec::new(),
         };
         if let Some(body) = body {
             scene.add(&tessellate::closed(body), Surface::mannequin(), BODY_LEVEL);
         }
-        for (mesh, surface) in cloth {
-            scene.add(mesh, *surface, CLOTH_LEVEL);
+        for c in cloth {
+            let printed = c
+                .print
+                .filter(|_| c.mesh.uvs.len() == c.mesh.positions.len());
+            if let Some(p) = printed {
+                let at = match scene.prints.iter().position(|(k, _)| *k == p.key) {
+                    Some(at) => at,
+                    None => {
+                        scene.prints.push((p.key, p.texture.clone()));
+                        scene.prints.len() - 1
+                    }
+                };
+                scene.print_of.push((scene.surfaces.len() as u32, at));
+            }
+            scene.add(c.mesh, c.surface, CLOTH_LEVEL);
         }
         scene
     }
@@ -280,7 +312,7 @@ impl PhotoScene {
 
     /// Corners of the box around everything in the scene.
     pub fn bounds(&self) -> Option<(Vec3, Vec3)> {
-        let mut points = self.triangles.iter().flat_map(|(p, _)| p.iter());
+        let mut points = self.triangles.iter().flat_map(|(p, _, _)| p.iter());
         let first = *points.next()?;
         Some(points.fold((first, first), |(lo, hi), p| (lo.min(*p), hi.max(*p))))
     }
@@ -292,6 +324,31 @@ struct GpuTriangle {
     /// Corner positions; `p[0].w` holds the surface index.
     p: [[f32; 4]; 3],
     n: [[f32; 4]; 3],
+    /// Texture coordinates of the corners: u0 v0 u1 v1, then u2 v2.
+    uv: [[f32; 4]; 2],
+}
+
+/// Every print's texels in one buffer of `u32` (RGBA8, sRGB): first the
+/// number of prints, then each one's offset, width and height, then the
+/// texels.
+fn print_texels(prints: &[(u64, r3d_core::Texture)]) -> Vec<u32> {
+    let mut out = vec![prints.len() as u32];
+    let header = 1 + 3 * prints.len();
+    let mut offset = header;
+    for (_, t) in prints {
+        out.extend([offset as u32, t.width, t.height]);
+        offset += (t.width * t.height) as usize;
+    }
+    for (_, t) in prints {
+        out.extend(
+            t.rgba
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .map(|p| u32::from_le_bytes(*p)),
+        );
+    }
+    out
 }
 
 #[repr(C)]
@@ -517,29 +574,39 @@ impl PhotoRenderer {
         let mut surface_of = scene.surface_of.clone();
         let backdrop = studio::backdrop(radius, height_m);
         surface_of.extend(std::iter::repeat_n(0, backdrop.len()));
-        triangles.extend(backdrop);
+        triangles.extend(backdrop.into_iter().map(|(p, n)| (p, n, [[0.0; 2]; 3])));
         let mut surfaces = scene.surfaces.clone();
         if let Some(b) = surfaces.first_mut() {
             *b = Surface::backdrop(studio.backdrop);
         }
 
-        let positions: Vec<[Vec3; 3]> = triangles.iter().map(|(p, _)| *p).collect();
+        let positions: Vec<[Vec3; 3]> = triangles.iter().map(|(p, _, _)| *p).collect();
         let tree = bvh::Bvh::build(&positions);
         let gpu_triangles: Vec<GpuTriangle> = tree
             .order
             .iter()
             .filter_map(|&t| {
-                let (p, n) = triangles.get(t as usize)?;
+                let (p, n, uv) = triangles.get(t as usize)?;
                 let surface = *surface_of.get(t as usize)?;
                 let mut p = p.map(|v| v.extend(0.0).to_array());
                 p[0][3] = surface as f32;
                 Some(GpuTriangle {
                     p,
                     n: n.map(|v| v.extend(0.0).to_array()),
+                    uv: [
+                        [uv[0][0], uv[0][1], uv[1][0], uv[1][1]],
+                        [uv[2][0], uv[2][1], 0.0, 0.0],
+                    ],
                 })
             })
             .collect();
-        let gpu_surfaces: Vec<GpuSurface> = surfaces.iter().map(GpuSurface::from).collect();
+        let mut gpu_surfaces: Vec<GpuSurface> = surfaces.iter().map(GpuSurface::from).collect();
+        // A printed surface reads its print (index + 1; 0: none).
+        for (surface, print) in &scene.print_of {
+            if let Some(s) = gpu_surfaces.get_mut(*surface as usize) {
+                s.spec[2] = (*print + 1) as f32;
+            }
+        }
 
         let total_power: f32 = studio.lights.iter().map(studio::AreaLight::power).sum();
         let mut lights = [GpuLight::default(); MAX_LIGHTS];
@@ -580,12 +647,12 @@ impl PhotoRenderer {
         let nodes = storage(gpu, "bvh", bytemuck::cast_slice(&tree.nodes), none);
         let tris = storage(gpu, "triangles", bytemuck::cast_slice(&gpu_triangles), none);
         let surfaces = storage(gpu, "surfaces", bytemuck::cast_slice(&gpu_surfaces), none);
-        let lut = storage(
-            gpu,
-            "sheen",
-            bytemuck::cast_slice(&sheen::albedo_table()),
-            none,
-        );
+        // The sheen's table and the prints share a buffer (8 storage
+        // buffers per stage at most): the table first.
+        let table = sheen::albedo_table();
+        let mut lut: Vec<u32> = table.iter().map(|v| v.to_bits()).collect();
+        lut.extend(print_texels(&scene.prints));
+        let lut = storage(gpu, "sheen and prints", bytemuck::cast_slice(&lut), none);
         let pixels = u64::from(width) * u64::from(height);
         let make = |label| {
             device.create_buffer(&wgpu::BufferDescriptor {

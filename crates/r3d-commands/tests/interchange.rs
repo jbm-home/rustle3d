@@ -160,7 +160,7 @@ fn every_template_survives_every_format() {
                 "dst",
             )
             .unwrap();
-            let rel = dst.adopt(&src.dir().join(file)).unwrap();
+            let rel = dst.adopt(&src.dir().join(file), "imports").unwrap();
             let out = dst
                 .run_step(&step(json!({"type": "import.pattern", "path": rel})))
                 .unwrap();
@@ -181,7 +181,7 @@ fn imported_pieces_go_beside_existing_ones() {
     let mut src = source(tmp.path(), "tote_bag");
     src.run_step(&step(json!({"type": "export.dxf", "path": "p.dxf"})))
         .unwrap();
-    let rel = src.adopt(&src.dir().join("p.dxf")).unwrap();
+    let rel = src.adopt(&src.dir().join("p.dxf"), "imports").unwrap();
     let right = |p: &Project| {
         p.panels()
             .keys()
@@ -210,7 +210,7 @@ fn hand_drawn_reference_files() {
         ("skirt-aama-inches.dxf", 2, "file"),
         ("bodice-inkscape.svg", 1, "file"),
     ] {
-        let rel = ws.adopt(&data.join(file)).unwrap();
+        let rel = ws.adopt(&data.join(file), "imports").unwrap();
         let out = ws
             .run_step(&step(json!({"type": "import.pattern", "path": rel})))
             .unwrap();

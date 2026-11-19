@@ -240,6 +240,7 @@ impl CommandSpec for GarmentAdd {
                 template: None,
                 fabric_details: FabricDetails::default(),
                 notes: String::new(),
+                print: None,
             },
         );
         Ok(CommandOutput {

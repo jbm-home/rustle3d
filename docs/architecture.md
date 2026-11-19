@@ -1,6 +1,6 @@
 # Rustle3D architecture
 
-Status: living document, last updated 2026-11-19 (M24, fit maps and tape measure).
+Status: living document, last updated 2026-11-19 (M21, textures and prints).
 
 Every choice here is the **current best guess**, not a rule. Each one says
 why it was made and what was considered, so it can be challenged and changed
@@ -58,7 +58,7 @@ the change log at the end. Sections marked **Open** are explicitly undecided.
 | `r3d-core` | `r3d-geom`, `serde`, `serde_json`, `schemars` | sim, GUI, GPU |
 | `r3d-sim` | `r3d-geom`, `glam`, `rayon`, `thiserror` | core, GUI, GPU |
 | `r3d-sim-gpu` | `r3d-sim`, `r3d-geom`, `wgpu`, `bytemuck`, `pollster`, `thiserror` | core, commands, render, GUI |
-| `r3d-io` | `r3d-core`, `r3d-geom`, `pdf-writer`, `lopdf`, `roxmltree`, `svgtypes`, `serde_json`, `thiserror` | sim, GUI, GPU; no file I/O (takes and returns bytes) |
+| `r3d-io` | `r3d-core`, `r3d-geom`, `pdf-writer`, `lopdf`, `roxmltree`, `svgtypes`, `png`, `zune-jpeg`, `miniz_oxide`, `serde_json`, `thiserror` | sim, GUI, GPU; no file I/O (takes and returns bytes) |
 | `r3d-commands` | core, geom, io (sim from M4), avatar, `rayon` | GUI, GPU |
 | `r3d-render` | core, geom, `wgpu`, `image` | commands, GUI toolkit |
 | `r3d-mcp` | commands (render from M3), `rmcp`, `tokio` | GUI toolkit |
@@ -88,7 +88,7 @@ Changes to the split suggested in the brief:
 ```
 Project                                        (✓ = implemented in M1)
  ├─ name, display_unit, next_id                ✓
- ├─ garments: IdMap<GarmentId, Garment>        ✓ (fabric, colour, layer; M30: fabric details, weight/width/price, notes)
+ ├─ garments: IdMap<GarmentId, Garment>        ✓ (fabric, colour, layer; M30: fabric details, weight/width/price, notes; M21: print)
  ├─ panels: IdMap<PanelId, Panel>              ✓ (name, garment, contour, grain angle)
  │    Panel { name, contour: Vec<EdgeId>, internal_lines, notches,
  │            symmetry: Option<SymmetryLink>, material: MaterialId,
@@ -168,6 +168,8 @@ Project                                        (✓ = implemented in M1)
 MySkirt.r3d/
  ├─ project.json        the document (pretty-printed, stable key order)
  ├─ avatars/            imported avatar meshes (copied in, referenced relatively)
+ ├─ imports/            pattern files imported (DXF, SVG, PDF), kept as given
+ ├─ textures/           print images the user added (PNG, JPEG; spec 25)
  ├─ exports/            default output location for OBJ/glTF/SVG/PDF/PNG
  └─ .r3d-cache/         derived data (SDF grids, meshes); safe to delete, git-ignored
 ```
@@ -606,3 +608,6 @@ code stays **i18n-ready** for more:
 | 2026-11-19 | M24: fit maps and the tape measure are computed from positions in `r3d_commands::fit` (shared by the app's live drape on either backend and the cached headless one), not in the solver; agents read them through two read-only actions, `fit.report` and `fit.tape`, because only a workspace holds the cached drape (queries see the document alone); `drape::Latest` is the one loader of the cached drape (renders, 3D exports, fit) | One definition of strain, gap and ease whatever produced the positions; the GPU solver stays unchanged. A query would need the drape in the document, which belongs to the cache |
 | 2026-11-19 | M24: a 3D mesh may carry per-vertex colours (`r3d_render::Mesh::colors`) for fit maps, drawn with the view's usual lighting; the colour scale is viridis (`r3d_render::fitmap`), fixed ranges (strain 0–20 %, gap 50–0 mm) | Folds stay readable under the colours; a perceptually uniform, colour-blind-safe scale; fixed ranges make maps of different garments comparable |
 | 2026-11-19 | M30: the projector is a full-window Flutter route painting the pattern itself (`Engine::projector_drawing`, the same drawing as the 1:1 exports) at a calibrated scale stored as an app preference (`projector.json`); no OS full screen | Drawing in Flutter keeps it independent of the board's renderer and pan/zoom; the calibration belongs to the room, not the project. True full screen needs a window plugin (and `unsafe` on Windows): maximising the window on the projector does the job |
+| 2026-11-19 | M21: a garment's print (built-in or an image file in the project's `textures/`, referenced by relative path) on `Garment`, a piece's shift and turn of it on `Panel`, schema v16; texture coordinates computed from the pattern along each piece's grainline (`Project::print_frame`), never stored | The print is a property of the fabric, laid on every piece by its grain as when cutting; storing coordinates per vertex would go stale with every edit, and images in the JSON would bloat it and its diffs |
+| 2026-11-19 | M21: built-in prints drawn by our own code (`r3d_core::print::builtin`, in the garment's colour), no shipped image assets; prints decoded in `r3d-io` (`png`, and `zune-jpeg`, MIT/Apache-2.0/Zlib, pure Rust, for JPEG) and cached per front-end by `r3d_commands::prints::Prints` | No third-party image licences to track; built-ins follow the garment's colour. JPEG is what photos of fabric come as; `zune-jpeg` is the decoder the `image` crate itself uses now, without its other codecs |
+| 2026-11-19 | M21: the photo tracer reads prints from the storage buffer it already had for the sheen table (one buffer: table, then a header and every print's texels), with manual bilinear filtering and no mip-maps | WebGPU guarantees eight storage buffers per shader stage and the tracer used all of them; binding arrays of textures are not portable. Samples accumulating per pixel filter the print |

@@ -2602,6 +2602,220 @@ Write the garment's notes: free text for whoever sews or produces it (finishing,
 
 </details>
 
+### `garment.set_print`
+
+Put a print on the garment's fabric: a built-in one (stripes, gingham, dots, twill, drawn in the garment's colour) or a PNG/JPEG image in the project folder (`r3d texture` copies one in). The print lies along each piece's grainline at its real size (`width_mm` × `height_mm` per repeat), turned by `angle_deg`; it shows in the 3D view, photos, the board and the glTF/OBJ exports. Replaces the previous print.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "BuiltinPrint": {
+      "description": "The prints the app ships, drawn by [`builtin`].",
+      "oneOf": [
+        {
+          "const": "stripes",
+          "description": "A stripe of the colour and one of the ground, along the grain.",
+          "type": "string"
+        },
+        {
+          "const": "gingham",
+          "description": "Crossing bands of the colour, darker where they cross.",
+          "type": "string"
+        },
+        {
+          "const": "dots",
+          "description": "Dots of the colour on the ground, in staggered rows (two per\nrepeat).",
+          "type": "string"
+        },
+        {
+          "const": "twill",
+          "description": "A 2/1 twill weave: diagonal ribs of the colour and a lighter\nthread.",
+          "type": "string"
+        }
+      ]
+    },
+    "GarmentId": {
+      "description": "Identifier of a garment, e.g. `garment:1`.",
+      "pattern": "^garment:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "PrintSource": {
+      "description": "Where a print's pixels come from.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "One of the prints the app ships, in the garment's colour.",
+          "properties": {
+            "builtin": {
+              "$ref": "#/$defs/BuiltinPrint"
+            }
+          },
+          "required": [
+            "builtin"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A PNG or JPEG file, relative to the project folder.",
+          "properties": {
+            "image": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "image"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Put a print on the garment's fabric.",
+  "properties": {
+    "angle_deg": {
+      "default": 0.0,
+      "description": "The print turned from the grainline (degrees, counter-clockwise);\n0: the image's top along the grain.",
+      "format": "double",
+      "type": "number"
+    },
+    "garment": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/GarmentId"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Defaults to the project's garment."
+    },
+    "height_mm": {
+      "description": "Height of one repeat along the grain (mm, 1–5000); omitted: the\nimage's proportions (square for built-ins).",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "print": {
+      "$ref": "#/$defs/PrintSource",
+      "description": "`{\"builtin\": \"stripes\" | \"gingham\" | \"dots\" | \"twill\"}`, or\n`{\"image\": \"textures/name.png\"}`: a PNG or JPEG file in the project\nfolder (relative, forward slashes)."
+    },
+    "width_mm": {
+      "description": "Width of one repeat across the grain (mm, 1–5000); omitted: the\nbuilt-in's usual repeat (20 mm stripes, 12 mm gingham, 16 mm dots,\n4 mm twill), 100 mm for an image.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "print"
+  ],
+  "title": "GarmentSetPrint",
+  "type": "object"
+}
+```
+
+</details>
+
+### `garment.remove_print`
+
+Take the print off the garment: back to its plain colour. The image file, if any, stays in the project folder.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "GarmentId": {
+      "description": "Identifier of a garment, e.g. `garment:1`.",
+      "pattern": "^garment:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Take the print off the garment's fabric.",
+  "properties": {
+    "garment": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/GarmentId"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Defaults to the project's garment."
+    }
+  },
+  "title": "GarmentRemovePrint",
+  "type": "object"
+}
+```
+
+</details>
+
+### `panel.set_print_placement`
+
+Shift (mm) and turn (degrees) the garment's print on one piece, e.g. to centre a motif on a front or match stripes across a seam. Zero for both lays the print as on every other piece.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "PanelId": {
+      "description": "Identifier of a panel, e.g. `panel:1`.",
+      "pattern": "^panel:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Shift and turn the garment's print on one piece.",
+  "properties": {
+    "angle_deg": {
+      "default": 0.0,
+      "description": "The print turned on the piece (degrees, counter-clockwise),\nadded to the garment's angle; default 0.",
+      "format": "double",
+      "type": "number"
+    },
+    "offset_mm": {
+      "default": [
+        0.0,
+        0.0
+      ],
+      "description": "The print moved on the piece (mm, board axes); default none.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+    },
+    "panel": {
+      "$ref": "#/$defs/PanelId"
+    }
+  },
+  "required": [
+    "panel"
+  ],
+  "title": "PanelSetPrintPlacement",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `garment.arrange`
 
 Place every panel around the body for the simulation, side by side in the order the seams join them (a panel's right side continues into the next panel; each takes a share of the turn in proportion to its width), tops at the avatar's waist (its narrowest girth) unless top_cm is given. Panels placed on an arm (sleeves) or flat keep their placement. Re-run it after adding panels or seams.
@@ -4375,7 +4589,7 @@ Read-only. Lengths in mm, areas in mm², rounded to 0.001.
 
 ### `project.summary`
 
-Project name, display unit, the garments (fabric, colour, notes), the size range (names, base, shown; null without one), entity counts and a summary of every panel.
+Project name, display unit, the garments (fabric, colour, notes, print), the size range (names, base, shown; null without one), entity counts and a summary of every panel.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -5107,7 +5321,7 @@ Export all panels as a PDF at 1:1 scale, tiled on A4/Letter pages (labelled A1, 
 
 ### `export.gltf`
 
-Export the draped garment as glTF 2.0 binary (GLB): one named node and mesh per piece, metres, Y up, the pattern position as texture coordinates (1 unit = 1 m of fabric), the fabric as a PBR material with KHR_materials_sheen; the avatar too if asked. Uses the cached drape from `simulate` if it is up to date, otherwise the starting positions, and says which. Returns the written path.
+Export the draped garment as glTF 2.0 binary (GLB): one named node and mesh per piece, metres, Y up, texture coordinates from the pattern along each piece's grainline (in repeats of the garment's print, embedded as its base colour texture; 1 unit = 1 m of fabric without one), the fabric as a PBR material with KHR_materials_sheen; the avatar too if asked. Uses the cached drape from `simulate` if it is up to date, otherwise the starting positions, and says which. Returns the written path.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -5139,7 +5353,7 @@ Export the draped garment as glTF 2.0 binary (GLB): one named node and mesh per 
 
 ### `export.obj`
 
-Export the draped garment as Wavefront OBJ: one object per piece, metres, Y up, the pattern position as texture coordinates, smooth normals; geometry only. Uses the cached drape from `simulate` if it is up to date, otherwise the starting positions, and says which. Returns the written path.
+Export the draped garment as Wavefront OBJ: one object per piece, metres, Y up, texture coordinates from the pattern along each piece's grainline, smooth normals; with an MTL file beside it (one material per garment, its colour, and its print's image as `map_Kd`, written beside it too). Uses the cached drape from `simulate` if it is up to date, otherwise the starting positions, and says which. Returns the written path.
 
 <details><summary>Parameters (JSON schema)</summary>
 

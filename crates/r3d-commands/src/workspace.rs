@@ -30,6 +30,8 @@ pub enum WorkspaceError {
     Import(#[from] r3d_io::import::ImportError),
     #[error(transparent)]
     Image(#[from] r3d_io::techpack::TechPackError),
+    #[error(transparent)]
+    Texture(#[from] r3d_io::texture::TextureError),
     #[error("not a readable zip archive: {detail}")]
     Archive { detail: String },
     #[error(
@@ -56,6 +58,7 @@ impl Localizable for WorkspaceError {
                 .arg("detail", detail),
             Self::Import(e) => e.message(),
             Self::Image(e) => e.message(),
+            Self::Texture(e) => e.message(),
             Self::Archive { detail } => {
                 Message::new("archive.invalid", self.to_string()).arg("detail", detail)
             }
@@ -218,11 +221,24 @@ impl Workspace {
         fs::read(&path).map_err(failed)
     }
 
+    /// Copy a print image from anywhere (one the user picked) into the
+    /// project's `textures/` folder, as [`Self::adopt`] does, after
+    /// checking that it is a PNG or JPEG that can be read (spec 25).
+    pub fn adopt_texture(&self, source: &Path) -> Result<String, WorkspaceError> {
+        let bytes = fs::read(source).map_err(|e| WorkspaceError::Read {
+            path: source.display().to_string(),
+            detail: e.to_string(),
+        })?;
+        r3d_io::texture::decode(&bytes)?;
+        self.adopt(source, "textures")
+    }
+
     /// Copy a file from anywhere (one the user picked) into the project's
-    /// `imports/` folder, so the project keeps what it was made from.
-    /// Returns its path relative to the project; a different file of the
-    /// same name gets a numbered name, the same file is not copied twice.
-    pub fn adopt(&self, source: &Path) -> Result<String, WorkspaceError> {
+    /// `folder` (`imports` for patterns), so the project keeps what it was
+    /// made from. Returns its path relative to the project; a different
+    /// file of the same name gets a numbered name, the same file is not
+    /// copied twice.
+    pub fn adopt(&self, source: &Path, folder: &str) -> Result<String, WorkspaceError> {
         let failed = |e: std::io::Error| WorkspaceError::Read {
             path: source.display().to_string(),
             detail: e.to_string(),
@@ -239,9 +255,9 @@ impl Workspace {
         };
         for k in 1.. {
             let candidate = if k == 1 {
-                format!("imports/{stem}{ext}")
+                format!("{folder}/{stem}{ext}")
             } else {
-                format!("imports/{stem} ({k}){ext}")
+                format!("{folder}/{stem} ({k}){ext}")
             };
             match fs::read(self.dir.join(&candidate)) {
                 Ok(existing) if existing == bytes => return Ok(candidate),
@@ -251,7 +267,7 @@ impl Workspace {
         }
         Err(WorkspaceError::Write {
             path: source.display().to_string(),
-            detail: "no free name in imports/".into(),
+            detail: format!("no free name in {folder}/"),
         })
     }
 
@@ -296,10 +312,10 @@ mod tests {
         let ws = Workspace::create(&tmp.path().join("P.r3d"), "P").unwrap();
         let src = tmp.path().join("skirt.svg");
         std::fs::write(&src, "a").unwrap();
-        assert_eq!(ws.adopt(&src).unwrap(), "imports/skirt.svg");
-        assert_eq!(ws.adopt(&src).unwrap(), "imports/skirt.svg");
+        assert_eq!(ws.adopt(&src, "imports").unwrap(), "imports/skirt.svg");
+        assert_eq!(ws.adopt(&src, "imports").unwrap(), "imports/skirt.svg");
         std::fs::write(&src, "b").unwrap();
-        assert_eq!(ws.adopt(&src).unwrap(), "imports/skirt (2).svg");
+        assert_eq!(ws.adopt(&src, "imports").unwrap(), "imports/skirt (2).svg");
         assert_eq!(ws.read("imports/skirt (2).svg").unwrap(), b"b");
         std::fs::write(tmp.path().join("secret"), "x").unwrap();
         for bad in ["../secret", "/etc/passwd", ""] {

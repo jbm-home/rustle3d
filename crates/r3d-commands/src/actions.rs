@@ -271,7 +271,13 @@ fn draped(
     let body = latest.body.as_deref().filter(|_| avatar);
     let avatar = body.zip(latest.form.as_ref().map(|f| &f.triangles[..]));
     Ok((
-        drape::scene3d(project, &latest.drape, &latest.positions, avatar),
+        drape::scene3d(
+            project,
+            &latest.drape,
+            &latest.positions,
+            avatar,
+            &crate::prints::Prints::default().all(project, Some(ws.dir())),
+        ),
         latest.state(),
     ))
 }
@@ -290,7 +296,7 @@ pub struct ExportGltf {
 }
 
 impl Described for ExportGltf {
-    const SUMMARY: &'static str = "Export the draped garment as glTF 2.0 binary (GLB): one named node and mesh per piece, metres, Y up, the pattern position as texture coordinates (1 unit = 1 m of fabric), the fabric as a PBR material with KHR_materials_sheen; the avatar too if asked. Uses the cached drape from `simulate` if it is up to date, otherwise the starting positions, and says which. Returns the written path.";
+    const SUMMARY: &'static str = "Export the draped garment as glTF 2.0 binary (GLB): one named node and mesh per piece, metres, Y up, texture coordinates from the pattern along each piece's grainline (in repeats of the garment's print, embedded as its base colour texture; 1 unit = 1 m of fabric without one), the fabric as a PBR material with KHR_materials_sheen; the avatar too if asked. Uses the cached drape from `simulate` if it is up to date, otherwise the starting positions, and says which. Returns the written path.";
 }
 
 impl ActionSpec for ExportGltf {
@@ -316,15 +322,36 @@ pub struct ExportObj {
 }
 
 impl Described for ExportObj {
-    const SUMMARY: &'static str = "Export the draped garment as Wavefront OBJ: one object per piece, metres, Y up, the pattern position as texture coordinates, smooth normals; geometry only. Uses the cached drape from `simulate` if it is up to date, otherwise the starting positions, and says which. Returns the written path.";
+    const SUMMARY: &'static str = "Export the draped garment as Wavefront OBJ: one object per piece, metres, Y up, texture coordinates from the pattern along each piece's grainline, smooth normals; with an MTL file beside it (one material per garment, its colour, and its print's image as `map_Kd`, written beside it too). Uses the cached drape from `simulate` if it is up to date, otherwise the starting positions, and says which. Returns the written path.";
 }
 
 impl ActionSpec for ExportObj {
     fn run(&self, ws: &mut Workspace) -> Result<Value, WorkspaceError> {
         let (scene, state) = draped(ws, self.avatar)?;
         let path = self.path.clone().unwrap_or_else(|| default_path(ws, "obj"));
-        let written = ws.write(&path, to_obj(&scene).as_bytes())?;
-        Ok(json!({ "path": written, "drape": state, "pieces": scene.pieces.len() }))
+        let (folder, stem) = match path.rsplit_once('/') {
+            Some((folder, name)) => (format!("{folder}/"), name),
+            None => (String::new(), path.as_str()),
+        };
+        let stem = stem.strip_suffix(".obj").unwrap_or(stem);
+        let files = to_obj(&scene, stem);
+        let written = ws.write(&path, files.obj.as_bytes())?;
+        let mtl = ws.write(
+            &format!("{folder}{}.mtl", stem.replace(char::is_whitespace, "_")),
+            files.mtl.as_bytes(),
+        )?;
+        let textures = files
+            .textures
+            .iter()
+            .map(|(name, bytes)| ws.write(&format!("{folder}{name}"), bytes))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(json!({
+            "path": written,
+            "mtl": mtl,
+            "textures": textures,
+            "drape": state,
+            "pieces": scene.pieces.len(),
+        }))
     }
 }
 

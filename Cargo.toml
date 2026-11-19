@@ -46,6 +46,7 @@ lopdf = { version = "0.47", default-features = false }
 roxmltree = "0.21"
 svgtypes = "0.16"
 png = "0.18"
+zune-jpeg = "0.4"
 miniz_oxide = "0.9"
 pollster = "1"
 proptest = "1"

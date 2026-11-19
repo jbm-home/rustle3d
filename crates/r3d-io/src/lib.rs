@@ -19,5 +19,6 @@ pub mod pdf;
 pub mod scene3d;
 pub mod svg;
 pub mod techpack;
+pub mod texture;
 
 pub use drawing::{Drawing, graded_drawing, pattern_drawing, pieces_drawing};

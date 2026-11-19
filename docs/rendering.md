@@ -31,6 +31,22 @@ What a level means (strain 0–20 %, gap 50–0 mm) is
 at the right edge (`fitmap::paint_legend`); the app draws its own legend
 with the same stops.
 
+**Prints** (M21, spec 25): a garment's print is a texture over the
+cloth, at texture coordinates computed from the pattern
+(`r3d_core::UvFrame`: the piece's position in mm projected on the
+print's frame turned to its grainline, in repeats, so every piece shows
+the print at its real size along its own grain). The interactive tier
+samples it (`Mesh::uvs`, `Draw::print`; `print.rs` uploads each print
+once with a mip-map pyramid built on the CPU in linear light, Williams
+1983, read through a repeating trilinear sampler with 8× anisotropy)
+and multiplies the material's base by it; the base is white for a
+printed material and the sheen takes the print's average colour
+(`Material::printed`). The board fills each piece with its print the
+same way. Built-in prints (stripes, gingham, dots, twill) are drawn by
+`r3d_core::print::builtin` in the garment's colour; images are decoded
+by `r3d_io::texture` (PNG; JPEG with `zune-jpeg`) and scaled down by
+halving to at most 2048 pixels a side.
+
 ## 2. The photo renderer
 
 `PhotoRenderer` takes a `PhotoScene` (the garment's pieces with their
@@ -135,8 +151,20 @@ colour.
 - Accumulation buffers are one `vec4<f32>` per pixel each, within the
   128 MiB binding every GPU guarantees: at most 8.4 megapixels (3840 ×
   2160) and 4096 pixels a side.
-- No textures yet (prints, weave normal maps); the cloth is a single
-  surface.
+- Prints colour the cloth's albedo only (no weave normal or roughness
+  maps); the cloth is a single surface, printed alike on both sides.
+
+### Prints
+A printed surface (`Cloth::print`) carries texture coordinates on its
+triangles (interpolated flat through the Phong tessellation) and the
+index of its print. At a hit the albedo is the print's colour there:
+bilinear, repeating, decoded from sRGB, read from one storage buffer
+that holds the sheen table and every print's texels (one `u32` per
+texel; WebGPU guarantees eight storage buffers per stage, all in use).
+No mip-maps: the samples a pixel takes average the print as they
+accumulate. The denoiser is guided by this albedo, so the print stays
+sharp after filtering. The sheen keeps the tint of the print's average
+colour.
 
 ## 3. Tests
 `crates/r3d-render/tests/photo.rs` (skipped on machines without any GPU

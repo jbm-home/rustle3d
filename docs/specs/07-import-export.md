@@ -12,9 +12,12 @@ print and cut.
   does not say (glTF = metres). The mesh is auto-centred on the ground and
   checked (non-manifold meshes and holes produce a warning, not a refusal).
 - **Export garment**: OBJ or glTF/GLB of the draped mesh (or the arranged
-  state if not simulated), with normals and UVs from the 2D pattern
-  (1 UV unit = 1 m of pattern), one mesh or node per panel, and optionally the
-  avatar.
+  state if not simulated), with normals and UVs from the 2D pattern along
+  each piece's grainline (in repeats of the garment's print, or 1 UV unit
+  = 1 m of fabric without one; spec 25), one mesh or node per panel, and
+  optionally the avatar. The print travels with it: embedded in the GLB
+  as the base colour texture (repeating sampler), or for OBJ an MTL file
+  beside it (`Kd`, `map_Kd`) with the image files.
 - **Export patterns**:
   - SVG at 1:1 scale (mm user units), with panels, internal lines, notches,
     grainlines and labels.

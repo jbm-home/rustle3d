@@ -52,6 +52,11 @@ and look at the result, either headless or live in the user's open app.
   piece. `fit_report` and `fit_tape` are the `fit.report` and `fit.tape`
   actions: strain per piece, tight spots, ease at the chest, waist and
   hips; a tape at a height or a point.
+- **Prints** (M21, spec 25): `garment_set_print`, `garment_remove_print`
+  and `panel_set_print_placement` are the commands; an image must
+  already be in the project folder (the server reads and writes nothing
+  outside it), e.g. `textures/name.jpg`. `render_board`, `render_3d`,
+  `render_photo` and the glTF/OBJ exports show the print.
 - **Tech pack** (M30, spec 23): `export_techpack` is the
   `export.techpack` action with one more parameter, `views` (`3d`
   default, `photo`, `none`): the server renders the garment's front and

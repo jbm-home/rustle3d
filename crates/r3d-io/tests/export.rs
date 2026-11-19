@@ -51,6 +51,7 @@ fn project(w: f64, h: f64, allowance: f64) -> Project {
             placement: None,
             symmetry: None,
             holes: Vec::new(),
+            print: Default::default(),
         },
     );
     tx.commit();

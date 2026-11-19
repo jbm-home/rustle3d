@@ -18,6 +18,7 @@ pub mod integrity;
 pub mod measure;
 pub mod message;
 pub mod model;
+pub mod print;
 pub mod project_dir;
 pub mod seam;
 
@@ -32,3 +33,4 @@ pub use model::{
     FabricLook, Garment, Grading, Guide, InternalLine, MirrorLink, Notch, Panel, PathSegment, Pin,
     Placement, Point, Project, Seam, SeamSide, Size, Symmetry, TemplateRef,
 };
+pub use print::{BuiltinPrint, Print, PrintPlacement, PrintSource, Texture, UvFrame};

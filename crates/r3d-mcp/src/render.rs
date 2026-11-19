@@ -8,18 +8,20 @@ use r3d_commands::CommandError;
 use r3d_commands::Workspace;
 use r3d_commands::drape;
 use r3d_commands::fit::FitMap;
+use r3d_commands::prints::{PrintImage, Prints, aspect_of, piece_uvs};
 use r3d_commands::techpack::{ExportTechPack, Image};
 use r3d_core::Fabric;
 use r3d_core::{Localizable, Message};
 use r3d_render::board::BoardView;
 use r3d_render::fitmap;
 use r3d_render::offscreen::{PNG_FORMAT, encode_png, render_pixels, render_png};
-use r3d_render::photo::{self, Lighting, PhotoScene, Quality, Settings, Surface};
+use r3d_render::photo::{self, Cloth, Lighting, PhotoScene, Quality, Settings, Surface};
 use r3d_render::{
-    BoardRenderer, BoardScene, Draw, Gpu, Material, Mesh, OrbitCamera, Target, Theme,
+    BoardRenderer, BoardScene, Draw, Gpu, Material, Mesh, OrbitCamera, Printed, Target, Theme,
     ViewRenderer3d,
 };
 use serde_json::{Value, json};
+use std::sync::Arc;
 
 /// What to draw.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -212,16 +214,51 @@ fn mesh(positions: Vec<Vec3>, indices: Vec<u32>) -> Mesh {
         normals: Vec::new(),
         indices,
         colors: Vec::new(),
+        uvs: Vec::new(),
     };
     mesh.recompute_normals();
     mesh
 }
 
+/// A piece of the garment as the 3D views show it.
+struct DressedPiece {
+    mesh: Mesh,
+    fabric: Fabric,
+    color: Option<String>,
+    /// Its garment's print, if it has one (the mesh then has texture
+    /// coordinates on it).
+    print: Option<Arc<PrintImage>>,
+}
+
+impl DressedPiece {
+    fn printed(&self) -> Option<Printed<'_>> {
+        self.print.as_ref().map(|p| Printed {
+            key: p.key,
+            texture: &p.texture,
+        })
+    }
+
+    /// The material of the 3D view, with the print over it.
+    fn material(&self) -> Material {
+        let material = Material::fabric(self.fabric, self.color.as_deref());
+        match &self.print {
+            Some(p) => material.printed(p.mean_rgb),
+            None => material,
+        }
+    }
+
+    /// The surface of photos, its colour the print's average.
+    fn surface(&self) -> Surface {
+        let hex = self.print.as_ref().map(|p| format!("#{:06X}", p.mean_rgb));
+        Surface::fabric(self.fabric, hex.as_deref().or(self.color.as_deref()))
+    }
+}
+
 /// The garments as the 3D views show them.
 struct Dressed {
     avatar: Option<Mesh>,
-    /// Each piece with its garment's fabric and colour.
-    pieces: Vec<(Mesh, Fabric, Option<String>)>,
+    /// Each piece with its garment's fabric, colour and print.
+    pieces: Vec<DressedPiece>,
     /// Style lines on the cloth.
     lines: Vec<Mesh>,
     /// `simulated` (the cached drape) or `start`.
@@ -247,7 +284,8 @@ impl Dressed {
             .as_deref()
             .zip(latest.form.as_ref().map(|f| &f.triangles[..]));
         let values = fit_map.map(|m| (m, m.values(&latest.drape, positions, body)));
-        let pieces: Vec<(Mesh, Fabric, Option<String>)> = latest
+        let prints = Prints::default().all(project, Some(ws.dir()));
+        let pieces: Vec<DressedPiece> = latest
             .drape
             .pieces
             .iter()
@@ -264,11 +302,19 @@ impl Dressed {
                         .map(|x| fitmap::color(map.level(*x)))
                         .collect();
                 }
-                Some((
-                    m,
-                    garment.map(|g| g.fabric).unwrap_or_default(),
-                    garment.and_then(|g| g.color.clone()),
-                ))
+                let print = project
+                    .panel(p.panel)
+                    .and_then(|panel| prints.get(&panel.garment))
+                    .cloned();
+                if print.is_some() {
+                    m.uvs = piece_uvs(project, &latest.drape, p, aspect_of(project, &prints, p));
+                }
+                Some(DressedPiece {
+                    mesh: m,
+                    fabric: garment.map(|g| g.fabric).unwrap_or_default(),
+                    color: garment.and_then(|g| g.color.clone()),
+                    print,
+                })
             })
             .collect();
         let lines = drape::LinesOnCloth::new(&latest.drape, positions)
@@ -315,10 +361,7 @@ impl Dressed {
 /// A camera on the garment from `angle`, framing it (or the body when
 /// there is no cloth).
 fn garment_camera(dressed: &Dressed, angle: CameraAngle) -> OrbitCamera {
-    let mut points = dressed
-        .pieces
-        .iter()
-        .flat_map(|(m, _, _)| m.positions.iter());
+    let mut points = dressed.pieces.iter().flat_map(|p| p.mesh.positions.iter());
     let garment = points
         .next()
         .map(|first| points.fold((*first, *first), |(lo, hi), p| (lo.min(*p), hi.max(*p))));
@@ -342,19 +385,24 @@ fn garment_png(
         draws.push(Draw {
             mesh: a,
             material: Material::mannequin(&theme),
+            print: None,
         });
     }
-    draws.extend(dressed.pieces.iter().map(|(m, fabric, color)| {
-        let material = Material::fabric(*fabric, color.as_deref());
-        Draw {
-            mesh: m,
-            material: match m.colors.is_empty() {
-                true => material,
-                // A fit map: its colours, no sheen over them.
-                false => Material {
+    draws.extend(dressed.pieces.iter().map(|p| {
+        match p.mesh.colors.is_empty() {
+            true => Draw {
+                mesh: &p.mesh,
+                material: p.material(),
+                print: p.printed(),
+            },
+            // A fit map: its colours, no sheen nor print over them.
+            false => Draw {
+                mesh: &p.mesh,
+                material: Material {
                     sheen_amount: 0.0,
-                    ..material
+                    ..Material::fabric(p.fabric, p.color.as_deref())
                 },
+                print: None,
             },
         }
     }));
@@ -365,6 +413,7 @@ fn garment_png(
             sheen: theme.panel_line,
             sheen_amount: 0.0,
         },
+        print: None,
     }));
     let mut renderer = ViewRenderer3d::new(gpu, PNG_FORMAT);
     let mut pixels = render_pixels(gpu, width, height, |view| {
@@ -471,7 +520,19 @@ pub fn render(
     match view {
         View::Board => {
             let project = ws.session().project();
-            let scene = BoardScene::from_project(project, &[]).with_sizes(project);
+            let prints = Prints::default()
+                .all(project, Some(ws.dir()))
+                .into_iter()
+                .map(|(garment, p)| r3d_render::board::BoardPrint {
+                    garment,
+                    key: p.key,
+                    texture: p.texture.clone(),
+                    aspect: p.aspect,
+                })
+                .collect();
+            let scene = BoardScene::from_project(project, &[])
+                .with_sizes(project)
+                .with_prints(project, prints);
             let board_view = BoardView::fit(scene.bounds(), width, height);
             let mut renderer = BoardRenderer::new(gpu, PNG_FORMAT);
             let png = render_png(gpu, width, height, |view| {
@@ -500,10 +561,14 @@ pub fn render(
         View::Photo(options) => {
             let start = std::time::Instant::now();
             let dressed = Dressed::of(ws, None)?;
-            let cloth: Vec<(&Mesh, Surface)> = dressed
+            let cloth: Vec<Cloth<'_>> = dressed
                 .pieces
                 .iter()
-                .map(|(m, fabric, color)| (m, Surface::fabric(*fabric, color.as_deref())))
+                .map(|p| Cloth {
+                    mesh: &p.mesh,
+                    surface: p.surface(),
+                    print: p.printed(),
+                })
                 .collect();
             let scene = PhotoScene::new(&cloth, dressed.avatar.as_ref());
             let camera = if options.close_up {

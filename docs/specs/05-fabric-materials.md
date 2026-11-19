@@ -15,7 +15,8 @@ differently. If needed, I can fine-tune it with understandable sliders.
   presets copied in on first use, plus custom ones).
 - Custom materials: duplicate a preset and edit it. Parameters are validated
   (positive, within physical ranges).
-- Visual properties: base color (later: textures and prints).
+- Visual properties: base color, and a print over it (built-in or the
+  user's image, M21, spec 25).
 
 ## UX
 - The fabric picker shows swatch cards with a short description ("Soft knit,

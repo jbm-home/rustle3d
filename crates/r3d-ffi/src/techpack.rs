@@ -5,6 +5,8 @@ use r3d_commands::techpack::{ExportTechPack, Image};
 use r3d_render::offscreen::{PNG_FORMAT, render_png};
 use r3d_render::{Draw, Gpu, Material, Mesh, OrbitCamera, Target, Theme, ViewRenderer3d};
 
+use crate::cloth::ClothPiece;
+
 /// Size of each picture (pixels, portrait).
 const VIEW: (u32, u32) = (900, 1200);
 
@@ -12,7 +14,7 @@ const VIEW: (u32, u32) = (900, 1200);
 /// on it and the body.
 #[derive(Debug, Default)]
 pub(crate) struct Dressed {
-    pub cloth: Vec<(Mesh, Material)>,
+    pub cloth: Vec<(ClothPiece, Material)>,
     pub lines: Vec<Mesh>,
     pub body: Option<Mesh>,
 }
@@ -24,7 +26,10 @@ pub(crate) fn views(
     dressed: &Dressed,
     request: &ExportTechPack,
 ) -> Result<Vec<Image>, String> {
-    let mut points = dressed.cloth.iter().flat_map(|(m, _)| m.positions.iter());
+    let mut points = dressed
+        .cloth
+        .iter()
+        .flat_map(|(p, _)| p.mesh.positions.iter());
     let Some(first) = points.next() else {
         return Ok(Vec::new());
     };
@@ -35,11 +40,13 @@ pub(crate) fn views(
         draws.push(Draw {
             mesh: body,
             material: Material::mannequin(&theme),
+            print: None,
         });
     }
-    draws.extend(dressed.cloth.iter().map(|(mesh, material)| Draw {
-        mesh,
+    draws.extend(dressed.cloth.iter().map(|(piece, material)| Draw {
+        mesh: &piece.mesh,
         material: *material,
+        print: piece.printed(),
     }));
     draws.extend(dressed.lines.iter().map(|mesh| Draw {
         mesh,
@@ -48,6 +55,7 @@ pub(crate) fn views(
             sheen: theme.panel_line,
             sheen_amount: 0.0,
         },
+        print: None,
     }));
     let mut renderer = ViewRenderer3d::new(gpu, PNG_FORMAT);
     let (width, height) = VIEW;

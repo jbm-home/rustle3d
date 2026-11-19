@@ -5,9 +5,11 @@
 use r3d_avatar::fit::{fit, fitted_positions};
 use r3d_avatar::model::BodyModel;
 use r3d_commands::{Session, drape};
-use r3d_core::{Fabric, Project};
-use r3d_render::photo::{self, Lighting, PhotoRenderer, PhotoScene, Quality, Settings, Surface};
-use r3d_render::{Gpu, Mesh, OrbitCamera, RenderError};
+use r3d_core::{Fabric, Project, Texture};
+use r3d_render::photo::{
+    self, Cloth, Lighting, PhotoRenderer, PhotoScene, Quality, Settings, Surface,
+};
+use r3d_render::{Gpu, Mesh, OrbitCamera, Printed, RenderError};
 
 fn gpu() -> Option<Gpu> {
     Gpu::headless().ok()
@@ -52,6 +54,11 @@ fn roughness(w: u32, px: &[u8]) -> f64 {
 
 /// The avatar in an A-line skirt where the simulation starts it.
 fn skirt_scene(fabric: Fabric) -> PhotoScene {
+    skirt_scene_printed(fabric, None)
+}
+
+/// The same, the skirt in `print` (2 cm repeats) if given.
+fn skirt_scene_printed(fabric: Fabric, print: Option<&Texture>) -> PhotoScene {
     let model = BodyModel::builtin().unwrap();
     let body = r3d_avatar::presets::builtin()[2].body; // Women M
     let fitted = fit(&model, &body);
@@ -60,6 +67,7 @@ fn skirt_scene(fabric: Fabric) -> PhotoScene {
         normals: Vec::new(),
         indices: model.triangles().iter().flatten().copied().collect(),
         colors: Vec::new(),
+        uvs: Vec::new(),
     };
     avatar.recompute_normals();
     let mut session = Session::new(Project::new("t"));
@@ -68,6 +76,13 @@ fn skirt_scene(fabric: Fabric) -> PhotoScene {
         .run_step(&r3d_commands::Step::from_value(step).unwrap())
         .unwrap();
     let form = drape::Form::new(avatar.positions.clone(), model.triangles().to_vec());
+    if print.is_some() {
+        let step = serde_json::json!({"type": "garment.set_print",
+            "print": {"builtin": "stripes"}, "width_mm": 20});
+        session
+            .run_step(&r3d_commands::Step::from_value(step).unwrap())
+            .unwrap();
+    }
     let built = drape::build(session.project(), Some(&form), 25.0).unwrap();
     let pieces: Vec<Mesh> = built
         .pieces
@@ -81,13 +96,21 @@ fn skirt_scene(fabric: Fabric) -> PhotoScene {
                 normals: Vec::new(),
                 indices: p.indices.clone(),
                 colors: Vec::new(),
+                uvs: r3d_commands::prints::piece_uvs(session.project(), &built, p, 1.0),
             };
             m.recompute_normals();
             m
         })
         .collect();
     let surface = Surface::fabric(fabric, None);
-    let cloth: Vec<(&Mesh, Surface)> = pieces.iter().map(|m| (m, surface)).collect();
+    let cloth: Vec<Cloth<'_>> = pieces
+        .iter()
+        .map(|mesh| Cloth {
+            mesh,
+            surface,
+            print: print.map(|texture| Printed { key: 1, texture }),
+        })
+        .collect();
     PhotoScene::new(&cloth, Some(&avatar))
 }
 
@@ -106,6 +129,36 @@ fn a_photo_of_the_garment_in_each_lighting() {
         assert!(luma > 3.0 && luma < 250.0, "{lighting:?}: {luma}");
         keep(&format!("photo-{}.png", lighting.name()), &png);
     }
+}
+
+#[test]
+fn a_striped_skirt_shows_its_stripes() {
+    let Some(gpu) = gpu() else { return };
+    let stripes = r3d_core::print::builtin(r3d_core::BuiltinPrint::Stripes, 0x1F3A70);
+    let camera = OrbitCamera::facing(0.0);
+    let settings = Settings::new(Quality::Quick, Lighting::Studio);
+    let shoot = |print| {
+        let scene = skirt_scene_printed(Fabric::Cotton, print);
+        let png = photo::render_png(&gpu, &scene, &camera, settings, 320, 240).unwrap();
+        keep(
+            if print.is_some() {
+                "photo-stripes.png"
+            } else {
+                "photo-plain.png"
+            },
+            &png,
+        );
+        pixels(&png)
+    };
+    let (w, _, plain) = shoot(None);
+    let (_, _, striped) = shoot(Some(&stripes));
+    // Blue and off-white stripes side by side: far more change across a row.
+    assert!(
+        roughness(w, &striped) > 2.0 * roughness(w, &plain),
+        "{} vs {}",
+        roughness(w, &striped),
+        roughness(w, &plain)
+    );
 }
 
 #[test]

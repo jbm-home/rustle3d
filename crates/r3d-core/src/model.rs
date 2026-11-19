@@ -14,6 +14,7 @@ use crate::id::{
     ConstraintId, EdgeId, GarmentId, GuideId, InternalLineId, NotchId, PanelId, PinId, PointId,
     SeamId,
 };
+use crate::print::{Print, PrintPlacement, UvFrame};
 
 /// Ordered entity map.
 pub type IdMap<K, V> = BTreeMap<K, V>;
@@ -327,6 +328,9 @@ pub struct Garment {
     /// (M30).
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub notes: String,
+    /// The print on the fabric (M21); none: the plain colour.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub print: Option<Print>,
 }
 
 /// The fabric of a garment as bought: what it weighs, how wide it is sold
@@ -646,6 +650,9 @@ pub struct Panel {
     /// each walked clockwise.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub holes: Vec<Vec<EdgeId>>,
+    /// How the piece shifts and turns its garment's print (M21).
+    #[serde(default, skip_serializing_if = "PrintPlacement::is_default")]
+    pub print: PrintPlacement,
 }
 
 /// A piece drawn as a half against an axis (a centre front on the fold).
@@ -801,6 +808,7 @@ impl Project {
                 template: None,
                 fabric_details: FabricDetails::default(),
                 notes: String::new(),
+                print: None,
             },
         );
         Self {
@@ -973,6 +981,25 @@ impl Project {
     pub fn garment_of(&self, panel: PanelId) -> Option<&Garment> {
         self.panel(panel)
             .and_then(|p| self.garments.get(&p.garment))
+    }
+
+    /// The map from `panel`'s pattern (mm) to its print's texture
+    /// coordinates: its garment's print turned to the piece's grainline,
+    /// shifted and turned by the piece (spec 25). `aspect` is the print
+    /// image's height over its width (for a print without a height).
+    /// Without a print, one unit per metre along the grain.
+    pub fn print_frame(&self, panel: PanelId, aspect: f64) -> Option<UvFrame> {
+        let p = self.panel(panel)?;
+        let print = self.garments.get(&p.garment).and_then(|g| g.print.as_ref());
+        let (repeat, angle) = match print {
+            Some(print) => (print.repeat_mm(aspect), print.angle_deg),
+            None => (DVec2::splat(crate::print::PLAIN_REPEAT_MM), 0.0),
+        };
+        Some(UvFrame::new(
+            p.grain_angle_deg + angle + p.print.angle_deg,
+            p.print.offset_mm,
+            repeat,
+        ))
     }
 
     /// The garments from the one worn next to the body to the outermost.

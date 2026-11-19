@@ -91,6 +91,7 @@ fn view3d_renders_the_avatar_and_the_cloth() {
         normals: Vec::new(),
         indices: model.triangles().iter().flatten().copied().collect(),
         colors: Vec::new(),
+        uvs: Vec::new(),
     };
     avatar.recompute_normals();
     // The skirt template where the simulation starts it, around the body.
@@ -99,17 +100,27 @@ fn view3d_renders_the_avatar_and_the_cloth() {
     session
         .run_step(&r3d_commands::Step::from_value(step).unwrap())
         .unwrap();
+    let step = serde_json::json!({"type": "garment.set_print",
+        "print": {"builtin": "gingham"}, "width_mm": 30});
+    session
+        .run_step(&r3d_commands::Step::from_value(step).unwrap())
+        .unwrap();
     let form = drape::Form::new(avatar.positions.clone(), model.triangles().to_vec());
-    let scene = drape::build(session.project(), Some(&form), 25.0)
-        .unwrap()
-        .scene;
+    let built = drape::build(session.project(), Some(&form), 25.0).unwrap();
+    let scene = &built.scene;
     let mut skirt = Mesh {
         positions: scene.particles.iter().map(|p| p.position).collect(),
         normals: Vec::new(),
         indices: scene.triangles.iter().flat_map(|t| t.vertices).collect(),
         colors: Vec::new(),
+        uvs: built
+            .pieces
+            .iter()
+            .flat_map(|p| r3d_commands::prints::piece_uvs(session.project(), &built, p, 1.0))
+            .collect(),
     };
     skirt.recompute_normals();
+    let gingham = r3d_core::print::builtin(r3d_core::BuiltinPrint::Gingham, 0xA03030);
     let camera = OrbitCamera::default();
     let (w, h) = (900, 900);
     let mut renderer = ViewRenderer3d::new(&gpu, PNG_FORMAT);
@@ -121,10 +132,15 @@ fn view3d_renders_the_avatar_and_the_cloth() {
             Draw {
                 mesh: &avatar,
                 material: Material::mannequin(&theme),
+                print: None,
             },
             Draw {
                 mesh: &skirt,
-                material: Material::fabric(Fabric::Denim, None),
+                material: Material::fabric(Fabric::Denim, None).printed(0xD09898),
+                print: Some(r3d_render::Printed {
+                    key: 7,
+                    texture: &gingham,
+                }),
             },
         ];
         let png = render_png(&gpu, w, h, |view_tex| {

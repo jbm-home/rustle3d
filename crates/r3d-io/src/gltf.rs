@@ -3,8 +3,9 @@
 //!
 //! One node and mesh per pattern piece, named after it, under a "garment"
 //! node; the avatar, if included, as its own node. Positions, normals and
-//! texture coordinates (the pattern position, 1 unit = 1 m) per vertex;
-//! 32-bit indices.
+//! texture coordinates (from the pattern along the grainline, spec 25) per
+//! vertex; 32-bit indices. A garment's print is embedded as an image
+//! (PNG or JPEG) with a repeating sampler, its base colour texture.
 
 use serde_json::{Value, json};
 
@@ -14,6 +15,9 @@ const ARRAY_BUFFER: u32 = 34962;
 const ELEMENT_ARRAY_BUFFER: u32 = 34963;
 const FLOAT: u32 = 5126;
 const UNSIGNED_INT: u32 = 5125;
+const LINEAR: u32 = 9729;
+const LINEAR_MIPMAP_LINEAR: u32 = 9987;
+const REPEAT: u32 = 10497;
 
 /// The binary buffer and the JSON arrays that describe it.
 #[derive(Default)]
@@ -24,16 +28,21 @@ struct Builder {
 }
 
 impl Builder {
-    /// Append `bytes` as a buffer view (4-byte aligned); its index.
-    fn view(&mut self, bytes: &[u8], target: u32) -> usize {
+    /// Append `bytes` as a buffer view (4-byte aligned) for vertex data
+    /// or indices (`target`) or an image (none); its index.
+    fn view(&mut self, bytes: &[u8], target: Option<u32>) -> usize {
         while !self.bin.len().is_multiple_of(4) {
             self.bin.push(0);
         }
         let offset = self.bin.len();
         self.bin.extend_from_slice(bytes);
-        self.views.push(json!({
-            "buffer": 0, "byteOffset": offset, "byteLength": bytes.len(), "target": target,
-        }));
+        let mut view = json!({
+            "buffer": 0, "byteOffset": offset, "byteLength": bytes.len(),
+        });
+        if let Some(target) = target {
+            view["target"] = json!(target);
+        }
+        self.views.push(view);
         self.views.len() - 1
     }
 
@@ -45,7 +54,7 @@ impl Builder {
             .flatten()
             .flat_map(|f| f.to_le_bytes())
             .collect();
-        let view = self.view(&bytes, ARRAY_BUFFER);
+        let view = self.view(&bytes, Some(ARRAY_BUFFER));
         let kind = match N {
             2 => "VEC2",
             3 => "VEC3",
@@ -72,7 +81,7 @@ impl Builder {
 
     fn indices(&mut self, data: &[u32]) -> usize {
         let bytes: Vec<u8> = data.iter().flat_map(|i| i.to_le_bytes()).collect();
-        let view = self.view(&bytes, ELEMENT_ARRAY_BUFFER);
+        let view = self.view(&bytes, Some(ELEMENT_ARRAY_BUFFER));
         self.accessors.push(json!({
             "bufferView": view, "componentType": UNSIGNED_INT, "count": data.len(), "type": "SCALAR",
         }));
@@ -115,6 +124,7 @@ pub fn to_glb(scene: &Scene3d) -> Vec<u8> {
         nodes.push(json!({ "name": avatar.name, "mesh": meshes.len() - 1 }));
         roots.push(nodes.len() - 1);
     }
+    let mut images = Vec::new();
     let materials: Vec<Value> = scene
         .materials
         .iter()
@@ -129,6 +139,14 @@ pub fn to_glb(scene: &Scene3d) -> Vec<u8> {
                 },
                 "doubleSided": m.double_sided,
             });
+            if let Some(image) = &m.texture {
+                let view = b.view(&image.bytes, None);
+                images.push(json!({ "bufferView": view, "mimeType": image.mime }));
+                // One texture per image, all through the one sampler.
+                let pbr = &mut material["pbrMetallicRoughness"];
+                pbr["baseColorFactor"] = json!([1.0, 1.0, 1.0, 1.0]);
+                pbr["baseColorTexture"] = json!({ "index": images.len() - 1 });
+            }
             if m.sheen > 0.0 {
                 // The sheen takes the fibres' lighter tint; the app's
                 // strongest sheen (silk, 1.6) is full strength.
@@ -162,6 +180,17 @@ pub fn to_glb(scene: &Scene3d) -> Vec<u8> {
     if uses_sheen {
         doc["extensionsUsed"] = json!(["KHR_materials_sheen"]);
     }
+    if !images.is_empty() {
+        doc["textures"] = json!(
+            (0..images.len())
+                .map(|i| json!({ "sampler": 0, "source": i }))
+                .collect::<Vec<_>>()
+        );
+        doc["images"] = json!(images);
+        doc["samplers"] = json!([{
+            "magFilter": LINEAR, "minFilter": LINEAR_MIPMAP_LINEAR, "wrapS": REPEAT, "wrapT": REPEAT,
+        }]);
+    }
     let mut json = doc.to_string().into_bytes();
     while !json.len().is_multiple_of(4) {
         json.push(b' ');
@@ -184,7 +213,7 @@ pub fn to_glb(scene: &Scene3d) -> Vec<u8> {
 pub(crate) mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
-    use crate::scene3d::Material3d;
+    use crate::scene3d::{Image3d, Material3d};
 
     pub(crate) fn sample() -> Scene3d {
         let square = |name: &str, y: f32| Mesh3d {
@@ -216,6 +245,13 @@ pub(crate) mod tests {
                     sheen_roughness: 0.6,
                     roughness: 0.85,
                     double_sided: true,
+                    texture: Some(Image3d {
+                        bytes: crate::texture::encode_png(&r3d_core::print::builtin(
+                            r3d_core::BuiltinPrint::Stripes,
+                            0x204080,
+                        )),
+                        mime: "image/png",
+                    }),
                 },
                 Material3d {
                     name: "Avatar".into(),
@@ -224,6 +260,7 @@ pub(crate) mod tests {
                     sheen_roughness: 0.0,
                     roughness: 0.7,
                     double_sided: false,
+                    texture: None,
                 },
             ],
         }
@@ -259,6 +296,18 @@ pub(crate) mod tests {
         assert!(doc["meshes"][2]["primitives"][0]["attributes"]["TEXCOORD_0"].is_null());
         assert_eq!(doc["extensionsUsed"], json!(["KHR_materials_sheen"]));
         assert!(doc["materials"][1]["extensions"].is_null());
+        // The print is embedded, through a repeating sampler.
+        let pbr = &doc["materials"][0]["pbrMetallicRoughness"];
+        assert_eq!(pbr["baseColorTexture"]["index"], 0);
+        assert_eq!(pbr["baseColorFactor"], json!([1.0, 1.0, 1.0, 1.0]));
+        assert_eq!(doc["textures"][0]["source"], 0);
+        assert_eq!(doc["images"][0]["mimeType"], "image/png");
+        assert_eq!(doc["samplers"][0]["wrapS"], REPEAT);
+        let image_view =
+            &doc["bufferViews"][doc["images"][0]["bufferView"].as_u64().unwrap() as usize];
+        assert!(image_view["target"].is_null());
+        let at = bin_at + 8 + image_view["byteOffset"].as_u64().unwrap() as usize;
+        assert_eq!(&glb[at..at + 4], &[0x89, b'P', b'N', b'G']);
     }
 
     #[test]

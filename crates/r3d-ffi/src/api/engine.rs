@@ -13,14 +13,15 @@ use flutter_rust_bridge::frb;
 use r3d_commands::actions::AvatarMotion;
 use r3d_commands::drape::{self, Animation, Drape, Form};
 use r3d_commands::fit::{self, FitMap, Probe};
+use r3d_commands::prints::{PrintImage, Prints, aspect_of, piece_uvs};
 use r3d_commands::production;
 use r3d_commands::{Progress, Script, Status, Step, Workspace};
 use r3d_sim::{CpuSolver, SimScene, Solver};
 use r3d_sim_gpu::{GpuContext, GpuSolver};
 
 use crate::cloth::{
-    Adjust, CORNER_PICK_PX, ClothHit, EDGE_PICK_MM, EDGE_PICK_PX, Held, Hit, LiveBody, PICK_PX,
-    RESYNC_EVERY, SEAM_END, SNAP_PX, STROKE_STEP_MM, Sync, Tool, ray_triangle,
+    Adjust, CORNER_PICK_PX, ClothHit, ClothPiece, EDGE_PICK_MM, EDGE_PICK_PX, Held, Hit, LiveBody,
+    PICK_PX, RESYNC_EVERY, SEAM_END, SNAP_PX, STROKE_STEP_MM, Sync, Tool, ray_triangle,
 };
 use crate::forms::Forms;
 use crate::photo::{PhotoJob, Subject};
@@ -31,7 +32,7 @@ use r3d_core::{
 };
 use r3d_render::board::BoardView;
 use r3d_render::fitmap;
-use r3d_render::photo::{Lighting, Quality, Settings, Surface};
+use r3d_render::photo::{Lighting, Quality, Settings};
 use r3d_render::theme::PIECE_COLORS;
 use r3d_render::{
     BoardRenderer, BoardScene, Draw, Gpu, ImageBlit, Material, Mesh, OrbitCamera, Target, Theme,
@@ -81,6 +82,9 @@ fn marker_spec(json: &str) -> Result<production::MarkerSpec, ApiError> {
 pub(crate) fn err(e: impl Localizable) -> ApiError {
     e.message().into()
 }
+
+/// Largest side of a print's preview in the inspector (pixels).
+const PREVIEW_SIDE: u32 = 256;
 
 /// The corner nearest to `at` within `max_mm`: its panel, id and place.
 fn corner_at(
@@ -139,11 +143,17 @@ fn piece_meshes(
     drape: &Drape,
     positions: &[glam::Vec3],
     paint: Option<&[[f32; 4]]>,
-) -> Vec<(PanelId, Mesh)> {
+    project: &r3d_core::Project,
+    prints: &HashMap<r3d_core::GarmentId, Arc<PrintImage>>,
+) -> Vec<ClothPiece> {
     drape
         .pieces
         .iter()
         .filter_map(|piece| {
+            let print = project
+                .panel(piece.panel)
+                .and_then(|p| prints.get(&p.garment))
+                .cloned();
             let mut mesh = Mesh {
                 positions: positions.get(piece.particles.clone())?.to_vec(),
                 normals: Vec::new(),
@@ -152,9 +162,17 @@ fn piece_meshes(
                     .and_then(|c| c.get(piece.particles.clone()))
                     .map(<[_]>::to_vec)
                     .unwrap_or_default(),
+                uvs: match print {
+                    Some(_) => piece_uvs(project, drape, piece, aspect_of(project, prints, piece)),
+                    None => Vec::new(),
+                },
             };
             mesh.recompute_normals();
-            Some((piece.panel, mesh))
+            Some(ClothPiece {
+                panel: piece.panel,
+                mesh,
+                print,
+            })
         })
         .collect()
 }
@@ -533,6 +551,8 @@ pub struct Engine {
     fit_map: Mutex<Option<FitMap>>,
     /// The loop of the last tape measure taken on the drape (m).
     tape: Mutex<Option<Vec<glam::Vec3>>>,
+    /// The garments' prints, drawn or read once.
+    prints: Mutex<Prints>,
 }
 
 /// Where a long step is, for the UI: `task` is a stable code
@@ -644,6 +664,7 @@ impl Engine {
             photo: Mutex::new(None),
             fit_map: Mutex::new(None),
             tape: Mutex::new(None),
+            prints: Mutex::new(Prints::default()),
         })
     }
 
@@ -1205,11 +1226,35 @@ impl Engine {
                     let body = surface
                         .as_deref()
                         .zip(form.as_deref().map(|f| &f.triangles[..]));
-                    let scene = drape::scene3d(project, drape, &positions, body);
+                    let prints = self.prints_of(project, ws.dir())?;
+                    let scene = drape::scene3d(project, drape, &positions, body, &prints);
                     if format == ExportFormat::Glb {
                         r3d_io::gltf::to_glb(&scene)
                     } else {
-                        r3d_io::obj::to_obj(&scene).into_bytes()
+                        // The material library and the prints beside it.
+                        let target = Path::new(path);
+                        let stem = target
+                            .file_stem()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("garment");
+                        let files = r3d_io::obj::to_obj(&scene, stem);
+                        let beside = |name: &str| target.with_file_name(name);
+                        let mtl = format!("{}.mtl", stem.replace(char::is_whitespace, "_"));
+                        let extra =
+                            std::iter::once((mtl, files.mtl.into_bytes())).chain(files.textures);
+                        for (name, bytes) in extra {
+                            let at = beside(&name);
+                            std::fs::write(&at, bytes).map_err(|e| {
+                                ApiError::from(
+                                    Message::new(
+                                        "write_failed",
+                                        format!("cannot write {}: {e}", at.display()),
+                                    )
+                                    .arg("path", at.display()),
+                                )
+                            })?;
+                        }
+                        files.obj.into_bytes()
                     }
                 }
             }
@@ -1367,6 +1412,7 @@ impl Engine {
     fn dressed_now(&self) -> Result<(r3d_core::Project, crate::techpack::Dressed), ApiError> {
         let ws = self.workspace()?;
         let project = ws.session().project().clone();
+        let prints = self.prints_of(&project, ws.dir())?;
         drop(ws);
         // Locks in the engine's usual order: the simulation before the
         // cloth.
@@ -1387,16 +1433,12 @@ impl Engine {
             Some(now) if now.loaded && now.positions.len() == start.len() => now.positions,
             _ => start,
         };
-        let material = |panel: PanelId| {
-            let garment = project.garment_of(panel);
-            Material::fabric(
-                garment.map(|g| g.fabric).unwrap_or_default(),
-                garment.and_then(|g| g.color.as_deref()),
-            )
-        };
-        let cloth_meshes = piece_meshes(drape, &positions, None)
+        let cloth_meshes = piece_meshes(drape, &positions, None, &project, &prints)
             .into_iter()
-            .map(|(panel, mesh)| (mesh, material(panel)))
+            .map(|piece| {
+                let material = piece.material(&project);
+                (piece, material)
+            })
             .collect();
         let lines = drape::LinesOnCloth::new(drape, &positions)
             .internal_lines(&project)
@@ -1411,6 +1453,7 @@ impl Engine {
                 normals: Vec::new(),
                 indices: f.triangles.iter().flatten().copied().collect(),
                 colors: Vec::new(),
+                uvs: Vec::new(),
             };
             mesh.recompute_normals();
             mesh
@@ -1438,7 +1481,9 @@ impl Engine {
 
     fn import_from(&self, path: &str, units: Option<String>) -> Result<String, ApiError> {
         let mut ws = self.workspace()?;
-        let rel = ws.adopt(std::path::Path::new(path)).map_err(err)?;
+        let rel = ws
+            .adopt(std::path::Path::new(path), "imports")
+            .map_err(err)?;
         let mut step = serde_json::json!({ "type": "import.pattern", "path": rel });
         if let Some(u) = units {
             step["units"] = serde_json::Value::from(u);
@@ -1451,6 +1496,49 @@ impl Engine {
         }
         self.forget_missing(ws.session().project())?;
         Ok(result.to_string())
+    }
+
+    /// Copy a print image the user chose (anywhere; PNG or JPEG) into the
+    /// project's `textures/` folder. Returns its path in the project, for
+    /// `garment.set_print`. Refused (`texture.format`, `texture.bad`) when
+    /// it is not an image that can be read.
+    pub fn adopt_texture(&self, path: String) -> Result<String, ApiError> {
+        let ws = self.workspace()?;
+        ws.adopt_texture(Path::new(&path)).map_err(err)
+    }
+
+    /// One repeat of a print as PNG, for the inspector: the built-in
+    /// `builtin` (`stripes`, `gingham`, `dots`, `twill`) in `garment`'s
+    /// colour, or without it the garment's own print. Empty when the
+    /// garment has no print or its image cannot be read.
+    #[frb(sync)]
+    pub fn print_preview(
+        &self,
+        garment: String,
+        builtin: Option<String>,
+    ) -> Result<Vec<u8>, ApiError> {
+        let id = garment
+            .parse::<r3d_core::GarmentId>()
+            .map_err(|_| ApiError::new("malformed", format!("not a garment: {garment}")))?;
+        let ws = self.workspace()?;
+        let project = ws.session().project();
+        let texture = match builtin {
+            Some(name) => {
+                let kind: r3d_core::BuiltinPrint = serde_json::from_value(serde_json::json!(name))
+                    .map_err(|_| ApiError::new("malformed", format!("no built-in print {name}")))?;
+                let rgb = project
+                    .garments()
+                    .get(&id)
+                    .ok_or_else(|| ApiError::new("not_found", format!("no garment {garment}")))?
+                    .rgb();
+                r3d_core::print::builtin(kind, rgb)
+            }
+            None => match self.prints_of(project, ws.dir())?.get(&id) {
+                Some(print) => (*print.texture).clone(),
+                None => return Ok(Vec::new()),
+            },
+        };
+        Ok(r3d_io::texture::encode_png(&texture.fitted(PREVIEW_SIDE)))
     }
 
     /// The fabrics the UI offers, with the colour each one renders with by
@@ -1604,9 +1692,11 @@ impl Engine {
         match v.kind {
             ViewKind::Board => {
                 let edges = self.selected_edges.lock().map_err(|_| poisoned())?.clone();
+                let prints = crate::cloth::board_prints(&self.prints_of(project, ws.dir())?);
                 let scene = self
                     .board_scene(project, &selected)
-                    .with_selected_edges(&edges);
+                    .with_selected_edges(&edges)
+                    .with_prints(project, prints);
                 let board_view = v
                     .board_view
                     .unwrap_or_else(|| BoardView::fit(scene.bounds(), v.width, v.height));
@@ -1621,7 +1711,7 @@ impl Engine {
                     blit.draw(&g.gpu, target, &image, theme.sky_bottom);
                 } else {
                     drop(photo);
-                    self.render_garment(g, project, &selected, view)?;
+                    self.render_garment(g, project, ws.dir(), &selected, view)?;
                 }
             }
         }
@@ -1670,6 +1760,7 @@ impl Engine {
                 normals: Vec::new(),
                 indices: form.triangles.iter().flatten().copied().collect(),
                 colors: Vec::new(),
+                uvs: Vec::new(),
             };
             mesh.recompute_normals();
             g.avatar = Some((body, mesh));
@@ -1702,9 +1793,23 @@ impl Engine {
             normals: Vec::new(),
             indices: form.triangles.iter().flatten().copied().collect(),
             colors: Vec::new(),
+            uvs: Vec::new(),
         };
         mesh.recompute_normals();
         Ok(Some(mesh))
+    }
+
+    /// The garments' prints (images read from `dir`, the project folder).
+    fn prints_of(
+        &self,
+        project: &r3d_core::Project,
+        dir: &Path,
+    ) -> Result<HashMap<r3d_core::GarmentId, Arc<PrintImage>>, ApiError> {
+        Ok(self
+            .prints
+            .lock()
+            .map_err(|_| poisoned())?
+            .all(project, Some(dir)))
     }
 
     /// Draw the live garment on the avatar into `view`.
@@ -1712,9 +1817,11 @@ impl Engine {
         &self,
         g: &mut Graphics,
         project: &r3d_core::Project,
+        dir: &Path,
         selected: &[PanelId],
         view: u32,
     ) -> Result<(), ApiError> {
+        let prints = self.prints_of(project, dir)?;
         self.refresh_avatar(g, project)?;
         let theme = g.theme;
         let v = g
@@ -1725,13 +1832,6 @@ impl Engine {
             view: &v.target,
             width: v.width,
             height: v.height,
-        };
-        let fabric = |panel: PanelId| {
-            let garment = project.garment_of(panel);
-            Material::fabric(
-                garment.map(|g| g.fabric).unwrap_or_default(),
-                garment.and_then(|g| g.color.as_deref()),
-            )
         };
         let published = self
             .sim
@@ -1782,7 +1882,7 @@ impl Engine {
         };
         let pieces = cloth
             .as_ref()
-            .map(|d| piece_meshes(d, &published.positions, paint.as_deref()))
+            .map(|d| piece_meshes(d, &published.positions, paint.as_deref(), project, &prints))
             .unwrap_or_default();
         drop(cloth);
         let tape = self
@@ -1797,21 +1897,35 @@ impl Engine {
             draws.push(Draw {
                 mesh: avatar,
                 material: Material::mannequin(&theme),
+                print: None,
             });
         }
-        for (panel, mesh) in &pieces {
-            let material = if !mesh.colors.is_empty() {
-                // A fit map: its colours, no sheen over them.
-                Material {
+        for piece in &pieces {
+            let (material, print) = if !piece.mesh.colors.is_empty() {
+                // A fit map: its colours, no sheen nor print over them.
+                let plain = ClothPiece {
+                    print: None,
+                    mesh: Mesh::default(),
+                    panel: piece.panel,
+                };
+                let material = Material {
                     sheen_amount: 0.0,
-                    ..fabric(*panel)
-                }
-            } else if selected.contains(panel) {
-                fabric(*panel).tinted(theme.selection, 0.45)
+                    ..plain.material(project)
+                };
+                (material, None)
+            } else if selected.contains(&piece.panel) {
+                (
+                    piece.material(project).tinted(theme.selection, 0.45),
+                    piece.printed(),
+                )
             } else {
-                fabric(*panel)
+                (piece.material(project), piece.printed())
             };
-            draws.push(Draw { mesh, material });
+            draws.push(Draw {
+                mesh: &piece.mesh,
+                material,
+                print,
+            });
         }
         let ink = |base: [f32; 4]| Material {
             base,
@@ -1821,10 +1935,12 @@ impl Engine {
         draws.extend(lines.iter().map(|mesh| Draw {
             mesh,
             material: ink(theme.panel_line),
+            print: None,
         }));
         draws.extend(edge_line.iter().chain(&tape).map(|mesh| Draw {
             mesh,
             material: ink(theme.selection),
+            print: None,
         }));
         g.garment.render(&g.gpu, target, &g.camera, &draws, &theme);
         Ok(())
@@ -2047,13 +2163,7 @@ impl Engine {
             ));
         }
         self.refresh_avatar(g, project)?;
-        let surface = |panel: PanelId| {
-            let garment = project.garment_of(panel);
-            Surface::fabric(
-                garment.map(|g| g.fabric).unwrap_or_default(),
-                garment.and_then(|g| g.color.as_deref()),
-            )
-        };
+        let prints = self.prints_of(project, ws.dir())?;
         let published = self
             .sim
             .lock()
@@ -2066,14 +2176,20 @@ impl Engine {
             .lock()
             .map_err(|_| poisoned())?
             .as_ref()
-            .map(|d| piece_meshes(d, &published.positions, None))
+            .map(|d| piece_meshes(d, &published.positions, None, project, &prints))
             .unwrap_or_default();
         let body = match self.moving_avatar(project, published.time)? {
             Some(moving) => Some(moving),
             None => g.avatar.as_ref().map(|(_, m)| m.clone()),
         };
         let subject = Subject {
-            cloth: cloth.into_iter().map(|(p, m)| (m, surface(p))).collect(),
+            cloth: cloth
+                .into_iter()
+                .map(|p| {
+                    let surface = p.surface(project);
+                    (p.mesh, surface, p.print)
+                })
+                .collect(),
             body,
             camera: g.camera,
         };

@@ -9,14 +9,24 @@ the app, and I can read or version the file with ordinary tools.
 
 ## Behavior
 - A project is a **folder** `Name.r3d/` containing `project.json`, `avatars/`,
-  `exports/` and a disposable `.r3d-cache/` (see `docs/architecture.md` §3).
+  `exports/` and a disposable `.r3d-cache/` (see `docs/architecture.md` §3);
+  `imports/` holds the pattern files imported (M13) and `textures/` the
+  print images the user added (M21, spec 25).
+- Prints (schema v16): a garment's `print` is `{"source": {"builtin":
+  "stripes"} | {"image": "textures/name.jpg"}, "width_mm", "height_mm"?,
+  "angle_deg"?}`; a piece's `print` is its shift and turn of it
+  (`{"offset_mm": [x, y], "angle_deg"}`), absent when zero. An image is
+  referenced by a relative path with forward slashes inside the folder,
+  never copied into the JSON, so the file stays small and diffable and
+  the image can be replaced by hand; a missing image shows the plain
+  colour.
 - `project.json` is pretty-printed with a stable key order, so diffs stay small.
 - A `schema_version` field; older versions are migrated on load. Files newer
   than the app are refused with a clear message, never half-loaded.
 - Save, Save As (copies assets), Open, Recent projects, autosave to
   `.r3d-cache/autosave.json` every 2 minutes, and recovery after a crash.
-- Imported assets (avatars) are copied into the project folder and referenced
-  by relative path.
+- Imported assets (avatars, pattern files, print images) are copied into
+  the project folder and referenced by relative path.
 - Project options, from a project's card on the start screen (the project
   is closed):
   - **Rename**: `project.rename`, then the folder is renamed `Name.r3d`

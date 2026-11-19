@@ -166,3 +166,62 @@ mod tests {
         assert!(ray_triangle(Vec3::new(0.2, 0.2, 1.0), Vec3::Z, a, b, c).is_none());
     }
 }
+
+/// One piece of the cloth as the views draw it: its panel, its mesh (with
+/// texture coordinates when its garment has a print) and that print.
+#[derive(Debug)]
+pub(crate) struct ClothPiece {
+    pub panel: PanelId,
+    pub mesh: r3d_render::Mesh,
+    pub print: Option<std::sync::Arc<r3d_commands::prints::PrintImage>>,
+}
+
+impl ClothPiece {
+    pub(crate) fn printed(&self) -> Option<r3d_render::Printed<'_>> {
+        self.print.as_ref().map(|p| r3d_render::Printed {
+            key: p.key,
+            texture: &p.texture,
+        })
+    }
+
+    /// Its fabric's look in the 3D view, the print over it.
+    pub(crate) fn material(&self, project: &r3d_core::Project) -> r3d_render::Material {
+        let garment = project.garment_of(self.panel);
+        let material = r3d_render::Material::fabric(
+            garment.map(|g| g.fabric).unwrap_or_default(),
+            garment.and_then(|g| g.color.as_deref()),
+        );
+        match &self.print {
+            Some(p) => material.printed(p.mean_rgb),
+            None => material,
+        }
+    }
+
+    /// Its fabric's surface in photos, coloured as the print on average.
+    pub(crate) fn surface(&self, project: &r3d_core::Project) -> r3d_render::photo::Surface {
+        let garment = project.garment_of(self.panel);
+        let mean = self.print.as_ref().map(|p| format!("#{:06X}", p.mean_rgb));
+        r3d_render::photo::Surface::fabric(
+            garment.map(|g| g.fabric).unwrap_or_default(),
+            mean.as_deref().or(garment.and_then(|g| g.color.as_deref())),
+        )
+    }
+}
+
+/// The garments' prints as the board fills pieces with them.
+pub(crate) fn board_prints(
+    prints: &std::collections::HashMap<
+        r3d_core::GarmentId,
+        std::sync::Arc<r3d_commands::prints::PrintImage>,
+    >,
+) -> Vec<r3d_render::board::BoardPrint> {
+    prints
+        .iter()
+        .map(|(garment, p)| r3d_render::board::BoardPrint {
+            garment: *garment,
+            key: p.key,
+            texture: p.texture.clone(),
+            aspect: p.aspect,
+        })
+        .collect()
+}

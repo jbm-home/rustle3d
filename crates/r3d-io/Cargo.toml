@@ -13,6 +13,7 @@ r3d-core.workspace = true
 r3d-geom.workspace = true
 pdf-writer.workspace = true
 png.workspace = true
+zune-jpeg.workspace = true
 miniz_oxide.workspace = true
 lopdf.workspace = true
 roxmltree.workspace = true

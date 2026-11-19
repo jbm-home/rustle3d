@@ -34,3 +34,4 @@ descriptions, public papers, open standards, general garment-making knowledge.
 | 22 | [Animated avatars](22-animated-avatars.md) | M23 |
 | 23 | [Production: indicators, marker, yardage, cost, tech pack and projector](23-production.md) | M30 |
 | 24 | [Fit maps and virtual tape measure](24-fit-maps-tape.md) | M24 |
+| 25 | [Textures and prints](25-textures-prints.md) | M21 |

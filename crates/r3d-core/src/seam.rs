@@ -220,6 +220,7 @@ mod tests {
                 placement: None,
                 symmetry: None,
                 holes: Vec::new(),
+                print: Default::default(),
             },
         );
         let line = tx.new_internal_line_id();

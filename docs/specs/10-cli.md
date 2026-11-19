@@ -9,7 +9,7 @@ scripts, simulate, export and render.
 ## Behavior
 `r3d` binary (clap). Implemented: `new`, `run`, `query`, `schema` (M1),
 `export`, `mcp` (M2), `simulate`, `render` (M4), `import` (M13),
-`marker`, `techpack` (M30), `fit` (M24). `run
+`marker`, `techpack` (M30), `fit` (M24), `texture` (M21). `run
 --dry-run` uses a bare session: actions such as exports are refused and
 nothing is written. Scripts can refer to earlier results
 (`"$3.created[0]"`), see `docs/commands.md`.
@@ -36,6 +36,11 @@ nothing is written. Scripts can refer to earlier results
   seconds taken. `--fit-map strain|gap` (3D only, M24, spec 24) colours
   the cloth by how tight it is, with a scale bar at the right edge; the
   output adds the scale and the tightest value.
+- `r3d texture <project> <image|stripes|gingham|dots|twill> [--garment
+  id] [--width-mm W] [--height-mm H] [--angle DEG]`: put a print on a
+  garment (spec 25): a PNG or JPEG is checked and copied into the
+  project's `textures/` folder, a built-in is drawn in the garment's
+  colour; runs `garment.set_print`, saves, and prints the garments.
 - `r3d fit <project> [--threshold-pct P] [--heights-cm 100,120]`: how the
   cached drape fits (`fit.report`, spec 24): strain per piece, the tight
   spots, the ease at the chest, waist and hips (and at the heights

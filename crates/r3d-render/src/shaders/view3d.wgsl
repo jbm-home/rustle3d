@@ -14,10 +14,14 @@ struct Globals {
 struct Material {
     base: vec4<f32>,
     sheen: vec4<f32>,
-    // x: sheen amount; y: 1 to use the vertex colours (a fit map)
+    // x: sheen amount; y: 1 to use the vertex colours (a fit map); z: 1
+    // to draw the print (its colours times the base)
     params: vec4<f32>,
 };
 @group(1) @binding(0) var<uniform> m: Material;
+// The surface's print (white without one), repeating, mip-mapped.
+@group(2) @binding(0) var print_texture: texture_2d<f32>;
+@group(2) @binding(1) var print_sampler: sampler;
 
 fn lin(c: vec3<f32>) -> vec3<f32> {
     return pow(c, vec3<f32>(2.2));
@@ -76,6 +80,7 @@ struct SurfaceIn {
     @location(0) pos: vec3<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) color: vec4<f32>,
+    @location(3) uv: vec2<f32>,
 };
 
 struct SurfaceOut {
@@ -83,6 +88,7 @@ struct SurfaceOut {
     @location(0) world: vec3<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) color: vec4<f32>,
+    @location(3) uv: vec2<f32>,
 };
 
 @vertex
@@ -92,11 +98,14 @@ fn vs_surface(v: SurfaceIn) -> SurfaceOut {
     o.world = v.pos;
     o.normal = v.normal;
     o.color = v.color;
+    o.uv = v.uv;
     return o;
 }
 
 @fragment
 fn fs_surface(i: SurfaceOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
+    // Sampled before any branch (derivatives need uniform control flow).
+    let printed = textureSample(print_texture, print_sampler, i.uv).rgb;
     var n = normalize(i.normal);
     if !front {
         n = -n;
@@ -106,7 +115,10 @@ fn fs_surface(i: SurfaceOut, @builtin(front_facing) front: bool) -> @location(0)
     let key = normalize(vec3<f32>(-0.6, 0.7, 0.4));
     let fill = normalize(vec3<f32>(0.8, 0.2, 0.35));
     let rim = normalize(vec3<f32>(-0.2, 0.4, -0.9));
-    let base = select(lin(m.base.rgb), lin(i.color.rgb), m.params.y > 0.5);
+    var base = select(lin(m.base.rgb), lin(i.color.rgb), m.params.y > 0.5);
+    if m.params.z > 0.5 {
+        base = base * lin(printed);
+    }
     let hemi = mix(lin(g.ground.rgb) * 0.35, lin(g.sky_top.rgb), n.y * 0.5 + 0.5);
     // Slightly wrapped diffuse: fabric scatters a little past the
     // terminator, but folds must keep their shading.

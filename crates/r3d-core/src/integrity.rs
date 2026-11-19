@@ -136,7 +136,19 @@ impl Project {
             let hex_ok = g.color.as_ref().is_none_or(|c| {
                 c.len() == 7 && c.starts_with('#') && c[1..].chars().all(|h| h.is_ascii_hexdigit())
             });
-            if !hex_ok {
+            let print_ok = g.print.as_ref().is_none_or(|p| {
+                let repeat = |v: f64| {
+                    (crate::print::MIN_REPEAT_MM..=crate::print::MAX_REPEAT_MM).contains(&v)
+                };
+                repeat(p.width_mm)
+                    && p.height_mm.is_none_or(repeat)
+                    && p.angle_deg.is_finite()
+                    && match &p.source {
+                        crate::print::PrintSource::Builtin(_) => true,
+                        crate::print::PrintSource::Image(path) => crate::print::image_path_ok(path),
+                    }
+            });
+            if !hex_ok || !print_ok {
                 return Err(E::BadValue {
                     entity: (*id).into(),
                 });
@@ -303,7 +315,11 @@ impl Project {
                     missing: panel.garment.into(),
                 });
             }
-            if !panel.grain_angle_deg.is_finite() || !panel.seam_allowance_mm.is_finite() {
+            if !panel.grain_angle_deg.is_finite()
+                || !panel.seam_allowance_mm.is_finite()
+                || !panel.print.offset_mm.is_finite()
+                || !panel.print.angle_deg.is_finite()
+            {
                 return Err(E::NonFinite { entity: pid });
             }
             if panel.seam_allowance_mm < 0.0 {

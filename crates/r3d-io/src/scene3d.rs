@@ -7,9 +7,10 @@ pub struct Mesh3d {
     pub name: String,
     pub positions: Vec<[f32; 3]>,
     /// Texture coordinates, one per position, or none (the avatar). For a
-    /// piece they are its pattern position: 1 unit = 1 m of fabric, `v`
-    /// pointing down the pattern, so a texture repeats at a fixed size on
-    /// every piece and follows the grain.
+    /// piece they come from its pattern along its grainline (spec 25): in
+    /// repeats of its garment's print, or 1 unit = 1 m of fabric without
+    /// one, `v` pointing down the image, so a texture repeats at a fixed
+    /// size on every piece and follows the grain.
     pub uvs: Vec<[f32; 2]>,
     /// Triangle corners, counter-clockwise seen from outside.
     pub indices: Vec<u32>,
@@ -31,6 +32,38 @@ pub struct Material3d {
     pub roughness: f32,
     /// Cloth is a single layer seen from both sides.
     pub double_sided: bool,
+    /// The print, drawn over the whole surface (the colour above is then
+    /// its average, for the sheen's tint).
+    pub texture: Option<Image3d>,
+}
+
+/// An image file to embed or write beside a 3D export.
+#[derive(Clone, PartialEq)]
+pub struct Image3d {
+    /// The file's bytes, PNG or JPEG.
+    pub bytes: Vec<u8>,
+    /// `image/png` or `image/jpeg`.
+    pub mime: &'static str,
+}
+
+impl std::fmt::Debug for Image3d {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Image3d")
+            .field("bytes", &self.bytes.len())
+            .field("mime", &self.mime)
+            .finish()
+    }
+}
+
+impl Image3d {
+    /// The image's file extension.
+    pub fn extension(&self) -> &'static str {
+        if self.mime == "image/jpeg" {
+            "jpg"
+        } else {
+            "png"
+        }
+    }
 }
 
 /// What a 3D export holds.

@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `cloth_hit`, `corner_at`, `corner_landing`, `dressed_now`, `edge_spot`, `edited`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form_now`, `form_soon`, `frozen_board`, `gpu_solver`, `graphics`, `import_from`, `live_body`, `long`, `marker_spec`, `motion_name`, `moving_avatar`, `new`, `new`, `offset_along`, `parse_track`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `selected`, `set_busy`, `sim`, `solver`, `tape_band`, `to_theme`, `workspace`
+// These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `cloth_hit`, `corner_at`, `corner_landing`, `dressed_now`, `edge_spot`, `edited`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form_now`, `form_soon`, `frozen_board`, `gpu_solver`, `graphics`, `import_from`, `live_body`, `long`, `marker_spec`, `motion_name`, `moving_avatar`, `new`, `new`, `offset_along`, `parse_track`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `prints_of`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `selected`, `set_busy`, `sim`, `solver`, `tape_band`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`
 
@@ -38,6 +38,12 @@ abstract class Engine implements RustOpaqueInterface {
     required double yMm,
     required double maxMm,
   });
+
+  /// Copy a print image the user chose (anywhere; PNG or JPEG) into the
+  /// project's `textures/` folder. Returns its path in the project, for
+  /// `garment.set_print`. Refused (`texture.format`, `texture.bad`) when
+  /// it is not an image that can be read.
+  Future<String> adoptTexture({required String path});
 
   /// How many changes agents have made that the UI can show: it
   /// refreshes when this moves. Asked several times a second, so it never
@@ -216,6 +222,12 @@ abstract class Engine implements RustOpaqueInterface {
     required double y,
     required Gesture gesture,
   });
+
+  /// One repeat of a print as PNG, for the inspector: the built-in
+  /// `builtin` (`stripes`, `gingham`, `dots`, `twill`) in `garment`'s
+  /// colour, or without it the garment's own print. Empty when the
+  /// garment has no print or its image cannot be read.
+  Uint8List printPreview({required String garment, String? builtin});
 
   /// Where the long step running is, or `None` when none is.
   StepProgress? progress();

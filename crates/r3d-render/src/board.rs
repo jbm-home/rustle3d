@@ -8,6 +8,7 @@ use r3d_geom::{Aabb, DVec2, polygon};
 use wgpu::util::DeviceExt;
 
 use crate::gpu::Gpu;
+use crate::print::{PrintCache, Printed};
 use crate::targets::Attachments;
 use crate::theme::{PIECE_COLORS, Rgba, SEAM_COLORS, Theme, WARNING};
 use crate::{MSAA_SAMPLES, Target};
@@ -35,6 +36,19 @@ pub struct BoardPanel {
     /// The panel's outline in the other sizes of the project's range (the
     /// graded nest), and whether each is the size shown in 3D.
     pub sizes: Vec<(Vec<DVec2>, bool)>,
+    /// Its garment's print (index into [`BoardScene::prints`]) and where
+    /// each fill point falls on it.
+    pub print: Option<(usize, Vec<[f32; 2]>)>,
+}
+
+/// A garment's print for the board: its pixels, a key that changes with
+/// them, and the image's height over width.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BoardPrint {
+    pub garment: r3d_core::GarmentId,
+    pub key: u64,
+    pub texture: std::sync::Arc<r3d_core::Texture>,
+    pub aspect: f64,
 }
 
 /// Everything the board draws.
@@ -53,6 +67,8 @@ pub struct BoardScene {
     pub guides: Vec<[DVec2; 2]>,
     /// Symmetric pieces' axes, between the drawn half's two ends.
     pub axes: Vec<[DVec2; 2]>,
+    /// The garments' prints the pieces are filled with.
+    pub prints: Vec<BoardPrint>,
 }
 
 /// A contour edge on the board.
@@ -116,6 +132,7 @@ impl BoardScene {
                     internal_lines,
                     notches,
                     sizes: Vec::new(),
+                    print: None,
                 })
             })
             .collect();
@@ -175,6 +192,7 @@ impl BoardScene {
             selected_edges: Vec::new(),
             guides: project.guides().values().map(|g| [g.a, g.b]).collect(),
             axes,
+            prints: Vec::new(),
         }
     }
 
@@ -196,6 +214,36 @@ impl BoardScene {
     }
 
     /// The same scene with `edges` highlighted.
+    /// Fill each piece with its garment's print, if `prints` has it
+    /// (spec 25): along its grainline, at the print's real size.
+    pub fn with_prints(mut self, project: &Project, prints: Vec<BoardPrint>) -> Self {
+        for panel in &mut self.panels {
+            let Some(garment) = project.panel(panel.id).map(|p| p.garment) else {
+                continue;
+            };
+            let Some(at) = prints.iter().position(|p| p.garment == garment) else {
+                continue;
+            };
+            let Some(frame) = prints
+                .get(at)
+                .and_then(|p| project.print_frame(panel.id, p.aspect))
+            else {
+                continue;
+            };
+            let uvs = panel
+                .fill
+                .iter()
+                .map(|p| {
+                    let uv = frame.uv(*p);
+                    [uv.x as f32, uv.y as f32]
+                })
+                .collect();
+            panel.print = Some((at, uvs));
+        }
+        self.prints = prints;
+        self
+    }
+
     pub fn with_selected_edges(mut self, edges: &[EdgeId]) -> Self {
         self.selected_edges = edges.to_vec();
         self
@@ -299,6 +347,16 @@ struct Vertex {
     color: [f32; 4],
 }
 
+/// A vertex of a printed fill: the tint mixed over the print (its
+/// amount in alpha) and where it falls on the print.
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+struct PrintVertex {
+    pos: [f32; 2],
+    tint: [f32; 4],
+    uv: [f32; 2],
+}
+
 /// Triangles accumulated for one frame.
 #[derive(Default)]
 struct Batch {
@@ -393,6 +451,9 @@ fn midpoint(points: &[DVec2]) -> Option<(DVec2, DVec2)> {
 pub struct BoardRenderer {
     format: wgpu::TextureFormat,
     pipeline: wgpu::RenderPipeline,
+    /// Printed fills, drawn between the grid and the rest.
+    printed: wgpu::RenderPipeline,
+    prints: PrintCache,
     uniforms: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     attachments: Option<Attachments>,
@@ -442,41 +503,72 @@ impl BoardRenderer {
             bind_group_layouts: &[Some(&layout)],
             immediate_size: 0,
         });
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("board"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                compilation_options: Default::default(),
-                buffers: &[Some(wgpu::VertexBufferLayout {
-                    array_stride: std::mem::size_of::<Vertex>() as u64,
-                    step_mode: wgpu::VertexStepMode::Vertex,
-                    attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x4],
-                })],
-            },
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState {
-                count: MSAA_SAMPLES,
-                ..Default::default()
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                compilation_options: Default::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            multiview_mask: None,
-            cache: None,
+        let prints = PrintCache::new(gpu, wgpu::ShaderStages::FRAGMENT);
+        let printed_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("board prints"),
+            bind_group_layouts: &[Some(&layout), Some(prints.layout())],
+            immediate_size: 0,
         });
+        let make =
+            |label, layout: &wgpu::PipelineLayout, vs, fs, buffer: wgpu::VertexBufferLayout<'_>| {
+                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some(label),
+                    layout: Some(layout),
+                    vertex: wgpu::VertexState {
+                        module: &shader,
+                        entry_point: Some(vs),
+                        compilation_options: Default::default(),
+                        buffers: &[Some(buffer)],
+                    },
+                    primitive: wgpu::PrimitiveState::default(),
+                    depth_stencil: None,
+                    multisample: wgpu::MultisampleState {
+                        count: MSAA_SAMPLES,
+                        ..Default::default()
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &shader,
+                        entry_point: Some(fs),
+                        compilation_options: Default::default(),
+                        targets: &[Some(wgpu::ColorTargetState {
+                            format,
+                            blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                            write_mask: wgpu::ColorWrites::ALL,
+                        })],
+                    }),
+                    multiview_mask: None,
+                    cache: None,
+                })
+            };
+        let pipeline = make(
+            "board",
+            &pipeline_layout,
+            "vs_main",
+            "fs_main",
+            wgpu::VertexBufferLayout {
+                array_stride: std::mem::size_of::<Vertex>() as u64,
+                step_mode: wgpu::VertexStepMode::Vertex,
+                attributes: &wgpu::vertex_attr_array![0 => Float32x2, 1 => Float32x4],
+            },
+        );
+        let printed = make(
+            "board prints",
+            &printed_layout,
+            "vs_print",
+            "fs_print",
+            wgpu::VertexBufferLayout {
+                array_stride: std::mem::size_of::<PrintVertex>() as u64,
+                step_mode: wgpu::VertexStepMode::Vertex,
+                attributes: &wgpu::vertex_attr_array![
+                    0 => Float32x2, 1 => Float32x4, 2 => Float32x2
+                ],
+            },
+        );
         Self {
             format,
             pipeline,
+            printed,
+            prints,
             uniforms,
             bind_group,
             attachments: None,
@@ -539,6 +631,11 @@ impl BoardRenderer {
                 guide,
             );
         }
+        // The grid and guides lie under the printed fills, the rest over.
+        let under = batch.vertices.len();
+        // Printed fills, by print: (key, first vertex, count).
+        let mut printed: Vec<PrintVertex> = Vec::new();
+        let mut runs: Vec<(u64, u32, u32)> = Vec::new();
 
         for panel in &scene.panels {
             let selected = scene.selected.contains(&panel.id);
@@ -548,9 +645,48 @@ impl BoardRenderer {
             } else {
                 base
             };
-            for t in &panel.triangles {
-                if let [Some(a), Some(b), Some(c)] = t.map(|i| panel.fill.get(i as usize)) {
-                    batch.tri(*a, *b, *c, fill);
+            let print = panel
+                .print
+                .as_ref()
+                .and_then(|(at, uvs)| Some((scene.prints.get(*at)?, uvs)))
+                .filter(|(_, uvs)| uvs.len() == panel.fill.len());
+            match print {
+                Some((print, uvs)) => {
+                    self.prints.prepare(
+                        gpu,
+                        Printed {
+                            key: print.key,
+                            texture: &print.texture,
+                        },
+                    );
+                    let first = printed.len() as u32;
+                    let tint = if selected {
+                        let [r, g, b, _] = theme.selection;
+                        [r, g, b, 0.25]
+                    } else {
+                        [0.0; 4]
+                    };
+                    for t in &panel.triangles {
+                        for i in t {
+                            if let (Some(p), Some(uv)) =
+                                (panel.fill.get(*i as usize), uvs.get(*i as usize))
+                            {
+                                printed.push(PrintVertex {
+                                    pos: [p.x as f32, p.y as f32],
+                                    tint,
+                                    uv: *uv,
+                                });
+                            }
+                        }
+                    }
+                    runs.push((print.key, first, printed.len() as u32 - first));
+                }
+                None => {
+                    for t in &panel.triangles {
+                        if let [Some(a), Some(b), Some(c)] = t.map(|i| panel.fill.get(i as usize)) {
+                            batch.tri(*a, *b, *c, fill);
+                        }
+                    }
                 }
             }
             let mut faint = theme.panel_line;
@@ -637,6 +773,14 @@ impl BoardRenderer {
                     usage: wgpu::BufferUsages::VERTEX,
                 })
         });
+        let print_buffer = (!printed.is_empty()).then(|| {
+            gpu.device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("board prints"),
+                    contents: bytemuck::cast_slice(&printed),
+                    usage: wgpu::BufferUsages::VERTEX,
+                })
+        });
 
         let att = Attachments::get(
             &mut self.attachments,
@@ -673,13 +817,30 @@ impl BoardRenderer {
                 occlusion_query_set: None,
                 multiview_mask: None,
             });
+            pass.set_bind_group(0, &self.bind_group, &[]);
+            let all = batch.vertices.len() as u32;
+            let under = under as u32;
             if let Some(vb) = &vertex_buffer {
                 pass.set_pipeline(&self.pipeline);
-                pass.set_bind_group(0, &self.bind_group, &[]);
                 pass.set_vertex_buffer(0, vb.slice(..));
-                pass.draw(0..batch.vertices.len() as u32, 0..1);
+                pass.draw(0..under, 0..1);
+            }
+            if let Some(pb) = &print_buffer {
+                pass.set_pipeline(&self.printed);
+                pass.set_vertex_buffer(0, pb.slice(..));
+                for (key, first, count) in &runs {
+                    pass.set_bind_group(1, self.prints.get(Some(*key)), &[]);
+                    pass.draw(*first..first + count, 0..1);
+                }
+            }
+            if let Some(vb) = &vertex_buffer {
+                pass.set_pipeline(&self.pipeline);
+                pass.set_vertex_buffer(0, vb.slice(..));
+                pass.draw(under..all, 0..1);
             }
         }
         gpu.queue.submit([encoder.finish()]);
+        let used: Vec<u64> = runs.iter().map(|r| r.0).collect();
+        self.prints.retain(&used);
     }
 }

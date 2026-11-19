@@ -960,6 +960,7 @@ mod tests {
                 placement: None,
                 symmetry: None,
                 holes: Vec::new(),
+                print: Default::default(),
             },
         );
         tx.commit();

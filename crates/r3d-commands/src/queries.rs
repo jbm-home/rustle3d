@@ -69,7 +69,7 @@ fn summarize(p: &Project, id: PanelId) -> Result<PanelSummary, CommandError> {
 pub struct ProjectSummary {}
 
 impl Described for ProjectSummary {
-    const SUMMARY: &'static str = "Project name, display unit, the garments (fabric, colour, notes), the size range (names, base, shown; null without one), entity counts and a summary of every panel.";
+    const SUMMARY: &'static str = "Project name, display unit, the garments (fabric, colour, notes, print), the size range (names, base, shown; null without one), entity counts and a summary of every panel.";
 }
 
 #[derive(Serialize)]
@@ -108,7 +108,7 @@ impl QuerySpec for ProjectSummary {
                 .map(|(id, g)| {
                     serde_json::json!({
                         "id": id, "name": g.name, "fabric": g.fabric, "color": g.color,
-                        "layer": g.layer, "notes": g.notes,
+                        "layer": g.layer, "notes": g.notes, "print": g.print,
                     })
                 })
                 .collect(),
@@ -233,11 +233,19 @@ struct InternalLineOut {
 }
 
 #[derive(Serialize)]
+struct PrintPlacementOut {
+    offset_mm: Vec2,
+    angle_deg: f64,
+}
+
+#[derive(Serialize)]
 struct PanelOut {
     #[serde(flatten)]
     summary: PanelSummary,
     grain_angle_deg: f64,
     seam_allowance_mm: f64,
+    /// How the piece shifts and turns its garment's print.
+    print: PrintPlacementOut,
     /// Where it sits around the body for the simulation; null when the
     /// panel is not simulated.
     placement: Option<r3d_core::Placement>,
@@ -340,6 +348,10 @@ impl QuerySpec for PanelGet {
             summary: summarize(p, self.panel)?,
             grain_angle_deg: panel.grain_angle_deg,
             seam_allowance_mm: panel.seam_allowance_mm,
+            print: PrintPlacementOut {
+                offset_mm: panel.print.offset_mm.to_array(),
+                angle_deg: panel.print.angle_deg,
+            },
             placement: panel.placement,
             mirror_of: panel.mirror_of.as_ref().map(|l| MirrorOut {
                 source: l.source,

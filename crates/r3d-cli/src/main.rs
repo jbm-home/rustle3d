@@ -251,6 +251,29 @@ enum Cmd {
         #[arg(long)]
         page: Option<u32>,
     },
+    /// Put a print on a garment's fabric, then save: a PNG or JPEG file
+    /// (copied into the project's `textures/` folder) or a built-in print
+    /// (`stripes`, `gingham`, `dots`, `twill`, in the garment's colour).
+    /// It lies along each piece's grainline at its real size.
+    Texture {
+        project: PathBuf,
+        /// The image file, or the name of a built-in print.
+        print: String,
+        /// The garment (`garment:N`); default: the project's first.
+        #[arg(long)]
+        garment: Option<String>,
+        /// Width of one repeat across the grain (mm); default: the
+        /// built-in's usual one, 100 mm for an image.
+        #[arg(long)]
+        width_mm: Option<f64>,
+        /// Height of one repeat along the grain (mm); default: the
+        /// image's proportions.
+        #[arg(long)]
+        height_mm: Option<f64>,
+        /// The print turned from the grainline (degrees).
+        #[arg(long, default_value_t = 0.0, allow_negative_numbers = true)]
+        angle: f64,
+    },
     /// Export the pattern at 1:1 scale (svg, pdf, dxf) or the draped garment
     /// (glb, obj; the cached `simulate` result if up to date) into the
     /// project folder.
@@ -599,7 +622,7 @@ fn cmd_import(
     page: Option<u32>,
 ) -> Result<(), Failure> {
     let mut ws = Workspace::open(project)?;
-    let path = ws.adopt(file)?;
+    let path = ws.adopt(file, "imports")?;
     let mut step = json!({ "type": "import.pattern", "path": path });
     if let Some(u) = units {
         step["units"] = Value::from(match u {
@@ -620,6 +643,36 @@ fn cmd_import(
     let result = ws.run_step(&Step::from_value(step)?)?;
     ws.save()?;
     print_json(&result)
+}
+
+fn cmd_texture(
+    project: &Path,
+    print: &str,
+    garment: Option<String>,
+    width_mm: Option<f64>,
+    height_mm: Option<f64>,
+    angle: f64,
+) -> Result<(), Failure> {
+    let mut ws = Workspace::open(project)?;
+    let builtin = ["stripes", "gingham", "dots", "twill"].contains(&print);
+    let source = if builtin && !Path::new(print).exists() {
+        json!({ "builtin": print })
+    } else {
+        json!({ "image": ws.adopt_texture(Path::new(print))? })
+    };
+    let mut step = json!({ "type": "garment.set_print", "print": source, "angle_deg": angle });
+    for (key, value) in [("width_mm", width_mm), ("height_mm", height_mm)] {
+        if let Some(v) = value {
+            step[key] = json!(v);
+        }
+    }
+    if let Some(g) = garment {
+        step["garment"] = json!(g);
+    }
+    ws.run_step(&Step::from_value(step)?)?;
+    ws.save()?;
+    let summary = ws.run_step(&Step::from_value(json!({ "type": "project.summary" }))?)?;
+    print_json(&json!({ "garments": summary["garments"] }))
 }
 
 fn cmd_simulate(project: &Path, frames: u32, motion: Option<String>) -> Result<(), Failure> {
@@ -786,6 +839,14 @@ fn main() -> ExitCode {
             scale,
             page,
         } => cmd_import(&project, &file, units, scale, page),
+        Cmd::Texture {
+            project,
+            print,
+            garment,
+            width_mm,
+            height_mm,
+            angle,
+        } => cmd_texture(&project, &print, garment, width_mm, height_mm, angle),
         Cmd::Marker {
             project,
             sizes,

@@ -10,8 +10,8 @@ use crate::mesh::Mesh;
 /// How far points move toward the curved surface (the paper's 3/4).
 const SHAPE: f32 = 0.75;
 
-/// A triangle's corner positions and normals.
-pub(crate) type Corners = ([Vec3; 3], [Vec3; 3]);
+/// A triangle's corner positions, normals and texture coordinates.
+pub(crate) type Corners = ([Vec3; 3], [Vec3; 3], [[f32; 2]; 3]);
 
 /// The triangles of `mesh`, each cut into `level²` curved ones. Edges on
 /// the mesh's border stay straight, so two pieces sewn along a border
@@ -28,13 +28,15 @@ pub(crate) fn tessellate(mesh: &Mesh, level: u32) -> Vec<Corners> {
         ) else {
             continue;
         };
+        // Texture coordinates are interpolated flat (none: zeros).
+        let uv = t.map(|i| mesh.uvs.get(i as usize).copied().unwrap_or_default());
         // Which of the three edges (0: corners 0-1, 1: 1-2, 2: 2-0) is a border.
         let on_border = [
             border.contains(&key(t[0], t[1])),
             border.contains(&key(t[1], t[2])),
             border.contains(&key(t[2], t[0])),
         ];
-        let at = |i: u32, j: u32| -> (Vec3, Vec3) {
+        let at = |i: u32, j: u32| -> (Vec3, Vec3, [f32; 2]) {
             // Barycentric weights of corners 0, 1, 2.
             let w1 = i as f32 / level as f32;
             let w2 = j as f32 / level as f32;
@@ -42,26 +44,27 @@ pub(crate) fn tessellate(mesh: &Mesh, level: u32) -> Vec<Corners> {
             let w = [w0, w1, w2];
             let flat = p[0] * w0 + p[1] * w1 + p[2] * w2;
             let normal = (n[0] * w0 + n[1] * w1 + n[2] * w2).normalize_or(n[0]);
+            let tex = [0, 1].map(|c| uv[0][c] * w0 + uv[1][c] * w1 + uv[2][c] * w2);
             let straight = (on_border[0] && j == 0)
                 || (on_border[1] && i + j == level)
                 || (on_border[2] && i == 0);
             if straight {
-                return (flat, normal);
+                return (flat, normal, tex);
             }
             let mut curved = Vec3::ZERO;
             for k in 0..3 {
                 let projected = flat - (flat - p[k]).dot(n[k]) * n[k];
                 curved += w[k] * projected;
             }
-            (flat * (1.0 - SHAPE) + curved * SHAPE, normal)
+            (flat * (1.0 - SHAPE) + curved * SHAPE, normal, tex)
         };
         for i in 0..level {
             for j in 0..level - i {
                 let (a, b, c) = (at(i, j), at(i + 1, j), at(i, j + 1));
-                out.push(([a.0, b.0, c.0], [a.1, b.1, c.1]));
+                out.push(([a.0, b.0, c.0], [a.1, b.1, c.1], [a.2, b.2, c.2]));
                 if i + j + 1 < level {
                     let d = at(i + 1, j + 1);
-                    out.push(([b.0, d.0, c.0], [b.1, d.1, c.1]));
+                    out.push(([b.0, d.0, c.0], [b.1, d.1, c.1], [b.2, d.2, c.2]));
                 }
             }
         }
@@ -154,6 +157,7 @@ mod tests {
                 0, 2, 4, 4, 2, 1, 1, 2, 5, 5, 2, 0, 4, 3, 0, 1, 3, 4, 5, 3, 1, 0, 3, 5,
             ],
             colors: Vec::new(),
+            uvs: Vec::new(),
         }
     }
 
@@ -168,7 +172,7 @@ mod tests {
         // ones stay near the unit sphere their normals describe.
         let lengths: Vec<f32> = fine
             .iter()
-            .flat_map(|(p, _)| p.iter().map(|v| v.length()))
+            .flat_map(|(p, _, _)| p.iter().map(|v| v.length()))
             .collect();
         let min = lengths.iter().copied().fold(f32::MAX, f32::min);
         let max = lengths.iter().copied().fold(0.0, f32::max);
@@ -204,12 +208,15 @@ mod tests {
             normals: vec![Vec3::new(-1.0, -1.0, 1.0).normalize(), Vec3::X, Vec3::Y],
             indices: vec![0, 1, 2],
             colors: Vec::new(),
+            uvs: vec![[0.0, 0.0], [3.0, 0.0], [0.0, 3.0]],
         };
-        for (p, _) in tessellate(&mesh, 3) {
-            for v in p {
-                // Edge points lie on the plane z = 0.
+        for (p, _, uv) in tessellate(&mesh, 3) {
+            for (v, t) in p.iter().zip(uv) {
+                // Edge points lie on the plane z = 0, their texture
+                // coordinates where the flat triangle has them.
                 if v.x.abs() < 1e-6 || v.y.abs() < 1e-6 || (v.x + v.y - 1.0).abs() < 1e-6 {
                     assert!(v.z.abs() < 1e-6, "{v}");
+                    assert!((t[0] - 3.0 * v.x).abs() < 1e-5 && (t[1] - 3.0 * v.y).abs() < 1e-5);
                 }
             }
         }

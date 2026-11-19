@@ -156,6 +156,48 @@ fn schema_lists_and_describes_operations() {
 }
 
 #[test]
+fn texture_puts_a_print_on_the_garment() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("Shirt.r3d");
+    r3d().arg("new").arg(&dir).assert().success();
+    // A built-in print, turned.
+    let out = r3d()
+        .arg("texture")
+        .arg(&dir)
+        .args(["stripes", "--width-mm", "25", "--angle", "-30"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let print = &json_of(&out)["garments"][0]["print"];
+    assert_eq!(print["source"], json!({"builtin": "stripes"}));
+    assert_eq!(print["width_mm"], 25.0);
+    assert_eq!(print["angle_deg"], -30.0);
+    // An image: copied into textures/.
+    let jpg = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../r3d-io/tests/data/two.jpg");
+    let out = r3d()
+        .arg("texture")
+        .arg(&dir)
+        .arg(&jpg)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let print = &json_of(&out)["garments"][0]["print"];
+    assert_eq!(print["source"], json!({"image": "textures/two.jpg"}));
+    assert!(dir.join("textures/two.jpg").is_file());
+    // Not an image: refused, nothing copied.
+    let bad = tmp.path().join("notes.png");
+    std::fs::write(&bad, "hello").unwrap();
+    let out = r3d().arg("texture").arg(&dir).arg(&bad).assert().failure();
+    let err = String::from_utf8_lossy(&out.get_output().stderr).to_string();
+    assert!(err.contains("texture.format"), "{err}");
+    assert!(!dir.join("textures/notes.png").exists());
+}
+
+#[test]
 fn export_writes_into_the_project() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("Skirt.r3d");

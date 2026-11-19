@@ -5,6 +5,7 @@ use bytemuck::{Pod, Zeroable};
 use crate::camera::OrbitCamera;
 use crate::gpu::Gpu;
 use crate::mesh::Mesh;
+use crate::print::{PrintCache, Printed};
 use crate::targets::{Attachments, DEPTH_FORMAT};
 use r3d_core::Fabric;
 
@@ -47,6 +48,19 @@ impl Material {
         }
     }
 
+    /// The same material with a print drawn over it: the print's colours
+    /// replace the base (left white, so a tint still shows), the sheen
+    /// takes the print's average colour `mean` (sRGB `0xRRGGBB`).
+    pub fn printed(self, mean: u32) -> Self {
+        let mean = hex(mean);
+        let lighter = |c: f32| c + (1.0 - c) * 0.6;
+        Self {
+            base: [1.0; 4],
+            sheen: [lighter(mean[0]), lighter(mean[1]), lighter(mean[2]), 1.0],
+            ..self
+        }
+    }
+
     /// The same material, tinted toward `tint` (selection highlight).
     pub fn tinted(self, tint: Rgba, amount: f32) -> Self {
         let mix = |a: Rgba| -> Rgba { std::array::from_fn(|i| a[i] + (tint[i] - a[i]) * amount) };
@@ -67,11 +81,13 @@ impl Material {
     }
 }
 
-/// One mesh to draw with its material.
+/// One mesh to draw with its material, and its print if it has one (the
+/// mesh then carries texture coordinates).
 #[derive(Debug, Clone, Copy)]
 pub struct Draw<'a> {
     pub mesh: &'a Mesh,
     pub material: Material,
+    pub print: Option<Printed<'a>>,
 }
 
 #[repr(C)]
@@ -93,6 +109,8 @@ struct Vertex {
     normal: [f32; 3],
     /// The mesh's own colour (sRGB), used when the material says so.
     color: [f32; 4],
+    /// Texture coordinates on the print.
+    uv: [f32; 2],
 }
 
 /// A GPU buffer that grows when needed.
@@ -131,6 +149,7 @@ pub struct ViewRenderer3d {
     globals: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     material_layout: wgpu::BindGroupLayout,
+    prints: PrintCache,
     /// Material buffer and its bind group, grown to the number of draws.
     materials: Option<(Growable, wgpu::BindGroup)>,
     vertices: Option<Growable>,
@@ -209,9 +228,10 @@ impl ViewRenderer3d {
             bind_group_layouts: &[Some(&layout)],
             immediate_size: 0,
         });
+        let prints = PrintCache::new(gpu, wgpu::ShaderStages::FRAGMENT);
         let surface_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("3d surface"),
-            bind_group_layouts: &[Some(&layout), Some(&material_layout)],
+            bind_group_layouts: &[Some(&layout), Some(&material_layout), Some(prints.layout())],
             immediate_size: 0,
         });
         let pipeline = |label,
@@ -253,7 +273,9 @@ impl ViewRenderer3d {
         let vertex_layout = wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<Vertex>() as u64,
             step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32x4],
+            attributes: &wgpu::vertex_attr_array![
+                0 => Float32x3, 1 => Float32x3, 2 => Float32x4, 3 => Float32x2
+            ],
         };
         Self {
             format,
@@ -287,6 +309,7 @@ impl ViewRenderer3d {
             globals,
             bind_group,
             material_layout,
+            prints,
             materials: None,
             vertices: None,
             indices: None,
@@ -326,10 +349,18 @@ impl ViewRenderer3d {
         let mut indices: Vec<u32> = Vec::new();
         let mut ranges = Vec::with_capacity(draws.len());
         let mut material_bytes = vec![0u8; draws.len() * MATERIAL_STRIDE as usize];
+        let mut prints = Vec::with_capacity(draws.len());
         for (i, d) in draws.iter().enumerate() {
             let first_index = indices.len() as u32;
             let base_vertex = vertices.len() as i32;
             let painted = d.mesh.colors.len() == d.mesh.positions.len();
+            let print = d
+                .print
+                .filter(|_| !painted && d.mesh.uvs.len() == d.mesh.positions.len());
+            if let Some(p) = print {
+                self.prints.prepare(gpu, p);
+            }
+            prints.push(print.map(|p| p.key));
             vertices.extend(
                 d.mesh
                     .positions
@@ -346,6 +377,7 @@ impl ViewRenderer3d {
                             .copied()
                             .filter(|_| painted)
                             .unwrap_or_default(),
+                        uv: d.mesh.uvs.get(k).copied().unwrap_or_default(),
                     }),
             );
             indices.extend_from_slice(&d.mesh.indices);
@@ -356,7 +388,7 @@ impl ViewRenderer3d {
                 params: [
                     d.material.sheen_amount,
                     if painted { 1.0 } else { 0.0 },
-                    0.0,
+                    if print.is_some() { 1.0 } else { 0.0 },
                     0.0,
                 ],
             };
@@ -430,11 +462,15 @@ impl ViewRenderer3d {
                 pass.set_index_buffer(i.buffer.slice(..), wgpu::IndexFormat::Uint32);
                 for (n, (range, base_vertex)) in ranges.into_iter().enumerate() {
                     pass.set_bind_group(1, materials, &[(n as u64 * MATERIAL_STRIDE) as u32]);
+                    let print = prints.get(n).copied().flatten();
+                    pass.set_bind_group(2, self.prints.get(print), &[]);
                     pass.draw_indexed(range, base_vertex, 0..1);
                 }
             }
         }
         gpu.queue.submit([encoder.finish()]);
+        let used: Vec<u64> = prints.into_iter().flatten().collect();
+        self.prints.retain(&used);
     }
 
     fn write_materials(&mut self, gpu: &Gpu, bytes: &[u8]) {

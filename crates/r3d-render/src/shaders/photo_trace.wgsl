@@ -23,12 +23,14 @@ struct Triangle {
     n0: vec4<f32>,
     n1: vec4<f32>,
     n2: vec4<f32>,
+    uv01: vec4<f32>, // corners 0 and 1
+    uv2: vec4<f32>,  // corner 2
 };
 
 struct Surface {
     base: vec4<f32>,  // linear albedo, translucency
     sheen: vec4<f32>, // sheen colour, sheen roughness
-    spec: vec4<f32>,  // roughness, specular strength
+    spec: vec4<f32>,  // roughness, specular strength, print (index + 1; 0: none)
 };
 
 struct Light {
@@ -56,7 +58,9 @@ struct Params {
 @group(0) @binding(1) var<storage, read> nodes: array<Node>;
 @group(0) @binding(2) var<storage, read> triangles: array<Triangle>;
 @group(0) @binding(3) var<storage, read> surfaces: array<Surface>;
-@group(0) @binding(4) var<storage, read> sheen_table: array<f32>;
+// The sheen's albedo table (SHEEN_SIZE² floats, as bits), then the prints:
+// their count, each one's offset, width and height, then RGBA8 texels.
+@group(0) @binding(4) var<storage, read> sheen_table: array<u32>;
 @group(0) @binding(5) var<storage, read_write> color_sum: array<vec4<f32>>;
 @group(0) @binding(6) var<storage, read_write> albedo_sum: array<vec4<f32>>;
 @group(0) @binding(7) var<storage, read_write> normal_sum: array<vec4<f32>>;
@@ -245,6 +249,10 @@ fn max3(c: vec3<f32>) -> f32 {
     return max(c.x, max(c.y, c.z));
 }
 
+fn sheen_at(i: u32) -> f32 {
+    return bitcast<f32>(sheen_table[i]);
+}
+
 fn sheen_albedo(nv: f32, roughness: f32) -> f32 {
     let size = f32(SHEEN_SIZE - 1u);
     let x = clamp(nv, 0.0, 1.0) * size;
@@ -255,8 +263,8 @@ fn sheen_albedo(nv: f32, roughness: f32) -> f32 {
     let y1 = min(y0 + 1u, SHEEN_SIZE - 1u);
     let fx = x - f32(x0);
     let fy = y - f32(y0);
-    let a = mix(sheen_table[y0 * SHEEN_SIZE + x0], sheen_table[y0 * SHEEN_SIZE + x1], fx);
-    let b = mix(sheen_table[y1 * SHEEN_SIZE + x0], sheen_table[y1 * SHEEN_SIZE + x1], fx);
+    let a = mix(sheen_at(y0 * SHEEN_SIZE + x0), sheen_at(y0 * SHEEN_SIZE + x1), fx);
+    let b = mix(sheen_at(y1 * SHEEN_SIZE + x0), sheen_at(y1 * SHEEN_SIZE + x1), fx);
     return mix(a, b, fy);
 }
 
@@ -406,6 +414,35 @@ fn clamp_contribution(c: vec3<f32>) -> vec3<f32> {
 // normals describe (Hanika 2021), so shadows of coarse triangles do not
 // show their facets. `side` flips the normals of a surface seen from
 // behind.
+fn srgb_to_linear(c: vec3<f32>) -> vec3<f32> {
+    let lo = c / 12.92;
+    let hi = pow((c + 0.055) / 1.055, vec3<f32>(2.4));
+    return select(hi, lo, c <= vec3<f32>(0.04045));
+}
+
+fn texel(base: u32, w: u32, h: u32, x: i32, y: i32) -> vec3<f32> {
+    let xi = u32(((x % i32(w)) + i32(w)) % i32(w));
+    let yi = u32(((y % i32(h)) + i32(h)) % i32(h));
+    return srgb_to_linear(unpack4x8unorm(sheen_table[base + yi * w + xi]).rgb);
+}
+
+// The colour of print `index` (from 1) at `uv` (in repeats): bilinear,
+// repeating, in linear light.
+fn print_color(index: u32, uv: vec2<f32>) -> vec3<f32> {
+    let head = SHEEN_SIZE * SHEEN_SIZE;
+    let k = head + 1u + 3u * (index - 1u);
+    let base = head + sheen_table[k];
+    let w = max(sheen_table[k + 1u], 1u);
+    let h = max(sheen_table[k + 2u], 1u);
+    let p = (uv - floor(uv)) * vec2<f32>(f32(w), f32(h)) - 0.5;
+    let f = fract(p);
+    let x = i32(floor(p.x));
+    let y = i32(floor(p.y));
+    let top = mix(texel(base, w, h, x, y), texel(base, w, h, x + 1, y), f.x);
+    let bottom = mix(texel(base, w, h, x, y + 1), texel(base, w, h, x + 1, y + 1), f.x);
+    return mix(top, bottom, f.y);
+}
+
 fn lifted(tri: Triangle, b: vec3<f32>, p: vec3<f32>, side: f32) -> vec3<f32> {
     let n0 = tri.n0.xyz * side;
     let n1 = tri.n1.xyz * side;
@@ -496,7 +533,12 @@ fn trace(@builtin(global_invocation_id) id: vec3<u32>) {
             ng = -ng;
             ns = ng;
         }
-        let s = surfaces[u32(tri.p0.w)];
+        var s = surfaces[u32(tri.p0.w)];
+        let print = u32(s.spec.z);
+        if print > 0u {
+            let uv = tri.uv01.xy * b.x + tri.uv01.zw * b.y + tri.uv2.xy * b.z;
+            s.base = vec4<f32>(print_color(print, uv), s.base.a);
+        }
         let frame = basis(ns);
         let to_local = transpose(frame);
         let wo = to_local * wo_world;

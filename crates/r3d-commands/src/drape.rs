@@ -1843,30 +1843,36 @@ impl Latest {
 }
 
 /// The garment draped at `positions` (one per particle of `drape`), as
-/// meshes to export: one per piece, named after it, with its pattern
-/// position as texture coordinates; the avatar too when `avatar` (its
-/// surface and triangles) is given.
+/// meshes to export: one per piece, named after it, with texture
+/// coordinates on its garment's print (`prints`, see
+/// [`crate::prints::Prints`]); the avatar too when `avatar` (its surface
+/// and triangles) is given.
 pub fn scene3d(
     project: &Project,
     drape: &Drape,
     positions: &[Vec3],
     avatar: Option<(&[Vec3], &[[u32; 3]])>,
+    prints: &std::collections::HashMap<GarmentId, std::sync::Arc<crate::prints::PrintImage>>,
 ) -> r3d_io::scene3d::Scene3d {
-    use r3d_io::scene3d::{Material3d, Mesh3d, Scene3d};
+    use r3d_io::scene3d::{Image3d, Material3d, Mesh3d, Scene3d};
     // One material per garment, named after it.
     let garments = project.garments_by_layer();
     let mut materials: Vec<Material3d> = garments
         .iter()
-        .filter_map(|id| project.garments().get(id))
-        .map(|g| {
+        .filter_map(|id| Some((project.garments().get(id)?, prints.get(id))))
+        .map(|(g, print)| {
             let look = g.fabric.look();
             Material3d {
                 name: g.name.clone(),
-                rgb: g.rgb(),
+                rgb: print.map_or(g.rgb(), |p| p.mean_rgb),
                 sheen: look.sheen,
                 sheen_roughness: look.sheen_roughness,
                 roughness: look.roughness,
                 double_sided: true,
+                texture: print.map(|p| Image3d {
+                    bytes: p.file.clone(),
+                    mime: p.mime,
+                }),
             }
         })
         .collect();
@@ -1875,13 +1881,17 @@ pub fn scene3d(
         .iter()
         .filter_map(|piece| {
             let at = positions.get(piece.particles.clone())?;
-            let rest = drape.scene.particles.get(piece.particles.clone())?;
             Some(Mesh3d {
                 name: project
                     .panel(piece.panel)
                     .map_or_else(|| piece.panel.to_string(), |p| p.name.clone()),
                 positions: at.iter().map(|p| p.to_array()).collect(),
-                uvs: rest.iter().map(|p| [p.rest.x, -p.rest.y]).collect(),
+                uvs: crate::prints::piece_uvs(
+                    project,
+                    drape,
+                    piece,
+                    crate::prints::aspect_of(project, prints, piece),
+                ),
                 indices: piece.indices.clone(),
                 material: project
                     .panel(piece.panel)
@@ -1899,6 +1909,7 @@ pub fn scene3d(
             sheen_roughness: 0.0,
             roughness: 0.7,
             double_sided: false,
+            texture: None,
         });
         Mesh3d {
             name: "Avatar".into(),
