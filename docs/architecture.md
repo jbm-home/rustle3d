@@ -543,6 +543,8 @@ code stays **i18n-ready** for more:
 
 | Date | Change | Why |
 |---|---|---|
+| 2026-11-19 | Calendar versions: the version is the release date, `YY.M.D` (`26.11.19`), set by `cargo xtask version` (or `make version`) in the workspace `Cargo.toml` and `app/pubspec.yaml`; months and days have no leading zero | The maintainer's choice: a version says when it was released. Cargo and Flutter want semver, which forbids leading zeros; two releases on one day are not planned for |
+| 2026-11-19 | `cargo xtask run|build` and a thin root `Makefile` launch and build the app on every OS; `xtask` depends on `ctrlc` (MIT/Apache-2.0) and, on Windows, runs the Flutter tool from its snapshot rather than `flutter.bat` | make is not installed on Windows by default, so the logic stays in Rust. Ctrl+C in a terminal killed the task before Flutter had closed the app, and `flutter.bat` then asked "Terminate batch job (Y/N)?" over the shell's prompt; ignoring Ctrl+C needs a console handler, which is `unsafe` without the crate |
 | 2026-11-14 | Initial choices: XPBD on CPU, folder projects, MakeHuman CC0 avatars, `r3d-render` crate added | Bootstrap discussion |
 | 2026-11-14 | egui ruled out; GUI stack is open until the M3 spike | Not modern or polished enough for the "beautiful UI" goal |
 | 2026-11-14 | M1: validation inside `apply` (no separate `validate`); `Transaction`/`ChangeSet` in `r3d-core`; IDs as prefixed strings; batch as a script step rather than a `Command` variant | Fewer code paths; keeps the document's fields private; clearer agent API |

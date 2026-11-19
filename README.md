@@ -176,7 +176,7 @@ make run
 Without make, `cargo xtask run` does exactly the same. The first run
 downloads dependencies and builds everything, then the app window opens.
 In the terminal, `r` reloads the interface after a change to its Dart
-code and `q` quits.
+code; `q`, Ctrl+C or closing the window quits.
 
 `make run` starts a **debug** build: quick to rebuild, with hot reload,
 but the 3D view is slower. To try the app at its real speed, use
@@ -196,6 +196,7 @@ Type `make` alone to list them; this list comes from the `Makefile`.
 | `make check` | `./scripts/check.sh` | everything CI checks; run it before every commit |
 | `make release` | `./scripts/release.sh` | a packaged, unsigned release in `dist/` |
 | `make docs` | `cargo xtask gen-docs` | regenerates `docs/commands.md` |
+| `make version` | `cargo xtask version` | sets the version to today's date (see below) |
 
 Flutter options go in `ARGS` (or after `--` with `cargo xtask`), for
 example to open the app on a fresh T-shirt project:
@@ -212,6 +213,11 @@ cargo run -p r3d-cli -- --help                     # all commands
 cargo run -p r3d-cli -- new Skirt.r3d              # a new project
 cargo run -p r3d-cli -- mcp --project Skirt.r3d    # serve it to an AI agent
 ```
+
+Versions are release dates, `YY.M.D`: `26.11.19` is the release of
+19 November 2026 (`26.1.5` for 5 January: no leading zeros). `make version`
+sets today's date in `Cargo.toml` and `app/pubspec.yaml`; `make version
+V=26.11.20` sets another one. The app shows it on its start screen.
 
 Contributors also need `cargo install flutter_rust_bridge_codegen --version 2.13.0`
 to regenerate the Dart bindings after changing `crates/r3d-ffi/src/api`;

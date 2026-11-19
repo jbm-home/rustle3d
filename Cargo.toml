@@ -16,7 +16,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "26.11.19"
 edition = "2024"
 rust-version = "1.100"
 license = "GPL-3.0-or-later"
@@ -37,6 +37,7 @@ r3d-mcp = { path = "crates/r3d-mcp" }
 assert_cmd = "2"
 bytemuck = { version = "1", features = ["derive"] }
 clap = { version = "4", features = ["derive"] }
+ctrlc = "3"
 rayon = "1"
 criterion = { version = "0.5", default-features = false }
 base64 = "0.23"

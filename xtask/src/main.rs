@@ -7,10 +7,13 @@
 //!   OS in debug (default) or release.
 //! - `build [--release] [-- <flutter args>]`: build the CLI and the desktop
 //!   app for this OS.
+//! - `version [YY.M.D]`: set the version to a release date (today's by
+//!   default) in `Cargo.toml` and `app/pubspec.yaml`.
 //! - `make-help`: print the `Makefile`'s header and its targets (`make`).
 
 mod dev;
 mod makehuman;
+mod version;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -40,8 +43,9 @@ fn main() -> ExitCode {
         Some("run") => dev::run(&root(), dev::Task::Run, rest),
         Some("build") => dev::run(&root(), dev::Task::Build, rest),
         Some("make-help") => dev::make_help(&root()),
+        Some("version") => version::run(&root(), rest),
         _ => Err(
-            "usage: cargo xtask <gen-docs|fetch-makehuman|run|build|make-help> [--release] [-- <flutter args>]"
+            "usage: cargo xtask <gen-docs|fetch-makehuman|run|build|version|make-help> [--release] [-- <flutter args>]"
                 .to_owned(),
         ),
     };

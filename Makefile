@@ -5,7 +5,7 @@
 # Each target's `## ...` comment is its line in `make help`.
 
 .DEFAULT_GOAL := help
-.PHONY: help run run-release build build-release test check release docs
+.PHONY: help run run-release build build-release test check release docs version
 
 # The bash scripts need Git Bash on Windows: a bare `bash` there may be WSL's.
 ifeq ($(OS),Windows_NT)
@@ -40,3 +40,6 @@ release:        ## packaged release in dist/
 
 docs:           ## regenerate docs/commands.md
 	cargo xtask gen-docs
+
+version:        ## set the version to today's date, YY.M.D (or V=26.11.19)
+	cargo xtask version $(V)

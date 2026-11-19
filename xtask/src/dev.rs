@@ -1,9 +1,12 @@
 //! `cargo xtask run|build [--release] [-- <flutter args>]`: launch or build
 //! the desktop app (and build the CLI) for this machine's OS, in debug or
 //! release. Cargokit builds `r3d-ffi` in the same mode as the Flutter app.
+//!
+//! Ctrl+C goes to Flutter, which closes the app; this task waits for it
+//! instead of dying first and giving the prompt back over Flutter's output.
 
-use std::path::Path;
-use std::process::Command;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 
 /// What `run` and `build` do.
 #[derive(Clone, Copy)]
@@ -22,14 +25,48 @@ fn desktop() -> Result<&'static str, String> {
     }
 }
 
-/// `flutter` is a batch file on Windows, which `Command` only finds by its
-/// full name.
-fn flutter() -> Command {
-    Command::new(if cfg!(windows) {
-        "flutter.bat"
-    } else {
-        "flutter"
-    })
+/// The Flutter tool.
+#[cfg(not(windows))]
+fn flutter() -> Result<Command, String> {
+    Ok(Command::new("flutter"))
+}
+
+/// The Flutter tool. On Windows `flutter.bat` asks "Terminate batch job
+/// (Y/N)?" after a Ctrl+C, over the shell's prompt; so the batch file only
+/// brings Flutter's own files up to date (`--version`), and the tool runs
+/// from its Dart snapshot, as the batch file would run it.
+#[cfg(windows)]
+fn flutter() -> Result<Command, String> {
+    let bat = std::env::var_os("PATH")
+        .iter()
+        .flat_map(std::env::split_paths)
+        .map(|dir| dir.join("flutter.bat"))
+        .find(|bat| bat.is_file())
+        .ok_or("flutter.bat is not in PATH (see README, Getting started)")?;
+    let root: PathBuf = bat
+        .parent()
+        .and_then(Path::parent)
+        .ok_or("flutter.bat is not in Flutter's bin folder")?
+        .to_owned();
+    let mut update = Command::new(&bat);
+    update
+        .arg("--version")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null());
+    status(update)?;
+    let cache = root.join("bin").join("cache");
+    let mut cmd = Command::new(cache.join("dart-sdk").join("bin").join("dart.exe"));
+    cmd.env("FLUTTER_ROOT", &root)
+        .arg(format!(
+            "--packages={}",
+            root.join("packages")
+                .join("flutter_tools")
+                .join(".dart_tool")
+                .join("package_config.json")
+                .display()
+        ))
+        .arg(cache.join("flutter_tools.snapshot"));
+    Ok(cmd)
 }
 
 fn status(mut cmd: Command) -> Result<(), String> {
@@ -71,7 +108,9 @@ pub fn run(root: &Path, task: Task, args: &[String]) -> Result<(), String> {
         cli.arg("--release");
     }
 
-    let mut cmd = flutter();
+    // The handler does nothing: Flutter gets Ctrl+C too and quits.
+    ctrlc::set_handler(|| {}).map_err(|e| format!("Ctrl+C handler: {e}"))?;
+    let mut cmd = flutter()?;
     cmd.current_dir(&app);
     match task {
         Task::Run => {

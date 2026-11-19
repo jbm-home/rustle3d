@@ -657,6 +657,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "ctrlc"
+version = "3.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11247e6c4f83c2b15748f4873805483deaa2bbc855e773817c07a9f987f55c62"
+dependencies = [
+ "dispatch2",
+ "nix",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "darling"
 version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -757,6 +768,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e0e367e4e7da84520dedcac1901e4da967309406d1e51017ae1abfb97adbd38"
 dependencies = [
  "bitflags",
+ "block2",
+ "libc",
  "objc2",
 ]
 
@@ -1943,7 +1956,7 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
 name = "r3d-avatar"
-version = "0.1.0"
+version = "26.11.19"
 dependencies = [
  "glam",
  "r3d-core",
@@ -1956,7 +1969,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-cli"
-version = "0.1.0"
+version = "26.11.19"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -1969,7 +1982,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-commands"
-version = "0.1.0"
+version = "26.11.19"
 dependencies = [
  "glam",
  "png",
@@ -1989,7 +2002,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-core"
-version = "0.1.0"
+version = "26.11.19"
 dependencies = [
  "glam",
  "r3d-geom",
@@ -2002,7 +2015,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-geom"
-version = "0.1.0"
+version = "26.11.19"
 dependencies = [
  "glam",
  "proptest",
@@ -2011,7 +2024,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-io"
-version = "0.1.0"
+version = "26.11.19"
 dependencies = [
  "glam",
  "lopdf",
@@ -2030,7 +2043,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-mcp"
-version = "0.1.0"
+version = "26.11.19"
 dependencies = [
  "base64",
  "glam",
@@ -2047,7 +2060,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-render"
-version = "0.1.0"
+version = "26.11.19"
 dependencies = [
  "bytemuck",
  "glam",
@@ -2064,7 +2077,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-sim"
-version = "0.1.0"
+version = "26.11.19"
 dependencies = [
  "criterion",
  "glam",
@@ -2076,7 +2089,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-sim-gpu"
-version = "0.1.0"
+version = "26.11.19"
 dependencies = [
  "bytemuck",
  "criterion",
@@ -2094,7 +2107,7 @@ dependencies = [
 
 [[package]]
 name = "r3d_ffi"
-version = "0.1.0"
+version = "26.11.19"
 dependencies = [
  "flutter_rust_bridge",
  "glam",
@@ -3454,8 +3467,9 @@ checksum = "e450f9b2ed1dff33c94c12589a87338689467b9c4f5d8a5710bd09a847d2c8a7"
 
 [[package]]
 name = "xtask"
-version = "0.1.0"
+version = "26.11.19"
 dependencies = [
+ "ctrlc",
  "glam",
  "r3d-avatar",
  "r3d-commands",
