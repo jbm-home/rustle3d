@@ -13,7 +13,6 @@ import 'body_check.dart';
 import 'body_panel.dart';
 import 'busy.dart';
 import 'design/tokens.dart';
-import 'guide.dart';
 import 'i18n.dart';
 import 'learn.dart';
 import 'motion_library.dart';
@@ -161,10 +160,6 @@ class _ShellState extends State<Shell> {
   /// The tape measure's last reading (Tape measure tool).
   TapeReading? _tape;
 
-  /// The guided flow's current step, and whether the guide is shown.
-  late GuideStep _step;
-  bool _guide = true;
-
   @override
   void initState() {
     super.initState();
@@ -173,10 +168,6 @@ class _ShellState extends State<Shell> {
     _agentPoll = Timer.periodic(
       const Duration(milliseconds: 200),
       (_) => _pollAgents(),
-    );
-    _step = GuideStep.firstFor(
-      panels: (_summary['counts']?['panels'] as int?) ?? 0,
-      seams: _seams.length,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -240,25 +231,6 @@ class _ShellState extends State<Shell> {
       _drape(() => widget.engine.runSimulation(running: false));
     } else if (status != _sim) {
       setState(() => _sim = status);
-    }
-  }
-
-  /// Go to a step of the guided flow: its tool becomes the active one.
-  void _goTo(GuideStep step) {
-    setState(() {
-      _step = step;
-      _guide = true;
-    });
-    switch (step) {
-      case GuideStep.sew:
-        _setTool('sew');
-      case GuideStep.fabric:
-        // The fabric is in the inspector when nothing is selected.
-        _guard(() => widget.engine.select(panels: const []));
-        _setTool('select');
-        _refresh();
-      case _:
-        _setTool('select');
     }
   }
 
@@ -352,7 +324,6 @@ class _ShellState extends State<Shell> {
 
   // What the first-launch tour points at.
   final _tourTop = GlobalKey();
-  final _tourGuide = GlobalKey();
   final _tourPattern = GlobalKey();
   final _tourGarment = GlobalKey();
 
@@ -372,7 +343,6 @@ class _ShellState extends State<Shell> {
     showTour(context, [
       TourStop(_tourPattern, l.tourPatternTitle, l.tourPatternText),
       TourStop(_tourGarment, l.tourGarmentTitle, l.tourGarmentText),
-      TourStop(_tourGuide, l.tourGuideTitle, l.tourGuideText),
       TourStop(_tourTop, l.tourHelpTitle, l.tourHelpText),
     ]);
   }
@@ -414,22 +384,6 @@ class _ShellState extends State<Shell> {
 
   void _look(CameraSide side) =>
       _guard(() => widget.engine.lookFrom(side: side));
-
-  /// The step's main action, from the guide banner.
-  void _stepAction() {
-    switch (_step) {
-      case GuideStep.measurements:
-        _showBody();
-      case GuideStep.pattern:
-        _addRectangle();
-      case GuideStep.sew:
-        _setTool('sew');
-      case GuideStep.fabric:
-        break;
-      case GuideStep.drape:
-        _setRunning(!(_sim?.running ?? false));
-    }
-  }
 
   /// Steps that can take seconds: drafting a template or a size range in
   /// every size, fitting a body to new measurements.
@@ -2220,18 +2174,6 @@ class _ShellState extends State<Shell> {
                 bodyKey: _spotBody,
                 onLearn: () => _scaffold.currentState?.openEndDrawer(),
                 onHome: widget.onHome,
-                step: _step,
-                guide: _guide,
-                onStep: _goTo,
-              ),
-              GuideBanner(
-                key: _tourGuide,
-                step: _step,
-                visible: _guide,
-                running: _sim?.running ?? false,
-                onAction: _stepAction,
-                onNext: _step.next == null ? null : () => _goTo(_step.next!),
-                onClose: () => setState(() => _guide = false),
               ),
               Expanded(
                 child: Padding(
@@ -2242,7 +2184,6 @@ class _ShellState extends State<Shell> {
                       _ToolRail(
                         active: _tool,
                         shown: _groupShown,
-                        highlight: _guide ? _step.tool : null,
                         keys: _spotTools,
                         onSelect: (tool) {
                           for (final (group, tools) in _ToolRail.groups) {
@@ -2665,9 +2606,6 @@ class _TopBar extends StatelessWidget {
     required this.bodyKey,
     required this.onLearn,
     required this.onHome,
-    required this.step,
-    required this.guide,
-    required this.onStep,
   });
 
   final String projectName;
@@ -2714,17 +2652,11 @@ class _TopBar extends StatelessWidget {
   final GlobalKey bodyKey;
   final VoidCallback onLearn;
   final VoidCallback onHome;
-  final GuideStep step;
-
-  /// The guide is open: the current step is shown as active.
-  final bool guide;
-  final ValueChanged<GuideStep> onStep;
 
   @override
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
     final l = context.l;
-    const steps = GuideStep.values;
     return SizedBox(
       height: 56,
       child: Padding(
@@ -2761,39 +2693,7 @@ class _TopBar extends StatelessWidget {
                 color: p.text,
               ),
             ),
-            const SizedBox(width: Space.xl),
-            // The steps take the room left, and scroll when the window is
-            // too narrow for them.
-            Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    for (var i = 0; i < steps.length; i++) ...[
-                      _StepChip(
-                        index: i + 1,
-                        label: steps[i].label(l),
-                        active: guide && steps[i] == step,
-                        done: steps[i].index < step.index,
-                        onTap: () => onStep(steps[i]),
-                      ),
-                      if (i < steps.length - 1)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: Space.xs,
-                          ),
-                          child: Icon(
-                            Icons.chevron_right,
-                            size: 16,
-                            color: p.textMuted,
-                          ),
-                        ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: Space.s),
+            const Spacer(),
             TextButton.icon(
               onPressed: onLearn,
               icon: const Icon(Icons.school_outlined, size: 18),
@@ -2995,77 +2895,6 @@ class _BodyMenu extends StatelessWidget {
   }
 }
 
-class _StepChip extends StatelessWidget {
-  const _StepChip({
-    required this.index,
-    required this.label,
-    required this.active,
-    required this.done,
-    required this.onTap,
-  });
-
-  final int index;
-  final String label;
-  final bool active;
-
-  /// Before the current step: shown with a check mark.
-  final bool done;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = Tokens.of(context);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
-      child: AnimatedContainer(
-        duration: Motion.normal,
-        curve: Motion.curve,
-        padding: const EdgeInsets.symmetric(horizontal: Space.m, vertical: 6),
-        decoration: BoxDecoration(
-          color: active ? p.accentSoft : Colors.transparent,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 18,
-              height: 18,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: active
-                    ? p.accent
-                    : (done ? p.accent.withValues(alpha: 0.18) : p.border),
-              ),
-              child: done && !active
-                  ? Icon(Icons.check_rounded, size: 12, color: p.accent)
-                  : Text(
-                      '$index',
-                      style: ts(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: active ? Colors.white : p.textMuted,
-                      ),
-                    ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: ts(
-                fontSize: 13,
-                fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-                color: active ? p.accent : p.textMuted,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 /// Says the body is being fitted to new measurements, over the 3D view
 /// (which shows the old body until then).
 class _FittingChip extends StatelessWidget {
@@ -3240,7 +3069,6 @@ class _ToolRail extends StatelessWidget {
   const _ToolRail({
     required this.active,
     required this.shown,
-    required this.highlight,
     required this.keys,
     required this.onSelect,
   });
@@ -3252,29 +3080,19 @@ class _ToolRail extends StatelessWidget {
 
   /// Buttons Learn points at, by tool.
   final Map<String, GlobalKey> keys;
-
-  /// The tool the guided flow's current step uses, ringed.
-  final String? highlight;
   final ValueChanged<String> onSelect;
 
   /// The groups: one button, a menu of their tools.
   static const groups = [
     ('shapes', ['rectangle', 'ellipse', 'sector']),
     ('curves', ['bend', 'straighten', 'addPoint', 'arc']),
-    ('details', ['dart', 'pleat', 'hole']),
+    ('details', ['dart', 'pleat']),
     ('trims', ['button', 'zipper']),
   ];
 
   static List<_RailTool> _details(L l) => [
     ('dart', Icons.change_history_rounded, l.toolDart, '', l.toolDartHint),
     ('pleat', Icons.view_week_outlined, l.toolPleat, '', l.toolPleatHint),
-    (
-      'hole',
-      Icons.radio_button_unchecked_rounded,
-      l.toolHole,
-      '',
-      l.toolHoleHint,
-    ),
   ];
 
   static List<_RailTool> _trims(L l) => [
@@ -3325,34 +3143,55 @@ class _ToolRail extends StatelessWidget {
     ('arc', Icons.looks_rounded, l.toolArc, '', l.toolArcHint),
   ];
 
-  /// The rail, top to bottom; a list is a group (one button, a menu).
-  static List<Object> _tools(L l) => [
-    ('select', Icons.near_me_outlined, l.toolSelect, 'V', l.toolSelectHint),
-    ('shapes', l.toolShapes, _shapes(l)),
-    ('polygon', Icons.pentagon_outlined, l.toolPolygon, 'P', l.toolPolygonHint),
-    ('curve', Icons.draw_outlined, l.toolCurve, 'C', l.toolCurveHint),
-    ('curves', l.toolEditCurve, _curveEdits(l)),
-    ('guide', Icons.straighten_rounded, l.toolGuide, 'G', l.toolGuideHint),
-    (
-      'dimension',
-      Icons.square_foot_rounded,
-      l.toolDimension,
-      'T',
-      l.toolDimensionHint,
-    ),
-    ('cut', Icons.content_cut_rounded, l.toolCut, 'K', l.toolCutHint),
-    ('details', l.toolDetails, _details(l)),
-    ('trims', l.toolTrims, _trims(l)),
-    ('draw', Icons.brush_rounded, l.toolDraw, 'D', l.toolDrawHint),
-    ('tape', Icons.linear_scale_rounded, l.toolTape, '', l.toolTapeHint),
-    (
-      'notch',
-      Icons.vertical_align_center_rounded,
-      l.toolNotch,
-      'N',
-      l.toolNotchHint,
-    ),
-    ('sew', Icons.link_rounded, l.toolSew, 'S', l.toolSewHint),
+  /// The rail, top to bottom, in sections set apart by a line: drawing,
+  /// measuring, sewing, trims. In a section, a list is a group (one
+  /// button, a menu).
+  static List<List<Object>> _sections(L l) => [
+    [
+      ('select', Icons.near_me_outlined, l.toolSelect, 'V', l.toolSelectHint),
+      ('shapes', l.toolShapes, _shapes(l)),
+      (
+        'polygon',
+        Icons.pentagon_outlined,
+        l.toolPolygon,
+        'P',
+        l.toolPolygonHint,
+      ),
+      ('curve', Icons.draw_outlined, l.toolCurve, 'C', l.toolCurveHint),
+      ('curves', l.toolEditCurve, _curveEdits(l)),
+      ('cut', Icons.content_cut_rounded, l.toolCut, 'K', l.toolCutHint),
+      (
+        'hole',
+        Icons.radio_button_unchecked_rounded,
+        l.toolHole,
+        '',
+        l.toolHoleHint,
+      ),
+      ('draw', Icons.brush_rounded, l.toolDraw, 'D', l.toolDrawHint),
+    ],
+    [
+      ('guide', Icons.straighten_rounded, l.toolGuide, 'G', l.toolGuideHint),
+      (
+        'dimension',
+        Icons.square_foot_rounded,
+        l.toolDimension,
+        'T',
+        l.toolDimensionHint,
+      ),
+      ('tape', Icons.linear_scale_rounded, l.toolTape, '', l.toolTapeHint),
+    ],
+    [
+      (
+        'notch',
+        Icons.vertical_align_center_rounded,
+        l.toolNotch,
+        'N',
+        l.toolNotchHint,
+      ),
+      ('details', l.toolDetails, _details(l)),
+      ('sew', Icons.link_rounded, l.toolSew, 'S', l.toolSewHint),
+    ],
+    [('trims', l.toolTrims, _trims(l))],
   ];
 
   @override
@@ -3398,7 +3237,6 @@ class _ToolRail extends StatelessWidget {
               icon: icon,
               label: tip,
               active: active,
-              highlight: id == highlight,
               grouped: onMenu != null,
               onTap: onMenu == null ? onTap! : () => onMenu(context),
             ),
@@ -3420,40 +3258,50 @@ class _ToolRail extends StatelessWidget {
       child: SingleChildScrollView(
         child: Column(
           children: [
-            for (final t in _tools(l))
-              if (t is _RailTool)
-                button(
-                  t,
-                  t.$3,
-                  line(t, first: true),
-                  active: t.$1 == active,
-                  onTap: () => onSelect(t.$1),
-                )
-              else if (t case (
-                final String group,
-                final String name,
-                final List<_RailTool> tools,
-              ))
-                button(
-                  tools.firstWhere(
-                    (x) => x.$1 == shown[group],
-                    orElse: () => tools.first,
+            for (final (i, section) in _sections(l).indexed) ...[
+              if (i > 0)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: Space.s,
+                    vertical: Space.xs,
                   ),
-                  name,
-                  TextSpan(
-                    children: [
-                      TextSpan(
-                        text: '$name\n',
-                        style: ts(fontWeight: FontWeight.w700),
-                      ),
-                      for (final (i, x) in tools.indexed)
-                        line(x, first: i == 0),
-                    ],
-                  ),
-                  active: tools.any((x) => x.$1 == active),
-                  onTap: null,
-                  onMenu: (context) => _openGroup(context, tools),
+                  child: Divider(color: p.border, height: 1),
                 ),
+              for (final t in section)
+                if (t is _RailTool)
+                  button(
+                    t,
+                    t.$3,
+                    line(t, first: true),
+                    active: t.$1 == active,
+                    onTap: () => onSelect(t.$1),
+                  )
+                else if (t case (
+                  final String group,
+                  final String name,
+                  final List<_RailTool> tools,
+                ))
+                  button(
+                    tools.firstWhere(
+                      (x) => x.$1 == shown[group],
+                      orElse: () => tools.first,
+                    ),
+                    name,
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: '$name\n',
+                          style: ts(fontWeight: FontWeight.w700),
+                        ),
+                        for (final (i, x) in tools.indexed)
+                          line(x, first: i == 0),
+                      ],
+                    ),
+                    active: tools.any((x) => x.$1 == active),
+                    onTap: null,
+                    onMenu: (context) => _openGroup(context, tools),
+                  ),
+            ],
           ],
         ),
       ),
@@ -3509,7 +3357,6 @@ class _RailButton extends StatefulWidget {
     required this.icon,
     required this.label,
     required this.active,
-    required this.highlight,
     required this.grouped,
     required this.onTap,
   });
@@ -3519,7 +3366,6 @@ class _RailButton extends StatefulWidget {
   /// For screen readers and tests.
   final String label;
   final bool active;
-  final bool highlight;
 
   /// Opens a menu of tools: marked with a small corner.
   final bool grouped;
@@ -3556,12 +3402,6 @@ class _RailButtonState extends State<_RailButton> {
             decoration: BoxDecoration(
               color: bg,
               borderRadius: BorderRadius.circular(Tokens.radius(context, 0.75)),
-              border: Border.all(
-                color: widget.highlight
-                    ? p.accent.withValues(alpha: 0.7)
-                    : Colors.transparent,
-                width: 1.5,
-              ),
             ),
             child: Stack(
               alignment: Alignment.center,

@@ -38,11 +38,10 @@ have never used a 3D garment tool.
 | 4 | | | | |
 
 Watch in particular: whether they find the templates and the sizes sheet;
-whether the step bar and the guide banner are read; whether they find
-Simulate; how they try to shorten (pattern points, ⇧-drag in 3D, Learn);
-whether the fabric swatches are found with nothing selected; whether the
-camera views (1–4 or the Front/Side/Back buttons) are found; anything they
-say is confusing or ugly.
+whether they find Simulate; how they try to shorten (pattern points,
+⇧-drag in 3D, Learn); whether the fabric swatches are found with nothing
+selected; whether the camera views (1–4 or the Front/Side/Back buttons)
+are found; anything they say is confusing or ugly.
 
 ## After
 

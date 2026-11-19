@@ -523,74 +523,11 @@ class LFr extends L {
       '**Simuler** le fait tomber sur le corps. Faites glisser pour tourner autour ; **⇧-glisser** un ourlet ou une couture modifie le patron depuis ici.';
 
   @override
-  String get tourGuideTitle => 'Une étape à la fois';
-
-  @override
-  String get tourGuideText =>
-      'Le guide indique quoi faire ensuite. Cliquez sur une étape en haut pour y aller, ou fermez le guide.';
-
-  @override
   String get tourHelpTitle => 'L’aide est toujours là';
 
   @override
   String get tourHelpText =>
       '**Apprendre** propose de courts tutoriels et montre où se trouvent les choses ; **Corps** change les mesures. **⌘Z** annule tout.';
-
-  @override
-  String get stepMeasurements => 'Mesures';
-
-  @override
-  String get stepMeasurementsGoal =>
-      'Vérifiez le corps pour lequel le vêtement est fait : sa taille et ses mesures.';
-
-  @override
-  String get stepMeasurementsAction => 'Ouvrir Corps';
-
-  @override
-  String get stepPattern => 'Patron';
-
-  @override
-  String get stepPatternGoal =>
-      'Façonnez les pièces : faites glisser un coin ou un bord, ou cliquez un bord pour taper sa longueur.';
-
-  @override
-  String get stepPatternAction => 'Ajouter une pièce';
-
-  @override
-  String get stepSew => 'Coudre';
-
-  @override
-  String get stepSewGoal =>
-      'Assemblez les pièces : cliquez un bord sur le patron, puis le bord auquel le coudre.';
-
-  @override
-  String get stepSewAction => 'Outil Coudre';
-
-  @override
-  String get stepFabric => 'Tissu';
-
-  @override
-  String get stepFabricGoal =>
-      'Choisissez la matière du vêtement, dans le panneau de droite.';
-
-  @override
-  String get stepDrape => 'Tombé';
-
-  @override
-  String get stepDrapeGoal =>
-      'Regardez-le tomber sur le corps. Puis tirez le tissu, ou ⌥-clic pour l’épingler.';
-
-  @override
-  String stepOf(int step, int total) {
-    return 'Étape $step sur $total';
-  }
-
-  @override
-  String get guideNext => 'Suivant  →';
-
-  @override
-  String get guideHide =>
-      'Masquer le guide (cliquez une étape pour le rouvrir)';
 
   @override
   String get toolSelect => 'Sélection';
@@ -2065,7 +2002,7 @@ class LFr extends L {
   }
 
   @override
-  String get toolDetails => 'Détails';
+  String get toolDetails => 'Pinces et plis';
 
   @override
   String get toolDart => 'Pince';

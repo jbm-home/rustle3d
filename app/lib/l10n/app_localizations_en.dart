@@ -519,73 +519,11 @@ class LEn extends L {
       '**Simulate** drapes it. Drag to turn around; **⇧-drag** a hem or a seam to change the pattern from here.';
 
   @override
-  String get tourGuideTitle => 'One step at a time';
-
-  @override
-  String get tourGuideText =>
-      'The guide says what to do next. Click a step at the top to jump to it, or close the guide.';
-
-  @override
   String get tourHelpTitle => 'Help is always here';
 
   @override
   String get tourHelpText =>
       '**Learn** has short how-tos and shows where things are; **Body** changes the measurements. **⌘Z** undoes anything.';
-
-  @override
-  String get stepMeasurements => 'Measurements';
-
-  @override
-  String get stepMeasurementsGoal =>
-      'Check the body the garment is made for: its size and measurements.';
-
-  @override
-  String get stepMeasurementsAction => 'Open Body';
-
-  @override
-  String get stepPattern => 'Pattern';
-
-  @override
-  String get stepPatternGoal =>
-      'Shape the pieces: drag a corner or an edge, or click an edge to type its length.';
-
-  @override
-  String get stepPatternAction => 'Add a piece';
-
-  @override
-  String get stepSew => 'Sew';
-
-  @override
-  String get stepSewGoal =>
-      'Join the pieces: click an edge on the pattern, then the edge to sew it to.';
-
-  @override
-  String get stepSewAction => 'Sew tool';
-
-  @override
-  String get stepFabric => 'Fabric';
-
-  @override
-  String get stepFabricGoal =>
-      'Choose what the garment is made of, in the panel on the right.';
-
-  @override
-  String get stepDrape => 'Drape';
-
-  @override
-  String get stepDrapeGoal =>
-      'Watch it drape on the body. Then drag the cloth, or ⌥-click to pin it.';
-
-  @override
-  String stepOf(int step, int total) {
-    return 'Step $step of $total';
-  }
-
-  @override
-  String get guideNext => 'Next  →';
-
-  @override
-  String get guideHide => 'Hide the guide (click a step to bring it back)';
 
   @override
   String get toolSelect => 'Select';
@@ -2045,7 +1983,7 @@ class LEn extends L {
   }
 
   @override
-  String get toolDetails => 'Details';
+  String get toolDetails => 'Darts and pleats';
 
   @override
   String get toolDart => 'Dart';

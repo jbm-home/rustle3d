@@ -11,7 +11,7 @@ box pleats, optionally stitched down (`pleat.add`); holes in pieces
 (`panel.add_hole`, `panel.remove_hole`); union and difference of pieces
 (`panel.boolean`). The cloth follows: internal lines that are sewn and
 holes are part of each piece's mesh. Project files: schema v13. The
-app: the Details tools (Dart, Pleat, Hole), Join or cut in the
+app: the Dart, Pleat and Hole tools, Join or cut in the
 inspector, the Ease of a seam in the edge card; since M32 the Sew tool
 picks every kind of side (spec 02, The Sew tool).
 
@@ -64,7 +64,8 @@ from another.
   length.
 
 ## UX
-- Rail: the Details group (Dart, Pleat, Hole). Dart and Pleat: click the
+- Rail: the Darts and pleats group (Dart, Pleat) in the sewing section,
+  Hole in the drawing section (since 2026-11-19). Dart and Pleat: click the
   edge where it goes, type the sizes. Hole: select a piece, click the
   hole's corners inside it, Enter.
 - Inspector: Join or cut (another piece, then Join or Cut out); in an

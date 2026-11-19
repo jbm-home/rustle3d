@@ -1,4 +1,4 @@
-# 11 — Templates and guided flow
+# 11 — Templates and Learn panel
 
 Provenance: maintainer's functional brief (2026-11-14); general garment-making knowledge (basic garment blocks drafted from body measurements).
 
@@ -8,8 +8,7 @@ Implemented: T-shirt, shirt, trousers, dress, straight skirt, A-line
 skirt and tote bag as
 Rust recipes in `r3d_commands::templates` (`template.apply`,
 `template.list`; sizes in cm, filled in from the avatar); the start screen
-with rendered thumbnails and a sizes sheet per body; the step bar with a
-goal, an action and a highlighted tool per step; the Learn panel (task
+with rendered thumbnails and a sizes sheet per body; the Learn panel (task
 cards; "Show me" points at the views, tools and panels involved with
 the tour's coach marks, and never changes the project; keys and button
 names in bold);
@@ -38,9 +37,11 @@ knowing pattern making, and I learn along the way.
   seams, arrangement and a default material, through ordinary commands.
   In a project with a size range (spec 18), the template is drafted for
   every size's body and its points and curves graded to match.
-- **Guided flow** for new garments: a step bar *Measurements → Pattern → Sew →
-  Fabric → Drape*. Each step highlights its tools and shows a one-line goal.
-  Steps can be skipped, and the flow can be closed at any time.
+- No guided flow: a step bar *Measurements → Pattern → Sew → Fabric →
+  Drape* with a goal banner was built in M10 and removed on 2026-11-19
+  (maintainer's change request): every step was one click away already
+  (Body, the rail, the inspector, Simulate), so it took room and said
+  nothing new. The Learn panel and the first-launch tour are the help.
 - **Learn panel**: short task cards that show where each action happens
 (coach marks over the window), without touching the project (no scripted
   commands).

@@ -20,7 +20,7 @@ descriptions, public papers, open standards, general garment-making knowledge.
 | 08 | [Command layer and undo](08-command-layer.md) | M1 |
 | 09 | [MCP connector](09-mcp-connector.md) | M2, M8 |
 | 10 | [CLI](10-cli.md) | M1 |
-| 11 | [Templates and guided flow](11-templates-guided-flow.md) | M10 |
+| 11 | [Templates and Learn panel](11-templates-guided-flow.md) | M10 |
 | 12 | [Synchronized 2D/3D views](12-synced-views.md) | M6 |
 | 13 | [3D → 2D editing](13-3d-to-2d-editing.md) | M8 |
 | 14 | [Photorealistic rendering](14-photoreal-rendering.md) | M14 |

@@ -305,36 +305,8 @@
   "tourPatternText": "The flat pieces, full size. Drag a corner or an edge to reshape them; **R** adds a piece.",
   "tourGarmentTitle": "The garment on the body",
   "tourGarmentText": "**Simulate** drapes it. Drag to turn around; **⇧-drag** a hem or a seam to change the pattern from here.",
-  "tourGuideTitle": "One step at a time",
-  "tourGuideText": "The guide says what to do next. Click a step at the top to jump to it, or close the guide.",
   "tourHelpTitle": "Help is always here",
   "tourHelpText": "**Learn** has short how-tos and shows where things are; **Body** changes the measurements. **⌘Z** undoes anything.",
-  "stepMeasurements": "Measurements",
-  "stepMeasurementsGoal": "Check the body the garment is made for: its size and measurements.",
-  "stepMeasurementsAction": "Open Body",
-  "stepPattern": "Pattern",
-  "stepPatternGoal": "Shape the pieces: drag a corner or an edge, or click an edge to type its length.",
-  "stepPatternAction": "Add a piece",
-  "stepSew": "Sew",
-  "stepSewGoal": "Join the pieces: click an edge on the pattern, then the edge to sew it to.",
-  "stepSewAction": "Sew tool",
-  "stepFabric": "Fabric",
-  "stepFabricGoal": "Choose what the garment is made of, in the panel on the right.",
-  "stepDrape": "Drape",
-  "stepDrapeGoal": "Watch it drape on the body. Then drag the cloth, or ⌥-click to pin it.",
-  "stepOf": "Step {step} of {total}",
-  "@stepOf": {
-    "placeholders": {
-      "step": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
-    }
-  },
-  "guideNext": "Next  →",
-  "guideHide": "Hide the guide (click a step to bring it back)",
   "toolSelect": "Select",
   "toolSelectHint": "Click a piece; drag a corner or an edge to reshape it",
   "toolRectangle": "Rectangle",
@@ -1038,7 +1010,7 @@
       }
     }
   },
-  "toolDetails": "Details",
+  "toolDetails": "Darts and pleats",
   "toolDart": "Dart",
   "toolDartHint": "Click an edge where the dart goes: drawn, folded and sewn",
   "toolPleat": "Pleat",

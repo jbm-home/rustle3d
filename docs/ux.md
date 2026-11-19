@@ -18,10 +18,15 @@ Every feature spec has a "UX" section that applies these principles.
   "New garment" with visual templates (skirt, T-shirt, dress, trousers, tote
   bag) and "Blank project". A template opens already sewn and arranged, so
   the user presses *Simulate* and sees cloth move in the first minute.
-- **Guided flow, not a wizard prison.** The "new garment" flow is a short
-  step bar (*Measurements → Pattern → Sewing → Fabric → Drape*). It highlights
-  the next useful action, but every step can be skipped and every tool stays
-  reachable.
+- **No wizard.** Every action is one click away (Body, the tool rail, the
+  inspector, Simulate); help is the Learn panel, which points at where
+  things happen. A step bar (*Measurements → Pattern → Sew → Fabric →
+  Drape*) was tried in M10 and removed: it repeated what was already on
+  screen.
+- **Tools grouped by purpose.** The rail has four sections set apart by a
+  line: drawing (select, shapes, polygon, curve, edit curves, cut, hole,
+  draw on garment), measuring (construction line, dimension, tape
+  measure), sewing (notch, darts and pleats, sew) and trims.
 - **Progressive disclosure.** The default inspector shows only the essentials
   (e.g. fabric: preset and color). An "Advanced" fold shows the physical
   parameters. Expert tools sit behind a clearly labelled "More tools" area.
@@ -94,7 +99,7 @@ Every feature spec has a "UX" section that applies these principles.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  Project name   ·  step bar (Pattern › Sew › Fabric › Drape)  ⌘K│
+│  Project name                    Learn · Body · … · Export    ⌘K│
 ├──┬───────────────────────────────┬───────────────────────┬──────┤
 │T │                               │                       │ Insp-│
 │o │        2D pattern board       │       3D view         │ ector│

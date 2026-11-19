@@ -7,7 +7,7 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-19 (a more natural walk and a new motion, Stand at ease; captured motions whose rest pose lies flat play upright; pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
+Last updated: 2026-11-19 (the tool rail in four sections, drawing, measuring, sewing and trims, with Dart and Pleat under Darts and pleats and Hole a tool of its own; the guided flow's step bar and banner removed; a more natural walk and a new motion, Stand at ease; captured motions whose rest pose lies flat play upright; pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
 hips, so trousers no longer slide with each step; a garment worn over
 trousers starts outside them; captured motions: Motion › Import a captured
 motion… plays a BVH motion capture on the avatar, Motion › Motion
@@ -74,12 +74,6 @@ while you work on a project. **Not now** hides it until then; **Don't
 show again** hides it for good. The **Support Rustle3D** link at the
 bottom of the start screen stays either way.
 
-### The guided flow
-The bar at the top walks through five steps: **Measurements → Pattern →
-Sew → Fabric → Drape**. Each step says what to do and points at the tool.
-Steps can be taken in any order; hide the guide with ✕ and click a step
-to bring it back.
-
 ### Learn
 **Learn** (top right) opens short how-tos. **Show me** points at the part
 of the screen where it happens; it never changes your project. A first
@@ -131,8 +125,9 @@ Motion button is off (see Known limits).
 ## The pattern (2D)
 
 The left view is the pattern board: drag to pan, scroll or pinch to zoom.
-The tool rail sits on its left; a button with a small corner opens a menu
-of related tools (the last one used stays on the button).
+The tool rail sits on its left, in four sections set apart by a line:
+drawing, measuring, sewing and trims. A button with a small corner opens
+a menu of related tools (the last one used stays on the button).
 
 | Tool | Key | What it does |
 |---|---|---|
@@ -146,14 +141,14 @@ of related tools (the last one used stays on the button).
 | Edit curves → Straighten | L | Click a curved edge to make it straight |
 | Edit curves → Add point | A | Click an edge to add a point there (the curve keeps its shape) |
 | Edit curves → Arc | | Click an edge, type how far it bulges: it becomes a circular arc |
+| Cut | K | Click (or drag, for curves) a line across a piece, from outside to outside, then Enter: the piece becomes two pieces sewn together along the line |
+| Hole | | Select a piece, click the corners of a hole inside it, Enter: the hole is cut out of the cloth |
+| Draw on garment | D | Drag across the 3D garment: the line lands on the pattern |
 | Construction line | G | Click two points: a line across the board to draw against (never cut or sewn); click it and press Delete to remove it |
 | Dimension | T | Click an edge, two corners or two edges, then where the dimension goes; type its value (or a formula) right there |
-| Details → Dart | | Click an edge where the dart goes, type its width and length: it is drawn, folded and sewn |
-| Details → Pleat | | Click an edge where the pleat starts, type its depth (and how far it is stitched down), knife or box: it is folded and sewn |
-| Details → Hole | | Select a piece, click the corners of a hole inside it, Enter: the hole is cut out of the cloth |
-| Cut | K | Click (or drag, for curves) a line across a piece, from outside to outside, then Enter: the piece becomes two pieces sewn together along the line |
-| Draw on garment | D | Drag across the 3D garment: the line lands on the pattern |
 | Notch | N | Click an edge where the notch goes |
+| Darts and pleats → Dart | | Click an edge where the dart goes, type its width and length: it is drawn, folded and sewn |
+| Darts and pleats → Pleat | | Click an edge where the pleat starts, type its depth (and how far it is stitched down), knife or box: it is folded and sewn |
 | Sew | S | Click an edge or a line, then the one to sew it to; drag along one to sew part of it; ⌘-click several edges in a row to sew them as one side |
 
 **Make a view bigger**: the button at the top right of the board or of
@@ -262,14 +257,14 @@ unless a corner is fixed), and warns when some constraints repeat
 others.
 
 ### Darts, pleats, holes, joining pieces
-- **Dart** (Details group): click the edge where the dart goes and type
+- **Dart** (Darts and pleats group, with the sewing tools): click the edge where the dart goes and type
   its width at the edge and its length. It is drawn, folded and sewn in
   one step: when the garment drapes, the dart closes.
 - **Pleat**: click the edge where it starts, type its depth and choose
   knife (one fold) or box (two folds facing away). A knife pleat takes up
   twice its depth along the edge. With "Stitched down", the folds are also
   sewn that far into the piece. Notches mark the fold lines.
-- **Hole**: select a piece, then click the corners of the hole inside it
+- **Hole** (with the drawing tools): select a piece, then click the corners of the hole inside it
   and press Enter. There is no cloth in a hole; its edges can be sewn
   (a facing) like any other.
 - **Join or cut**: with a piece selected, the inspector's **Join or cut**
@@ -485,7 +480,7 @@ size to size (its grade), and the other sizes follow.
     5 cm and more to touching (yellow).
   - **Fabric colours** shows the garment as it is again. The colours
     are chosen to read for colour-blind eyes and in grey.
-- **Tape measure** (the tool under Draw on garment): click on the draped
+- **Tape measure** (with the measuring tools): click on the draped
   garment. The tape goes around the garment at that height and is drawn
   on it; a card gives the height, the **garment's** circumference (along
   the cloth, folds included), the **body's** inside it (as a tape around

@@ -979,18 +979,6 @@ abstract class L {
   /// **'**Simulate** drapes it. Drag to turn around; **⇧-drag** a hem or a seam to change the pattern from here.'**
   String get tourGarmentText;
 
-  /// No description provided for @tourGuideTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'One step at a time'**
-  String get tourGuideTitle;
-
-  /// No description provided for @tourGuideText.
-  ///
-  /// In en, this message translates to:
-  /// **'The guide says what to do next. Click a step at the top to jump to it, or close the guide.'**
-  String get tourGuideText;
-
   /// No description provided for @tourHelpTitle.
   ///
   /// In en, this message translates to:
@@ -1002,102 +990,6 @@ abstract class L {
   /// In en, this message translates to:
   /// **'**Learn** has short how-tos and shows where things are; **Body** changes the measurements. **⌘Z** undoes anything.'**
   String get tourHelpText;
-
-  /// No description provided for @stepMeasurements.
-  ///
-  /// In en, this message translates to:
-  /// **'Measurements'**
-  String get stepMeasurements;
-
-  /// No description provided for @stepMeasurementsGoal.
-  ///
-  /// In en, this message translates to:
-  /// **'Check the body the garment is made for: its size and measurements.'**
-  String get stepMeasurementsGoal;
-
-  /// No description provided for @stepMeasurementsAction.
-  ///
-  /// In en, this message translates to:
-  /// **'Open Body'**
-  String get stepMeasurementsAction;
-
-  /// No description provided for @stepPattern.
-  ///
-  /// In en, this message translates to:
-  /// **'Pattern'**
-  String get stepPattern;
-
-  /// No description provided for @stepPatternGoal.
-  ///
-  /// In en, this message translates to:
-  /// **'Shape the pieces: drag a corner or an edge, or click an edge to type its length.'**
-  String get stepPatternGoal;
-
-  /// No description provided for @stepPatternAction.
-  ///
-  /// In en, this message translates to:
-  /// **'Add a piece'**
-  String get stepPatternAction;
-
-  /// No description provided for @stepSew.
-  ///
-  /// In en, this message translates to:
-  /// **'Sew'**
-  String get stepSew;
-
-  /// No description provided for @stepSewGoal.
-  ///
-  /// In en, this message translates to:
-  /// **'Join the pieces: click an edge on the pattern, then the edge to sew it to.'**
-  String get stepSewGoal;
-
-  /// No description provided for @stepSewAction.
-  ///
-  /// In en, this message translates to:
-  /// **'Sew tool'**
-  String get stepSewAction;
-
-  /// No description provided for @stepFabric.
-  ///
-  /// In en, this message translates to:
-  /// **'Fabric'**
-  String get stepFabric;
-
-  /// No description provided for @stepFabricGoal.
-  ///
-  /// In en, this message translates to:
-  /// **'Choose what the garment is made of, in the panel on the right.'**
-  String get stepFabricGoal;
-
-  /// No description provided for @stepDrape.
-  ///
-  /// In en, this message translates to:
-  /// **'Drape'**
-  String get stepDrape;
-
-  /// No description provided for @stepDrapeGoal.
-  ///
-  /// In en, this message translates to:
-  /// **'Watch it drape on the body. Then drag the cloth, or ⌥-click to pin it.'**
-  String get stepDrapeGoal;
-
-  /// No description provided for @stepOf.
-  ///
-  /// In en, this message translates to:
-  /// **'Step {step} of {total}'**
-  String stepOf(int step, int total);
-
-  /// No description provided for @guideNext.
-  ///
-  /// In en, this message translates to:
-  /// **'Next  →'**
-  String get guideNext;
-
-  /// No description provided for @guideHide.
-  ///
-  /// In en, this message translates to:
-  /// **'Hide the guide (click a step to bring it back)'**
-  String get guideHide;
 
   /// No description provided for @toolSelect.
   ///
@@ -3424,7 +3316,7 @@ abstract class L {
   /// No description provided for @toolDetails.
   ///
   /// In en, this message translates to:
-  /// **'Details'**
+  /// **'Darts and pleats'**
   String get toolDetails;
 
   /// No description provided for @toolDart.
