@@ -85,3 +85,32 @@ pub fn run(root: &Path, task: Task, args: &[String]) -> Result<(), String> {
     cmd.args(passed);
     status(cmd)
 }
+
+/// `make` with no target: the `Makefile`'s leading comment, then each
+/// target with its `## ...` comment, read from the `Makefile` itself so the
+/// help cannot drift from it.
+pub fn make_help(root: &Path) -> Result<(), String> {
+    let path = root.join("Makefile");
+    let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    for line in text.lines().map_while(|l| l.strip_prefix('#')) {
+        eprintln!("{}", line.strip_prefix(' ').unwrap_or(line));
+    }
+    let targets: Vec<(&str, &str)> = text
+        .lines()
+        .filter_map(|line| {
+            let (target, rest) = line.split_once(':')?;
+            let (_, help) = rest.split_once("## ")?;
+            let is_name = !target.is_empty()
+                && target
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+            is_name.then_some((target, help.trim()))
+        })
+        .collect();
+    let width = targets.iter().map(|(t, _)| t.len()).max().unwrap_or(0);
+    eprintln!("\nTargets:");
+    for (target, help) in targets {
+        eprintln!("  make {target:<width$}  {help}");
+    }
+    Ok(())
+}

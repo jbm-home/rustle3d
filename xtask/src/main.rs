@@ -7,6 +7,7 @@
 //!   OS in debug (default) or release.
 //! - `build [--release] [-- <flutter args>]`: build the CLI and the desktop
 //!   app for this OS.
+//! - `make-help`: print the `Makefile`'s header and its targets (`make`).
 
 mod dev;
 mod makehuman;
@@ -38,8 +39,9 @@ fn main() -> ExitCode {
         Some("fetch-makehuman") => makehuman::run(&root()),
         Some("run") => dev::run(&root(), dev::Task::Run, rest),
         Some("build") => dev::run(&root(), dev::Task::Build, rest),
+        Some("make-help") => dev::make_help(&root()),
         _ => Err(
-            "usage: cargo xtask <gen-docs|fetch-makehuman|run|build> [--release] [-- <flutter args>]"
+            "usage: cargo xtask <gen-docs|fetch-makehuman|run|build|make-help> [--release] [-- <flutter args>]"
                 .to_owned(),
         ),
     };

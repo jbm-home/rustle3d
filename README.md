@@ -54,9 +54,9 @@ go after `--`, e.g. `cargo xtask run -- --dart-define=R3D_DEMO=t_shirt`. The
 Rust core is built in the same mode as the app.
 
 With GNU make installed (on Windows: `winget install ezwinports.make`), the
-`Makefile` gives the same tasks short names: `make run`, `make run-release`,
-`make build`, `make build-release`, `make test`, `make check`,
-`make release`, `make docs`; Flutter options go in `ARGS=...`.
+`Makefile` gives the same tasks short names; `make` alone lists them
+(`make run`, `make run-release`, `make build`, …). Flutter options go in
+`ARGS=...`.
 
 Prerequisites: Rust stable (`rustup`), Flutter stable, and
 `cargo install flutter_rust_bridge_codegen --version 2.13.0` (to regenerate
