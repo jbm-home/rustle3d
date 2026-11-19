@@ -397,8 +397,12 @@ pub fn grabbed_cloth_follows_the_hand_and_falls_when_released(make: Make) {
     for _ in 0..60 {
         s.step(1.0 / 60.0).unwrap();
     }
-    // Down from the hand at 30 cm; it may land on folds of its own cloth,
-    // each layer two particle radii (17 mm here) thick.
+    // Down from the hand at 30 cm. Where the corner ends is chaotic: it
+    // may rest on a fold standing 12 cm high, and a 5 mm change of the hand
+    // flips that. The cloth's mean height is not: a pile of a few layers
+    // (25 to 55 mm), against more than 100 mm while held.
     let y = s.positions()[corner].y;
-    assert!(y < 0.1, "did not fall back: at {y} m");
+    assert!(y < 0.15, "corner did not fall back: at {y} m");
+    let mean = s.positions().iter().map(|p| p.y).sum::<f32>() / s.positions().len() as f32;
+    assert!(mean < 0.07, "cloth did not fall back: mean height {mean} m");
 }
