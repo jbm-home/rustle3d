@@ -1,5 +1,5 @@
 use r3d_core::seam::{Span, Track};
-use r3d_core::{EdgeId, InternalLineId, Project, Seam, SeamId, SeamSide, Transaction};
+use r3d_core::{AnyId, EdgeId, InternalLineId, Project, Seam, SeamId, SeamSide, Transaction};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -41,7 +41,7 @@ pub struct SeamSideSpec {
 impl SeamSideSpec {
     /// The side it names (walked forward), checked: one path, existing,
     /// its edges consecutive on one piece's outline, its range inside it.
-    fn side(&self, field: &'static str, p: &Project) -> Result<SeamSide, CommandError> {
+    pub(crate) fn side(&self, field: &'static str, p: &Project) -> Result<SeamSide, CommandError> {
         let edges = match (self.edge, self.edges.is_empty(), self.line) {
             (Some(e), true, None) => vec![e],
             (None, false, None) => self.edges.clone(),
@@ -101,13 +101,13 @@ impl SeamSideSpec {
 }
 
 /// Whether two stretches of the same track overlap (more than touching).
-fn overlap(a: &Span, b: &Span) -> bool {
+pub(crate) fn overlap(a: &Span, b: &Span) -> bool {
     a.track == b.track && a.from.max(b.from) < a.to.min(b.to) - 1e-6
 }
 
 /// The direction a side runs on the pattern: from its first point to its
 /// last.
-fn heading(p: &Project, side: &SeamSide) -> r3d_geom::DVec2 {
+pub(crate) fn heading(p: &Project, side: &SeamSide) -> r3d_geom::DVec2 {
     p.side_polyline(side)
         .and_then(|pts| Some(*pts.last()? - *pts.first()?))
         .unwrap_or_default()
@@ -142,49 +142,12 @@ impl CommandSpec for SeamAdd {
             p.side_spans(&a).unwrap_or_default(),
             p.side_spans(&b).unwrap_or_default(),
         );
-        let taken: Vec<(SeamId, Span)> = p
-            .seams()
-            .iter()
-            .flat_map(|(id, s)| [(*id, &s.a), (*id, &s.b)])
-            .flat_map(|(id, s)| {
-                p.side_spans(s)
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(move |span| (id, span))
-            })
-            .collect();
-        for (field, mine) in [("a", &sa), ("b", &sb)] {
-            for x in mine.iter() {
-                if let Some((seam, y)) = taken.iter().find(|(_, y)| overlap(x, y)) {
-                    // An edge already sewn there: say by which seam.
-                    return Err(match y.track {
-                        Track::Edge(edge) => CommandError::Sewn {
-                            edge: edge.into(),
-                            seam: (*seam).into(),
-                        },
-                        Track::Line(_) => CommandError::invalid(field, Invalid::Overlaps),
-                    });
-                }
-            }
-        }
-        if sa.iter().any(|x| sb.iter().any(|y| overlap(x, y))) {
-            return Err(CommandError::invalid("b", Invalid::SamePoint));
-        }
+        free_to_join(p, &sa, &sb)?;
         a.reversed = self.a.reversed.unwrap_or(false);
-        b.reversed = match self.b.reversed {
-            Some(r) => r,
-            None => match (a.whole_edge(), b.whole_edge()) {
-                (Some(ea), Some(eb))
-                    if mirror_twin(p, ea).is_some_and(|(t, _)| t == eb)
-                        || mirror_twin(p, eb).is_some_and(|(t, _)| t == ea) =>
-                {
-                    // A reflection reverses a contour: an edge's start
-                    // mirrors its twin's end.
-                    !a.reversed
-                }
-                _ => heading(p, &b).dot(heading(p, &a)) < 0.0,
-            },
-        };
+        b.reversed = self
+            .b
+            .reversed
+            .unwrap_or_else(|| default_reversed(p, &a, &b));
         let id = tx.new_seam_id();
         tx.put_seam(
             id,
@@ -198,6 +161,70 @@ impl CommandSpec for SeamAdd {
         Ok(CommandOutput {
             created: vec![id.into()],
         })
+    }
+}
+
+/// Every stretch already joined, by a seam or a zipper, with what joins
+/// it.
+fn joined(p: &Project) -> Vec<(AnyId, Span)> {
+    let seams = p
+        .seams()
+        .iter()
+        .flat_map(|(id, s)| [(AnyId::from(*id), &s.a), (AnyId::from(*id), &s.b)]);
+    let zippers = p
+        .zippers()
+        .iter()
+        .flat_map(|(id, z)| [(AnyId::from(*id), &z.a), (AnyId::from(*id), &z.b)]);
+    seams
+        .chain(zippers)
+        .flat_map(|(id, s)| {
+            p.side_spans(s)
+                .unwrap_or_default()
+                .into_iter()
+                .map(move |span| (id, span))
+        })
+        .collect()
+}
+
+/// Two sides about to be joined (by a seam or a zipper), as stretches:
+/// nothing joined twice, not against another seam or zipper, nor a side
+/// on itself.
+pub(crate) fn free_to_join(p: &Project, sa: &[Span], sb: &[Span]) -> Result<(), CommandError> {
+    let taken = joined(p);
+    for (field, mine) in [("a", sa), ("b", sb)] {
+        for x in mine.iter() {
+            if let Some((by, y)) = taken.iter().find(|(_, y)| overlap(x, y)) {
+                // An edge already joined there: say by what.
+                return Err(match y.track {
+                    Track::Edge(edge) => CommandError::Sewn {
+                        edge: edge.into(),
+                        seam: *by,
+                    },
+                    Track::Line(_) => CommandError::invalid(field, Invalid::Overlaps),
+                });
+            }
+        }
+    }
+    if sa.iter().any(|x| sb.iter().any(|y| overlap(x, y))) {
+        return Err(CommandError::invalid("b", Invalid::SamePoint));
+    }
+    Ok(())
+}
+
+/// Whether side `b` is walked reversed when not said: an edge joined to
+/// its linked mirror image meets it mirrored point to mirrored point;
+/// other sides are walked both the same way on the pattern.
+pub(crate) fn default_reversed(p: &Project, a: &SeamSide, b: &SeamSide) -> bool {
+    match (a.whole_edge(), b.whole_edge()) {
+        (Some(ea), Some(eb))
+            if mirror_twin(p, ea).is_some_and(|(t, _)| t == eb)
+                || mirror_twin(p, eb).is_some_and(|(t, _)| t == ea) =>
+        {
+            // A reflection reverses a contour: an edge's start mirrors
+            // its twin's end.
+            !a.reversed
+        }
+        _ => heading(p, b).dot(heading(p, a)) < 0.0,
     }
 }
 

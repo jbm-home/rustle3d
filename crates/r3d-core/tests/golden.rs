@@ -12,9 +12,10 @@ use std::path::PathBuf;
 use glam::DVec2;
 use r3d_core::file::{self, SCHEMA_VERSION};
 use r3d_core::{
-    Along, Around, Avatar, Body, Constraint, Edge, EdgeCurve, Fabric, FabricDetails, Garment,
-    Grading, Guide, InternalLine, Notch, Panel, PathSegment, Pin, Placement, Point, Print,
-    PrintPlacement, PrintSource, Project, Seam, SeamSide, Size, Symmetry, TemplateRef, Transaction,
+    Along, Around, Avatar, Body, Button, Buttonhole, Constraint, Edge, EdgeCurve, Fabric,
+    FabricDetails, Garment, Grading, Guide, InternalLine, Notch, Panel, PathSegment, Pin,
+    Placement, Point, Print, PrintPlacement, PrintSource, Project, Seam, SeamSide, Size, Symmetry,
+    TemplateRef, Transaction, Zipper,
 };
 
 fn golden_dir(version: u32) -> PathBuf {
@@ -283,6 +284,36 @@ fn sample() -> Project {
         Guide {
             a: DVec2::new(-50.0, 300.0),
             b: DVec2::new(450.0, 300.0),
+        },
+    );
+    let button = tx.new_button_id();
+    tx.put_button(
+        button,
+        Button {
+            panel,
+            at: DVec2::new(60.0, 500.0),
+            diameter_mm: 11.0,
+            hole: Buttonhole {
+                panel,
+                at: DVec2::new(340.0, 500.0),
+                angle_deg: 180.0,
+            },
+            closed: true,
+        },
+    );
+    let zipper = tx.new_zipper_id();
+    tx.put_zipper(
+        zipper,
+        Zipper {
+            a: SeamSide {
+                edges: vec![contour[3]],
+                line: None,
+                from_mm: Some(0.0),
+                to_mm: Some(180.0),
+                reversed: true,
+            },
+            b: SeamSide::edge(contour[1], false),
+            open_mm: 60.0,
         },
     );
     tx.commit();

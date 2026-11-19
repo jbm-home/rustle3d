@@ -49,7 +49,13 @@ pub const LABELS: &[(&str, &str)] = &[
     ("cost", "Cost per garment"),
     ("consumption_by_size", "Fabric per garment by size (m)"),
     ("trims", "Trims"),
-    ("no_trims", "No trims yet."),
+    ("no_trims", "No trims."),
+    ("trim", "Trim"),
+    ("trim_size", "Size"),
+    ("quantity", "Quantity"),
+    ("placement", "On"),
+    ("button", "Button"),
+    ("zipper", "Zipper"),
     ("measurements", "Measurements"),
     ("size_chart", "Size chart (body, cm)"),
     ("size", "Size"),
@@ -345,11 +351,85 @@ impl Writer<'_> {
             blocks.push(Block::Table { columns, rows });
         }
         blocks.push(Block::Subheading(self.t("trims")));
-        blocks.push(Block::Text(self.t("no_trims")));
+        let trims = self.trims();
+        if trims.is_empty() {
+            blocks.push(Block::Text(self.t("no_trims")));
+        } else {
+            blocks.push(Block::Table {
+                columns: vec![
+                    Column::text(self.t("garment"), 2.0),
+                    Column::text(self.t("trim"), 1.5),
+                    Column::number(self.t("trim_size"), 1.2),
+                    Column::number(self.t("quantity"), 1.2),
+                    Column::text(self.t("placement"), 4.0),
+                ],
+                rows: trims,
+            });
+        }
         Section {
             title: self.t("materials"),
             blocks,
         }
+    }
+
+    /// The trims one garment takes: buttons by diameter (with their
+    /// buttonholes), zippers by length; where they go.
+    fn trims(&self) -> Vec<Vec<String>> {
+        let p = self.project;
+        let piece = |id: PanelId| p.panel(id).map(|x| x.name.clone()).unwrap_or_default();
+        let garment = |id: PanelId| p.panel(id).map(|x| x.garment);
+        // (garment, kind, size in mm) → pieces, count.
+        let mut rows: std::collections::BTreeMap<(GarmentId, u8, i64), (Vec<String>, usize)> =
+            Default::default();
+        let mut add = |g: GarmentId, kind: u8, size: f64, pieces: Vec<String>| {
+            let e = rows
+                .entry((g, kind, (size * 10.0).round() as i64))
+                .or_default();
+            for name in pieces {
+                if !e.0.contains(&name) {
+                    e.0.push(name);
+                }
+            }
+            e.1 += 1;
+        };
+        for b in p.buttons().values() {
+            if let Some(g) = garment(b.panel) {
+                add(
+                    g,
+                    0,
+                    b.diameter_mm,
+                    vec![piece(b.panel), piece(b.hole.panel)],
+                );
+            }
+        }
+        for z in p.zippers().values() {
+            let (Some(a), Some(len)) = (p.side_panel(&z.a), p.zipper_length(z)) else {
+                continue;
+            };
+            let Some(g) = garment(a) else {
+                continue;
+            };
+            let mut pieces = vec![piece(a)];
+            pieces.extend(p.side_panel(&z.b).map(piece));
+            // Zippers are bought by the centimetre.
+            add(g, 1, (len / 10.0).ceil() * 10.0, pieces);
+        }
+        rows.into_iter()
+            .map(|((g, kind, size), (pieces, count))| {
+                let size = size as f64 / 10.0;
+                vec![
+                    self.garment_name(g),
+                    self.t(if kind == 0 { "button" } else { "zipper" }),
+                    if kind == 0 {
+                        format!("{} mm", self.num(size, 0))
+                    } else {
+                        format!("{} cm", self.num(size / 10.0, 0))
+                    },
+                    count.to_string(),
+                    pieces.join(", "),
+                ]
+            })
+            .collect()
     }
 
     /// A piece's extent along its grainline and across it (mm).

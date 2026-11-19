@@ -20,6 +20,10 @@ the app, and I can read or version the file with ordinary tools.
   never copied into the JSON, so the file stays small and diffable and
   the image can be replaced by hand; a missing image shows the plain
   colour.
+- Trims (schema v17, spec 26): `buttons` (`{"panel", "at", "diameter_mm",
+  "hole": {"panel", "at", "angle_deg"}, "closed"}`) and `zippers`
+  (`{"a", "b"` as seam sides, `"open_mm"}`), absent when empty, so
+  projects without trims keep the same file.
 - `project.json` is pretty-printed with a stable key order, so diffs stay small.
 - A `schema_version` field; older versions are migrated on load. Files newer
   than the app are refused with a clear message, never half-loaded.

@@ -2439,6 +2439,421 @@ Remove a pin: the cloth there is free again.
 
 </details>
 
+### `button.add`
+
+Add a button sewn on a piece at `at` and its buttonhole on `hole_panel` (often the overlapping piece; the same piece for a cuff). `hole_at` is where the button sits once buttoned (the slit's end nearest the edge); the slit runs from there along `hole_angle_deg` for the button's diameter + 3 mm. Buttoned, the drape holds the button point and `hole_at` together. Both points must be inside their pieces. Returns the button.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "PanelId": {
+      "description": "Identifier of a panel, e.g. `panel:1`.",
+      "pattern": "^panel:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Add a button and its buttonhole.",
+  "properties": {
+    "at": {
+      "description": "Where it is sewn, `[x, y]` in mm (inside the piece).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+    },
+    "closed": {
+      "description": "Buttoned when draped. Omitted: buttoned.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "diameter_mm": {
+      "description": "Its diameter (mm). Omitted: 11 mm.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "hole_angle_deg": {
+      "description": "Direction of the slit from `hole_at` (degrees from +X). Omitted:\nacross the piece towards its middle.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "hole_at": {
+      "description": "Where the button sits in the buttonhole once buttoned: the slit's\nend nearest the edge, `[x, y]` in mm (inside the piece).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+    },
+    "hole_panel": {
+      "$ref": "#/$defs/PanelId",
+      "description": "The piece the buttonhole is cut in (usually the overlapping one)."
+    },
+    "panel": {
+      "$ref": "#/$defs/PanelId",
+      "description": "The piece the button is sewn on."
+    }
+  },
+  "required": [
+    "panel",
+    "at",
+    "hole_panel",
+    "hole_at"
+  ],
+  "title": "ButtonAdd",
+  "type": "object"
+}
+```
+
+</details>
+
+### `button.set`
+
+Move a button (`at`), its buttonhole (`hole_at`, `hole_angle_deg`) or change its diameter; what is omitted stays.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "ButtonId": {
+      "description": "Identifier of a button, e.g. `button:1`.",
+      "pattern": "^button:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Move or resize a button or its buttonhole.",
+  "properties": {
+    "at": {
+      "description": "Where the button is sewn, `[x, y]` in mm.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "button": {
+      "$ref": "#/$defs/ButtonId"
+    },
+    "diameter_mm": {
+      "description": "Its diameter (mm).",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "hole_angle_deg": {
+      "description": "The slit's direction (degrees from +X).",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "hole_at": {
+      "description": "Where it sits in the buttonhole, `[x, y]` in mm.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": [
+        "array",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "button"
+  ],
+  "title": "ButtonSet",
+  "type": "object"
+}
+```
+
+</details>
+
+### `button.set_closed`
+
+Button (`closed: true`) or unbutton buttons: buttoned, the drape holds each button and its buttonhole together; unbuttoned, they hang free. A running drape follows without starting again.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "ButtonId": {
+      "description": "Identifier of a button, e.g. `button:1`.",
+      "pattern": "^button:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Button or unbutton.",
+  "properties": {
+    "buttons": {
+      "description": "One or more buttons.",
+      "items": {
+        "$ref": "#/$defs/ButtonId"
+      },
+      "type": "array"
+    },
+    "closed": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "buttons",
+    "closed"
+  ],
+  "title": "ButtonSetClosed",
+  "type": "object"
+}
+```
+
+</details>
+
+### `button.remove`
+
+Remove a button and its buttonhole.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "ButtonId": {
+      "description": "Identifier of a button, e.g. `button:1`.",
+      "pattern": "^button:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Remove a button and its buttonhole.",
+  "properties": {
+    "button": {
+      "$ref": "#/$defs/ButtonId"
+    }
+  },
+  "required": [
+    "button"
+  ],
+  "title": "ButtonRemove",
+  "type": "object"
+}
+```
+
+</details>
+
+### `zipper.add`
+
+Add a zipper joining two sides (given as a seam's: a whole `edge`, consecutive `edges` or an internal `line`, maybe only `from_mm`/`to_mm` along it). Both sides start at the zipper's bottom stop: use `reversed` to walk a side from its end (b.reversed omitted: chosen as for a seam). The drape joins the sides like a seam from the bottom stop up to the slider, `open_mm` below the top (omitted: 0, closed all along). Stretches sewn or zipped already cannot be used. Returns the zipper.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "EdgeId": {
+      "description": "Identifier of a edge, e.g. `edge:1`.",
+      "pattern": "^edge:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "InternalLineId": {
+      "description": "Identifier of a line, e.g. `line:1`.",
+      "pattern": "^line:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "SeamSideSpec": {
+      "additionalProperties": false,
+      "description": "One side of a new seam: a whole edge, a run of edges, or an internal\nline; all of it or part of it.",
+      "properties": {
+        "edge": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EdgeId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "One edge."
+        },
+        "edges": {
+          "description": "Or consecutive outline edges of one piece, in their order around it\n(e.g. a pocket's sides and bottom).",
+          "items": {
+            "$ref": "#/$defs/EdgeId"
+          },
+          "type": "array"
+        },
+        "from_mm": {
+          "description": "Only from here along the path (mm from its start). Omitted: its\nstart.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "line": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InternalLineId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Or an internal line (a pocket's placement line, a tuck's line)."
+        },
+        "reversed": {
+          "description": "Walk the side from its end instead of its start. Omitted: `false`\nfor side `a`; for side `b`, an edge sewn to its linked mirror image\nmeets it mirrored point to mirrored point (a centre seam), other\nsides are walked both the same way on the pattern (what sewing two\npanels laid side by side needs).",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "to_mm": {
+          "description": "Only to here (mm from the path's start). Omitted: its end.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Add a zipper between two sides.",
+  "properties": {
+    "a": {
+      "$ref": "#/$defs/SeamSideSpec",
+      "description": "Its sides, as a seam's; each starts at the bottom stop."
+    },
+    "b": {
+      "$ref": "#/$defs/SeamSideSpec"
+    },
+    "open_mm": {
+      "description": "How much of it is open from the top (mm). Omitted: closed.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "a",
+    "b"
+  ],
+  "title": "ZipperAdd",
+  "type": "object"
+}
+```
+
+</details>
+
+### `zipper.set_open`
+
+Move a zipper's slider: `open_mm` of it open from the top (0: closed; its length or more: open all the way). A running drape follows without starting again.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "ZipperId": {
+      "description": "Identifier of a zipper, e.g. `zipper:1`.",
+      "pattern": "^zipper:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Move a zipper's slider.",
+  "properties": {
+    "open_mm": {
+      "description": "How much of it is open from the top (mm): 0 closed; its length (or\nmore) open all the way.",
+      "format": "double",
+      "type": "number"
+    },
+    "zipper": {
+      "$ref": "#/$defs/ZipperId"
+    }
+  },
+  "required": [
+    "zipper",
+    "open_mm"
+  ],
+  "title": "ZipperSetOpen",
+  "type": "object"
+}
+```
+
+</details>
+
+### `zipper.remove`
+
+Remove a zipper: its sides are free again.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "ZipperId": {
+      "description": "Identifier of a zipper, e.g. `zipper:1`.",
+      "pattern": "^zipper:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Remove a zipper.",
+  "properties": {
+    "zipper": {
+      "$ref": "#/$defs/ZipperId"
+    }
+  },
+  "required": [
+    "zipper"
+  ],
+  "title": "ZipperRemove",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `garment.set_fabric`
 
 Choose what the garment is made of: cotton, denim, jersey, silk or wool. Sets how it drapes and how it looks.
@@ -4842,6 +5257,24 @@ Every pin: its panel, the pinned point on the pattern (mm) and where it is held 
   "additionalProperties": false,
   "description": "Every pin.",
   "title": "PinList",
+  "type": "object"
+}
+```
+
+</details>
+
+### `trim.list`
+
+Every trim: buttons (the piece and point they are sewn at, diameter, the buttonhole's piece, the point where the button sits and the slit's ends, buttoned or not) and zippers (their sides, length, how much is open from the top, the share closed; mm).
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Every button and zipper.",
+  "title": "TrimList",
   "type": "object"
 }
 ```

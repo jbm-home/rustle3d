@@ -122,6 +122,22 @@ fn every_command_round_trips() {
         "at": [10, 20], "position": [0.0, 1.0, 0.1]}));
     let pin = pin.created[0].to_string();
     h.round_trip(json!({"type": "pin.remove", "pin": pin}));
+    let poly_panel = poly.created[0].to_string();
+    let button = h.round_trip(json!({"type": "button.add", "panel": poly_panel,
+        "at": [100, 300], "hole_panel": poly_panel, "hole_at": [250, 300]}));
+    let button = button.created[0].to_string();
+    h.round_trip(
+        json!({"type": "button.set", "button": button, "diameter_mm": 15,
+        "hole_angle_deg": 90}),
+    );
+    h.round_trip(json!({"type": "button.set_closed", "buttons": [button], "closed": false}));
+    h.round_trip(json!({"type": "button.remove", "button": button}));
+    let zipper = h.round_trip(json!({"type": "zipper.add",
+        "a": {"edge": poly.created[6].to_string(), "to_mm": 200},
+        "b": {"edge": poly.created[8].to_string(), "from_mm": 100}}));
+    let zipper = zipper.created[0].to_string();
+    h.round_trip(json!({"type": "zipper.set_open", "zipper": zipper, "open_mm": 80}));
+    h.round_trip(json!({"type": "zipper.remove", "zipper": zipper}));
 
     let split = h.round_trip(json!({"type": "edge.split", "edge": edge, "at_mm": 100}));
     let new_point = split.created[0].to_string();

@@ -9,13 +9,14 @@ use std::collections::BTreeMap;
 use std::mem;
 
 use crate::id::{
-    ConstraintId, EdgeId, GarmentId, GuideId, InternalLineId, NotchId, PanelId, PinId, PointId,
-    SeamId,
+    ButtonId, ConstraintId, EdgeId, GarmentId, GuideId, InternalLineId, NotchId, PanelId, PinId,
+    PointId, SeamId, ZipperId,
 };
 use crate::model::{
     Avatar, Constraint, DisplayUnit, Edge, Garment, Grading, Guide, IdMap, InternalLine, Notch,
     Panel, Pin, Point, Project, Seam,
 };
+use crate::trim::{Button, Zipper};
 
 /// Before/after values of one entity. `None` means "absent".
 #[derive(Clone, Debug, PartialEq)]
@@ -39,6 +40,8 @@ pub enum Change {
     Pin(Box<EntityChange<PinId, Pin>>),
     Constraint(Box<EntityChange<ConstraintId, Constraint>>),
     Guide(Box<EntityChange<GuideId, Guide>>),
+    Button(Box<EntityChange<ButtonId, Button>>),
+    Zipper(Box<EntityChange<ZipperId, Zipper>>),
     Avatar {
         before: Option<Avatar>,
         after: Option<Avatar>,
@@ -90,6 +93,8 @@ impl Change {
             Change::Pin(c) => set(&mut p.pins, c.id, pick!(c)),
             Change::Constraint(c) => set(&mut p.constraints, c.id, pick!(c)),
             Change::Guide(c) => set(&mut p.guides, c.id, pick!(c)),
+            Change::Button(c) => set(&mut p.buttons, c.id, pick!(c)),
+            Change::Zipper(c) => set(&mut p.zippers, c.id, pick!(c)),
             Change::Name { before, after } => {
                 p.name = if forward { after } else { before }.clone();
             }
@@ -123,6 +128,8 @@ impl Change {
                 a.after = b.after.clone()
             }
             (Change::Guide(a), Change::Guide(b)) if a.id == b.id => a.after = b.after.clone(),
+            (Change::Button(a), Change::Button(b)) if a.id == b.id => a.after = b.after.clone(),
+            (Change::Zipper(a), Change::Zipper(b)) if a.id == b.id => a.after = b.after.clone(),
             (Change::InternalLine(a), Change::InternalLine(b)) if a.id == b.id => {
                 a.after = b.after.clone()
             }
@@ -210,6 +217,13 @@ impl ChangeSet {
                 }
                 Change::Constraint(c) => {
                     each!(c, |v: &Constraint| [project.constraint_panel(v)])
+                }
+                Change::Button(c) => each!(c, |v: &Button| [Some(v.panel), Some(v.hole.panel)]),
+                Change::Zipper(c) => {
+                    each!(c, |v: &Zipper| [
+                        project.side_panel(&v.a),
+                        project.side_panel(&v.b)
+                    ])
                 }
                 Change::Garment(_)
                 | Change::Guide(_)
@@ -403,6 +417,28 @@ impl<'a> Transaction<'a> {
         new_guide_id,
         put_guide,
         remove_guide
+    );
+
+    entity_ops!(
+        "button",
+        ButtonId,
+        Button,
+        buttons,
+        Button,
+        new_button_id,
+        put_button,
+        remove_button
+    );
+
+    entity_ops!(
+        "zipper",
+        ZipperId,
+        Zipper,
+        zippers,
+        Zipper,
+        new_zipper_id,
+        put_zipper,
+        remove_zipper
     );
 
     /// What changed so far, in order.

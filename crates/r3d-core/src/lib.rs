@@ -21,11 +21,12 @@ pub mod model;
 pub mod print;
 pub mod project_dir;
 pub mod seam;
+pub mod trim;
 
 pub use edit::{ChangeSet, Transaction};
 pub use id::{
-    AnyId, ConstraintId, EdgeId, GarmentId, GuideId, InternalLineId, NotchId, PanelId, PinId,
-    PointId, SeamId,
+    AnyId, ButtonId, ConstraintId, EdgeId, GarmentId, GuideId, InternalLineId, NotchId, PanelId,
+    PinId, PointId, SeamId, ZipperId,
 };
 pub use message::{Localizable, Message};
 pub use model::{
@@ -34,3 +35,4 @@ pub use model::{
     Placement, Point, Project, Seam, SeamSide, Size, Symmetry, TemplateRef,
 };
 pub use print::{BuiltinPrint, Print, PrintPlacement, PrintSource, Texture, UvFrame};
+pub use trim::{Button, Buttonhole, Zipper};

@@ -295,6 +295,25 @@ impl CommandSpec for PanelCut {
             .filter(|(_, p)| p.panel == panel_id && polygon::contains(&new_outline, p.at))
             .map(|(id, p)| (*id, *p))
             .collect();
+        // Buttons and buttonholes on the half that leaves go with it.
+        let moving =
+            |panel: PanelId, at: DVec2| panel == panel_id && polygon::contains(&new_outline, at);
+        let buttons: Vec<_> = tx
+            .project()
+            .buttons()
+            .iter()
+            .filter(|(_, b)| moving(b.panel, b.at) || moving(b.hole.panel, b.hole.at))
+            .map(|(id, b)| (*id, b.clone()))
+            .collect();
+        for (id, mut b) in buttons {
+            if moving(b.panel, b.at) {
+                b.panel = new_panel;
+            }
+            if moving(b.hole.panel, b.hole.at) {
+                b.hole.panel = new_panel;
+            }
+            tx.put_button(id, b);
+        }
         for (id, pin) in pins {
             tx.put_pin(
                 id,

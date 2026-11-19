@@ -136,6 +136,7 @@ impl Session {
         // follows (symmetric halves, then linked mirror copies, which may
         // copy a symmetric piece).
         crate::commands::settle_constraints(&mut tx)?;
+        crate::commands::settle_trims(&mut tx);
         crate::commands::sync_symmetry(&mut tx)?;
         crate::commands::sync_mirrors(&mut tx)?;
         // Never commit a document that breaks an invariant: that would be a

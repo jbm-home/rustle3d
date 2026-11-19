@@ -26,6 +26,7 @@ mod shape;
 mod symmetry;
 mod take_in;
 mod template;
+mod trim;
 
 pub use arrange::*;
 pub use avatar::*;
@@ -53,6 +54,7 @@ pub use shape::*;
 pub use symmetry::*;
 pub use take_in::*;
 pub use template::*;
+pub use trim::*;
 
 use std::collections::{BTreeMap, BTreeSet};
 

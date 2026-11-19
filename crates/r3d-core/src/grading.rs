@@ -210,6 +210,10 @@ impl Project {
         for pin in out.pins.values_mut() {
             pin.at += field(pin.panel).at(pin.at);
         }
+        for b in out.buttons.values_mut() {
+            b.at += field(b.panel).at(b.at);
+            b.hole.at += field(b.hole.panel).at(b.hole.at);
+        }
         if let Some(avatar) = &mut out.avatar
             && let Some(body) = self.size_body(i)
         {

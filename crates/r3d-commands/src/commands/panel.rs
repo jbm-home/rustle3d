@@ -428,6 +428,22 @@ impl CommandSpec for PanelTranslate {
                 },
             );
         }
+        let buttons: Vec<_> = tx
+            .project()
+            .buttons()
+            .iter()
+            .filter(|(_, b)| b.panel == self.panel || b.hole.panel == self.panel)
+            .map(|(id, b)| (*id, b.clone()))
+            .collect();
+        for (id, mut b) in buttons {
+            if b.panel == self.panel {
+                b.at += d;
+            }
+            if b.hole.panel == self.panel {
+                b.hole.at += d;
+            }
+            tx.put_button(id, b);
+        }
         if panel.placement.is_some_and(|p| p.centre_x_mm.is_some()) {
             tx.put_panel(self.panel, panel);
         }

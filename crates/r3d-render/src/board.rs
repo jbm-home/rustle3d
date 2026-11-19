@@ -14,6 +14,8 @@ use crate::theme::{PIECE_COLORS, Rgba, SEAM_COLORS, Theme, WARNING};
 use crate::{MSAA_SAMPLES, Target};
 
 const NOTCH_MM: f64 = 6.0;
+/// Zippers on the board: a brass tone, readable on both themes.
+const ZIPPER: Rgba = crate::theme::hex(0xB8862B);
 const MINOR_GRID_MM: f64 = 10.0;
 const MAJOR_GRID_MM: f64 = 100.0;
 
@@ -69,6 +71,28 @@ pub struct BoardScene {
     pub axes: Vec<[DVec2; 2]>,
     /// The garments' prints the pieces are filled with.
     pub prints: Vec<BoardPrint>,
+    pub buttons: Vec<BoardButton>,
+    pub zippers: Vec<BoardZipper>,
+}
+
+/// A button and its buttonhole on the board (mm).
+#[derive(Debug, Clone, PartialEq)]
+pub struct BoardButton {
+    pub id: r3d_core::ButtonId,
+    pub at: DVec2,
+    pub diameter: f64,
+    /// The buttonhole: where the button sits, then the slit's other end.
+    pub slit: [DVec2; 2],
+    pub closed: bool,
+}
+
+/// A zipper on the board: its two sides from the bottom stop (mm), and
+/// the share closed from there (0–1).
+#[derive(Debug, Clone, PartialEq)]
+pub struct BoardZipper {
+    pub id: r3d_core::ZipperId,
+    pub sides: [Vec<DVec2>; 2],
+    pub closed: f64,
 }
 
 /// A contour edge on the board.
@@ -184,6 +208,28 @@ impl BoardScene {
                 Some([pos(sym.start)?, pos(sym.end)?])
             })
             .collect();
+        let buttons = project
+            .buttons()
+            .iter()
+            .map(|(id, b)| BoardButton {
+                id: *id,
+                at: b.at,
+                diameter: b.diameter_mm,
+                slit: b.slit(),
+                closed: b.closed,
+            })
+            .collect();
+        let zippers = project
+            .zippers()
+            .iter()
+            .filter_map(|(id, z)| {
+                Some(BoardZipper {
+                    id: *id,
+                    sides: [project.side_polyline(&z.a)?, project.side_polyline(&z.b)?],
+                    closed: project.zipper_closed(z),
+                })
+            })
+            .collect();
         Self {
             panels,
             selected: selected.to_vec(),
@@ -193,7 +239,46 @@ impl BoardScene {
             guides: project.guides().values().map(|g| [g.a, g.b]).collect(),
             axes,
             prints: Vec::new(),
+            buttons,
+            zippers,
         }
+    }
+
+    /// The button whose button or buttonhole is within `max_mm` of `p`.
+    pub fn button_at(&self, p: DVec2, max_mm: f64) -> Option<r3d_core::ButtonId> {
+        self.buttons
+            .iter()
+            .map(|b| {
+                let [s0, s1] = b.slit;
+                let d = (b.at.distance(p) - b.diameter / 2.0)
+                    .max(0.0)
+                    .min(r3d_geom::fit::distance_to_segment(p, s0, s1));
+                (d, b.id)
+            })
+            .filter(|(d, _)| *d <= max_mm)
+            .min_by(|a, b| a.0.total_cmp(&b.0))
+            .map(|(_, id)| id)
+    }
+
+    /// The zipper with a side within `max_mm` of `p`.
+    pub fn zipper_at(&self, p: DVec2, max_mm: f64) -> Option<r3d_core::ZipperId> {
+        self.zippers
+            .iter()
+            .map(|z| {
+                let d = z
+                    .sides
+                    .iter()
+                    .flat_map(|s| s.windows(2))
+                    .filter_map(|w| match w {
+                        [a, b] => Some(r3d_geom::fit::distance_to_segment(p, *a, *b)),
+                        _ => None,
+                    })
+                    .fold(f64::MAX, f64::min);
+                (d, z.id)
+            })
+            .filter(|(d, _)| *d <= max_mm)
+            .min_by(|a, b| a.0.total_cmp(&b.0))
+            .map(|(_, id)| id)
     }
 
     /// The same scene with the graded nest: each piece's outline in the
@@ -737,6 +822,52 @@ impl BoardRenderer {
                 }
                 if seam.mismatch {
                     batch.dot(mid + side * 9.0 * px, 4.5 * px, WARNING);
+                }
+            }
+        }
+        // Trims. Zippers: a band of teeth along each side, solid where it
+        // is closed, dashed where it is open, a bar at the bottom stop.
+        for z in &scene.zippers {
+            for side in &z.sides {
+                let total = r3d_core::seam::polyline_length(side);
+                let cut = total * z.closed;
+                let closed = r3d_core::seam::sub_polyline(side, 0.0, cut);
+                let open = r3d_core::seam::sub_polyline(side, cut, total);
+                if cut > 0.0 {
+                    batch.polyline(&closed, false, 4.0 * px, ZIPPER);
+                }
+                for w in open.windows(2) {
+                    if let [a, b] = w {
+                        batch.dashed(*a, *b, 4.0 * px, 3.0 * px, 3.0 * px, ZIPPER);
+                    }
+                }
+                if let [a, b, ..] = side.as_slice()
+                    && let Some(dir) = (*b - *a).try_normalize()
+                {
+                    let across = DVec2::new(-dir.y, dir.x) * 5.0 * px;
+                    batch.segment(*a - across, *a + across, 2.5 * px, ZIPPER);
+                }
+            }
+        }
+        // Buttons at their real size (a ring and the thread's dot), and
+        // buttonholes as slits with bar tacks; unbuttoned ones fainter.
+        for b in &scene.buttons {
+            let mut color = theme.panel_line;
+            if !b.closed {
+                color[3] *= 0.5;
+            }
+            let r = (b.diameter / 2.0).max(2.0 * px);
+            let ring: Vec<DVec2> = (0..24)
+                .map(|k| b.at + DVec2::from_angle(k as f64 / 24.0 * std::f64::consts::TAU) * r)
+                .collect();
+            batch.polyline(&ring, true, 1.5 * px, color);
+            batch.dot(b.at, 2.0 * px, color);
+            let [s0, s1] = b.slit;
+            batch.segment(s0, s1, 2.0 * px, color);
+            if let Some(dir) = (s1 - s0).try_normalize() {
+                let across = DVec2::new(-dir.y, dir.x) * 3.0 * px;
+                for end in [s0, s1] {
+                    batch.segment(end - across, end + across, 2.0 * px, color);
                 }
             }
         }

@@ -633,6 +633,58 @@ impl QuerySpec for PinList {
     }
 }
 
+/// Every button and zipper.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct TrimList {}
+
+impl Described for TrimList {
+    const SUMMARY: &'static str = "Every trim: buttons (the piece and point they are sewn at, diameter, the buttonhole's piece, the point where the button sits and the slit's ends, buttoned or not) and zippers (their sides, length, how much is open from the top, the share closed; mm).";
+}
+
+impl QuerySpec for TrimList {
+    fn run(&self, p: &Project) -> Result<Value, CommandError> {
+        let name = |id: PanelId| p.panel(id).map(|panel| panel.name.clone());
+        let buttons: Vec<Value> = p
+            .buttons()
+            .iter()
+            .map(|(id, b)| {
+                let [s0, s1] = b.slit();
+                serde_json::json!({
+                    "id": id,
+                    "panel": b.panel,
+                    "panel_name": name(b.panel),
+                    "at": r3v(b.at),
+                    "diameter_mm": r3(b.diameter_mm),
+                    "hole_panel": b.hole.panel,
+                    "hole_panel_name": name(b.hole.panel),
+                    "hole_at": r3v(b.hole.at),
+                    "hole_angle_deg": r3(b.hole.angle_deg),
+                    "slit": [r3v(s0), r3v(s1)],
+                    "closed": b.closed,
+                })
+            })
+            .collect();
+        let zippers: Vec<Value> = p
+            .zippers()
+            .iter()
+            .map(|(id, z)| {
+                serde_json::json!({
+                    "id": id,
+                    "a": z.a,
+                    "b": z.b,
+                    "panel_a": p.side_panel(&z.a),
+                    "panel_b": p.side_panel(&z.b),
+                    "length_mm": p.zipper_length(z).map(r3),
+                    "open_mm": r3(z.open_mm),
+                    "closed": r3(p.zipper_closed(z)),
+                })
+            })
+            .collect();
+        Ok(serde_json::json!({ "buttons": buttons, "zippers": zippers }))
+    }
+}
+
 /// The starter garments and their default sizes.
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

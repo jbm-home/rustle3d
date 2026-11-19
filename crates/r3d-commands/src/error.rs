@@ -78,6 +78,8 @@ pub enum Invalid {
     Apart,
     #[error("has holes: fill them first (panel.remove_hole)")]
     HasHoles,
+    #[error("must be inside the piece")]
+    OutsidePiece,
 }
 
 impl Invalid {
@@ -119,6 +121,7 @@ impl Invalid {
             Invalid::Overlaps => "invalid.overlaps",
             Invalid::Apart => "invalid.apart",
             Invalid::HasHoles => "invalid.has_holes",
+            Invalid::OutsidePiece => "invalid.outside_piece",
         }
     }
 }

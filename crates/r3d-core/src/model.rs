@@ -11,10 +11,11 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::id::{
-    ConstraintId, EdgeId, GarmentId, GuideId, InternalLineId, NotchId, PanelId, PinId, PointId,
-    SeamId,
+    ButtonId, ConstraintId, EdgeId, GarmentId, GuideId, InternalLineId, NotchId, PanelId, PinId,
+    PointId, SeamId, ZipperId,
 };
 use crate::print::{Print, PrintPlacement, UvFrame};
+use crate::trim::{Button, Zipper};
 
 /// Ordered entity map.
 pub type IdMap<K, V> = BTreeMap<K, V>;
@@ -55,6 +56,12 @@ pub struct Project {
     pub(crate) guides: IdMap<GuideId, Guide>,
     /// Named variables for formulas: name → formula (`docs/specs/20-parametric.md`).
     pub(crate) variables: BTreeMap<String, String>,
+    /// Buttons and their buttonholes (M20).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub(crate) buttons: IdMap<ButtonId, Button>,
+    /// Zippers (M20).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub(crate) zippers: IdMap<ZipperId, Zipper>,
 }
 
 /// A relation the drawing keeps between points and edges: after every
@@ -828,6 +835,8 @@ impl Project {
             constraints: IdMap::new(),
             guides: IdMap::new(),
             variables: BTreeMap::new(),
+            buttons: IdMap::new(),
+            zippers: IdMap::new(),
         }
     }
 
@@ -865,6 +874,14 @@ impl Project {
 
     pub fn pins(&self) -> &IdMap<PinId, Pin> {
         &self.pins
+    }
+
+    pub fn buttons(&self) -> &IdMap<ButtonId, Button> {
+        &self.buttons
+    }
+
+    pub fn zippers(&self) -> &IdMap<ZipperId, Zipper> {
+        &self.zippers
     }
 
     /// The seam an edge belongs to, if any.

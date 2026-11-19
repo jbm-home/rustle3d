@@ -178,6 +178,31 @@ impl Project {
                 });
             }
         }
+        for (id, b) in &self.buttons {
+            let ok = [b.at, b.hole.at].iter().all(|p| p.is_finite())
+                && b.hole.angle_deg.is_finite()
+                && b.diameter_mm.is_finite()
+                && b.diameter_mm > 0.0
+                && self.panels.contains_key(&b.panel)
+                && self.panels.contains_key(&b.hole.panel);
+            if !ok {
+                return Err(E::BadValue {
+                    entity: (*id).into(),
+                });
+            }
+        }
+        for (id, z) in &self.zippers {
+            let ok = self.side_ok(&z.a)
+                && self.side_ok(&z.b)
+                && z.a != z.b
+                && z.open_mm.is_finite()
+                && z.open_mm >= 0.0;
+            if !ok {
+                return Err(E::BadValue {
+                    entity: (*id).into(),
+                });
+            }
+        }
         for (id, panel) in &self.panels {
             if let Some(p) = &panel.placement
                 && ![p.angle_deg, p.top_cm, p.offset_mm]
@@ -214,7 +239,9 @@ impl Project {
             .chain(self.seams.keys().map(|k| (AnyId::from(*k), k.raw())))
             .chain(self.pins.keys().map(|k| (AnyId::from(*k), k.raw())))
             .chain(self.constraints.keys().map(|k| (AnyId::from(*k), k.raw())))
-            .chain(self.guides.keys().map(|k| (AnyId::from(*k), k.raw())));
+            .chain(self.guides.keys().map(|k| (AnyId::from(*k), k.raw())))
+            .chain(self.buttons.keys().map(|k| (AnyId::from(*k), k.raw())))
+            .chain(self.zippers.keys().map(|k| (AnyId::from(*k), k.raw())));
         for (entity, raw) in ids {
             if raw >= self.next_id {
                 return Err(E::IdCounter { entity });
