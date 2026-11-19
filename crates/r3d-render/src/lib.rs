@@ -19,6 +19,7 @@ pub mod offscreen;
 pub mod photo;
 pub mod print;
 pub mod theme;
+pub mod trims;
 pub mod view3d;
 
 mod targets;

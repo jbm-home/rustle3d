@@ -7,7 +7,7 @@
 // so no two invocations write the same particle.
 //
 // Prepended by the Rust side: SKIN, NEAR, BAND, BRICK, MAX_NEIGHBOURS,
-// ITERATIONS, ON_SKIN.
+// ITERATIONS, ON_SKIN, CLOSURE_COMPLIANCE, CLOSING_SPEED.
 
 struct Step {
     // xyz: gravity (m/s²), w: substep h (s).
@@ -94,6 +94,7 @@ struct Hinge {
 // quaternion, then translation): the bone's at the substep's end, its
 // inverse, and the bone's at the substep's start.
 @group(1) @binding(21) var<storage, read> body: array<vec4f>;
+@group(1) @binding(22) var<storage, read> closures: array<vec2u>;
 
 const WG: u32 = 64u;
 
@@ -256,6 +257,34 @@ fn seam(@builtin(global_invocation_id) id: vec3u) {
     let dl = -len / denom;
     x[s.x] = vec4f(pa - n * (dl * wa), 0.0);
     x[s.y] = vec4f(pb + n * (dl * wb), 0.0);
+}
+
+// ---------------------------------------------------------------------------
+// Closures (buttons, zippers): stiff distances whose target shrinks to
+// zero at CLOSING_SPEED from the gap at the substep's start (r3d-sim
+// `solver::closure_target`)
+
+@compute @workgroup_size(WG)
+fn closure(@builtin(global_invocation_id) id: vec3u) {
+    if id.x >= range.count {
+        return;
+    }
+    let s = closures[range.start + id.x];
+    let pa = x[s.x].xyz;
+    let pb = x[s.y].xyz;
+    let d = pb - pa;
+    let len = length(d);
+    let wa = pdata[s.x].x;
+    let wb = pdata[s.y].x;
+    let denom = wa + wb + CLOSURE_COMPLIANCE * step.params.z;
+    if len <= 1e-9 || denom <= 1e-12 {
+        return;
+    }
+    let goal = max(distance(prev[s.x].xyz, prev[s.y].xyz) - CLOSING_SPEED * step.gravity_h.w, 0.0);
+    let n = d / len;
+    let dl = (len - goal) / denom;
+    x[s.x] = vec4f(pa + n * (dl * wa), 0.0);
+    x[s.y] = vec4f(pb - n * (dl * wb), 0.0);
 }
 
 // ---------------------------------------------------------------------------

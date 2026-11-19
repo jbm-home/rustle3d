@@ -39,6 +39,36 @@ pub struct SelfContact {
     pub sewn: Vec<Vec<u32>>,
 }
 
+/// The particles within `reach` of `start` along the cloth `graph`
+/// (bounded Dijkstra); `best` is all infinite and left so.
+fn patch(graph: &[Vec<(u32, f32)>], start: u32, reach: f32, best: &mut [f32]) -> Vec<u32> {
+    let mut seen = vec![start];
+    let Some(slot) = best.get_mut(start as usize) else {
+        return Vec::new();
+    };
+    *slot = 0.0;
+    let mut heap = BinaryHeap::from([Visit(0.0, start)]);
+    while let Some(Visit(d, v)) = heap.pop() {
+        if d > best[v as usize] {
+            continue;
+        }
+        for &(u, l) in &graph[v as usize] {
+            let nd = d + l;
+            if nd < reach && nd < best[u as usize] {
+                if best[u as usize].is_infinite() {
+                    seen.push(u);
+                }
+                best[u as usize] = nd;
+                heap.push(Visit(nd, u));
+            }
+        }
+    }
+    for v in &seen {
+        best[*v as usize] = f32::INFINITY;
+    }
+    seen
+}
+
 /// Entry of the bounded Dijkstra search (min-heap on distance).
 struct Visit(f32, u32);
 
@@ -61,8 +91,16 @@ impl Ord for Visit {
 
 impl SelfContact {
     /// `rest`: flat pattern positions; `triangles` and `seams` give the
-    /// cloth's connectivity. Indices are assumed valid.
-    pub fn new(rest: &[Vec2], triangles: &[[u32; 3]], seams: &[[u32; 2]]) -> Self {
+    /// cloth's connectivity. `overlaps`: pairs of points whose
+    /// surroundings (within the given distance on the cloth, m) lie on
+    /// each other on purpose (a buttoned band): those never collide.
+    /// Indices are assumed valid.
+    pub fn new(
+        rest: &[Vec2],
+        triangles: &[[u32; 3]],
+        seams: &[[u32; 2]],
+        overlaps: &[([u32; 2], f32)],
+    ) -> Self {
         let n = rest.len();
         // Cloth graph: mesh edges (rest length) and seams (length 0).
         let mut graph: Vec<Vec<(u32, f32)>> = vec![Vec::new(); n];
@@ -112,6 +150,21 @@ impl SelfContact {
             }
             seen.sort_unstable();
             excluded.push(seen);
+        }
+        for ([a, b], reach) in overlaps {
+            let (pa, pb) = (
+                patch(&graph, *a, *reach, &mut best),
+                patch(&graph, *b, *reach, &mut best),
+            );
+            for (from, to) in [(&pa, &pb), (&pb, &pa)] {
+                for i in from {
+                    if let Some(list) = excluded.get_mut(*i as usize) {
+                        list.extend_from_slice(to);
+                        list.sort_unstable();
+                        list.dedup();
+                    }
+                }
+            }
         }
         Self {
             radius,
@@ -280,15 +333,29 @@ mod tests {
     #[test]
     fn near_on_the_cloth_is_excluded_far_is_not() {
         let (rest, tris) = strip(20);
-        let s = SelfContact::new(&rest, &tris, &[]);
+        let s = SelfContact::new(&rest, &tris, &[], &[]);
         assert!((s.radius - 0.004).abs() < 1e-6);
         // Reach 4 radii = 16 mm: 1 cm and the 1.4 cm diagonal are in, 3 cm
         // along the strip is out.
         assert!(s.is_excluded(0, 2) && s.is_excluded(0, 3));
         assert!(!s.is_excluded(0, 6) && !s.is_excluded(0, 40));
         // A seam joining both ends makes them neighbours.
-        let s = SelfContact::new(&rest, &tris, &[[0, 40]]);
+        let s = SelfContact::new(&rest, &tris, &[[0, 40]], &[]);
         assert!(s.is_excluded(0, 40) && s.is_excluded(2, 40));
+    }
+
+    #[test]
+    fn an_overlap_excludes_both_patches() {
+        // Two strips, their first ends buttoned together: everything
+        // within 2 cm of one end ignores everything within 2 cm of the
+        // other, and no more.
+        let (mut rest, mut tris) = strip(20);
+        let (rest2, tris2) = strip(20);
+        rest.extend(rest2);
+        tris.extend(tris2.iter().map(|t| t.map(|v| v + 42)));
+        let s = SelfContact::new(&rest, &tris, &[[0, 42]], &[([0, 42], 0.02)]);
+        assert!(s.is_excluded(2, 45) && s.is_excluded(45, 2));
+        assert!(!s.is_excluded(8, 50));
     }
 
     #[test]
@@ -299,7 +366,7 @@ mod tests {
         let (rest2, tris2) = strip(20);
         rest.extend(rest2);
         tris.extend(tris2.iter().map(|t| t.map(|v| v + 42)));
-        let s = SelfContact::new(&rest, &tris, &[[0, 42]]);
+        let s = SelfContact::new(&rest, &tris, &[[0, 42]], &[]);
         let mut x: Vec<Vec3> = (0..84).map(|i| Vec3::new(i as f32, 1.0, 0.0)).collect();
         x[0] = Vec3::ZERO;
         x[42] = Vec3::new(0.0, 0.0, 0.0005);

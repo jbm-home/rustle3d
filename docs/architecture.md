@@ -1,6 +1,6 @@
 # Rustle3D architecture
 
-Status: living document, last updated 2026-11-19 (M21, textures and prints).
+Status: living document, last updated 2026-11-19 (M20, buttons and zippers).
 
 Every choice here is the **current best guess**, not a rule. Each one says
 why it was made and what was considered, so it can be challenged and changed
@@ -102,6 +102,8 @@ Project                                        (✓ = implemented in M1)
  ├─ constraints: IdMap<ConstraintId, Constraint> ✓ (M27: geometric constraints and dimensions)
  ├─ guides: IdMap<GuideId, Guide>              ✓ (M27: construction lines)
  ├─ variables: name → formula                  ✓ (M28: named variables for formulas)
+ ├─ buttons: IdMap<ButtonId, Button>           ✓ (M20: a button, its buttonhole, buttoned or not)
+ ├─ zippers: IdMap<ZipperId, Zipper>           ✓ (M20: two sides, an open length from the top)
  ├─ arrangement_points: from the avatar, editable
  └─ drape:   Option<DrapeSnapshot>             (last saved simulated positions)
 ```
@@ -611,3 +613,5 @@ code stays **i18n-ready** for more:
 | 2026-11-19 | M21: a garment's print (built-in or an image file in the project's `textures/`, referenced by relative path) on `Garment`, a piece's shift and turn of it on `Panel`, schema v16; texture coordinates computed from the pattern along each piece's grainline (`Project::print_frame`), never stored | The print is a property of the fabric, laid on every piece by its grain as when cutting; storing coordinates per vertex would go stale with every edit, and images in the JSON would bloat it and its diffs |
 | 2026-11-19 | M21: built-in prints drawn by our own code (`r3d_core::print::builtin`, in the garment's colour), no shipped image assets; prints decoded in `r3d-io` (`png`, and `zune-jpeg`, MIT/Apache-2.0/Zlib, pure Rust, for JPEG) and cached per front-end by `r3d_commands::prints::Prints` | No third-party image licences to track; built-ins follow the garment's colour. JPEG is what photos of fabric come as; `zune-jpeg` is the decoder the `image` crate itself uses now, without its other codecs |
 | 2026-11-19 | M21: the photo tracer reads prints from the storage buffer it already had for the sheen table (one buffer: table, then a header and every print's texels), with manual bilinear filtering and no mip-maps | WebGPU guarantees eight storage buffers per shader stage and the tracer used all of them; binding arrays of textures are not portable. Samples accumulating per pixel filter the print |
+| 2026-11-19 | M20: buttons and zippers as entity maps on `Project` (schema v17), omitted from the JSON when empty; a zipper's state is its open length from the top, not a slider position from the bottom | Projects without trims keep the same file (and the same drape cache key); a closed zipper stays closed when its sides change length |
+| 2026-11-19 | M20: closures are a constraint kind of their own in the solvers (`SimScene::closures`), a stiff distance whose target shrinks at 0.5 m/s, not seams; opening or closing one rebuilds the scene and carries the cloth over | Seams close on the sewing ramp and are stiff after it: a button fastened later snapped shut at ≈ 50 m/s. The rebuild path already carries pattern edits into a running drape, so no solver needs constraints added or removed at run time |

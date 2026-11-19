@@ -30,6 +30,21 @@ pub const GRAB_RADIUS: f32 = 0.03;
 /// Compliance of the grab (m/N): firm, but the cloth can still resist.
 pub const GRAB_COMPLIANCE: f32 = 1e-4;
 
+/// Compliance of a closure (m/N): as stiff as a closed seam.
+pub const CLOSURE_COMPLIANCE: f32 = 1e-9;
+/// A closure brings its two points together at this speed (m/s): a
+/// button fastened over a few centimetres of cloth closes in a tenth of
+/// a second instead of snapping in one substep.
+pub const CLOSING_SPEED: f32 = 0.5;
+
+/// The distance a closure holds its two points at by the end of a
+/// substep of `h`, when they were `before` apart at its start: the gap
+/// shrinks at [`CLOSING_SPEED`] down to zero. Held both ways, so the
+/// cloth's own momentum cannot close it faster either.
+pub fn closure_target(before: f32, h: f32) -> f32 {
+    (before - CLOSING_SPEED * h).max(0.0)
+}
+
 /// How far the sewing phase has gone at `time` (0 → 1).
 pub fn sewing_ramp(time: f32) -> f32 {
     (time / SEWING_TIME).clamp(0.0, 1.0)
@@ -50,19 +65,26 @@ pub fn sewing(time: f32, has_seams: bool) -> (Vec3, f32) {
 pub struct StepStats {
     /// Largest distance between two sewn vertices (m).
     pub max_seam_gap: f32,
+    /// Largest distance between two points held by a closure (m).
+    pub max_closure_gap: f32,
     /// Largest particle speed (m/s).
     pub max_speed: f32,
 }
 
 impl StepStats {
-    /// Measured on positions `x` and velocities `v`; `seams` index both.
-    pub fn measure(x: &[Vec3], v: &[Vec3], seams: &[[u32; 2]]) -> Self {
+    /// Measured on positions `x` and velocities `v`; `seams` and
+    /// `closures` index both.
+    pub fn measure(x: &[Vec3], v: &[Vec3], seams: &[[u32; 2]], closures: &[[u32; 2]]) -> Self {
         let at = |i: u32| x.get(i as usize).copied().unwrap_or_default();
-        Self {
-            max_seam_gap: seams
+        let gap = |pairs: &[[u32; 2]]| {
+            pairs
                 .iter()
                 .map(|[a, b]| at(*a).distance(at(*b)))
-                .fold(0.0, f32::max),
+                .fold(0.0, f32::max)
+        };
+        Self {
+            max_seam_gap: gap(seams),
+            max_closure_gap: gap(closures),
             max_speed: v.iter().map(|v| v.length()).fold(0.0, f32::max),
         }
     }

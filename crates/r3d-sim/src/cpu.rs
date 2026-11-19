@@ -11,6 +11,8 @@
 //!   discrete shells (Grinspun et al. 2003);
 //! - seams: zero-length distances whose compliance ramps down while the
 //!   garment closes;
+//! - closures (buttons, zippers): stiff zero-length distances that close
+//!   at a bounded speed, so they can be fastened at any time;
 //! - contacts with the body and the ground, with friction; mesh edges
 //!   between two particles near the body are kept out of it at their
 //!   middle too (a straight edge cuts into a convex body such as the bust);
@@ -25,7 +27,8 @@ use crate::model::{Hinge, Membrane, Model};
 use crate::motion::{Posed, touch};
 use crate::scene::SimScene;
 use crate::solver::{
-    GRAB_COMPLIANCE, NEAR, SKIN, SUBSTEPS, Solver, StepError, StepStats, dihedral, grabbed, sewing,
+    CLOSURE_COMPLIANCE, GRAB_COMPLIANCE, NEAR, SKIN, SUBSTEPS, Solver, StepError, StepStats,
+    closure_target, dihedral, grabbed, sewing,
 };
 
 /// A patch of cloth held by the user.
@@ -120,6 +123,9 @@ impl CpuSolver {
                 let n = d / len;
                 project(&mut self.x, w, &[a, b], &[-n, n], len, seam_alpha / h2);
             }
+        }
+        for [a, b] in &self.model.closures {
+            close(&mut self.x, &self.prev, w, [*a as usize, *b as usize], h);
         }
         self.model.self_contact.solve(&self.pairs, &mut self.x, w);
         if let Some(g) = &self.grab {
@@ -279,7 +285,7 @@ impl Solver for CpuSolver {
             self.substep(h);
             self.time += h;
         }
-        self.stats = StepStats::measure(&self.x, &self.v, &self.model.seams);
+        self.stats = StepStats::measure(&self.x, &self.v, &self.model.seams, &self.model.closures);
         Ok(())
     }
 
@@ -332,6 +338,25 @@ fn project(x: &mut [Vec3], w: &[f32], idx: &[usize], grads: &[Vec3], c: f32, alp
     for (i, g) in idx.iter().zip(grads) {
         x[*i] += *g * (dl * w[*i]);
     }
+}
+
+/// A closure between particles `a` and `b`: XPBD on the distance
+/// `|x_b − x_a| = target` (Macklin et al. 2016), the target shrinking to
+/// zero at the closing speed from where the pair was at the substep's
+/// start (`prev`).
+fn close(x: &mut [Vec3], prev: &[Vec3], w: &[f32], [a, b]: [usize; 2], h: f32) {
+    let (wa, wb) = (w[a], w[b]);
+    let target = closure_target(prev[b].distance(prev[a]), h);
+    let d = x[b] - x[a];
+    let len = d.length();
+    let denom = wa + wb + CLOSURE_COMPLIANCE / (h * h);
+    if len <= 1e-9 || denom <= 1e-12 {
+        return;
+    }
+    let n = d / len;
+    let dl = (len - target) / denom;
+    x[a] += n * (dl * wa);
+    x[b] -= n * (dl * wb);
 }
 
 fn membrane(x: &mut [Vec3], w: &[f32], m: &Membrane, h2: f32) {

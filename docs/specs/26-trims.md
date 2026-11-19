@@ -4,9 +4,11 @@ Provenance: maintainer's functional brief (ROADMAP M20: buttons and buttonholes,
 
 ## Status (2026-11-19, M20)
 
-Implemented in step 1: buttons and zippers in the document (schema v17),
-their commands, `trim.list`, the board (buttons, buttonholes, zippers),
-the tech pack's bill of materials.
+Implemented: buttons and zippers in the document (schema v17), their
+commands, `trim.list`, the board (buttons, buttonholes, zippers), the
+tech pack's bill of materials; closures in the drape on both solvers,
+opened and closed while it runs; buttons and zippers drawn on the
+garment in the 3D view and its renders.
 
 ## User story
 As a designer, I put five buttons down the front of a shirt and two on
@@ -49,7 +51,23 @@ starting the drape again. The tech pack lists 7 buttons of 11 mm and one
 - A zipper whose sides no longer exist is removed with them.
 
 ### Drape
-- See step 2 (docs/physics.md, "Closures").
+- A buttoned button ties the button point to the buttonhole's end; a
+  zipper ties its sides point for point from the bottom stop up to the
+  slider, as a seam does (its stop always holds). Ties close at
+  0.5 m/s, so a garment buttoned or zipped while it hangs closes in a
+  fraction of a second without a jolt (docs/physics.md, "Closures").
+- Opening or closing a trim during a drape rebuilds the scene and the
+  cloth carries on from where it is.
+- Around a buttoned button and its buttonhole (6 cm), the two layers
+  may lie on each other: they do not push each other away.
+- `simulate` reports how many points closures hold
+  (`closures`) and the widest gap between them (`max_closure_gap_mm`).
+
+### 3D view
+- Buttons are drawn as small dark discs on the cloth, at their real
+  size; a zipper as a brass band along its closed stretch. In the app's
+  3D view, the headless renders and the tech pack's pictures (not yet
+  in photos).
 
 ### Board
 - Buttons drawn at their real size (a ring and a dot), buttonholes as

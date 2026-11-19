@@ -45,6 +45,11 @@ fn two_panels_sewn_into_a_tube_close_their_seams() {
 }
 
 #[test]
+fn buttons_hold_two_bands_together() {
+    on_gpu(reference::buttons_hold_two_bands_together);
+}
+
+#[test]
 fn jersey_stretches_more_along_the_weft() {
     on_gpu(reference::jersey_stretches_more_along_the_weft);
 }

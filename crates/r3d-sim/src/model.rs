@@ -53,6 +53,8 @@ pub struct Model {
     pub hinges: Vec<Hinge>,
     /// Vertex pairs sewn together.
     pub seams: Vec<[u32; 2]>,
+    /// Vertex pairs held by closures (buttons, closed zippers).
+    pub closures: Vec<[u32; 2]>,
     /// Mesh edges, each once, sorted.
     pub edges: Vec<[u32; 2]>,
     pub self_contact: SelfContact,
@@ -79,6 +81,12 @@ impl Model {
             .copied()
             .collect();
         let seams: Vec<[u32; 2]> = scene.seams.iter().filter(|s| valid(*s)).copied().collect();
+        let closures: Vec<crate::scene::Closure> = scene
+            .closures
+            .iter()
+            .filter(|c| valid(&c.pair) && c.pair[0] != c.pair[1])
+            .copied()
+            .collect();
         let mut membranes = Vec::with_capacity(triangles.len());
         let mut rest_area = Vec::with_capacity(triangles.len());
         let rest = |i: u32| {
@@ -172,10 +180,23 @@ impl Model {
             .collect();
         edges.sort_unstable();
         edges.dedup();
+        // Closed closures join the cloth as seams do; buttoned bands lie
+        // on each other.
+        let ties: Vec<[u32; 2]> = seams
+            .iter()
+            .copied()
+            .chain(closures.iter().map(|c| c.pair))
+            .collect();
+        let overlaps: Vec<([u32; 2], f32)> = closures
+            .iter()
+            .filter(|c| c.overlap > 0.0)
+            .map(|c| (c.pair, c.overlap))
+            .collect();
         let self_contact = SelfContact::new(
             &scene.particles.iter().map(|p| p.rest).collect::<Vec<_>>(),
             &triangles.iter().map(|t| t.vertices).collect::<Vec<_>>(),
-            &seams,
+            &ties,
+            &overlaps,
         );
         Self {
             positions: scene.particles.iter().map(|p| p.position).collect(),
@@ -186,6 +207,7 @@ impl Model {
             membranes,
             hinges,
             seams,
+            closures: closures.iter().map(|c| c.pair).collect(),
             edges,
             self_contact,
             motion: scene.motion.filter(|_| scene.collider.is_some()),

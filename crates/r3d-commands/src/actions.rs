@@ -220,7 +220,7 @@ fn default_frames() -> u32 {
 }
 
 impl Described for Simulate {
-    const SUMMARY: &'static str = "Drape the placed and sewn panels on the avatar for a number of frames (1/60 s each, deterministic) and cache the result in the project, so `r3d render --view 3d` shows it. With `motion`, the avatar walks, turns or raises its arms after 1.5 s and the cloth follows; renders and exports then show the body and the garment as they are at the last frame. Returns the garment's extent, how open the seams are and whether the cloth has settled.";
+    const SUMMARY: &'static str = "Drape the placed and sewn panels on the avatar for a number of frames (1/60 s each, deterministic) and cache the result in the project, so `r3d render --view 3d` shows it. With `motion`, the avatar walks, turns or raises its arms after 1.5 s and the cloth follows; renders and exports then show the body and the garment as they are at the last frame. Returns the garment's extent, how open the seams are, how many points buttons and closed zippers hold and how far apart they still are, and whether the cloth has settled.";
 }
 
 impl ActionSpec for Simulate {
@@ -250,6 +250,8 @@ impl ActionSpec for Simulate {
             "top_m": r3(top.into()),
             "bottom_m": r3(bottom.into()),
             "max_seam_gap_mm": r3(f64::from(out.stats.max_seam_gap) * 1000.0),
+            "closures": out.drape.scene.closures.len(),
+            "max_closure_gap_mm": r3(f64::from(out.stats.max_closure_gap) * 1000.0),
             "max_speed_m_s": r3(out.stats.max_speed.into()),
             "settled": out.stats.max_speed < SETTLED_SPEED,
             "motion": out.animation.map(|a| AvatarMotion::from(a.motion)),

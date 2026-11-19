@@ -261,6 +261,8 @@ struct Dressed {
     pieces: Vec<DressedPiece>,
     /// Style lines on the cloth.
     lines: Vec<Mesh>,
+    /// Buttons and zippers on the cloth, with their look.
+    trims: Vec<(Mesh, Material)>,
     /// `simulated` (the cached drape) or `start`.
     state: &'static str,
     /// The facts of the fit map the pieces are coloured by, if any.
@@ -317,11 +319,13 @@ impl Dressed {
                 })
             })
             .collect();
-        let lines = drape::LinesOnCloth::new(&latest.drape, positions)
+        let on = drape::LinesOnCloth::new(&latest.drape, positions);
+        let lines = on
             .internal_lines(project)
             .iter()
             .map(|l| Mesh::ribbon(l, LINE_WIDTH_M, LINE_LIFT_M))
             .collect();
+        let trims = r3d_render::trims::meshes(&on.buttons(project), &on.zippers(project));
         let fit = values.map(|(map, v)| {
             // The tightest value on the garment, and its piece.
             let (loose, tight) = map.range();
@@ -352,6 +356,7 @@ impl Dressed {
             avatar,
             pieces,
             lines,
+            trims,
             state: latest.state(),
             fit,
         })
@@ -413,6 +418,11 @@ fn garment_png(
             sheen: theme.panel_line,
             sheen_amount: 0.0,
         },
+        print: None,
+    }));
+    draws.extend(dressed.trims.iter().map(|(mesh, material)| Draw {
+        mesh,
+        material: *material,
         print: None,
     }));
     let mut renderer = ViewRenderer3d::new(gpu, PNG_FORMAT);

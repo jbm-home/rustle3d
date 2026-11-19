@@ -25,13 +25,13 @@ use r3d_avatar::motion::{EASE_IN_S, Motion, ease};
 use r3d_avatar::pack::Influences;
 use r3d_avatar::skeleton::{Skeleton, skin};
 use r3d_core::seam::{Span, Track};
-use r3d_core::{Around, EdgeId, Fabric, GarmentId, PanelId, PinId, Project, SeamSide};
+use r3d_core::{Around, ButtonId, EdgeId, Fabric, GarmentId, PanelId, PinId, Project, SeamSide};
 use r3d_geom::DVec2;
 use r3d_geom::Rigid;
 use r3d_geom::mesh::mesh_panel;
 use r3d_sim::collide::{Skin, StaticMesh};
 use r3d_sim::motion::BodyMotion;
-use r3d_sim::scene::{Particle, Triangle};
+use r3d_sim::scene::{Closure, Particle, Triangle};
 use r3d_sim::{CpuSolver, FabricPreset, SUBSTEPS, SimScene, Solver, StepStats};
 
 use crate::error::CommandError;
@@ -751,6 +751,9 @@ struct Laid {
     /// The mesh vertices along each track of the panel (contour and hole
     /// edges, sewn internal lines), at its samples.
     tracks: BTreeMap<Track, Vec<u32>>,
+    /// The mesh vertex of each button (end 0) and buttonhole (end 1) on
+    /// the panel.
+    trims: BTreeMap<(ButtonId, usize), u32>,
     mesh: r3d_geom::mesh::PanelMesh,
     /// Pattern height of the panel's top (mm).
     top: f64,
@@ -1053,11 +1056,17 @@ fn sample_tracks(project: &Project, spacing: f64) -> BTreeMap<Track, Vec<f64>> {
             .is_some_and(|p| p.placement.is_some())
     };
     let mut fixed: BTreeMap<Track, Vec<(f64, f64, usize)>> = BTreeMap::new();
-    for seam in project.seams().values() {
-        if !(placed(project.side_panel(&seam.a)) && placed(project.side_panel(&seam.b))) {
+    // Seams and zippers: their two sides meet point for point.
+    let joins = project
+        .seams()
+        .values()
+        .map(|s| (&s.a, &s.b))
+        .chain(project.zippers().values().map(|z| (&z.a, &z.b)));
+    for (side_a, side_b) in joins {
+        if !(placed(project.side_panel(side_a)) && placed(project.side_panel(side_b))) {
             continue;
         }
-        let (Some(a), Some(b)) = (spans(project, &seam.a), spans(project, &seam.b)) else {
+        let (Some(a), Some(b)) = (spans(project, side_a), spans(project, side_b)) else {
             continue;
         };
         let need = |side: &[Span]| side.iter().map(|s| count(s.length())).sum::<usize>();
@@ -1161,6 +1170,8 @@ pub fn build(
     let mut edge_vertices: BTreeMap<EdgeId, Vec<u32>> = BTreeMap::new();
     // Particle indices along each track, at its samples.
     let mut track_particles: BTreeMap<Track, Vec<u32>> = BTreeMap::new();
+    // The particle of each button and buttonhole.
+    let mut trim_particles: BTreeMap<(ButtonId, usize), u32> = BTreeMap::new();
 
     // Mesh every placed panel first: the starting radius depends on the
     // width of all of them.
@@ -1207,9 +1218,23 @@ pub fn build(
             })
             .collect();
         let hole_pts: Vec<Vec<DVec2>> = holes.iter().map(|(p, _)| p.clone()).collect();
-        let line_pts: Vec<Vec<DVec2>> = lines.iter().map(|(_, p)| p.clone()).collect();
+        let mut line_pts: Vec<Vec<DVec2>> = lines.iter().map(|(_, p)| p.clone()).collect();
+        // Buttons and buttonholes on the piece become mesh vertices (each
+        // a line of one point), so a closure holds exactly there; those
+        // too near the outline or a hole are left to the nearest vertex.
+        let ends: Vec<((ButtonId, usize), DVec2)> = button_ends(project, *panel_id)
+            .into_iter()
+            .filter(|(_, p)| clear_of(*p, &boundary, &hole_pts, 0.25 * spacing))
+            .collect();
+        line_pts.extend(ends.iter().map(|(_, p)| vec![*p]));
         let mesh = mesh_panel(&boundary, &hole_pts, &line_pts, spacing)
             .map_err(|e| internal(format!("{panel_id}: {e}")))?;
+        let mut trims: BTreeMap<(ButtonId, usize), u32> = BTreeMap::new();
+        for (k, (key, _)) in ends.iter().enumerate() {
+            if let Some(v) = mesh.lines.get(lines.len() + k).and_then(|l| l.first()) {
+                trims.insert(*key, *v);
+            }
+        }
         // Each track's mesh vertices, at its samples.
         let mut tracks: BTreeMap<Track, Vec<u32>> = BTreeMap::new();
         let mut put_loop = |edges: &[EdgeId], starts: &[usize], indices: &[u32]| {
@@ -1232,6 +1257,21 @@ pub fn build(
         for ((track, _), indices) in lines.iter().zip(&mesh.lines) {
             tracks.insert(*track, indices.clone());
         }
+        // The other ends: at the nearest vertex.
+        for (key, at) in button_ends(project, *panel_id) {
+            if trims.contains_key(&key) {
+                continue;
+            }
+            let nearest = mesh
+                .vertices
+                .iter()
+                .enumerate()
+                .min_by(|a, b| a.1.distance(at).total_cmp(&b.1.distance(at)))
+                .map(|(i, _)| i as u32);
+            if let Some(v) = nearest {
+                trims.insert(key, v);
+            }
+        }
         let top = mesh.vertices.iter().fold(f64::MIN, |m, v| m.max(v.y));
         laid.push(Laid {
             panel: *panel_id,
@@ -1239,6 +1279,7 @@ pub fn build(
             place,
             boundary,
             tracks,
+            trims,
             mesh,
             top,
         });
@@ -1311,6 +1352,9 @@ pub fn build(
             }
             track_particles.insert(*track, verts);
         }
+        for (key, v) in &l.trims {
+            trim_particles.insert(*key, offset + v);
+        }
 
         scene.particles.extend(
             mesh.vertices
@@ -1374,6 +1418,44 @@ pub fn build(
         }
     }
 
+    // Closures: buttoned buttons, and zippers from their bottom stop up
+    // to the slider (the stop always holds, as on a real zipper).
+    for (id, b) in project.buttons() {
+        if let (true, Some(a), Some(h)) = (
+            b.closed,
+            trim_particles.get(&(*id, 0)),
+            trim_particles.get(&(*id, 1)),
+        ) {
+            scene.closures.push(Closure {
+                pair: [*a, *h],
+                overlap: BUTTON_OVERLAP_M,
+            });
+        }
+    }
+    for z in project.zippers().values() {
+        let (Some(a), Some(b)) = (side_particles(&z.a), side_particles(&z.b)) else {
+            continue;
+        };
+        let pairs: Vec<[u32; 2]> = a
+            .iter()
+            .zip(&b)
+            .filter(|(x, y)| x != y)
+            .map(|(x, y)| [*x, *y])
+            .collect();
+        let last = pairs.len().saturating_sub(1).max(1) as f64;
+        let closed = project.zipper_closed(z);
+        scene.closures.extend(
+            pairs
+                .iter()
+                .enumerate()
+                .filter(|(k, _)| *k == 0 || *k as f64 / last <= closed + 1e-9)
+                .map(|(_, pair)| Closure {
+                    pair: *pair,
+                    overlap: 0.0,
+                }),
+        );
+    }
+
     scene.collider = form.map(|f| f.collider.clone());
     // Pins: the cloth around each pin starts at the pin's place, keeping
     // its local shape, and does not move.
@@ -1405,6 +1487,42 @@ pub fn build(
         pins,
         edges,
     })
+}
+
+/// Around a buttoned button and its buttonhole, the cloth within this
+/// distance (m) lies on the other band on purpose: a front band buttoned
+/// over the other, its buttons 6–10 cm apart. They do not repel there.
+const BUTTON_OVERLAP_M: f32 = 0.06;
+
+/// The buttons (end 0) and buttonholes (end 1) on `panel`, where the
+/// closure holds them (mm).
+fn button_ends(project: &Project, panel: PanelId) -> Vec<((ButtonId, usize), DVec2)> {
+    let mut out = Vec::new();
+    for (id, b) in project.buttons() {
+        if b.panel == panel {
+            out.push(((*id, 0), b.at));
+        }
+        if b.hole.panel == panel {
+            out.push(((*id, 1), b.hole.at));
+        }
+    }
+    out
+}
+
+/// Whether `p` lies inside `boundary`, outside every hole and at least
+/// `margin` from all of them (mm).
+fn clear_of(p: DVec2, boundary: &[DVec2], holes: &[Vec<DVec2>], margin: f64) -> bool {
+    let far = |ring: &[DVec2]| {
+        (0..ring.len()).all(|i| {
+            let (a, b) = (ring[i], ring[(i + 1) % ring.len()]);
+            r3d_geom::fit::distance_to_segment(p, a, b) >= margin
+        })
+    };
+    r3d_geom::polygon::contains(boundary, p)
+        && far(boundary)
+        && holes
+            .iter()
+            .all(|h| !r3d_geom::polygon::contains(h, p) && far(h))
 }
 
 /// Cloth within this distance of a pin (on the pattern) is held (m).
@@ -1589,6 +1707,56 @@ impl<'a> LinesOnCloth<'a> {
                     })
                     .collect();
                 (on.len() > 1).then_some(on)
+            })
+            .collect()
+    }
+
+    /// Where a pattern point of `panel` (mm) is on the cloth, with the
+    /// cloth's normal there.
+    fn on_cloth(&self, panel: PanelId, p: DVec2) -> Option<(Vec3, Vec3)> {
+        let (t, w) = self.locator.locate(panel, (p / 1000.0).as_vec2())?;
+        let [a, b, c] = t.map(|k| self.positions.get(k).copied());
+        let at = a? * w.x + b? * w.y + c? * w.z;
+        let [na, nb, nc] = t.map(|k| self.normal(k));
+        Some((at, (na * w.x + nb * w.y + nc * w.z).normalize_or(Vec3::Y)))
+    }
+
+    /// The buttons on the cloth: centre, the cloth's normal and radius
+    /// (m). A buttoned one sits where the button is sewn; so does an
+    /// unbuttoned one (its buttonhole is not drawn in 3D).
+    pub fn buttons(&self, project: &Project) -> Vec<(Vec3, Vec3, f32)> {
+        let project = project.as_shown();
+        project
+            .buttons()
+            .values()
+            .filter_map(|b| {
+                let (at, n) = self.on_cloth(b.panel, b.at)?;
+                Some((at, n, (b.diameter_mm / 2000.0) as f32))
+            })
+            .collect()
+    }
+
+    /// The zippers' closed stretches on the cloth, along their first side
+    /// (both sides meet there).
+    pub fn zippers(&self, project: &Project) -> Vec<ClothLine> {
+        let project = project.as_shown();
+        project
+            .zippers()
+            .values()
+            .filter_map(|z| {
+                let panel = project.side_panel(&z.a)?;
+                let side = project.side_polyline(&z.a)?;
+                let total = r3d_core::seam::polyline_length(&side);
+                let closed = total * project.zipper_closed(z);
+                let steps = ((closed / LINE_STEP_MM).ceil() as usize).max(1);
+                let line: ClothLine = (0..=steps)
+                    .filter_map(|k| {
+                        let (p, _) =
+                            r3d_core::seam::point_along(&side, closed * k as f64 / steps as f64);
+                        self.on_cloth(panel, p)
+                    })
+                    .collect();
+                (closed > 0.0 && line.len() > 1).then_some(line)
             })
             .collect()
     }

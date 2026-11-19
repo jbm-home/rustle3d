@@ -22,5 +22,5 @@ pub mod solver;
 pub use cpu::CpuSolver;
 pub use fabric::{FabricParams, FabricPreset};
 pub use model::Model;
-pub use scene::SimScene;
+pub use scene::{Closure, SimScene};
 pub use solver::{SUBSTEPS, Solver, StepError, StepStats};

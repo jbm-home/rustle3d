@@ -28,6 +28,20 @@ pub struct Triangle {
     pub warp: Vec2,
 }
 
+/// Two points held together by a closure: a button through its
+/// buttonhole, or a closed stretch of zipper. A stiff tie that closes at
+/// a bounded speed ([`crate::solver::CLOSING_SPEED`]), so a garment can be
+/// fastened at any time, not only while its seams close.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Closure {
+    pub pair: [u32; 2],
+    /// The cloth within this distance of each end, on its pattern (m),
+    /// lies on the cloth around the other end on purpose (a front band
+    /// buttoned over the other): the two patches do not repel each other.
+    /// 0: only the usual neighbourhood of a seam.
+    pub overlap: f32,
+}
+
 /// A complete scene.
 #[derive(Debug, Clone, Default)]
 pub struct SimScene {
@@ -36,6 +50,8 @@ pub struct SimScene {
     pub fabrics: Vec<FabricParams>,
     /// Vertex pairs sewn together.
     pub seams: Vec<[u32; 2]>,
+    /// Vertex pairs held by a closure (a button, a closed zipper).
+    pub closures: Vec<Closure>,
     /// The body, if any.
     pub collider: Option<StaticMesh>,
     /// How the body's parts move; `None`: it stands still. Needs a

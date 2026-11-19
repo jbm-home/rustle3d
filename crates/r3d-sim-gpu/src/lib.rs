@@ -30,7 +30,8 @@ use r3d_sim::model::Model;
 use r3d_sim::motion::{BodyMotion, ITERATIONS, ON_SKIN};
 use r3d_sim::selfcollide::MARGIN;
 use r3d_sim::solver::{
-    GRAB_COMPLIANCE, NEAR, SKIN, SUBSTEPS, StepError, StepStats, grabbed, sewing,
+    CLOSING_SPEED, CLOSURE_COMPLIANCE, GRAB_COMPLIANCE, NEAR, SKIN, SUBSTEPS, StepError, StepStats,
+    grabbed, sewing,
 };
 use r3d_sim::{SimScene, Solver};
 
@@ -116,10 +117,11 @@ mod bind {
     pub const NEIGHBOUR_COUNT: u32 = 19;
     pub const CONTACTS: u32 = 20;
     pub const BODY: u32 = 21;
+    pub const CLOSURES: u32 = 22;
     /// Bindings the kernels only read.
-    pub const READ_ONLY: [u32; 11] = [
+    pub const READ_ONLY: [u32; 12] = [
         PDATA, MEMBRANES, HINGES, SEAMS, EDGE_ROWS, SEWN, EXCLUDED, SDF_SLOTS, SDF_VALUES, GRAB,
-        BODY,
+        BODY, CLOSURES,
     ];
 }
 
@@ -145,8 +147,9 @@ mod kernel {
     pub const SELF_COUNT: usize = 14;
     pub const SELF_GATHER: usize = 15;
     pub const SELF_APPLY: usize = 16;
+    pub const CLOSURE: usize = 17;
 
-    pub const ALL: [(&str, &[u32]); 17] = [
+    pub const ALL: [(&str, &[u32]); 18] = [
         ("predict", &[X, PREV, VEL, PDATA]),
         ("membrane", &[X, PDATA, MEMBRANES]),
         ("hinge", &[X, PDATA, HINGES]),
@@ -189,6 +192,7 @@ mod kernel {
             &[X, PDATA, DELTA, SEWN, NEIGHBOURS, NEIGHBOUR_COUNT, CONTACTS],
         ),
         ("self_apply", &[X, DELTA, SEWN]),
+        ("closure", &[X, PREV, PDATA, CLOSURES]),
     ];
 }
 
@@ -248,7 +252,9 @@ impl GpuContext {
         let source = format!(
             "const SKIN: f32 = {SKIN:?};\nconst NEAR: f32 = {NEAR:?};\nconst BAND: f32 = {BAND:?};\n\
              const BRICK: u32 = {BRICK}u;\nconst MAX_NEIGHBOURS: u32 = {MAX_NEIGHBOURS}u;\n\
-             const ITERATIONS: u32 = {ITERATIONS}u;\nconst ON_SKIN: f32 = {ON_SKIN:?};\n{}",
+             const ITERATIONS: u32 = {ITERATIONS}u;\nconst ON_SKIN: f32 = {ON_SKIN:?};\n\
+             const CLOSURE_COMPLIANCE: f32 = {CLOSURE_COMPLIANCE:?};\n\
+             const CLOSING_SPEED: f32 = {CLOSING_SPEED:?};\n{}",
             include_str!("shaders/xpbd.wgsl")
         );
         let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -409,6 +415,7 @@ pub struct GpuSolver {
     scene: SceneUniform,
     inv_mass: Vec<f32>,
     seams: Vec<[u32; 2]>,
+    closures: Vec<[u32; 2]>,
     has_seams: bool,
     /// Positions and velocities read back after the last step.
     x: Vec<Vec3>,
@@ -581,6 +588,12 @@ impl GpuSolver {
             .filter_map(|k| model.seams.get(*k))
             .copied()
             .collect();
+        let (closure_order, closure_ranges) = colour(&model.closures, n);
+        let closures: Vec<[u32; 2]> = closure_order
+            .iter()
+            .filter_map(|k| model.closures.get(*k))
+            .copied()
+            .collect();
 
         // Per-particle rows.
         let mut adjacent: Vec<Vec<u32>> = vec![Vec::new(); n];
@@ -698,6 +711,14 @@ impl GpuSolver {
                 bind::SEAMS,
                 storage("cloth seams", bytemuck::cast_slice(&seams), U::empty()),
             ),
+            (
+                bind::CLOSURES,
+                storage(
+                    "cloth closures",
+                    bytemuck::cast_slice(&closures),
+                    U::empty(),
+                ),
+            ),
             (bind::NEARBY, zeroed("cloth near", 4 * n as u64)),
             (bind::DELTA, zeroed("cloth delta", 16 * n as u64)),
             (
@@ -775,6 +796,7 @@ impl GpuSolver {
         let membrane_slots = slots(&membrane_ranges);
         let hinge_slots = slots(&hinge_ranges);
         let seam_slots = slots(&seam_ranges);
+        let closure_slots = slots(&closure_ranges);
         let mut range_bytes = vec![0u8; ranges.len() * SLOT as usize];
         for (k, (start, count)) in ranges.iter().enumerate() {
             let r = RangeUniform {
@@ -860,6 +882,7 @@ impl GpuSolver {
         substep_passes.extend(coloured(MEMBRANE, &membrane_slots));
         substep_passes.extend(coloured(HINGE, &hinge_slots));
         substep_passes.extend(coloured(SEAM, &seam_slots));
+        substep_passes.extend(coloured(CLOSURE, &closure_slots));
         if self_collision {
             frame_passes = vec![
                 Dispatch {
@@ -911,6 +934,7 @@ impl GpuSolver {
             scene,
             inv_mass: model.inv_mass,
             seams: model.seams,
+            closures: model.closures,
             has_seams: !seams.is_empty(),
             x: model.positions,
             v: vec![Vec3::ZERO; n],
@@ -1054,7 +1078,7 @@ impl Solver for GpuSolver {
         }
         result?;
         self.time += frame_dt;
-        self.stats = StepStats::measure(&self.x, &self.v, &self.seams);
+        self.stats = StepStats::measure(&self.x, &self.v, &self.seams, &self.closures);
         Ok(())
     }
 

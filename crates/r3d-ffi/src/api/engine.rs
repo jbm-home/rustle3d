@@ -1440,11 +1440,13 @@ impl Engine {
                 (piece, material)
             })
             .collect();
-        let lines = drape::LinesOnCloth::new(drape, &positions)
+        let on = drape::LinesOnCloth::new(drape, &positions);
+        let lines = on
             .internal_lines(&project)
             .iter()
             .map(|l| Mesh::ribbon(l, LINE_WIDTH_M, LINE_LIFT_M))
             .collect();
+        let trims = r3d_render::trims::meshes(&on.buttons(&project), &on.zippers(&project));
         drop(cloth);
         let animation = *self.animation.lock().map_err(|_| poisoned())?;
         let body = form.as_deref().map(|f| {
@@ -1463,6 +1465,7 @@ impl Engine {
             crate::techpack::Dressed {
                 cloth: cloth_meshes,
                 lines,
+                trims,
                 body,
             },
         ))
@@ -1847,7 +1850,7 @@ impl Engine {
             .map_err(|_| poisoned())?
             .first()
             .copied();
-        let (lines, edge_line) = cloth
+        let (lines, edge_line, trims) = cloth
             .as_ref()
             .map(|d| {
                 let on = drape::LinesOnCloth::new(d, &published.positions);
@@ -1859,7 +1862,8 @@ impl Engine {
                 let edge = edge
                     .and_then(|e| on.edge(e))
                     .map(|l| Mesh::ribbon(&l, EDGE_WIDTH_M, LINE_LIFT_M));
-                (lines, edge)
+                let trims = r3d_render::trims::meshes(&on.buttons(project), &on.zippers(project));
+                (lines, edge, trims)
             })
             .unwrap_or_default();
         let fit_map = *self.fit_map.lock().map_err(|_| poisoned())?;
@@ -1940,6 +1944,11 @@ impl Engine {
         draws.extend(edge_line.iter().chain(&tape).map(|mesh| Draw {
             mesh,
             material: ink(theme.selection),
+            print: None,
+        }));
+        draws.extend(trims.iter().map(|(mesh, material)| Draw {
+            mesh,
+            material: *material,
             print: None,
         }));
         g.garment.render(&g.gpu, target, &g.camera, &draws, &theme);

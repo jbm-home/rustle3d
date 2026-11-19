@@ -1,6 +1,6 @@
 # Cloth physics
 
-Status: living document (2026-11-19, M24); the solver choice is revisable (see
+Status: living document (2026-11-19, M20); the solver choice is revisable (see
 the alternatives below). All algorithms come from the
 published papers listed in §9. Code that implements a method cites the paper
 in its doc comment.
@@ -84,10 +84,46 @@ element's rest area or length as each method prescribes.
 | Bending | **Isometric quadratic bending** on interior edges (4-point stencil) | Bergou et al. [5] | Constant Hessian, cheap and stable. Anisotropy approximated by weighting each hinge by the angle between the edge and the grain. Dihedral bending [1] is the fallback. |
 | Seams | Zero-rest-length distance constraints between paired seam vertices, compliance ramped from soft to stiff during "sewing" | [2] | When a seam gap goes under a threshold, the pair can be **welded** into one particle (more stable, fewer constraints). |
 | Pins / grab | Attachment constraint to a world target, with its own compliance | [2] | The mouse grab uses a soft compliance, so cloth follows the cursor without exploding. |
+| Closures (buttons, zippers) | Stiff distance constraint whose rest length shrinks to zero at a bounded speed | [2] | See "Closures" below: fastened at any time without snapping. |
 | Avatar contact | Unilateral SDF constraint `φ(x) ≥ h` | [6], [7] | Thickness `h` from the fabric. |
 | Self-contact | Particle–particle unilateral distance `≥ h`, excluding rest neighbors | [7], [8] | Basic self-collision for the MVP; see §5. |
 | Friction | Position-based Coulomb friction (static/kinetic) on contacts | [7] | Separate cloth–body and cloth–cloth coefficients. |
 | Damping | XPBD constraint damping plus light global velocity damping | [2] | Air drag later. |
+
+### Closures (M20)
+
+A buttoned button holds two points of the garment together (the button
+and the buttonhole's end, both made mesh vertices when they are clear of
+the outline, else the nearest vertex); a closed zipper holds its two
+sides point for point like a seam, from its bottom stop up to the slider
+(the stop always holds). Seams close on the sewing ramp (§4), which is
+over after 0.6 s: a button fastened later at full stiffness would pull
+two points a few centimetres apart together in one substep (≈ 50 m/s).
+A closure is therefore an XPBD distance constraint [2] with the
+compliance of a closed seam (10⁻⁹ m/N) whose target is
+`max(0, d₀ − v·h)`, `d₀` the pair's distance at the substep's start and
+`v` = 0.5 m/s: the gap shrinks at that speed, held both ways so the
+cloth's own momentum cannot close it faster (limiting only the
+correction let the momentum build: a 3 cm gap shut in one frame at
+2.8 m/s). Once closed it is a stiff zero-length tie.
+
+- Opening or closing a trim is a document edit: the app rebuilds the
+  scene and carries the cloth over (§7.8 of the architecture), so the
+  drape goes on; the closures are the only constraints that change.
+- A button holds two layers on top of each other: cloth within 6 cm of
+  the button and cloth within 6 cm of its buttonhole (along the cloth)
+  never repel (self-collision would keep a front band 2 cm off the one
+  under it). Closures join the cloth graph for self-collision as seams
+  do (neighbours excluded, closed pairs pushed as one).
+- On the GPU, closures are coloured like seams, one dispatch per colour
+  after the seams.
+- Checked on both backends (`buttons_hold_two_bands_together`): two
+  bands 3 cm apart held by three buttons close at the bounded speed
+  (gap still > 2 cm after one frame, speed < 2 m/s), are closed within
+  2 mm after 1.5 s and hang together; unbuttoned they hang apart. A
+  skirt with a centre-back zipper (`r3d-commands` `tests/closures.rs`)
+  drapes zipped, opens (only the stop holds), and closes again within
+  2 mm in a second, each time carried over without starting again.
 
 ### Fabric parameters (our own documented model)
 

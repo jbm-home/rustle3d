@@ -6,7 +6,7 @@ use glam::{Vec2, Vec3};
 use r3d_geom::Rigid;
 use r3d_sim::collide::{Skin, StaticMesh};
 use r3d_sim::motion::BodyMotion;
-use r3d_sim::scene::{Particle, Triangle};
+use r3d_sim::scene::{Closure, Particle, Triangle};
 use r3d_sim::{FabricPreset, SimScene, Solver};
 
 /// Makes a solver of the backend under test.
@@ -269,6 +269,62 @@ pub fn two_panels_sewn_into_a_tube_close_their_seams(make: Make) {
         "seams open: {:?}",
         s.stats()
     );
+}
+
+/// Two bands hanging side by side, overlapping by 5 cm, 3 cm apart in
+/// depth, held by three buttons: the buttons close at a bounded speed and
+/// stay closed, the overlapping bands do not push each other away, and
+/// nothing blows up. Without the buttons the bands hang apart.
+pub fn buttons_hold_two_bands_together(make: Make) {
+    let n = 13;
+    let build = |buttoned: bool| {
+        let left = sheet(0.3, 0.3, n, Vec2::Y, |r| Vec3::new(r.x, 0.5 + r.y, 0.0));
+        let right = sheet(0.3, 0.3, n, Vec2::Y, |r| {
+            Vec3::new(r.x + 0.25, 0.5 + r.y, 0.03)
+        });
+        let offset = left.particles.len() as u32;
+        let mut scene = left;
+        scene.particles.extend(right.particles);
+        scene
+            .triangles
+            .extend(right.triangles.into_iter().map(|t| Triangle {
+                vertices: t.vertices.map(|v| v + offset),
+                ..t
+            }));
+        // Each band held by its top edge.
+        for i in 0..n {
+            scene.particles[n * (n - 1) + i].pinned = true;
+            scene.particles[offset as usize + n * (n - 1) + i].pinned = true;
+        }
+        if buttoned {
+            // Column 11 of the left band (x = 0.275) on column 1 of the
+            // right one (x = 0.25 + 0.025), rows 1, 5 and 9.
+            for j in [1, 5, 9] {
+                let a = (j * n + 11) as u32;
+                let b = offset + (j * n + 1) as u32;
+                scene.closures.push(Closure {
+                    pair: [a, b],
+                    overlap: 0.06,
+                });
+            }
+        }
+        scene
+    };
+    // One frame: the buttons pull at the closing speed, no faster.
+    let mut s = make(build(true));
+    s.step(1.0 / 60.0).unwrap();
+    let start = s.stats();
+    assert!(start.max_closure_gap > 0.02, "{start:?}");
+    assert!(start.max_speed < 2.0, "snapped shut: {start:?}");
+    let s = run(make, build(true), 1.5);
+    let st = s.stats();
+    assert!(st.max_closure_gap < 0.002, "buttons open: {st:?}");
+    // The free bottom corners: the bands hang together, not pushed apart.
+    let (l, r) = (s.positions()[11], s.positions()[n * n + 1]);
+    assert!(l.distance(r) < 0.04, "{l} {r}");
+    let free = run(make, build(false), 1.5);
+    let (l, r) = (free.positions()[11], free.positions()[n * n + 1]);
+    assert!((l.z - r.z).abs() > 0.02, "unbuttoned bands met: {l} {r}");
 }
 
 pub fn jersey_stretches_more_along_the_weft(make: Make) {

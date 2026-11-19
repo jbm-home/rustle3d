@@ -16,6 +16,8 @@ const VIEW: (u32, u32) = (900, 1200);
 pub(crate) struct Dressed {
     pub cloth: Vec<(ClothPiece, Material)>,
     pub lines: Vec<Mesh>,
+    /// Buttons and zippers on the cloth.
+    pub trims: Vec<(Mesh, Material)>,
     pub body: Option<Mesh>,
 }
 
@@ -55,6 +57,11 @@ pub(crate) fn views(
             sheen: theme.panel_line,
             sheen_amount: 0.0,
         },
+        print: None,
+    }));
+    draws.extend(dressed.trims.iter().map(|(mesh, material)| Draw {
+        mesh,
+        material: *material,
         print: None,
     }));
     let mut renderer = ViewRenderer3d::new(gpu, PNG_FORMAT);
