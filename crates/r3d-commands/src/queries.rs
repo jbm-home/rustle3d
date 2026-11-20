@@ -109,6 +109,7 @@ impl QuerySpec for ProjectSummary {
                     serde_json::json!({
                         "id": id, "name": g.name, "fabric": g.fabric, "color": g.color,
                         "layer": g.layer, "notes": g.notes, "print": g.print,
+                        "source": g.source.as_ref().map(|s| &s.file),
                     })
                 })
                 .collect(),

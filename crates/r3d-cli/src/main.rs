@@ -296,12 +296,18 @@ enum Cmd {
         query: String,
     },
     /// Import the pieces of a pattern drawn elsewhere (DXF-AAMA or plain
-    /// DXF, SVG, PDF), then save. The file is copied into the project's
-    /// `imports/` folder first. One undo step.
+    /// DXF, SVG, PDF, or a Seamly2D .sm2d or Valentina .val pattern), then
+    /// save. The file is copied into the project's `imports/` folder
+    /// first, with the measurement file a Seamly2D/Valentina pattern
+    /// names. One undo step.
     Import {
         project: PathBuf,
-        /// The .dxf, .svg or .pdf file.
+        /// The .dxf, .svg, .pdf, .sm2d or .val file.
         file: PathBuf,
+        /// Seamly2D/Valentina: the measurement file to draft with, in
+        /// place of the one the pattern names.
+        #[arg(long)]
+        measurements: Option<PathBuf>,
         /// What one unit of the drawing is, when the file does not say or
         /// says it wrong.
         #[arg(long, value_enum)]
@@ -313,6 +319,14 @@ enum Cmd {
         /// PDF: import only this page (1 = first).
         #[arg(long)]
         page: Option<u32>,
+    },
+    /// Take the avatar's body from a Seamly2D or Valentina measurement
+    /// file (.vit, .smis; a multisize .vst or .smms also sets the size
+    /// range), then save. The file is copied into `imports/` first.
+    Measurements {
+        project: PathBuf,
+        /// The measurement file.
+        file: PathBuf,
     },
     /// Drape on a body imported from a file (a scan, a game character;
     /// you own its licence), or check it.
@@ -720,13 +734,21 @@ fn cmd_techpack(
 fn cmd_import(
     project: &Path,
     file: &Path,
+    measurements: Option<&Path>,
     units: Option<UnitArg>,
     scale: Option<f64>,
     page: Option<u32>,
 ) -> Result<(), Failure> {
     let mut ws = Workspace::open(project)?;
-    let path = ws.adopt(file, "imports")?;
+    let (path, linked) = ws.adopt_pattern(file)?;
     let mut step = json!({ "type": "import.pattern", "path": path });
+    let measurements = match measurements {
+        Some(m) => Some(ws.adopt(m, "imports")?),
+        None => linked,
+    };
+    if let Some(m) = measurements {
+        step["measurements"] = Value::from(m);
+    }
     if let Some(u) = units {
         step["units"] = Value::from(match u {
             UnitArg::Mm => "mm",
@@ -744,6 +766,16 @@ fn cmd_import(
         step["page"] = Value::from(p);
     }
     let result = ws.run_step(&Step::from_value(step)?)?;
+    ws.save()?;
+    print_json(&result)
+}
+
+fn cmd_measurements(project: &Path, file: &Path) -> Result<(), Failure> {
+    let mut ws = Workspace::open(project)?;
+    let path = ws.adopt(file, "imports")?;
+    let result = ws.run_step(&Step::from_value(
+        json!({ "type": "import.measurements", "path": path }),
+    )?)?;
     ws.save()?;
     print_json(&result)
 }
@@ -976,10 +1008,12 @@ fn main() -> ExitCode {
         Cmd::Import {
             project,
             file,
+            measurements,
             units,
             scale,
             page,
-        } => cmd_import(&project, &file, units, scale, page),
+        } => cmd_import(&project, &file, measurements.as_deref(), units, scale, page),
+        Cmd::Measurements { project, file } => cmd_measurements(&project, &file),
         Cmd::Avatar { cmd } => cmd_avatar(cmd),
         Cmd::Texture {
             project,

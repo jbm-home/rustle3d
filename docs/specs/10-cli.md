@@ -24,9 +24,15 @@ nothing is written. Scripts can refer to earlier results
   in `.r3d-cache/drape.bin`, keyed by a fingerprint of the document, so a
   stale drape is never shown. Same as the `simulate` action (scripts, MCP).
 - `r3d import <project> <file> [--units mm|cm|m|in|pt|px] [--scale k]
-  [--page n]`: copy a DXF-AAMA (or plain DXF), SVG or PDF pattern into
-  the project's `imports/` folder, import its pieces (the
-  `import.pattern` action, one undo step) and save (see 07).
+  [--page n] [--measurements file]`: copy a DXF-AAMA (or plain DXF), SVG,
+  PDF, Seamly2D (`.sm2d`) or Valentina (`.val`) pattern into the
+  project's `imports/` folder (a parametric pattern with the measurement
+  file it names, or `--measurements`), import its pieces (the
+  `import.pattern` action, one undo step) and save (see 07 and 28).
+- `r3d measurements <project> <file>`: copy a Seamly2D or Valentina
+  measurement file (`.vit`, `.smis`, `.vst`, `.smms`) into `imports/`,
+  take the avatar's body, variables and (multisize) sizes from it
+  (`import.measurements`) and save (see 28).
 - `r3d render <project> --view board|3d|photo --out file.png [--size WxH]`:
   the 3D view and the photo show the cached drape when it matches the
   document, otherwise the starting positions; the JSON output says which

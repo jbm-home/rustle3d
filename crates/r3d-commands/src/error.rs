@@ -86,6 +86,10 @@ pub enum Invalid {
     TextureSize,
     #[error("cannot be given with `motion`")]
     WithMotion,
+    #[error("needs a body: set the avatar first (avatar.set)")]
+    NoBody,
+    #[error("is missing a measurement our bodies need (height, bust_circ, waist_circ, hip_circ)")]
+    MissingMeasurement,
 }
 
 impl Invalid {
@@ -131,6 +135,8 @@ impl Invalid {
             Invalid::Lods => "invalid.lods",
             Invalid::TextureSize => "invalid.texture_size",
             Invalid::WithMotion => "invalid.with_motion",
+            Invalid::NoBody => "invalid.no_body",
+            Invalid::MissingMeasurement => "invalid.missing_measurement",
         }
     }
 }
@@ -201,6 +207,10 @@ pub enum CommandError {
     Motion(#[from] r3d_avatar::captured::MotionError),
     #[error("the avatar has no skeleton (an imported body, or no avatar): export without skinning")]
     NoSkeleton,
+    #[error(transparent)]
+    Pattern(#[from] r3d_io::import::val::ValError),
+    #[error("{garment} was not imported from a parametric pattern")]
+    NoSource { garment: AnyId },
     #[error("internal error: {detail}")]
     Internal { detail: String },
 }
@@ -281,6 +291,10 @@ impl Localizable for CommandError {
             Self::ImportedBodyStill => Message::new("motion.imported_body", text),
             Self::Motion(e) => e.message(),
             Self::NoSkeleton => Message::new("export.no_skeleton", text),
+            Self::Pattern(e) => e.message(),
+            Self::NoSource { garment } => {
+                Message::new("pattern.no_source", text).arg("garment", garment)
+            }
             Self::Internal { detail } => Message::new("internal", text).arg("detail", detail),
         }
     }

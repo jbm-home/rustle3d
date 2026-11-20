@@ -402,6 +402,7 @@ class _ShellState extends State<Shell> {
     'grading.set_sizes',
     'grading.show_size',
     'avatar.set',
+    'garment.redraft',
   };
 
   /// Run a step that can take seconds off the UI thread, showing its
@@ -411,6 +412,7 @@ class _ShellState extends State<Shell> {
     final title = switch (step['type']) {
       'template.apply' => l.busyTemplate,
       'avatar.set' => l.busyBodyTitle,
+      'garment.redraft' => l.busyRedraft,
       _ => l.busySizesTitle,
     };
     try {
@@ -1928,7 +1930,17 @@ class _ShellState extends State<Shell> {
       acceptedTypeGroups: [
         XTypeGroup(
           label: l.importFiles,
-          extensions: const ['dxf', 'svg', 'pdf'],
+          extensions: const [
+            'dxf',
+            'svg',
+            'pdf',
+            'sm2d',
+            'val',
+            'smis',
+            'smms',
+            'vit',
+            'vst',
+          ],
         ),
       ],
     );
@@ -1944,10 +1956,22 @@ class _ShellState extends State<Shell> {
     }
     if (!mounted) return;
     _refresh();
+    // A measurement file gives the avatar's body.
+    if (result['panels'] == null) {
+      _toast(l.measurementsImported);
+      return;
+    }
     final pieces = (result['panels'] as List<dynamic>).length;
     final ignored = result['ignored'] as int? ?? 0;
+    final unsupported = (result['unsupported'] as List<dynamic>?)?.length ?? 0;
     _toast(
-      [l.imported(pieces), if (ignored > 0) l.importIgnored(ignored)].join(' '),
+      [
+        l.imported(pieces),
+        if (unsupported > 0)
+          l.importUnsupported(unsupported)
+        else if (ignored > 0)
+          l.importIgnored(ignored),
+      ].join(' '),
     );
   }
 
@@ -5125,6 +5149,23 @@ class _GarmentCard extends StatelessWidget {
               ],
             ],
           ),
+          if (garment['source'] case final String file) ...[
+            const SizedBox(height: Space.xs),
+            Text(
+              l.garmentSource(file.split('/').last),
+              style: ts(fontSize: 12, color: p.textMuted),
+            ),
+            const SizedBox(height: Space.xs),
+            Tooltip(
+              message: l.garmentRedraftTip,
+              child: OutlinedButton.icon(
+                onPressed: () =>
+                    run({'type': 'garment.redraft', 'garment': id}),
+                icon: const Icon(Icons.autorenew_rounded, size: 18),
+                label: Text(l.garmentRedraft),
+              ),
+            ),
+          ],
           const SizedBox(height: Space.s),
           _FabricPicker(
             current: garment['fabric'] as String? ?? 'cotton',

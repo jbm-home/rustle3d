@@ -262,7 +262,27 @@
   "allProjects": "All projects",
   "export": "Export",
   "importPattern": "Import",
-  "importTip": "Import a pattern drawn elsewhere: DXF-AAMA, DXF, SVG or PDF",
+  "importTip": "Import a pattern drawn elsewhere (DXF-AAMA, DXF, SVG, PDF, Seamly2D or Valentina), or a Seamly2D or Valentina measurement file",
+  "importUnsupported": "{count, plural, =1{1 kind of drafting step is not supported yet: the pieces using it were left out.} other{{count} kinds of drafting step are not supported yet: the pieces using them were left out.}}",
+  "@importUnsupported": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "measurementsImported": "The avatar takes the measurements from the file.",
+  "garmentSource": "Drafted from {file}",
+  "@garmentSource": {
+    "placeholders": {
+      "file": {
+        "type": "String"
+      }
+    }
+  },
+  "garmentRedraft": "Draft again for the avatar",
+  "garmentRedraftTip": "Run the pattern again with the avatar's measurements; your changes to the pieces are kept",
+  "busyRedraft": "Drafting the pattern again",
   "importFiles": "Patterns",
   "imported": "{count, plural, =1{1 piece imported} other{{count} pieces imported}}.",
   "@imported": {

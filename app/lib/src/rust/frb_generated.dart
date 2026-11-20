@@ -6127,12 +6127,16 @@ class EngineImpl extends RustOpaque implements Engine {
       .crateApiEngineEngineImportMotion(that: this, path: path);
 
   /// Import the pieces of a pattern from a file the user chose
-  /// (anywhere; DXF, SVG or PDF): the file is copied into the project's
+  /// (anywhere; DXF, SVG, PDF, or a Seamly2D/Valentina pattern with the
+  /// measurement file it names): the file is copied into the project's
   /// `imports/` folder, then read, as one undo step. `units` (`mm`, `cm`,
   /// `in`, `px`…) overrides what the file says. Returns the JSON result
   /// of `import.pattern`: `panels`, `ignored`, and `scale` (`assumed`
-  /// when the file did not say how big a unit is). Off the UI thread (a
-  /// big PDF takes a while).
+  /// when the file did not say how big a unit is), or for a parametric
+  /// pattern `unsupported` (drafting steps left out). A Seamly2D or
+  /// Valentina measurement file (.vit, .vst, .smis, .smms) gives the
+  /// avatar's body instead (`import.measurements`: `body`, `sizes`,
+  /// `variables`). Off the UI thread (a big PDF takes a while).
   Future<String> importPattern({required String path, String? units}) => RustLib
       .instance
       .api

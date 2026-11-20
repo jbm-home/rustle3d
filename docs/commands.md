@@ -4354,6 +4354,151 @@ Add pattern pieces in one step: for each, its sewing line (as in panel.create_pa
 
 </details>
 
+### `pattern.import_parametric`
+
+Import a Seamly2D or Valentina pattern (the text of a .sm2d or .val file, and of its measurement file if it has one): its drafting steps are run with the measurements (without a measurement file, the avatar's height, bust, waist and hips) and its pieces added, with seam allowances, notches, grainlines and internal paths, laid out side by side to the right of the board. They make a garment of their own (the project's only garment on an empty board), which keeps the pattern: graded in every size of a size range, and drafted again for another body with garment.redraft. `import.pattern` reads the files. Returns the garment if one was added, then the panels.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Import a parametric pattern as a garment of its own.",
+  "properties": {
+    "file": {
+      "description": "The pattern file's name, as shown (`imports/skirt.val`).",
+      "type": "string"
+    },
+    "measurements": {
+      "description": "The text of its measurement file (`.vit`, `.vst`, `.smis`,\n`.smms`), if it has one. Without it, the pattern is drafted for the\navatar's height, bust, waist and hips.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "pattern": {
+      "description": "The pattern file's text: a Seamly2D (`.sm2d`) or Valentina\n(`.val`) pattern.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "file",
+    "pattern"
+  ],
+  "title": "PatternImportParametric",
+  "type": "object"
+}
+```
+
+</details>
+
+### `garment.redraft`
+
+Draft a garment imported from a Seamly2D or Valentina pattern again for a body (default: the avatar's): its pattern is run with that body's height, bust, waist and hips in place of the measurement file's (a multisize file is read at the size that fits it), and each point and curve moves as the pattern moves it, so changes made to the pieces since are kept; internal lines and pins follow. A piece whose outline gained or lost points is left as it is and listed in `skipped`. In a size range the garment is graded again.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "Body": {
+      "additionalProperties": false,
+      "description": "Body measurements (cm), the input of the avatar fitting.",
+      "properties": {
+        "bust_cm": {
+          "format": "double",
+          "type": "number"
+        },
+        "height_cm": {
+          "format": "double",
+          "type": "number"
+        },
+        "hips_cm": {
+          "format": "double",
+          "type": "number"
+        },
+        "masculinity": {
+          "description": "0 = feminine body, 1 = masculine body.",
+          "format": "double",
+          "type": "number"
+        },
+        "waist_cm": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "masculinity",
+        "height_cm",
+        "bust_cm",
+        "waist_cm",
+        "hips_cm"
+      ],
+      "type": "object"
+    },
+    "GarmentId": {
+      "description": "Identifier of a garment, e.g. `garment:1`.",
+      "pattern": "^garment:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Draft an imported parametric pattern again for a body.",
+  "properties": {
+    "body": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Body"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Measurements in cm; default: the avatar's."
+    },
+    "garment": {
+      "$ref": "#/$defs/GarmentId"
+    }
+  },
+  "required": [
+    "garment"
+  ],
+  "title": "GarmentRedraft",
+  "type": "object"
+}
+```
+
+</details>
+
+### `avatar.use_measurements`
+
+Take the avatar's measurements from a Seamly2D or Valentina measurement file (its text): height, bust, waist and hips (height, bust_circ, waist_circ, hip_circ) become the body, the file's gender its masculinity; its other measurements become variables for formulas (in mm; a custom @name without the @). A multisize file also sets the size range: its sizes along the chest (or its first) dimension, its base size as the base. `import.measurements` reads the file.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Take the avatar's body (and sizes) from a measurement file.",
+  "properties": {
+    "measurements": {
+      "description": "The text of a Seamly2D or Valentina measurement file: individual\n(`.vit`, `.smis`) or multisize (`.vst`, `.smms`).",
+      "type": "string"
+    }
+  },
+  "required": [
+    "measurements"
+  ],
+  "title": "AvatarUseMeasurements",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `constraint.add`
 
 Add a constraint (fixed, coincident, horizontal, vertical, parallel, perpendicular, tangent, equal_length, on_edge) or a dimension (distance, length, angle) on contour points and edges. A dimension with a `formula` (e.g. "waist / 4 + 10 mm") takes its value from the body's measurements and the variables, now and whenever they change, and in every size of the range. The drawing is solved at once: the geometry moves as little as possible so that every constraint holds; constraints that cannot all hold are refused (`constraints_unsolvable`). With `measure`, a dimension keeps the value it has now. Returns the constraint; `constraint.list` shows them with the freedom left.
@@ -6249,7 +6394,7 @@ Export all panels as DXF-AAMA (ASTM D6673, ASCII DXF in mm), for pattern and cut
 
 ### `import.pattern`
 
-Import the pieces of a pattern drawn elsewhere, from a DXF-AAMA (or plain DXF), SVG or PDF file inside the project folder: outlines (curves fitted back to editable edges), seam allowances, notches, grainlines, internal lines and names. A tiled PDF's pages are put back together. One undo step (`pattern.import`). Returns the new panels, what was left out, and the scale: `file`, `given` or `assumed` (check the size when assumed).
+Import the pieces of a pattern drawn elsewhere, from a DXF-AAMA (or plain DXF), SVG or PDF file inside the project folder: outlines (curves fitted back to editable edges), seam allowances, notches, grainlines, internal lines and names. A tiled PDF's pages are put back together. One undo step (`pattern.import`). Returns the new panels, what was left out, and the scale: `file`, `given` or `assumed` (check the size when assumed). A Seamly2D (.sm2d) or Valentina (.val) pattern is drafted with its measurement file (the one it names, next to it, or `measurements`) and becomes a garment that can be drafted again for other bodies and sizes (`pattern.import_parametric`); it returns the garment and panels, the pieces left out and the drafting steps not supported.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -6287,8 +6432,15 @@ Import the pieces of a pattern drawn elsewhere, from a DXF-AAMA (or plain DXF), 
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "Import a pattern from a DXF-AAMA, SVG or PDF file.",
+  "description": "Import a pattern from a DXF-AAMA, SVG, PDF, Seamly2D or Valentina\nfile.",
   "properties": {
+    "measurements": {
+      "description": "A parametric pattern's measurement file, relative to the project\nfolder. By default the one the pattern names, looked for next to\nit.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "page": {
       "description": "PDF: import only this page (1 = first). By default every page,\nwith the tiles of a tiled pattern put back together.",
       "format": "uint32",
@@ -6299,7 +6451,7 @@ Import the pieces of a pattern drawn elsewhere, from a DXF-AAMA (or plain DXF), 
       ]
     },
     "path": {
-      "description": "The file, relative to the project folder (`r3d import` and the app\ncopy files into `imports/`). Its extension gives the format:\n`.dxf`, `.svg` or `.pdf`.",
+      "description": "The file, relative to the project folder (`r3d import` and the app\ncopy files into `imports/`). Its extension gives the format:\n`.dxf`, `.svg`, `.pdf`, or a parametric pattern `.sm2d` (Seamly2D)\nor `.val` (Valentina).",
       "type": "string"
     },
     "scale": {
@@ -6326,6 +6478,33 @@ Import the pieces of a pattern drawn elsewhere, from a DXF-AAMA (or plain DXF), 
     "path"
   ],
   "title": "ImportPattern",
+  "type": "object"
+}
+```
+
+</details>
+
+### `import.measurements`
+
+Read a Seamly2D or Valentina measurement file inside the project folder (.vit, .smis, .vst, .smms): the avatar takes its height, bust, waist and hips, its other measurements become variables, and a multisize file's sizes become the size range. One undo step (`avatar.use_measurements`). Returns the body, the sizes and the number of variables.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Take the avatar's body and sizes from a Seamly2D or Valentina\nmeasurement file.",
+  "properties": {
+    "path": {
+      "description": "The file, relative to the project folder: `.vit` or `.smis`\n(individual), `.vst` or `.smms` (multisize).",
+      "type": "string"
+    }
+  },
+  "required": [
+    "path"
+  ],
+  "title": "ImportMeasurements",
   "type": "object"
 }
 ```

@@ -32,6 +32,14 @@ the app, and I can read or version the file with ordinary tools.
   (metres per unit, up axis `y|z|x|-y|-z|-x`, a turn about the vertical)
   and the arrangement points (mm, by name); absent with the built-in
   body, so other projects keep the same file.
+- Parametric sources (schema v19, spec 28): a garment imported from a
+  Seamly2D or Valentina pattern has `source`: `{"file":
+  "imports/skirt.val", "pattern", "measurements", "body", "pieces":
+  [{"panel", "piece"}]}`, the pattern's and measurement file's text
+  (kept in the JSON, so the garment can be drafted again even if the
+  files are gone), the body it was drafted for (absent: the measurement
+  file's own values) and which panel is which piece of the file; absent
+  for other garments.
 - `project.json` is pretty-printed with a stable key order, so diffs stay small.
 - A `schema_version` field; older versions are migrated on load. Files newer
   than the app are refused with a clear message, never half-loaded.

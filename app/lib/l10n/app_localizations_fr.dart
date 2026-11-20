@@ -417,7 +417,38 @@ class LFr extends L {
 
   @override
   String get importTip =>
-      'Importer un patron dessiné ailleurs : DXF-AAMA, DXF, SVG ou PDF';
+      'Importer un patron dessiné ailleurs (DXF-AAMA, DXF, SVG, PDF, Seamly2D ou Valentina), ou un fichier de mensurations Seamly2D ou Valentina';
+
+  @override
+  String importUnsupported(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count types d’étapes de tracé ne sont pas encore pris en charge : les pièces qui les utilisent ont été laissées de côté.',
+      one: '1 type d’étape de tracé n’est pas encore pris en charge : les pièces qui l’utilisent ont été laissées de côté.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get measurementsImported =>
+      'L’avatar prend les mensurations du fichier.';
+
+  @override
+  String garmentSource(String file) {
+    return 'Tracé depuis $file';
+  }
+
+  @override
+  String get garmentRedraft => 'Retracer pour l’avatar';
+
+  @override
+  String get garmentRedraftTip =>
+      'Relancer le patron avec les mensurations de l’avatar ; vos modifications des pièces sont conservées';
+
+  @override
+  String get busyRedraft => 'Nouveau tracé du patron';
 
   @override
   String get importFiles => 'Patrons';

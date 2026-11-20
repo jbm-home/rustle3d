@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Multisize measurements made up for Rustle3D's tests (old Valentina layout). -->
+<vst>
+  <version>0.4.4</version>
+  <read-only>false</read-only>
+  <unit>cm</unit>
+  <size base="44"/>
+  <height base="170"/>
+  <body-measurements>
+    <m name="height" base="170" height_increase="6" size_increase="0"/>
+    <m name="bust_circ" base="88" height_increase="0" size_increase="4"/>
+    <m name="waist_circ" base="70" height_increase="0" size_increase="4"/>
+    <m name="hip_circ" base="96" height_increase="0" size_increase="4"/>
+    <m name="height_waist_side" base="104" height_increase="4" size_increase="0"/>
+    <m name="height_knee" base="46" height_increase="2" size_increase="0"/>
+  </body-measurements>
+</vst>

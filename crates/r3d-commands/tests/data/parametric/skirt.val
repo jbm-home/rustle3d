@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A quarter skirt, drafted by hand for Rustle3D's tests (Valentina format). -->
+<pattern>
+  <version>1.2.1</version>
+  <unit>cm</unit>
+  <measurements path="body.vit"/>
+  <increments>
+    <increment name="#ease" formula="1" description="ease at waist and hips"/>
+  </increments>
+  <draw name="Skirt">
+    <calculation>
+      <point type="single" id="1" name="A" x="0" y="0" mx="0" my="0"/>
+      <point type="endLine" id="2" name="A1" basePoint="1" length="waist_circ/4 + #ease" angle="0" typeLine="hair"/>
+      <point type="endLine" id="3" name="A2" basePoint="1" length="height_waist_side - height_knee" angle="270" typeLine="hair"/>
+      <point type="endLine" id="4" name="A3" basePoint="3" length="hip_circ/4 + #ease" angle="0" typeLine="hair"/>
+      <point type="alongLine" id="5" name="A4" firstPoint="1" secondPoint="3" length="20" typeLine="none"/>
+      <point type="endLine" id="6" name="A5" basePoint="5" length="Line_A2_A3" angle="0" typeLine="hair"/>
+      <spline type="simpleInteractive" id="7" point1="2" point4="6" angle1="270" length1="5" angle2="90" length2="5"/>
+      <spline type="parallelCurve" id="11" curve="7" width="1" suffix="p"/>
+    </calculation>
+    <modeling>
+      <point type="modeling" id="100" idObject="1"/>
+      <point type="modeling" id="101" idObject="2"/>
+      <spline type="modelingSpline" id="102" idObject="7"/>
+      <point type="modeling" id="103" idObject="6"/>
+      <point type="modeling" id="104" idObject="4"/>
+      <point type="modeling" id="105" idObject="3"/>
+      <point type="modeling" id="108" idObject="5"/>
+      <spline type="modelingPath" id="110" idObject="11"/>
+      <path type="2" id="107" name="Hip line" visible="1">
+        <nodes>
+          <node type="NodePoint" idObject="108"/>
+          <node type="NodePoint" idObject="103"/>
+        </nodes>
+      </path>
+    </modeling>
+    <details>
+      <detail id="200" version="2" name="Front" seamAllowance="true" width="1">
+        <grainline enabled="true" mx="0" my="0" length="10" rotation="90" arrows="0"/>
+        <nodes>
+          <node type="NodePoint" idObject="100"/>
+          <node type="NodePoint" idObject="101"/>
+          <node type="NodeSpline" idObject="102" reverse="0"/>
+          <node type="NodePoint" idObject="103" passmark="true"/>
+          <node type="NodePoint" idObject="104"/>
+          <node type="NodePoint" idObject="105"/>
+        </nodes>
+        <iPaths><record path="107"/></iPaths>
+      </detail>
+      <detail id="202" version="2" name="Facing">
+        <nodes>
+          <node type="NodePoint" idObject="100"/>
+          <node type="NodeSplinePath" idObject="110"/>
+        </nodes>
+      </detail>
+    </details>
+  </draw>
+</pattern>

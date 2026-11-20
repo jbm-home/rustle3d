@@ -15,6 +15,9 @@ size shown in 3D), a grade step on a selected point. Project files:
 schema v10 (`grading`, `grade` on points and curved edges, a garment's
 `template`).
 
+Since 2026-11-20, a garment imported from a Seamly2D or Valentina pattern
+is graded by running that pattern for every size's body (spec 28).
+
 Not yet: grade rules read from imported files (they come in at the size
 drawn), an ASTM rule table (`.rul`) next to the DXF, notches graded on
 their own (they keep their distance from the edge's start), editing a

@@ -37,3 +37,4 @@ descriptions, public papers, open standards, general garment-making knowledge.
 | 25 | [Textures and prints](25-textures-prints.md) | M21 |
 | 26 | [Trims: buttons and zippers](26-trims.md) | M20 |
 | 27 | [Imported avatars](27-imported-avatars.md) | M31 |
+| 28 | [Seamly2D and Valentina patterns](28-parametric-import.md) | M28 |

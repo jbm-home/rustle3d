@@ -8,6 +8,7 @@
 
 pub mod pdf;
 pub mod svg;
+pub mod val;
 pub(crate) mod vector;
 
 use r3d_core::{Localizable, Message, PathSegment};
@@ -196,6 +197,8 @@ pub enum ImportError {
     NoSuchPage { page: usize, pages: usize },
     #[error("the PDF is encrypted")]
     Encrypted,
+    #[error(transparent)]
+    Val(#[from] val::ValError),
 }
 
 impl Localizable for ImportError {
@@ -214,6 +217,7 @@ impl Localizable for ImportError {
                 .arg("page", page)
                 .arg("pages", pages),
             Self::Encrypted => Message::new("import_encrypted", text),
+            Self::Val(e) => e.message(),
         }
     }
 }
@@ -343,7 +347,7 @@ pub(crate) fn finish(
     })
 }
 
-fn is_simple(outline: &Path) -> bool {
+pub(crate) fn is_simple(outline: &Path) -> bool {
     let mut pts = outline.polyline();
     if pts.len() > 1 && pts[0].distance(pts[pts.len() - 1]) < 1e-6 {
         pts.pop();

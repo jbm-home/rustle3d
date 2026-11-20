@@ -1569,25 +1569,42 @@ impl Engine {
     }
 
     /// Import the pieces of a pattern from a file the user chose
-    /// (anywhere; DXF, SVG or PDF): the file is copied into the project's
+    /// (anywhere; DXF, SVG, PDF, or a Seamly2D/Valentina pattern with the
+    /// measurement file it names): the file is copied into the project's
     /// `imports/` folder, then read, as one undo step. `units` (`mm`, `cm`,
     /// `in`, `px`…) overrides what the file says. Returns the JSON result
     /// of `import.pattern`: `panels`, `ignored`, and `scale` (`assumed`
-    /// when the file did not say how big a unit is). Off the UI thread (a
-    /// big PDF takes a while).
+    /// when the file did not say how big a unit is), or for a parametric
+    /// pattern `unsupported` (drafting steps left out). A Seamly2D or
+    /// Valentina measurement file (.vit, .vst, .smis, .smms) gives the
+    /// avatar's body instead (`import.measurements`: `body`, `sizes`,
+    /// `variables`). Off the UI thread (a big PDF takes a while).
     pub fn import_pattern(&self, path: String, units: Option<String>) -> Result<String, ApiError> {
         self.long("import", |_| self.import_from(&path, units))
     }
 
     fn import_from(&self, path: &str, units: Option<String>) -> Result<String, ApiError> {
         let mut ws = self.workspace()?;
-        let rel = ws
-            .adopt(std::path::Path::new(path), "imports")
-            .map_err(err)?;
-        let mut step = serde_json::json!({ "type": "import.pattern", "path": rel });
-        if let Some(u) = units {
-            step["units"] = serde_json::Value::from(u);
-        }
+        let file = std::path::Path::new(path);
+        let ext = file
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(str::to_lowercase)
+            .unwrap_or_default();
+        let step = if matches!(ext.as_str(), "vit" | "vst" | "smis" | "smms") {
+            let rel = ws.adopt(file, "imports").map_err(err)?;
+            serde_json::json!({ "type": "import.measurements", "path": rel })
+        } else {
+            let (rel, measurements) = ws.adopt_pattern(file).map_err(err)?;
+            let mut step = serde_json::json!({ "type": "import.pattern", "path": rel });
+            if let Some(m) = measurements {
+                step["measurements"] = serde_json::Value::from(m);
+            }
+            if let Some(u) = units {
+                step["units"] = serde_json::Value::from(u);
+            }
+            step
+        };
         let step = Step::from_value(step).map_err(err)?;
         let result = ws.run_step(&step).map_err(err)?;
         self.edited()?;

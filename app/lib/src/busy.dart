@@ -89,8 +89,10 @@ class _BusyCardState extends State<_BusyCard> {
   String _what(BuildContext context, StepProgress? p) {
     final l = context.l;
     return switch (p?.task) {
-      'template.sizes' when p!.done == 0 => l.busySizesStart(p.total),
-      'template.sizes' => l.busySizes(p!.item, p.done, p.total),
+      'template.sizes' ||
+      'pattern.sizes' when p!.done == 0 => l.busySizesStart(p.total),
+      'template.sizes' ||
+      'pattern.sizes' => l.busySizes(p!.item, p.done, p.total),
       'body.fit' => l.busyBodyFit,
       'drape.prepare' => l.busyDrape,
       'export' => l.busyExport,

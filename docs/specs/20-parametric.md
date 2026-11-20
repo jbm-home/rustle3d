@@ -13,9 +13,10 @@ Project files: schema v12 (`variables`). The app: a formula button on
 each dimension in the inspector, a Variables section (nothing selected).
 
 Not yet: other body measurements than height, bust, waist and hips
-(neck, shoulder, arm length…); importing Seamly2D/Valentina patterns and
-measurement files (open XML formats, their formulas); formulas on grade
-rules. Since M32 (2026-11-18) a formula can also be typed in place of
+(neck, shoulder, arm length…); formulas on grade rules. Seamly2D and
+Valentina patterns and measurement files come in through spec 28
+(2026-11-20): their own drafting steps are run for each body, not turned
+into constraints. Since M32 (2026-11-18) a formula can also be typed in place of
 a value in the dimension's field (anything that is not a number is
 taken as a formula).
 

@@ -10,11 +10,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use r3d_core::{AnyId, PathSegment};
+use r3d_core::AnyId;
 
-use crate::commands::{
-    DEFAULT_GRAIN_ANGLE_DEG, LineSpec, PatternImport, PieceSpec, SegmentSpec, Vec2,
-};
+use crate::commands::{PatternImport, PieceSpec};
 use crate::drape;
 use crate::error::{CommandError, Invalid};
 use crate::progress::Progress;
@@ -483,14 +481,21 @@ impl UnitSpec {
     }
 }
 
-/// Import a pattern from a DXF-AAMA, SVG or PDF file.
+/// Import a pattern from a DXF-AAMA, SVG, PDF, Seamly2D or Valentina
+/// file.
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ImportPattern {
     /// The file, relative to the project folder (`r3d import` and the app
     /// copy files into `imports/`). Its extension gives the format:
-    /// `.dxf`, `.svg` or `.pdf`.
+    /// `.dxf`, `.svg`, `.pdf`, or a parametric pattern `.sm2d` (Seamly2D)
+    /// or `.val` (Valentina).
     pub path: String,
+    /// A parametric pattern's measurement file, relative to the project
+    /// folder. By default the one the pattern names, looked for next to
+    /// it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub measurements: Option<String>,
     /// What one unit of the drawing is, when the file says nothing or says
     /// it wrong: `mm`, `cm`, `m`, `in`, `pt` or `px`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -506,12 +511,12 @@ pub struct ImportPattern {
 }
 
 impl Described for ImportPattern {
-    const SUMMARY: &'static str = "Import the pieces of a pattern drawn elsewhere, from a DXF-AAMA (or plain DXF), SVG or PDF file inside the project folder: outlines (curves fitted back to editable edges), seam allowances, notches, grainlines, internal lines and names. A tiled PDF's pages are put back together. One undo step (`pattern.import`). Returns the new panels, what was left out, and the scale: `file`, `given` or `assumed` (check the size when assumed).";
+    const SUMMARY: &'static str = "Import the pieces of a pattern drawn elsewhere, from a DXF-AAMA (or plain DXF), SVG or PDF file inside the project folder: outlines (curves fitted back to editable edges), seam allowances, notches, grainlines, internal lines and names. A tiled PDF's pages are put back together. One undo step (`pattern.import`). Returns the new panels, what was left out, and the scale: `file`, `given` or `assumed` (check the size when assumed). A Seamly2D (.sm2d) or Valentina (.val) pattern is drafted with its measurement file (the one it names, next to it, or `measurements`) and becomes a garment that can be drafted again for other bodies and sizes (`pattern.import_parametric`); it returns the garment and panels, the pieces left out and the drafting steps not supported.";
 }
 
 impl ActionSpec for ImportPattern {
     fn run(&self, ws: &mut Workspace) -> Result<Value, WorkspaceError> {
-        use r3d_io::import::{ImportOptions, grain_angle_deg};
+        use r3d_io::import::ImportOptions;
         if let Some(s) = self.scale {
             crate::error::positive("scale", s)?;
             crate::error::finite("scale", &[s])?;
@@ -522,6 +527,9 @@ impl ActionSpec for ImportPattern {
             .map(str::to_lowercase)
             .unwrap_or_default();
         let bytes = ws.read(&self.path)?;
+        if matches!(ext.as_str(), "val" | "sm2d") {
+            return self.parametric(ws, &bytes);
+        }
         let options = ImportOptions {
             mm_per_unit: self.units.map(UnitSpec::mm),
             page: self.page.map(|p| p as usize),
@@ -536,23 +544,7 @@ impl ActionSpec for ImportPattern {
         let pieces = pattern
             .pieces
             .iter()
-            .map(|p| PieceSpec {
-                name: p.name.clone(),
-                start: xy(p.outline.start),
-                segments: segments(&p.outline.segments),
-                seam_allowance_mm: p.seam_allowance_mm,
-                grain_angle_deg: p.grain.map_or(DEFAULT_GRAIN_ANGLE_DEG, grain_angle_deg),
-                notches: p.notches.iter().map(|n| xy(*n)).collect(),
-                internal_lines: p
-                    .internal_lines
-                    .iter()
-                    .filter(|l| !l.segments.is_empty())
-                    .map(|l| LineSpec {
-                        start: xy(l.start),
-                        segments: segments(&l.segments),
-                    })
-                    .collect(),
-            })
+            .map(PieceSpec::from_imported)
             .collect();
         let cmd = Command::PatternImport(PatternImport {
             pieces,
@@ -574,21 +566,121 @@ impl ActionSpec for ImportPattern {
     }
 }
 
-fn xy(p: glam::DVec2) -> Vec2 {
-    [p.x, p.y]
+impl ImportPattern {
+    /// A Seamly2D or Valentina pattern, with its measurement file.
+    fn parametric(&self, ws: &mut Workspace, bytes: &[u8]) -> Result<Value, WorkspaceError> {
+        let pattern = text(bytes)?;
+        let link = r3d_io::import::val::linked_measurements(bytes).map_err(CommandError::from)?;
+        let measurements = match (&self.measurements, link) {
+            (Some(path), _) => Some(text(&ws.read(path)?)?),
+            (None, Some(link)) => Some(text(&beside(ws, &self.path, &link)?)?),
+            (None, None) => None,
+        };
+        let cmd = Command::PatternImportParametric(crate::commands::PatternImportParametric {
+            file: self.path.clone(),
+            pattern,
+            measurements,
+        });
+        let out = ws.session_mut().execute(&cmd)?;
+        let garment = out.created.iter().find_map(|id| match id {
+            AnyId::Garment(g) => Some(*g),
+            _ => None,
+        });
+        let panels: Vec<String> = out
+            .created
+            .iter()
+            .filter(|id| matches!(id, AnyId::Panel(_)))
+            .map(ToString::to_string)
+            .collect();
+        // What was left out, from the pattern as drafted.
+        let project = ws.session().project();
+        let source = out
+            .created
+            .iter()
+            .find_map(|id| match id {
+                AnyId::Panel(p) => project.panel(*p),
+                _ => None,
+            })
+            .and_then(|p| project.garments().get(&p.garment))
+            .and_then(|g| g.source.clone());
+        let (ignored, unsupported) = match source {
+            Some(s) => crate::sources::report(&s)?,
+            None => (0, Vec::new()),
+        };
+        Ok(json!({
+            "garment": garment.map(|g| g.to_string()),
+            "panels": panels,
+            "ignored": ignored,
+            "unsupported": unsupported,
+        }))
+    }
 }
 
-fn segments(segs: &[PathSegment]) -> Vec<SegmentSpec> {
-    segs.iter()
-        .map(|s| match s {
-            PathSegment::Line { to } => SegmentSpec::Line { to: xy(*to) },
-            PathSegment::Cubic { c1, c2, to } => SegmentSpec::Cubic {
-                c1: xy(*c1),
-                c2: xy(*c2),
-                to: xy(*to),
-            },
+/// A file's text.
+fn text(bytes: &[u8]) -> Result<String, WorkspaceError> {
+    String::from_utf8(bytes.to_vec()).map_err(|_| {
+        CommandError::from(r3d_io::import::val::ValError::Malformed {
+            detail: "not UTF-8 text".into(),
         })
-        .collect()
+        .into()
+    })
+}
+
+/// The measurement file `link` that a pattern at `pattern` names: at that
+/// path from the pattern's folder, else by its name next to the pattern.
+fn beside(ws: &Workspace, pattern: &str, link: &str) -> Result<Vec<u8>, WorkspaceError> {
+    let folder = pattern.rsplit_once('/').map_or("", |(f, _)| f);
+    let name = link.rsplit('/').next().unwrap_or(link);
+    let join = |p: &str| {
+        if folder.is_empty() {
+            p.to_owned()
+        } else {
+            format!("{folder}/{p}")
+        }
+    };
+    ws.read(&join(link))
+        .or_else(|_| ws.read(&join(name)))
+        .map_err(|_| {
+            CommandError::from(r3d_io::import::val::ValError::MissingMeasurementFile {
+                file: link.to_owned(),
+            })
+            .into()
+        })
+}
+
+/// Take the avatar's body and sizes from a Seamly2D or Valentina
+/// measurement file.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ImportMeasurements {
+    /// The file, relative to the project folder: `.vit` or `.smis`
+    /// (individual), `.vst` or `.smms` (multisize).
+    pub path: String,
+}
+
+impl Described for ImportMeasurements {
+    const SUMMARY: &'static str = "Read a Seamly2D or Valentina measurement file inside the project folder (.vit, .smis, .vst, .smms): the avatar takes its height, bust, waist and hips, its other measurements become variables, and a multisize file's sizes become the size range. One undo step (`avatar.use_measurements`). Returns the body, the sizes and the number of variables.";
+}
+
+impl ActionSpec for ImportMeasurements {
+    fn run(&self, ws: &mut Workspace) -> Result<Value, WorkspaceError> {
+        self.run_with(ws, &Progress::default())
+    }
+
+    fn run_with(&self, ws: &mut Workspace, progress: &Progress) -> Result<Value, WorkspaceError> {
+        let measurements = text(&ws.read(&self.path)?)?;
+        let cmd =
+            Command::AvatarUseMeasurements(crate::commands::AvatarUseMeasurements { measurements });
+        ws.session_mut().execute_with(&cmd, progress)?;
+        let p = ws.session().project();
+        Ok(json!({
+            "body": p.avatar().map(|a| a.body),
+            "sizes": p
+                .grading()
+                .map(|g| g.sizes.iter().map(|s| s.name.clone()).collect::<Vec<_>>()),
+            "variables": p.variables().len(),
+        }))
+    }
 }
 
 /// Below this particle speed (m/s) the cloth counts as settled.

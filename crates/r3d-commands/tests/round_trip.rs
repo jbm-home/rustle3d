@@ -232,6 +232,21 @@ fn every_command_round_trips() {
     h.round_trip(json!({"type": "grading.set_sizes", "base": "38", "sizes": [
         {"name": "38", "bust_cm": -4}, {"name": "40"}, {"name": "42", "bust_cm": 4}]}));
     h.round_trip(json!({"type": "grading.clear", "confirm": true}));
+
+    // A parametric pattern (spec 28), drafted again, and a multisize
+    // measurement file.
+    let parametric = h.round_trip(json!({"type": "pattern.import_parametric",
+        "file": "imports/skirt.val",
+        "pattern": include_str!("data/parametric/skirt.val"),
+        "measurements": include_str!("data/parametric/body.vit")}));
+    h.round_trip(
+        json!({"type": "garment.redraft", "garment": parametric.created[0],
+        "body": {"masculinity": 0, "height_cm": 168, "bust_cm": 92, "waist_cm": 80,
+        "hips_cm": 104}}),
+    );
+    h.round_trip(json!({"type": "avatar.use_measurements",
+        "measurements": include_str!("data/parametric/sizes.vst")}));
+    h.round_trip(json!({"type": "grading.clear", "confirm": true}));
     let copy = r3d_commands::step::parse_query(
         json!({"type": "panel.copy", "panels": [imported.created[0]]}),
     )

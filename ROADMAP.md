@@ -794,9 +794,21 @@ Built (2026-11-18), demo `./demos/m28/demo.sh`, spec 20:
   formulas move get their grades from it, so the graded nest, exports and
   per-size drape follow; grade rules stay for the rest.
 - The app: a formula button on each dimension, a Variables section.
-- Open: more body measurements (neck, shoulder, arm…); Seamly2D/Valentina
-  import (left for later: the formulas work, the format is a separate
-  piece of work); formulas typed directly in a value field.
+- Open: more body measurements (neck, shoulder, arm…); formulas typed
+  directly in a value field.
+- Seamly2D/Valentina import, built 2026-11-20 (spec 28, demo
+  `./demos/m28/seamly.sh`): `.val`/`.sm2d` patterns are run with their
+  measurement file (`.vit`, `.vst`, `.smis`, `.smms`) through our own
+  reading of their drafting steps and formulas (`r3d_io::import::val`),
+  the pieces exact with seam allowance, notches, grainline, internal
+  paths and fold lines; the garment keeps the pattern (schema v19), is
+  graded in every size by running it for each size's body, and is
+  drafted again for another body keeping the edits (`garment.redraft`);
+  a measurement file gives the avatar, variables and, multisize, the
+  size range (`import.measurements`). The app's Import takes these files
+  and a garment card offers Draft again for the avatar. Open: the steps
+  `parallelCurve`, `graduatedCurve`, `ellipticalArcWithLength` and the
+  union of pieces; seam allowances that change along the outline.
 
 ## M29 — Construction details ✅ (2026-11-18)
 - Seams on part of an edge and on a chain of edges, with an adjustable

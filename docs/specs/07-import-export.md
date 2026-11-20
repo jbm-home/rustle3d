@@ -47,6 +47,9 @@ print and cut.
     the test square; in DXF every piece once per size, block `P<n>-<size>`
     with a `Size: …` text). The app exports a graded project's nest of
     every size.
+- **Parametric patterns** (Seamly2D `.sm2d`, Valentina `.val`, with their
+  measurement files): drafted for the body and kept, so they can be
+  graded and drafted again; see spec 28.
 - **Import patterns** (`import.pattern`, one undo step through the
   `pattern.import` command): DXF-AAMA or plain DXF, SVG, PDF.
   - The file must be inside the project folder; the app and `r3d import`

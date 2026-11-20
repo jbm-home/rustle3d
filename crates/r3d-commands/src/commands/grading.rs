@@ -188,7 +188,7 @@ fn rebase(tx: &mut Transaction<'_>, i: usize) {
 }
 
 /// Set the range to `sizes` based on `base`: see [`GradingSetSizes`].
-fn set_sizes(
+pub(crate) fn set_sizes(
     tx: &mut Transaction<'_>,
     sizes: &[SizeSpec],
     base: &str,
@@ -304,6 +304,10 @@ fn set_sizes(
         .collect();
     for garment in garments {
         crate::templates::grade_garment(tx, garment, progress)?;
+    }
+    // Garments imported from a parametric pattern: run for every size.
+    for garment in super::source_garments(tx) {
+        crate::sources::grade(tx, garment, progress)?;
     }
     Ok(CommandOutput::default())
 }

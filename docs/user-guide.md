@@ -7,7 +7,7 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-20 (the tape measure goes round a slanting sleeve square to it, and measures a length between two points of the garment; the start screen tells you when a new version is out, and the check can be turned off; Installing: a disk image for macOS, one for Intel and Apple silicon, an installer for Windows, and the first launch on recent macOS, through Privacy & Security; the shirt, T-shirt and dress take their shoulders, neckline and armholes from the avatar's body, and their hem fits over the hips: large sizes no longer have drooping shoulders; the avatar now takes the measurements given in every size of the charts, up to the women's 54: large sizes came out too slim and trousers fell off them; changing the size or the body while draping starts the drape again around the new body; trousers end just above the floor whatever the body; garments worn in layers lie close together: a shirt worn under trousers is tucked into them, and nothing shows through a garment worn over another; the trousers template is a little shorter; a selected piece's panel shows its garment's fabric; the Construction line and Tape measure tools have new icons; the tool rail in four sections, drawing, measuring, sewing and trims, with Dart and Pleat under Darts and pleats and Hole a tool of its own; the guided flow's step bar and banner removed; a more natural walk and a new motion, Stand at ease; captured motions whose rest pose lies flat play upright; pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
+Last updated: 2026-11-20 (patterns and measurement files from Seamly2D and Valentina come in drafted for their measurements, graded in every size, and can be drafted again for the avatar; the tape measure goes round a slanting sleeve square to it, and measures a length between two points of the garment; the start screen tells you when a new version is out, and the check can be turned off; Installing: a disk image for macOS, one for Intel and Apple silicon, an installer for Windows, and the first launch on recent macOS, through Privacy & Security; the shirt, T-shirt and dress take their shoulders, neckline and armholes from the avatar's body, and their hem fits over the hips: large sizes no longer have drooping shoulders; the avatar now takes the measurements given in every size of the charts, up to the women's 54: large sizes came out too slim and trousers fell off them; changing the size or the body while draping starts the drape again around the new body; trousers end just above the floor whatever the body; garments worn in layers lie close together: a shirt worn under trousers is tucked into them, and nothing shows through a garment worn over another; the trousers template is a little shorter; a selected piece's panel shows its garment's fabric; the Construction line and Tape measure tools have new icons; the tool rail in four sections, drawing, measuring, sewing and trims, with Dart and Pleat under Darts and pleats and Hole a tool of its own; the guided flow's step bar and banner removed; a more natural walk and a new motion, Stand at ease; captured motions whose rest pose lies flat play upright; pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
 hips, so trousers no longer slide with each step; a garment worn over
 trousers starts outside them; captured motions: Motion › Import a captured
 motion… plays a BVH motion capture on the avatar, Motion › Motion
@@ -755,6 +755,27 @@ part of the same drawing).
   points or pixels. **Keep as is** keeps the first reading.
 - A copy of the file is kept in the project, in its `imports` folder.
 
+### Seamly2D and Valentina
+Patterns made in **Seamly2D** (`.sm2d`) or **Valentina** (`.val`) come
+in drafted for their measurements, the way you drafted them:
+- **Import** the pattern: the measurement file it uses (`.vit`, `.vst`,
+  `.smis` or `.smms`) comes along when it is in its usual place, next to
+  the pattern or where the pattern says. Without a measurement file, the
+  pattern is drafted for the avatar's height, bust, waist and hips.
+- The pieces keep their curves, seam allowance, notches, grainline and
+  internal paths; a piece cut on the fold is unfolded. They make a
+  garment of their own, named after the file.
+- A few drafting tools are not supported yet (parallel curve, graduated
+  curve, elliptical arc by length, joined pieces): the pieces that use
+  them are left out, and the message says so.
+- With **sizes**, each size is drafted with its own measurements.
+- **Draft again for the avatar** (on the garment, in the garment list of
+  the panel on the right) runs the pattern again with the avatar's
+  measurements. The changes you made to the pieces are kept.
+- **Import** also takes a measurement file on its own: the avatar takes
+  its height, bust, waist and hips, the other measurements become
+  **variables** for your formulas, and a multisize file sets the sizes.
+
 ## AI agents
 Rustle3D can be driven by an AI agent through MCP (Model Context
 Protocol):
@@ -789,7 +810,7 @@ Print images you add are kept in the project's `textures` folder;
 replacing a file there (same name) changes the print. Bodies you import
 are kept in its `avatars` folder; if that file changes, import it again
 (the check says so).
-Patterns come in from DXF, SVG and PDF and go out as SVG, PDF and
+Patterns come in from DXF, SVG, PDF, Seamly2D and Valentina and go out as SVG, PDF and
 DXF-AAMA; garments go out as glTF and OBJ; the marker as SVG or PDF and
 the tech pack as PDF: open formats only.
 

@@ -808,8 +808,44 @@ abstract class L {
   /// No description provided for @importTip.
   ///
   /// In en, this message translates to:
-  /// **'Import a pattern drawn elsewhere: DXF-AAMA, DXF, SVG or PDF'**
+  /// **'Import a pattern drawn elsewhere (DXF-AAMA, DXF, SVG, PDF, Seamly2D or Valentina), or a Seamly2D or Valentina measurement file'**
   String get importTip;
+
+  /// No description provided for @importUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 kind of drafting step is not supported yet: the pieces using it were left out.} other{{count} kinds of drafting step are not supported yet: the pieces using them were left out.}}'**
+  String importUnsupported(int count);
+
+  /// No description provided for @measurementsImported.
+  ///
+  /// In en, this message translates to:
+  /// **'The avatar takes the measurements from the file.'**
+  String get measurementsImported;
+
+  /// No description provided for @garmentSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Drafted from {file}'**
+  String garmentSource(String file);
+
+  /// No description provided for @garmentRedraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft again for the avatar'**
+  String get garmentRedraft;
+
+  /// No description provided for @garmentRedraftTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Run the pattern again with the avatar\'s measurements; your changes to the pieces are kept'**
+  String get garmentRedraftTip;
+
+  /// No description provided for @busyRedraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Drafting the pattern again'**
+  String get busyRedraft;
 
   /// No description provided for @importFiles.
   ///

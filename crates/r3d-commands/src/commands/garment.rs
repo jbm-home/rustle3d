@@ -241,6 +241,7 @@ impl CommandSpec for GarmentAdd {
                 fabric_details: FabricDetails::default(),
                 notes: String::new(),
                 print: None,
+                source: None,
             },
         );
         Ok(CommandOutput {

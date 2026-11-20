@@ -343,6 +343,40 @@ pub struct Garment {
     /// The print on the fabric (M21); none: the plain colour.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub print: Option<Print>,
+    /// The Seamly2D/Valentina pattern it was imported from, so it can be
+    /// drafted again for other bodies and sizes (spec 28); `None` for a
+    /// garment drawn here or from another format.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<PatternSource>,
+}
+
+/// A parametric pattern a garment was imported from (spec 28): the files'
+/// text, kept in the project so that it can be run again for any body.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PatternSource {
+    /// The pattern file as imported (`imports/skirt.val`), for display.
+    pub file: String,
+    /// The pattern file's text.
+    pub pattern: String,
+    /// The measurement file's text, if the pattern has one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub measurements: Option<String>,
+    /// The body the pieces were drafted for; `None`: the measurement
+    /// file's own values.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body: Option<Body>,
+    /// Each piece of the garment drafted from the file: its panel and its
+    /// id in the file.
+    pub pieces: Vec<SourcePiece>,
+}
+
+/// A panel and the piece of a pattern file it was drafted from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SourcePiece {
+    pub panel: PanelId,
+    pub piece: u32,
 }
 
 /// The fabric of a garment as bought: what it weighs, how wide it is sold
@@ -821,6 +855,7 @@ impl Project {
                 fabric_details: FabricDetails::default(),
                 notes: String::new(),
                 print: None,
+                source: None,
             },
         );
         Self {

@@ -279,6 +279,41 @@ impl Workspace {
         self.adopt(source, "motions")
     }
 
+    /// Copy a pattern file from anywhere into the project's `imports/`
+    /// folder, as [`Self::adopt`] does; a Seamly2D or Valentina pattern
+    /// brings the measurement file it names (at that path from the
+    /// pattern, else by its name next to it), if it is there. Returns the
+    /// pattern's relative path and the measurement file's.
+    pub fn adopt_pattern(&self, source: &Path) -> Result<(String, Option<String>), WorkspaceError> {
+        let pattern = self.adopt(source, "imports")?;
+        let parametric = source
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| e.eq_ignore_ascii_case("val") || e.eq_ignore_ascii_case("sm2d"));
+        if !parametric {
+            return Ok((pattern, None));
+        }
+        let bytes = fs::read(source).map_err(|e| WorkspaceError::Read {
+            path: source.display().to_string(),
+            detail: e.to_string(),
+        })?;
+        let Some(link) =
+            r3d_io::import::val::linked_measurements(&bytes).map_err(CommandError::from)?
+        else {
+            return Ok((pattern, None));
+        };
+        let folder = source.parent().unwrap_or(Path::new(""));
+        let by_name = Path::new(&link).file_name().map(|n| folder.join(n));
+        let found = [Some(folder.join(&link)), by_name]
+            .into_iter()
+            .flatten()
+            .find(|p| p.is_file());
+        Ok(match found {
+            Some(m) => (pattern, Some(self.adopt(&m, "imports")?)),
+            None => (pattern, None),
+        })
+    }
+
     /// Copy a file from anywhere (one the user picked) into the project's
     /// `folder` (`imports` for patterns), so the project keeps what it was
     /// made from. Returns its path relative to the project; a different

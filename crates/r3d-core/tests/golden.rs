@@ -14,8 +14,8 @@ use r3d_core::file::{self, SCHEMA_VERSION};
 use r3d_core::{
     Along, Around, Avatar, AvatarMesh, Body, BodyPoint, Button, Buttonhole, Constraint, Edge,
     EdgeCurve, Fabric, FabricDetails, Garment, Grading, Guide, InternalLine, Notch, Panel,
-    PathSegment, Pin, Placement, Point, Print, PrintPlacement, PrintSource, Project, Seam,
-    SeamSide, Size, Symmetry, TemplateRef, Transaction, UpAxis, Zipper,
+    PathSegment, PatternSource, Pin, Placement, Point, Print, PrintPlacement, PrintSource, Project,
+    Seam, SeamSide, Size, SourcePiece, Symmetry, TemplateRef, Transaction, UpAxis, Zipper,
 };
 
 fn golden_dir(version: u32) -> PathBuf {
@@ -138,6 +138,28 @@ fn sample() -> Project {
                 height_mm: None,
                 angle_deg: 45.0,
             }),
+            source: None,
+        },
+    );
+    // The first garment was imported from a parametric pattern.
+    let first = tx.project().garments().get(&garment).cloned().unwrap();
+    tx.put_garment(
+        garment,
+        Garment {
+            source: Some(PatternSource {
+                file: "imports/skirt.val".into(),
+                pattern: "<pattern><version>1.2.1</version></pattern>".into(),
+                measurements: Some("<vit><unit>cm</unit></vit>".into()),
+                body: Some(Body {
+                    masculinity: 0.0,
+                    height_cm: 168.0,
+                    bust_cm: 88.0,
+                    waist_cm: 70.0,
+                    hips_cm: 96.0,
+                }),
+                pieces: vec![SourcePiece { panel, piece: 200 }],
+            }),
+            ..first
         },
     );
     let pin = tx.new_pin_id();

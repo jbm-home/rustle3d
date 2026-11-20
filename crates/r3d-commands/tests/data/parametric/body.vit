@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Individual measurements made up for Rustle3D's tests (Valentina format). -->
+<vit>
+  <version>0.6.2</version>
+  <read-only>false</read-only>
+  <unit>cm</unit>
+  <personal>
+    <customer>Test</customer>
+    <gender>female</gender>
+  </personal>
+  <body-measurements>
+    <m name="height" value="168"/>
+    <m name="bust_circ" value="88"/>
+    <m name="waist_circ" value="70"/>
+    <m name="hip_circ" value="96"/>
+    <m name="height_waist_side" value="104"/>
+    <m name="height_knee" value="46"/>
+    <m name="@hem_depth" value="3"/>
+  </body-measurements>
+</vit>

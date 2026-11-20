@@ -414,7 +414,38 @@ class LEn extends L {
 
   @override
   String get importTip =>
-      'Import a pattern drawn elsewhere: DXF-AAMA, DXF, SVG or PDF';
+      'Import a pattern drawn elsewhere (DXF-AAMA, DXF, SVG, PDF, Seamly2D or Valentina), or a Seamly2D or Valentina measurement file';
+
+  @override
+  String importUnsupported(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count kinds of drafting step are not supported yet: the pieces using them were left out.',
+      one: '1 kind of drafting step is not supported yet: the pieces using it were left out.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get measurementsImported =>
+      'The avatar takes the measurements from the file.';
+
+  @override
+  String garmentSource(String file) {
+    return 'Drafted from $file';
+  }
+
+  @override
+  String get garmentRedraft => 'Draft again for the avatar';
+
+  @override
+  String get garmentRedraftTip =>
+      'Run the pattern again with the avatar\'s measurements; your changes to the pieces are kept';
+
+  @override
+  String get busyRedraft => 'Drafting the pattern again';
 
   @override
   String get importFiles => 'Patterns';

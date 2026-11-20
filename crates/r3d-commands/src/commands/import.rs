@@ -1,5 +1,6 @@
-use r3d_core::{AnyId, PanelId, Transaction};
+use r3d_core::{AnyId, PanelId, PathSegment, Transaction};
 use r3d_geom::DVec2;
+use r3d_io::import::{ImportedPiece, grain_angle_deg};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -46,6 +47,46 @@ pub struct PieceSpec {
     pub notches: Vec<Vec2>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub internal_lines: Vec<LineSpec>,
+}
+
+impl PieceSpec {
+    /// A piece as an import reader found it.
+    pub fn from_imported(p: &ImportedPiece) -> PieceSpec {
+        PieceSpec {
+            name: p.name.clone(),
+            start: xy(p.outline.start),
+            segments: segments(&p.outline.segments),
+            seam_allowance_mm: p.seam_allowance_mm,
+            grain_angle_deg: p.grain.map_or(default_grain(), grain_angle_deg),
+            notches: p.notches.iter().map(|n| xy(*n)).collect(),
+            internal_lines: p
+                .internal_lines
+                .iter()
+                .filter(|l| !l.segments.is_empty())
+                .map(|l| LineSpec {
+                    start: xy(l.start),
+                    segments: segments(&l.segments),
+                })
+                .collect(),
+        }
+    }
+}
+
+fn xy(p: DVec2) -> Vec2 {
+    [p.x, p.y]
+}
+
+fn segments(segs: &[PathSegment]) -> Vec<SegmentSpec> {
+    segs.iter()
+        .map(|s| match s {
+            PathSegment::Line { to } => SegmentSpec::Line { to: xy(*to) },
+            PathSegment::Cubic { c1, c2, to } => SegmentSpec::Cubic {
+                c1: xy(*c1),
+                c2: xy(*c2),
+                to: xy(*to),
+            },
+        })
+        .collect()
 }
 
 fn is_zero(v: &f64) -> bool {
