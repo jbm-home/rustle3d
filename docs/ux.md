@@ -121,6 +121,6 @@ maximized (`Tab` toggles).
   the maintainer's approval.
 - **10-minute test** before v0.1 (end of M10): a first-time user makes a
   skirt and a T-shirt from the templates. We record where they get stuck
-  and fix it before v0.1. Protocol and note sheet: [`user-test.md`](user-test.md).
+  and fix it before v0.1.
 - Offscreen screenshots of key screens are kept as review artifacts in CI, so
   visual regressions are visible in PRs.
