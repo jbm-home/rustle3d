@@ -97,6 +97,18 @@
   "supportDonate": "Donate",
   "supportLater": "Not now",
   "supportTurnOff": "Don’t show again",
+  "updateTitle": "Rustle3D {version} is available",
+  "@updateTitle": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "updateText": "Download it from rustle3d.com and install it over this version: your projects are kept.",
+  "updateDownload": "Download",
+  "updateSkip": "Skip this version",
+  "updateCheck": "Check for updates",
   "cannotOpen": "Could not open {target}.",
   "@cannotOpen": {
     "placeholders": {

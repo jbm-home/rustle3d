@@ -208,6 +208,24 @@ class LFr extends L {
   String get supportTurnOff => 'Ne plus afficher';
 
   @override
+  String updateTitle(String version) {
+    return 'Rustle3D $version est disponible';
+  }
+
+  @override
+  String get updateText =>
+      'Téléchargez-la sur rustle3d.com et installez-la par-dessus cette version : vos projets sont conservés.';
+
+  @override
+  String get updateDownload => 'Télécharger';
+
+  @override
+  String get updateSkip => 'Ignorer cette version';
+
+  @override
+  String get updateCheck => 'Rechercher les mises à jour';
+
+  @override
   String cannotOpen(String target) {
     return 'Impossible d’ouvrir $target.';
   }

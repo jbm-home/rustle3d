@@ -206,6 +206,24 @@ class LEn extends L {
   String get supportTurnOff => 'Don’t show again';
 
   @override
+  String updateTitle(String version) {
+    return 'Rustle3D $version is available';
+  }
+
+  @override
+  String get updateText =>
+      'Download it from rustle3d.com and install it over this version: your projects are kept.';
+
+  @override
+  String get updateDownload => 'Download';
+
+  @override
+  String get updateSkip => 'Skip this version';
+
+  @override
+  String get updateCheck => 'Check for updates';
+
+  @override
   String cannotOpen(String target) {
     return 'Could not open $target.';
   }

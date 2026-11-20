@@ -1,5 +1,6 @@
 // Rustle3D desktop app: a Flutter UI over the Rust core (crates/r3d-ffi).
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:material_ui/material_ui.dart';
@@ -8,10 +9,12 @@ import 'src/design/tokens.dart';
 import 'src/i18n.dart';
 import 'src/projects.dart';
 import 'src/rust/api/engine.dart';
+import 'src/rust/api/templates.dart';
 import 'src/rust/frb_generated.dart';
 import 'src/shell.dart';
 import 'src/start_screen.dart';
 import 'src/support.dart';
+import 'src/update.dart';
 import 'src/views/rust_view.dart';
 
 Future<void> main() async {
@@ -27,9 +30,11 @@ Future<void> main() async {
   const open = String.fromEnvironment('R3D_OPEN');
   Engine? engine;
   final support = SupportMemory(store.libraryDir);
+  final updates = UpdateCheck(store.libraryDir, current: appVersion());
   // Review aids open a project at once: they are not real launches.
   if (open.isEmpty && demo.isEmpty) {
     support.launched(hasProjects: store.all().isNotEmpty);
+    unawaited(updates.check());
   }
   if (open.isNotEmpty) engine = Engine.open(path: open);
   if (demo.isNotEmpty) {
@@ -53,7 +58,14 @@ Future<void> main() async {
       await engine.runSimulation(running: true);
     }
   }
-  runApp(Rustle3dApp(store: store, support: support, engine: engine));
+  runApp(
+    Rustle3dApp(
+      store: store,
+      support: support,
+      updates: updates,
+      engine: engine,
+    ),
+  );
 }
 
 class Rustle3dApp extends StatefulWidget {
@@ -61,6 +73,7 @@ class Rustle3dApp extends StatefulWidget {
     super.key,
     required this.store,
     this.support,
+    this.updates,
     this.engine,
   });
 
@@ -69,6 +82,9 @@ class Rustle3dApp extends StatefulWidget {
   /// The donation reminder's state, after counting this launch; none (no
   /// reminder) in tests.
   final SupportMemory? support;
+
+  /// The update check; none (no check, no request) in tests.
+  final UpdateCheck? updates;
 
   /// A project to open at once instead of the start screen.
   final Engine? engine;
@@ -155,6 +171,7 @@ class _Rustle3dAppState extends State<Rustle3dApp> {
                   key: const ValueKey('start'),
                   store: widget.store,
                   support: _support,
+                  updates: widget.updates,
                   dark: _dark,
                   onToggleTheme: _toggleTheme,
                   language: _language,

@@ -451,6 +451,36 @@ abstract class L {
   /// **'Don’t show again'**
   String get supportTurnOff;
 
+  /// No description provided for @updateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rustle3D {version} is available'**
+  String updateTitle(String version);
+
+  /// No description provided for @updateText.
+  ///
+  /// In en, this message translates to:
+  /// **'Download it from rustle3d.com and install it over this version: your projects are kept.'**
+  String get updateText;
+
+  /// No description provided for @updateDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get updateDownload;
+
+  /// No description provided for @updateSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip this version'**
+  String get updateSkip;
+
+  /// No description provided for @updateCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for updates'**
+  String get updateCheck;
+
   /// No description provided for @cannotOpen.
   ///
   /// In en, this message translates to:

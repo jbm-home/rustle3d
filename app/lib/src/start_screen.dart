@@ -18,6 +18,7 @@ import 'rust/api/engine.dart';
 import 'rust/api/library.dart';
 import 'rust/api/templates.dart';
 import 'support.dart';
+import 'update.dart';
 
 /// What the start screen offers, in order: the `template.apply` ids.
 const _templates = [
@@ -59,6 +60,7 @@ class StartScreen extends StatefulWidget {
     super.key,
     required this.store,
     required this.support,
+    this.updates,
     required this.dark,
     required this.onToggleTheme,
     required this.language,
@@ -70,6 +72,9 @@ class StartScreen extends StatefulWidget {
 
   /// Whether this launch shows the donation card.
   final SupportMemory support;
+
+  /// The update check, none in tests.
+  final UpdateCheck? updates;
 
   final bool dark;
   final VoidCallback onToggleTheme;
@@ -185,6 +190,20 @@ class _ImportZipButton extends StatelessWidget {
 class _StartScreenState extends State<StartScreen> {
   late List<RecentProject> _projects = widget.store.all();
   final _thumbs = _Thumbs();
+
+  void _updatesChanged() => setState(() {});
+
+  @override
+  void initState() {
+    super.initState();
+    widget.updates?.addListener(_updatesChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.updates?.removeListener(_updatesChanged);
+    super.dispose();
+  }
 
   Future<void> _newGarment(String template, String title) async {
     final path = await showDialog<String>(
@@ -306,6 +325,14 @@ class _StartScreenState extends State<StartScreen> {
                           letterSpacing: -0.5,
                         ),
                       ),
+                      if (widget.updates case final updates?)
+                        if (updates.available case final version?)
+                          UpdateCard(
+                            version: version,
+                            onDownload: () =>
+                                _launch(context, downloadUrl(widget.language)),
+                            onSkip: updates.skip,
+                          ),
                       if (widget.support.remindNow)
                         SupportCard(
                           onDonate: () {
@@ -394,6 +421,18 @@ class _StartScreenState extends State<StartScreen> {
                             ),
                             label: Text(l.updatesLink),
                           ),
+                          if (widget.updates case final updates?)
+                            TextButton.icon(
+                              onPressed: () =>
+                                  updates.enabled = !updates.enabled,
+                              icon: Icon(
+                                updates.enabled
+                                    ? Icons.check_box_outlined
+                                    : Icons.check_box_outline_blank_rounded,
+                                size: 16,
+                              ),
+                              label: Text(l.updateCheck),
+                            ),
                           TextButton.icon(
                             onPressed: () => _launch(context, donateUrl),
                             icon: const Icon(
