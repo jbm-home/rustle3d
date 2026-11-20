@@ -92,7 +92,7 @@ void main() {
     final board = tester.getRect(
       find.byWidgetPredicate((w) => w is RustView && w.kind == ViewKind.board),
     );
-    final ratio = tester.view.devicePixelRatio;
+    final ratio = RustView.pixelRatio(tester.view.devicePixelRatio);
     for (var view = 0; view < 8; view++) {
       final px = engine.toView(
         view: view,

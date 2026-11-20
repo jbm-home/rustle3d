@@ -80,7 +80,7 @@ void main() {
     // picking the second with ⇧, then make them parallel.
     await tester.sendKeyEvent(LogicalKeyboardKey.keyV);
     await frames(2);
-    final ratio = tester.view.devicePixelRatio;
+    final ratio = RustView.pixelRatio(tester.view.devicePixelRatio);
     final drawn = [
       for (final e in got['edges'] as List)
         if (e['derived'] != true) e as Map,
@@ -174,7 +174,7 @@ void main() {
     // A dart, from the Details group: click the half piece's side.
     await tester.sendKeyEvent(LogicalKeyboardKey.keyV);
     await frames(2);
-    await tester.tap(find.bySemanticsLabel('Details'));
+    await tester.tap(find.bySemanticsLabel('Darts and pleats'));
     await frames();
     await tester.tap(find.text('Dart').last);
     await frames();

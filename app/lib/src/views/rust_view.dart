@@ -61,6 +61,12 @@ typedef BoardOverlay = void Function(
 );
 
 class RustView extends StatefulWidget {
+  /// View pixels per logical pixel on a screen of `device` pixels per
+  /// logical pixel: the screen's when the texture is shared, 1 when the
+  /// pixels are copied.
+  static double pixelRatio(double device) =>
+      _RustViewState._shared ? device : 1;
+
   const RustView({
     super.key,
     required this.engine,
@@ -380,7 +386,7 @@ class _RustViewState extends State<RustView>
   @override
   Widget build(BuildContext context) {
     // Copied pixels cost bandwidth: render those at one pixel per point.
-    _ratio = _shared ? MediaQuery.devicePixelRatioOf(context) : 1;
+    _ratio = RustView.pixelRatio(MediaQuery.devicePixelRatioOf(context));
     return LayoutBuilder(
       builder: (context, constraints) {
         final physical = Size(

@@ -79,7 +79,7 @@ void main() {
     final board = tester.getRect(
       find.byWidgetPredicate((w) => w is RustView && w.kind == ViewKind.board),
     );
-    final ratio = tester.view.devicePixelRatio;
+    final ratio = RustView.pixelRatio(tester.view.devicePixelRatio);
     // The board's view id is not exposed: the one that places a pattern
     // point inside the board.
     Offset? onBoard(num x, num y) {
@@ -97,8 +97,8 @@ void main() {
     }
 
     List<Map> edgesOf(String panel) => [
-      for (final e in run({'type': 'panel.get', 'panel': panel})['edges']
-          as List)
+      for (final e
+          in run({'type': 'panel.get', 'panel': panel})['edges'] as List)
         e as Map,
     ];
     (num, num) middle(Map e) {
@@ -139,11 +139,9 @@ void main() {
     await click(150, 240);
     final pocketSeam = seams().single as Map;
     expect(pocketSeam['b']['line'], line, reason: '$pocketSeam');
-    expect(
-      (pocketSeam['a']['edges'] as List).toSet(),
-      {for (final e in sides) e['id']},
-      reason: '$pocketSeam',
-    );
+    expect((pocketSeam['a']['edges'] as List).toSet(), {
+      for (final e in sides) e['id'],
+    }, reason: '$pocketSeam');
 
     // Part of the body's top edge (y = 0), dragged from x = 60 to x = 180,
     // sewn to the pocket's top edge.
