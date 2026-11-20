@@ -234,7 +234,13 @@ pub(crate) fn map_panel(
             return deg;
         }
         let d = by(DVec2::from_angle(deg.to_radians()));
-        d.y.atan2(d.x).to_degrees().rem_euclid(360.0)
+        // In [0, 360): a hair below 0 is 0, not 360.
+        let turned = d.y.atan2(d.x).to_degrees();
+        if turned.abs() < 1e-9 {
+            0.0
+        } else {
+            turned.rem_euclid(360.0)
+        }
     };
     let p = tx.project();
     // The panel's middle height, before it moves.

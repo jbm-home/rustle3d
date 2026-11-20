@@ -583,7 +583,7 @@ class LFr extends L {
 
   @override
   String get toolSelectHint =>
-      'Cliquez une pièce ; faites glisser un coin ou un bord pour la modifier';
+      'Cliquez une pièce ; faites-la glisser pour la déplacer, les coins de son cadre pour la mettre à l’échelle, la poignée ronde au-dessus pour la faire pivoter (⇧ : par pas de 15°, ou dans les deux sens à la fois) ; faites glisser un coin ou un bord pour la modifier';
 
   @override
   String get toolRectangle => 'Rectangle';
@@ -2139,6 +2139,25 @@ class LFr extends L {
 
   @override
   String get errHasHoles => 'Cette pièce a des trous : bouchez-les d’abord.';
+
+  @override
+  String get rotatePiece => 'Faire pivoter';
+
+  @override
+  String get rotatePieceHint =>
+      'Dans le sens inverse des aiguilles d’une montre ; un angle négatif tourne dans l’autre sens.';
+
+  @override
+  String get rotateAngle => 'Angle';
+
+  @override
+  String get scalePiece => 'Mettre à l’échelle';
+
+  @override
+  String get scaleAcross => 'En largeur';
+
+  @override
+  String get scaleUpDown => 'En hauteur';
 
   @override
   String get errConstrained =>

@@ -72,6 +72,13 @@ pub(crate) enum Tool {
         grab: DVec2,
         applied: DVec2,
     },
+    /// On the board: move a whole piece (`panel.translate`), `applied` mm
+    /// so far.
+    Piece {
+        panel: PanelId,
+        grab: DVec2,
+        applied: DVec2,
+    },
 }
 
 /// On the board, corners within this distance of the pointer are picked

@@ -1,9 +1,11 @@
 // The pattern edited on the board: dragging an edge reshapes its piece,
-// as one undo step; a drag with the Draw tool puts a line on a piece; a
-// trackpad pinch zooms it.
+// as one undo step; dragging a piece moves it and its frame's handle
+// turns it; a drag with the Draw tool puts a line on a piece; a trackpad
+// pinch zooms it.
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
@@ -71,6 +73,118 @@ void main() {
 
     engine.run(stepJson: '{"type":"history.undo"}');
     expect(outlines(), before);
+  });
+
+  testWidgets('dragging a piece moves it; its frame turns it', (tester) async {
+    final dir = Directory.systemTemp.createTempSync('r3d').path;
+    final store = ProjectStore(projectsDir: dir, libraryDir: dir);
+    File('$dir/tour-seen').createSync();
+    final path = await store.create(
+      name: 'Skirt',
+      body: store.standardBody(),
+      template: 'a_line_skirt',
+    );
+    final engine = Engine.open(path: path);
+    await tester.pumpWidget(Rustle3dApp(store: store, engine: engine));
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    Map<String, dynamic> get(String id) => jsonDecode(
+      engine.run(stepJson: jsonEncode({'type': 'panel.get', 'panel': id})),
+    ) as Map<String, dynamic>;
+    Rect box(String id) {
+      final b = get(id)['bbox'];
+      return Rect.fromPoints(
+        Offset(
+          (b['min'][0] as num).toDouble(),
+          (b['min'][1] as num).toDouble(),
+        ),
+        Offset(
+          (b['max'][0] as num).toDouble(),
+          (b['max'][1] as num).toDouble(),
+        ),
+      );
+    }
+
+    final board = tester.getRect(
+      find.byWidgetPredicate((w) => w is RustView && w.kind == ViewKind.board),
+    );
+    // Across the middle of the board, a click inside a piece, away from
+    // its corners and edges, selects it and no edge.
+    Offset? inside;
+    for (
+      var x = board.left + 10;
+      x < board.right - 10 && inside == null;
+      x += 6
+    ) {
+      engine.select(panels: const []);
+      final at = Offset(x, board.center.dy);
+      await tester.tapAt(at);
+      await tester.pump();
+      if (engine.selection().length == 1 && engine.selectedEdge() == null) {
+        inside = at;
+      }
+    }
+    final grab = inside!;
+    final id = engine.selection().single;
+
+    // How the board maps the screen to the pattern: the view under which
+    // the point clicked is inside the piece.
+    final ratio = RustView.pixelRatio(tester.view.devicePixelRatio);
+    late Offset Function(Offset mm) toScreen;
+    var mmPerPx = 0.0;
+    for (var view = 0; view < 8 && mmPerPx == 0; view++) {
+      List<double>? mmAt(Offset screen) {
+        final px = (screen - board.topLeft) * ratio;
+        return engine.toPattern(view: view, x: px.dx, y: px.dy);
+      }
+
+      final (a, b) = (mmAt(grab), mmAt(grab + const Offset(100, 0)));
+      if (a == null || b == null || !box(id).contains(Offset(a[0], a[1]))) {
+        continue;
+      }
+      mmPerPx = (b[0] - a[0]) / 100;
+      toScreen = (mm) => grab + Offset(mm.dx - a[0], a[1] - mm.dy) / mmPerPx;
+    }
+    expect(mmPerPx, greaterThan(0));
+
+    // Drag it: it moves, as one undo step.
+    final before = box(id).center;
+    final move = await tester.startGesture(grab, kind: PointerDeviceKind.mouse);
+    for (var i = 0; i < 8; i++) {
+      await move.moveBy(const Offset(5, 0));
+      await tester.pump();
+    }
+    await move.up();
+    await tester.pump();
+    expect(box(id).center.dx - before.dx, closeTo(40 * mmPerPx, 2 * mmPerPx));
+    expect(engine.selection(), [id]);
+    engine.run(stepJson: '{"type":"history.undo"}');
+    expect(box(id).center.dx, closeTo(before.dx, 1e-6));
+    // (Undone behind the app's back: a click shows the piece as it is.)
+    await tester.tapAt(grab);
+    await tester.pump();
+
+    // The round handle above the selected piece turns it: from above its
+    // centre round to its right, a quarter turn clockwise.
+    final c = box(id).center;
+    final handle = Offset(c.dx, box(id).bottom + 40 * mmPerPx);
+    final radius = handle.dy - c.dy;
+    final turn = await tester.startGesture(
+      toScreen(handle),
+      kind: PointerDeviceKind.mouse,
+    );
+    for (var i = 1; i <= 9; i++) {
+      final a = pi / 2 - i * pi / 18;
+      await turn.moveTo(toScreen(c + Offset(cos(a) * radius, sin(a) * radius)));
+      await tester.pump();
+    }
+    await turn.up();
+    await tester.pump();
+    final grain = (get(id)['grain_angle_deg'] as num).toDouble();
+    expect(grain, closeTo(0, 1));
+    engine.run(stepJson: '{"type":"history.undo"}');
+    expect((get(id)['grain_angle_deg'] as num).toDouble(), closeTo(90, 1e-6));
   });
 
   testWidgets('a drag with the Draw tool puts a line on a piece', (

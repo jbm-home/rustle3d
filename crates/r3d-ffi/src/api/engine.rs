@@ -3304,9 +3304,8 @@ impl Engine {
             if gesture != Gesture::Pull {
                 return Ok(false);
             }
-            let (board_view, width, height) = (v.board_view, v.width, v.height);
             drop(slot);
-            return self.press_board(view, board_view, width, height, x, y);
+            return self.press_board(view, x, y);
         }
         let only = |i: usize| !adjust || open.contains_key(&i);
         let Some(hit) = self.pick_cloth(v, &slot, x, y, &only)? else {
@@ -3370,7 +3369,7 @@ impl Engine {
         let Some(held) = *self.held.lock().map_err(|_| poisoned())? else {
             return Ok(None);
         };
-        if let Tool::Corner { .. } | Tool::Edge { .. } = held.tool {
+        if let Tool::Corner { .. } | Tool::Edge { .. } | Tool::Piece { .. } = held.tool {
             return self.pull_board(view, held.tool, x, y);
         }
         let anchor = held.anchor;
@@ -3422,7 +3421,7 @@ impl Engine {
                 }
             }
             // Board tools are handled above.
-            Tool::Corner { .. } | Tool::Edge { .. } => held.tool,
+            Tool::Corner { .. } | Tool::Edge { .. } | Tool::Piece { .. } => held.tool,
             Tool::Move { panel, from, .. } => {
                 // Around the vertical axis by the angle swept, up or down
                 // by the height dragged; the pieces start again there.
@@ -3452,28 +3451,27 @@ impl Engine {
         Ok(match tool {
             Tool::Length { applied, .. } => Some(change("length", applied)),
             Tool::Fit { applied, .. } => Some(change("fit", applied)),
-            Tool::Pull { .. } | Tool::Move { .. } | Tool::Corner { .. } | Tool::Edge { .. } => None,
+            Tool::Pull { .. }
+            | Tool::Move { .. }
+            | Tool::Corner { .. }
+            | Tool::Edge { .. }
+            | Tool::Piece { .. } => None,
         })
     }
 
-    /// A press at pixel (`x`, `y`) of a board: hold the corner or else the
-    /// edge under the pointer, to drag it, and select its piece. Pieces
-    /// that are linked mirror copies follow their source and are not held.
+    /// A press at pixel (`x`, `y`) of a board: hold the corner, else the
+    /// edge, else the whole piece under the pointer, to drag it, and
+    /// select its piece. The corners and edges of a linked mirror copy
+    /// follow its source and are not held (the copy itself moves).
     /// The board stops fitting the pattern while it changes under the
-    /// pointer.
-    fn press_board(
-        &self,
-        view: u32,
-        board_view: Option<BoardView>,
-        width: u32,
-        height: u32,
-        x: f64,
-        y: f64,
-    ) -> Result<bool, ApiError> {
+    /// pointer (as shown, so the press lands where a click would).
+    fn press_board(&self, view: u32, x: f64, y: f64) -> Result<bool, ApiError> {
+        let Some((bv, width, height)) = self.frozen_board(view)? else {
+            return Ok(false);
+        };
         let ws = self.workspace()?;
         let project = ws.session().project();
         let scene = BoardScene::from_project(project, &[]);
-        let bv = board_view.unwrap_or_else(|| BoardView::fit(scene.bounds(), width, height));
         let at = bv.to_board(x, y, width, height);
         let editable = |panel: PanelId| project.panel(panel).is_some_and(|p| p.mirror_of.is_none());
         let corner = corner_at(project, at, CORNER_PICK_PX * bv.mm_per_px)
@@ -3501,17 +3499,22 @@ impl Engine {
                         applied: r3d_geom::DVec2::ZERO,
                     },
                 ),
-                None => return Ok(false),
+                // Inside a piece: the whole piece (a linked copy too).
+                None => match scene.panel_at(at) {
+                    Some(panel) => (
+                        panel,
+                        None,
+                        Tool::Piece {
+                            panel,
+                            grab: at,
+                            applied: r3d_geom::DVec2::ZERO,
+                        },
+                    ),
+                    None => return Ok(false),
+                },
             },
         };
         drop(ws);
-        if let Some(v) = self
-            .graphics()?
-            .as_mut()
-            .and_then(|g| g.views.get_mut(&view))
-        {
-            v.board_view = Some(bv);
-        }
         *self.selected()? = vec![panel];
         *self.selected_edges.lock().map_err(|_| poisoned())? = edge.into_iter().collect();
         *self.held.lock().map_err(|_| poisoned())? = Some(Held {
@@ -3569,6 +3572,26 @@ impl Engine {
                     step,
                     Tool::Edge {
                         edge,
+                        grab,
+                        applied: d,
+                    },
+                    d,
+                )
+            }
+            Tool::Piece {
+                panel,
+                grab,
+                applied,
+            } => {
+                let d = (at - grab).round();
+                let by = d - applied;
+                let step = serde_json::json!({
+                    "type": "panel.translate", "panel": panel, "delta": [by.x, by.y],
+                });
+                (
+                    step,
+                    Tool::Piece {
+                        panel,
                         grab,
                         applied: d,
                     },

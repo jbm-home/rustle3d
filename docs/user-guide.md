@@ -7,7 +7,7 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-20 (the Draw tool also draws on a piece of the pattern, not only on the 3D garment; a shape added from the Shapes menu comes in selected, with the Select tool on; in French, the circle skirt is now called « jupe soleil »; patterns and measurement files from Seamly2D and Valentina come in drafted for their measurements, graded in every size, and can be drafted again for the avatar; the tape measure goes round a slanting sleeve square to it, and measures a length between two points of the garment; the start screen tells you when a new version is out, and the check can be turned off; Installing: a disk image for macOS, one for Intel and Apple silicon, an installer for Windows, and the first launch on recent macOS, through Privacy & Security; the shirt, T-shirt and dress take their shoulders, neckline and armholes from the avatar's body, and their hem fits over the hips: large sizes no longer have drooping shoulders; the avatar now takes the measurements given in every size of the charts, up to the women's 54: large sizes came out too slim and trousers fell off them; changing the size or the body while draping starts the drape again around the new body; trousers end just above the floor whatever the body; garments worn in layers lie close together: a shirt worn under trousers is tucked into them, and nothing shows through a garment worn over another; the trousers template is a little shorter; a selected piece's panel shows its garment's fabric; the Construction line and Tape measure tools have new icons; the tool rail in four sections, drawing, measuring, sewing and trims, with Dart and Pleat under Darts and pleats and Hole a tool of its own; the guided flow's step bar and banner removed; a more natural walk and a new motion, Stand at ease; captured motions whose rest pose lies flat play upright; pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
+Last updated: 2026-11-20 (with Select, drag a piece to move it, the corners of its frame to scale it and the round handle above it to turn it; Rotate and Scale in the inspector for an exact angle or percentage; the Draw tool also draws on a piece of the pattern, not only on the 3D garment; a shape added from the Shapes menu comes in selected, with the Select tool on; in French, the circle skirt is now called « jupe soleil »; patterns and measurement files from Seamly2D and Valentina come in drafted for their measurements, graded in every size, and can be drafted again for the avatar; the tape measure goes round a slanting sleeve square to it, and measures a length between two points of the garment; the start screen tells you when a new version is out, and the check can be turned off; Installing: a disk image for macOS, one for Intel and Apple silicon, an installer for Windows, and the first launch on recent macOS, through Privacy & Security; the shirt, T-shirt and dress take their shoulders, neckline and armholes from the avatar's body, and their hem fits over the hips: large sizes no longer have drooping shoulders; the avatar now takes the measurements given in every size of the charts, up to the women's 54: large sizes came out too slim and trousers fell off them; changing the size or the body while draping starts the drape again around the new body; trousers end just above the floor whatever the body; garments worn in layers lie close together: a shirt worn under trousers is tucked into them, and nothing shows through a garment worn over another; the trousers template is a little shorter; a selected piece's panel shows its garment's fabric; the Construction line and Tape measure tools have new icons; the tool rail in four sections, drawing, measuring, sewing and trims, with Dart and Pleat under Darts and pleats and Hole a tool of its own; the guided flow's step bar and banner removed; a more natural walk and a new motion, Stand at ease; captured motions whose rest pose lies flat play upright; pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
 hips, so trousers no longer slide with each step; a garment worn over
 trousers starts outside them; captured motions: Motion › Import a captured
 motion… plays a BVH motion capture on the avatar, Motion › Motion
@@ -176,14 +176,14 @@ Motion button is off (see Known limits).
 
 ## The pattern (2D)
 
-The left view is the pattern board: drag to pan, scroll or pinch to zoom.
+The left view is the pattern board: drag an empty spot to pan, scroll or pinch to zoom.
 The tool rail sits on its left, in four sections set apart by a line:
 drawing, measuring, sewing and trims. A button with a small corner opens
 a menu of related tools (the last one used stays on the button).
 
 | Tool | Key | What it does |
 |---|---|---|
-| Select | V | Click a piece, a corner or an edge (⌘-click or ⇧-click a second corner or edge); drag a corner or an edge to reshape the piece; a picked curved edge, or a corner between curves, shows its handles: drag them to bend the curve (a smooth point keeps its two handles lined up) |
+| Select | V | Click a piece, a corner or an edge (⌘-click or ⇧-click a second corner or edge); drag a piece to move it; drag a corner or an edge to reshape the piece; a selected piece has a frame: drag a corner of it to scale the piece, the round handle above it to turn it (⇧ turns by 15° steps, or scales both ways at once); a picked curved edge, or a corner between curves, shows its handles: drag them to bend the curve (a smooth point keeps its two handles lined up) |
 | Shapes → Rectangle | R | Adds a rectangular piece; like every shape, it comes in selected, with the Select tool on |
 | Shapes → Ellipse | E | Adds a circle or an ellipse of the width and height you type |
 | Shapes → Circle skirt | | Adds the pieces of a full, half or quarter circle skirt from the waist and the skirt's length |
@@ -219,6 +219,19 @@ drag a corner, the point lands on what is near the pointer: a corner,
 the middle of an edge, an edge, a construction line, a symmetry axis, or
 level with the previous point (or the first one, or a dragged corner's
 neighbours). A small label says what it snapped to.
+
+**Moving, turning and scaling a piece**: with Select, drag the piece
+(away from its corners and edges) to move it. A selected piece shows a
+frame: drag one of its corners to scale the piece (the opposite corner
+stays put; hold ⇧ to keep its proportions), or the round handle above
+it to turn it about its middle (hold ⇧ for 15° steps). For an exact
+value, **Rotate** and **Scale** in the inspector ask for an angle or
+percentages across and up and down. Lines, pins, buttons, holes and the
+grainline go with the piece, and each change is one step you can undo.
+A linked mirror copy is turned and scaled through its source. A piece
+whose dimensions or constraints could not follow (a horizontal edge
+turned 30°, a dimension with a formula when scaling) says so: remove
+them first.
 
 **Naming a piece**: select it; in the inspector, click the pencil next
 to its name (or double-click the name), type the new one and press

@@ -579,7 +579,7 @@ class LEn extends L {
 
   @override
   String get toolSelectHint =>
-      'Click a piece; drag a corner or an edge to reshape it';
+      'Click a piece; drag it to move it, its frame\'s corners to scale it, the round handle above it to turn it (⇧: 15° steps, or scale both ways at once); drag a corner or an edge to reshape it';
 
   @override
   String get toolRectangle => 'Rectangle';
@@ -2117,6 +2117,25 @@ class LEn extends L {
 
   @override
   String get errHasHoles => 'This piece has holes: fill them first.';
+
+  @override
+  String get rotatePiece => 'Rotate';
+
+  @override
+  String get rotatePieceHint =>
+      'Counter-clockwise; a negative angle turns the other way.';
+
+  @override
+  String get rotateAngle => 'Angle';
+
+  @override
+  String get scalePiece => 'Scale';
+
+  @override
+  String get scaleAcross => 'Across';
+
+  @override
+  String get scaleUpDown => 'Up and down';
 
   @override
   String get errConstrained =>

@@ -70,6 +70,13 @@ fn a_quarter_turn_turns_the_piece_about_its_centre_with_what_it_owns() {
     assert!(close([line.start.x, line.start.y], [350.0, 200.0]));
     s.undo().unwrap();
     assert!(close(pos(&s, &points[0]), [0.0, 0.0]));
+    // A quarter turn back from vertical: the grainline at 0, not 360.
+    ok(
+        &mut s,
+        json!({"type": "panel.rotate", "panel": panel, "angle_deg": -90}),
+    );
+    let p = s.project().panel(panel.parse().unwrap()).unwrap();
+    assert!(p.grain_angle_deg.abs() < 1e-9, "{}", p.grain_angle_deg);
 }
 
 #[test]

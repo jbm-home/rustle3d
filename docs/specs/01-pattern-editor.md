@@ -48,7 +48,12 @@ that they can later be sewn and draped.
   dimensions; a change they cannot follow (30° with a horizontal edge,
   stretching one way with a length or an angle, any scaling of a
   dimension with a formula) is refused. A linked mirror copy is turned
-  and scaled through its source.
+  and scaled through its source. In the app (Select): dragging a piece
+  away from its corners and edges moves it (the board pans from an
+  empty spot); a selected piece has a frame whose corners scale it from
+  the opposite corner and whose round handle turns it about its middle
+  (⇧: uniform scale, 15° steps), each drag one undo step; the inspector's
+  Rotate and Scale take typed values.
 - **Symmetry**: a linked mirror copy of a panel (`panel.mirror`) follows
   every change of its source, including notches, internal lines, grainline
   and seam allowance. It cannot be edited directly, but it can be moved

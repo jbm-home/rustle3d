@@ -3,7 +3,7 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math' show max, min;
+import 'dart:math' show atan2, max, min, pi;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
@@ -752,6 +752,9 @@ class _ShellState extends State<Shell> {
   /// `c2`.
   (String, String)? _handle;
 
+  /// The selected piece being turned or scaled by its frame's handles.
+  _FrameDrag? _frameDrag;
+
   /// The points placed so far with Curve (a closed piece) or Cut (an open
   /// line), in mm.
   final List<_Anchor> _path = [];
@@ -1337,6 +1340,129 @@ class _ShellState extends State<Shell> {
     ];
   }
 
+  /// The selected piece's bounding box (mm), with Select and nothing
+  /// picked on it, when it can be turned and scaled by its frame (not a
+  /// linked mirror copy: that one follows its source).
+  Rect? get _frame {
+    final panel = _panel;
+    if (_tool != 'select' ||
+        panel == null ||
+        panel['mirror_of'] != null ||
+        _pickedEdge != null ||
+        _points.isNotEmpty) {
+      return null;
+    }
+    final box = panel['bbox'] as Map<String, dynamic>?;
+    if (box == null) return null;
+    return Rect.fromPoints(_at(box['min']), _at(box['max']));
+  }
+
+  /// The frame's handles (mm) on a board at `mmPerPx`: each corner with
+  /// the piece's bounding-box corner it stands for (set off from it, so
+  /// the piece's own corners stay free to drag), then the turning handle
+  /// above the piece.
+  (List<(Offset, Offset)>, Offset)? _frameHandles(double mmPerPx) {
+    final f = _frame;
+    if (f == null) return null;
+    // Board y goes up: the rectangle's bottom is the piece's top.
+    final r = f.inflate(12 * mmPerPx);
+    return (
+      [
+        (r.topLeft, f.topLeft),
+        (r.topRight, f.topRight),
+        (r.bottomRight, f.bottomRight),
+        (r.bottomLeft, f.bottomLeft),
+      ],
+      Offset(f.center.dx, r.bottom + 28 * mmPerPx),
+    );
+  }
+
+  /// A press on a handle of the selected piece's frame: the turning
+  /// handle turns it about its centre, a corner scales it from the
+  /// opposite corner.
+  bool _framePress(Offset mm, double mmPerPx) {
+    final id = _panel?['id'] as String?;
+    final f = _frame;
+    final handles = _frameHandles(mmPerPx);
+    if (id == null || f == null || handles == null) return false;
+    final (corners, turn) = handles;
+    final near = _pickPx * mmPerPx;
+    if ((turn - mm).distance < near) {
+      _frameDrag = _FrameDrag(id, f.center, mm, null);
+      return true;
+    }
+    for (final (i, (handle, corner)) in corners.indexed) {
+      if ((handle - mm).distance < near) {
+        _frameDrag = _FrameDrag(id, corners[(i + 2) % 4].$2, mm, corner);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Turn (in whole degrees, 15° steps with ⇧) or scale (both ways at
+  /// once with ⇧) the piece to follow the pointer, by what is left to
+  /// apply since the last move.
+  void _frameDragTo(Offset mm) {
+    final d = _frameDrag;
+    if (d == null || d.refused) return;
+    final shift = HardwareKeyboard.instance.isShiftPressed;
+    final Map<String, Object?> step;
+    var angle = d.angle;
+    var factor = d.factor;
+    if (d.corner case final corner?) {
+      final from = corner - d.pivot;
+      final now = corner + (mm - d.grab) - d.pivot;
+      double ratio(double to, double was) =>
+          was.abs() < 1e-9 ? 1 : (to / was).clamp(0.05, 20);
+      if (shift && from.distanceSquared > 1e-9) {
+        final k = ((now.dx * from.dx + now.dy * from.dy) / from.distanceSquared)
+            .clamp(0.05, 20.0);
+        factor = Offset(k, k);
+      } else {
+        factor = Offset(ratio(now.dx, from.dx), ratio(now.dy, from.dy));
+      }
+      if (factor == d.factor) return;
+      step = {
+        'type': 'panel.scale',
+        'panel': d.panel,
+        'factor': [factor.dx / d.factor.dx, factor.dy / d.factor.dy],
+        'centre': [d.pivot.dx, d.pivot.dy],
+      };
+    } else {
+      double direction(Offset v) => atan2(v.dy, v.dx) * 180 / pi;
+      final swept =
+          (direction(mm - d.pivot) - direction(d.grab - d.pivot) + 180) % 360 -
+          180;
+      angle = shift ? (swept / 15).round() * 15.0 : swept.roundToDouble();
+      if (angle == d.angle) return;
+      step = {
+        'type': 'panel.rotate',
+        'panel': d.panel,
+        'angle_deg': angle - d.angle,
+        'centre': [d.pivot.dx, d.pivot.dy],
+      };
+    }
+    try {
+      widget.engine.run(stepJson: jsonEncode(step));
+      d
+        ..angle = angle
+        ..factor = factor;
+    } on ApiError catch (e) {
+      // Refused once (a constraint): not again for every move.
+      d.refused = true;
+      _toast(context.error(e));
+    }
+    _refresh();
+  }
+
+  void _frameRelease() {
+    if (_frameDrag == null) return;
+    _frameDrag = null;
+    // The whole drag is one undo step.
+    _guard(widget.engine.release);
+  }
+
   /// A press on a curve handle holds it; elsewhere it does what the tool
   /// does.
   bool _handlePress(Offset mm, double mmPerPx) {
@@ -1444,6 +1570,28 @@ class _ShellState extends State<Shell> {
         }
         point(toScreen(a.at), i == 0 && !cut ? 6 : 4);
       }
+    }
+    // The selected piece's frame: corners to scale it, a handle on a
+    // stalk to turn it.
+    final pxPerMm =
+        (toScreen(const Offset(1, 0)) - toScreen(Offset.zero)).distance;
+    if (_frameHandles(pxPerMm > 0 ? 1 / pxPerMm : 1) case (
+      final corners,
+      final turn,
+    )) {
+      final frame = Paint()
+        ..color = p.accent.withValues(alpha: 0.6)
+        ..strokeWidth = 1
+        ..style = PaintingStyle.stroke;
+      final screen = [for (final (h, _) in corners) toScreen(h)];
+      canvas.drawPath(Path()..addPolygon(screen, true), frame);
+      final top = toScreen(Offset(turn.dx, corners[2].$1.dy));
+      canvas.drawLine(top, toScreen(turn), frame);
+      for (final c in screen) {
+        canvas.drawRect(Rect.fromCenter(center: c, width: 9, height: 9), ring);
+        canvas.drawRect(Rect.fromCenter(center: c, width: 7, height: 7), dot);
+      }
+      point(toScreen(turn), 5);
     }
     for (final (e, key) in _handles) {
       final end = e[key == 'c1' ? 'start' : 'end']['pos'];
@@ -2358,9 +2506,16 @@ class _ShellState extends State<Shell> {
                                               onRelease: _handleRelease,
                                             ),
                                             'select' => PatternPointer(
-                                              onPress: _handlePress,
-                                              onDrag: _handleDrag,
-                                              onRelease: _handleRelease,
+                                              onPress: (mm, k) =>
+                                                  _framePress(mm, k) ||
+                                                  _handlePress(mm, k),
+                                              onDrag: (mm) => _frameDrag != null
+                                                  ? _frameDragTo(mm)
+                                                  : _handleDrag(mm),
+                                              onRelease: () {
+                                                _frameRelease();
+                                                _handleRelease();
+                                              },
                                             ),
                                             'straighten' => PatternPointer(
                                               onTap: _straightenTap,
@@ -4209,6 +4364,61 @@ class _PanelInspector extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: linked
                     ? null
+                    : () async {
+                        final picked = await _askNumbers(
+                          context,
+                          title: l.rotatePiece,
+                          fields: [(l.rotateAngle, '°', 90)],
+                          hint: l.rotatePieceHint,
+                        );
+                        final angle = picked?.$1.first ?? 0;
+                        if (angle == 0) return;
+                        run({
+                          'type': 'panel.rotate',
+                          'panel': id,
+                          'angle_deg': angle,
+                        });
+                      },
+                icon: const Icon(Icons.rotate_left_rounded, size: 16),
+                label: Text(l.rotatePiece),
+              ),
+            ),
+            const SizedBox(width: Space.s),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: linked
+                    ? null
+                    : () async {
+                        final picked = await _askNumbers(
+                          context,
+                          title: l.scalePiece,
+                          fields: [
+                            (l.scaleAcross, '%', 100),
+                            (l.scaleUpDown, '%', 100),
+                          ],
+                        );
+                        if (picked == null) return;
+                        final [x, y] = picked.$1;
+                        if (x <= 0 || y <= 0) return;
+                        run({
+                          'type': 'panel.scale',
+                          'panel': id,
+                          'factor': [x / 100, y / 100],
+                        });
+                      },
+                icon: const Icon(Icons.open_in_full_rounded, size: 16),
+                label: Text(l.scalePiece),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: Space.s),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: linked
+                    ? null
                     : () => run({
                         'type': 'panel.mirror',
                         'panel': id,
@@ -4232,6 +4442,25 @@ class _PanelInspector extends StatelessWidget {
       ],
     );
   }
+}
+
+/// A turn or a scaling of the selected piece, dragged by a handle of its
+/// frame: about `pivot` (its centre to turn, the opposite corner to
+/// scale) from where the pointer pressed (`grab`); `corner` is the
+/// bounding-box corner grabbed to scale, null to turn. What is applied so
+/// far: `angle` (degrees) or `factor` (across, up and down).
+class _FrameDrag {
+  _FrameDrag(this.panel, this.pivot, this.grab, this.corner);
+
+  final String panel;
+  final Offset pivot;
+  final Offset grab;
+  final Offset? corner;
+  double angle = 0;
+  Offset factor = const Offset(1, 1);
+
+  /// The pattern refused a step: the rest of the drag does nothing.
+  bool refused = false;
 }
 
 /// Where the piece sits for the simulation: around the body, an arm, or

@@ -101,10 +101,8 @@ class _GameExportDialogState extends State<_GameExportDialog> {
         context,
         widget.engine,
         l.export,
-        () => widget.engine.exportGame(
-          path: location.path,
-          optionsJson: options,
-        ),
+        () =>
+            widget.engine.exportGame(path: location.path, optionsJson: options),
       );
       if (mounted) {
         Navigator.pop(context, location.path.split(RegExp(r'[/\\]')).last);

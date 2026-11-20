@@ -59,8 +59,7 @@ class _MarkerDialogState extends State<_MarkerDialog> {
 
   List<String> get _allSizes => [
     for (final s
-        in ((widget.summary['grading'] as Map?)?['sizes'] as List?) ??
-            const [])
+        in ((widget.summary['grading'] as Map?)?['sizes'] as List?) ?? const [])
       s as String,
   ];
 
@@ -152,9 +151,7 @@ class _MarkerDialogState extends State<_MarkerDialog> {
       );
       if (mounted) {
         setState(
-          () => _saved = l.exported(
-            location.path.split(RegExp(r'[/\\]')).last,
-          ),
+          () => _saved = l.exported(location.path.split(RegExp(r'[/\\]')).last),
         );
       }
     } on ApiError catch (e) {
@@ -300,10 +297,7 @@ class _MarkerDialogState extends State<_MarkerDialog> {
                 ),
                 const SizedBox(width: Space.s),
                 Expanded(
-                  child: _Stat(
-                    label: l.markerCost,
-                    value: num2(m?['cost'], 2),
-                  ),
+                  child: _Stat(label: l.markerCost, value: num2(m?['cost'], 2)),
                 ),
               ],
             ),

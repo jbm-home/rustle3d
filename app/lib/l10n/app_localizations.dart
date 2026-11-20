@@ -1066,7 +1066,7 @@ abstract class L {
   /// No description provided for @toolSelectHint.
   ///
   /// In en, this message translates to:
-  /// **'Click a piece; drag a corner or an edge to reshape it'**
+  /// **'Click a piece; drag it to move it, its frame\'s corners to scale it, the round handle above it to turn it (⇧: 15° steps, or scale both ways at once); drag a corner or an edge to reshape it'**
   String get toolSelectHint;
 
   /// No description provided for @toolRectangle.
@@ -3540,6 +3540,42 @@ abstract class L {
   /// In en, this message translates to:
   /// **'This piece has holes: fill them first.'**
   String get errHasHoles;
+
+  /// No description provided for @rotatePiece.
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate'**
+  String get rotatePiece;
+
+  /// No description provided for @rotatePieceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Counter-clockwise; a negative angle turns the other way.'**
+  String get rotatePieceHint;
+
+  /// No description provided for @rotateAngle.
+  ///
+  /// In en, this message translates to:
+  /// **'Angle'**
+  String get rotateAngle;
+
+  /// No description provided for @scalePiece.
+  ///
+  /// In en, this message translates to:
+  /// **'Scale'**
+  String get scalePiece;
+
+  /// No description provided for @scaleAcross.
+  ///
+  /// In en, this message translates to:
+  /// **'Across'**
+  String get scaleAcross;
+
+  /// No description provided for @scaleUpDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Up and down'**
+  String get scaleUpDown;
 
   /// No description provided for @errConstrained.
   ///
