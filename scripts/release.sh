@@ -13,8 +13,8 @@
 # (LICENSES-flutter.txt), and README.txt with the source code's address
 # (inside Rustle3D.app/Contents/Resources on macOS).
 # Needs Rust, Flutter, cargo-about (cargo install cargo-about --locked
-# --features cli), Python 3 and the platform toolchain (see README
-# "Building"); on macOS the x86_64 and aarch64 Rust targets (added with
+# --features cli), Python 3 and the platform toolchain (see
+# docs/building.md); on macOS the x86_64 and aarch64 Rust targets (added with
 # rustup when missing); on Windows Inno Setup 6 (ISCC on PATH or in its
 # default folder).
 set -euo pipefail

@@ -42,7 +42,7 @@ fn flutter() -> Result<Command, String> {
         .flat_map(std::env::split_paths)
         .map(|dir| dir.join("flutter.bat"))
         .find(|bat| bat.is_file())
-        .ok_or("flutter.bat is not in PATH (see README, Getting started)")?;
+        .ok_or("flutter.bat is not in PATH (see docs/building.md)")?;
     let root: PathBuf = bat
         .parent()
         .and_then(Path::parent)
