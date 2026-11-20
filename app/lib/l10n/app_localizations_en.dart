@@ -633,11 +633,11 @@ class LEn extends L {
       'Draw a line across a piece: it becomes two pieces sewn together';
 
   @override
-  String get toolDraw => 'Draw on garment';
+  String get toolDraw => 'Draw';
 
   @override
   String get toolDrawHint =>
-      'Drag on the 3D garment: the line goes on the pattern';
+      'Drag across a piece, on the pattern or on the 3D garment: the line goes on the pattern';
 
   @override
   String get toolNotch => 'Notch';

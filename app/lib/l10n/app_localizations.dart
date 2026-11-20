@@ -1168,13 +1168,13 @@ abstract class L {
   /// No description provided for @toolDraw.
   ///
   /// In en, this message translates to:
-  /// **'Draw on garment'**
+  /// **'Draw'**
   String get toolDraw;
 
   /// No description provided for @toolDrawHint.
   ///
   /// In en, this message translates to:
-  /// **'Drag on the 3D garment: the line goes on the pattern'**
+  /// **'Drag across a piece, on the pattern or on the 3D garment: the line goes on the pattern'**
   String get toolDrawHint;
 
   /// No description provided for @toolNotch.

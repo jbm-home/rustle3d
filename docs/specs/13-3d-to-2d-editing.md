@@ -28,7 +28,8 @@ point to move.
     3D garment becomes an internal line on the pattern (exact hits mapped
     to the pattern, points 8 mm apart, one panel per stroke); the stroke
     is shown under the cursor while drawing. Internal lines are not drawn
-    on the 3D garment yet.
+    on the 3D garment yet. The same tool draws on a piece of the board
+    too (the stroke stays on the piece it started on).
   - **Pick** (implemented for panels and edges): clicking the 3D garment
     selects the panel under the cursor (exact ray / triangle hit, mapped to
     the pattern) and the edge when the hit is within 20 mm of one; the edge

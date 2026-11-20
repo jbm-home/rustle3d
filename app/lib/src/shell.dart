@@ -2310,6 +2310,11 @@ class _ShellState extends State<Shell> {
                                           kind: ViewKind.board,
                                           // Corners and edges are dragged with Select.
                                           holding: _tool == 'select',
+                                          drawing: _tool == 'draw',
+                                          onDrawn: (_) {
+                                            _refresh();
+                                            _toast(l.toastLineAdded);
+                                          },
                                           pattern: switch (_tool) {
                                             'polygon' => PatternPointer(
                                               onTap: _polygonTap,

@@ -6467,8 +6467,9 @@ class EngineImpl extends RustOpaque implements Engine {
   String? strokeEnd() =>
       RustLib.instance.api.crateApiEngineEngineStrokeEnd(that: this);
 
-  /// Start drawing on the garment at (`x`, `y`) of a 3D view. Returns
-  /// whether the pointer is on the cloth.
+  /// Start drawing a line at (`x`, `y`) of a view: on the 3D garment,
+  /// or on a piece of the board. Returns whether the pointer is on a
+  /// piece.
   bool strokeStart({required int view, required double x, required double y}) =>
       RustLib.instance.api.crateApiEngineEngineStrokeStart(
         that: this,

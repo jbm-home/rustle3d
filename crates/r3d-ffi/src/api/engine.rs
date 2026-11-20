@@ -2972,17 +2972,14 @@ impl Engine {
         self.run_created(serde_json::json!({ "type": "edge.split", "edge": edge, "at_mm": offset }))
     }
 
-    /// Start drawing on the garment at (`x`, `y`) of a 3D view. Returns
-    /// whether the pointer is on the cloth.
+    /// Start drawing a line at (`x`, `y`) of a view: on the 3D garment,
+    /// or on a piece of the board. Returns whether the pointer is on a
+    /// piece.
     #[frb(sync)]
     pub fn stroke_start(&self, view: u32, x: f64, y: f64) -> Result<bool, ApiError> {
-        let slot = self.graphics()?;
-        let Some(v) = slot.as_ref().and_then(|g| g.views.get(&view)) else {
-            return Ok(false);
-        };
-        let hit = self.cloth_hit(v, &slot, x, y)?;
+        let hit = self.stroke_hit(view, x, y)?;
         let started = hit.is_some();
-        *self.stroke.lock().map_err(|_| poisoned())? = hit.map(|h| (h.panel, vec![h.at]));
+        *self.stroke.lock().map_err(|_| poisoned())? = hit.map(|(panel, at)| (panel, vec![at]));
         Ok(started)
     }
 
@@ -2990,29 +2987,47 @@ impl Engine {
     /// cloth, are skipped.
     #[frb(sync)]
     pub fn stroke_to(&self, view: u32, x: f64, y: f64) -> Result<(), ApiError> {
-        let slot = self.graphics()?;
-        let Some(v) = slot.as_ref().and_then(|g| g.views.get(&view)) else {
-            return Ok(());
-        };
-        let hit = self.cloth_hit(v, &slot, x, y)?;
-        drop(slot);
-        if let Some(hit) = hit {
-            self.extend_stroke(hit)?;
+        match self.stroke_hit(view, x, y)? {
+            Some((panel, at)) => self.extend_stroke(panel, at),
+            None => Ok(()),
+        }
+    }
+
+    fn extend_stroke(&self, panel: PanelId, at: r3d_geom::DVec2) -> Result<(), ApiError> {
+        let mut stroke = self.stroke.lock().map_err(|_| poisoned())?;
+        if let Some((started_on, points)) = stroke.as_mut()
+            && panel == *started_on
+            && points
+                .last()
+                .is_none_or(|p| p.distance(at) >= STROKE_STEP_MM)
+        {
+            points.push(at);
         }
         Ok(())
     }
 
-    fn extend_stroke(&self, hit: ClothHit) -> Result<(), ApiError> {
-        let mut stroke = self.stroke.lock().map_err(|_| poisoned())?;
-        if let Some((panel, points)) = stroke.as_mut()
-            && hit.panel == *panel
-            && points
-                .last()
-                .is_none_or(|p| p.distance(hit.at) >= STROKE_STEP_MM)
-        {
-            points.push(hit.at);
+    /// The piece under (`x`, `y`) of a view and the point there on its
+    /// pattern, in the shown size (mm): through the draped cloth in 3D,
+    /// straight under the pointer on the board.
+    fn stroke_hit(
+        &self,
+        view: u32,
+        x: f64,
+        y: f64,
+    ) -> Result<Option<(PanelId, r3d_geom::DVec2)>, ApiError> {
+        if let Some((board_view, w, h)) = self.frozen_board(view)? {
+            let at = board_view.to_board(x, y, w, h);
+            let ws = self.workspace()?;
+            let panel = BoardScene::from_project(ws.session().project(), &[]).panel_at(at);
+            return Ok(panel.map(|panel| (panel, at)));
         }
-        Ok(())
+        let slot = self.graphics()?;
+        let Some(v) = slot.as_ref().and_then(|g| g.views.get(&view)) else {
+            return Ok(None);
+        };
+        Ok(self
+            .cloth_hit(v, &slot, x, y)?
+            .map(|hit| (hit.panel, hit.at)))
     }
 
     /// Finish the line: it becomes an internal line on the pattern

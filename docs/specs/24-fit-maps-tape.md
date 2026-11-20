@@ -118,7 +118,7 @@ the body's, and the ease between them, as a tailor would with a tape.
   colour bar, its two ends with their values ("0 %" … "20 %+", or
   "50 mm+" … "0 mm"), what yellow means ("tight"), and the largest
   value on the garment and its piece.
-- **Tape measure** tool (rail, under Draw on garment; no key: M already
+- **Tape measure** tool (rail, under Draw; no key: M already
   maximizes a view). A card at the top left of the 3D view switches
   between **Round** and **Length**. Round: click on the draped garment;
   the loop round it there is drawn on the cloth, and the card reads the

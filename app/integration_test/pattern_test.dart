@@ -1,10 +1,12 @@
 // The pattern edited on the board: dragging an edge reshapes its piece,
-// as one undo step; a trackpad pinch zooms it.
+// as one undo step; a drag with the Draw tool puts a line on a piece; a
+// trackpad pinch zooms it.
 
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:rustle3d/main.dart';
@@ -69,6 +71,65 @@ void main() {
 
     engine.run(stepJson: '{"type":"history.undo"}');
     expect(outlines(), before);
+  });
+
+  testWidgets('a drag with the Draw tool puts a line on a piece', (
+    tester,
+  ) async {
+    final dir = Directory.systemTemp.createTempSync('r3d').path;
+    final store = ProjectStore(projectsDir: dir, libraryDir: dir);
+    File('$dir/tour-seen').createSync();
+    final path = await store.create(
+      name: 'Skirt',
+      body: store.standardBody(),
+      template: 'a_line_skirt',
+    );
+    final engine = Engine.open(path: path);
+    await tester.pumpWidget(Rustle3dApp(store: store, engine: engine));
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    int lines() {
+      final summary = jsonDecode(
+        engine.run(stepJson: '{"type":"project.summary"}'),
+      );
+      return (summary['panels'] as List).fold<int>(0, (n, p) {
+        final panel = jsonDecode(
+          engine.run(
+            stepJson: jsonEncode({'type': 'panel.get', 'panel': p['id']}),
+          ),
+        );
+        return n + (panel['internal_lines'] as List).length;
+      });
+    }
+
+    final board = tester.getRect(
+      find.byWidgetPredicate((w) => w is RustView && w.kind == ViewKind.board),
+    );
+    final before = lines();
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyD);
+    await tester.pump();
+    // Across the board until a stroke starts on a piece.
+    for (
+      var x = board.left + 20;
+      x < board.right - 20 && lines() == before;
+      x += 20
+    ) {
+      final stroke = await tester.startGesture(
+        Offset(x, board.center.dy - 30),
+        kind: PointerDeviceKind.mouse,
+      );
+      for (var i = 0; i < 10; i++) {
+        await stroke.moveBy(const Offset(0, 6));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await stroke.up();
+      await tester.pump();
+    }
+    // One line, or two when drawn on a piece with a linked mirror copy.
+    expect(lines(), greaterThan(before));
+    engine.run(stepJson: '{"type":"history.undo"}');
+    expect(lines(), before);
   });
 
   testWidgets('a trackpad pinch zooms the board', (tester) async {

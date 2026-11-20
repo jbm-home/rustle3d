@@ -639,11 +639,11 @@ class LFr extends L {
       'Tracez une ligne à travers une pièce : elle devient deux pièces cousues';
 
   @override
-  String get toolDraw => 'Dessiner sur le vêtement';
+  String get toolDraw => 'Dessiner';
 
   @override
   String get toolDrawHint =>
-      'Faites glisser sur le vêtement 3D : la ligne va sur le patron';
+      'Faites glisser sur une pièce, dans le patron ou sur le vêtement 3D : la ligne va sur le patron';
 
   @override
   String get toolNotch => 'Cran';
