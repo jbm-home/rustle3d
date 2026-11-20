@@ -1053,12 +1053,28 @@ class _ShellState extends State<Shell> {
     if (w <= 0 || h <= 0) return;
     final spot = _freeSpot(w * 5);
     final panels = (_summary['panels'] as List<dynamic>? ?? const []);
-    _run({
-      'type': 'panel.create_ellipse',
-      'name': l.pieceNew(panels.length + 1),
-      'centre': [spot[0], h * 5],
-      'radii': [w * 5, h * 5],
-    });
+    _shapeAdded(
+      _run({
+        'type': 'panel.create_ellipse',
+        'name': l.pieceNew(panels.length + 1),
+        'centre': [spot[0], h * 5],
+        'radii': [w * 5, h * 5],
+      }),
+    );
+  }
+
+  /// After a shape is added: back to Select with the new pieces selected,
+  /// so the next click picks a piece rather than going to the tool used
+  /// before. `out` is a command's output or a batch's list of them.
+  void _shapeAdded(dynamic out) {
+    if (out == null) return;
+    final panels = [
+      for (final o in out is List ? out : [out])
+        for (final id in ((o as Map?)?['created'] as List? ?? const []))
+          if (id is String && id.startsWith('panel:')) id,
+    ];
+    _setTool('select');
+    _guard(() => widget.engine.select(panels: panels));
     _refresh();
   }
 
@@ -1089,7 +1105,7 @@ class _ShellState extends State<Shell> {
     final inner = w * 10 / pieces;
     final radius = inner / (sweep * 3.141592653589793 / 180) + len * 10;
     final spot = _freeSpot(radius);
-    _run({
+    final out = _run({
       'type': 'batch',
       'label': 'panel.create_sector',
       'commands': [
@@ -1104,7 +1120,7 @@ class _ShellState extends State<Shell> {
           },
       ],
     });
-    _refresh();
+    _shapeAdded(out);
   }
 
   /// Board pick tolerance (logical pixels).
@@ -1793,14 +1809,15 @@ class _ShellState extends State<Shell> {
       final max = (p['bbox']?['max'] as List<dynamic>?)?.first as num?;
       if (max != null && max > right) right = max.toDouble();
     }
-    _run({
-      'type': 'panel.create_rect',
-      'name': context.l.pieceNew(panels.length + 1),
-      'origin': [right + 60, 0],
-      'width': 300,
-      'height': 400,
-    });
-    _refresh();
+    _shapeAdded(
+      _run({
+        'type': 'panel.create_rect',
+        'name': context.l.pieceNew(panels.length + 1),
+        'origin': [right + 60, 0],
+        'width': 300,
+        'height': 400,
+      }),
+    );
   }
 
   /// Ask where to save, then export there: the pattern, or the garment as

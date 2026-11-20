@@ -1655,7 +1655,7 @@ class LFr extends L {
       'guide_move': 'Déplacer une ligne de construction',
       'guide_remove': 'Retirer une ligne de construction',
       'panel_create_ellipse': 'Ajouter une ellipse',
-      'panel_create_sector': 'Ajouter une jupe cercle',
+      'panel_create_sector': 'Ajouter une jupe soleil',
       'edge_set_arc': 'Faire un arc',
       'constraint_set_formula': 'Formule de cote',
       'variable_set': 'Modifier une variable',
@@ -1788,7 +1788,7 @@ class LFr extends L {
       'Un cercle ou une ellipse aux dimensions saisies';
 
   @override
-  String get toolSector => 'Jupe cercle';
+  String get toolSector => 'Jupe soleil';
 
   @override
   String get toolSectorHint =>
@@ -1852,17 +1852,17 @@ class LFr extends L {
   String get sectorLength => 'Longueur de jupe';
 
   @override
-  String get sectorFull => 'Complète';
+  String get sectorFull => 'Soleil';
 
   @override
-  String get sectorHalf => 'Demi';
+  String get sectorHalf => 'Demi-soleil';
 
   @override
-  String get sectorQuarter => 'Quart';
+  String get sectorQuarter => 'Quart de soleil';
 
   @override
   String get sectorHint =>
-      'Une jupe cercle complète se fait en deux demi-pièces, à coudre sur les côtés.';
+      'Une jupe soleil se coupe en deux demi-pièces, à coudre sur les côtés.';
 
   @override
   String get arcTitle => 'Arc';
