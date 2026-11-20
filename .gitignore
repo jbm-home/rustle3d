@@ -5,6 +5,3 @@
 /scratch/
 *.r3d/exports/
 /dist/
-
-# Demo outputs (demos/out.sh)
-/demo-out/

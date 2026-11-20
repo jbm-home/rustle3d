@@ -486,8 +486,8 @@ fn run_resolves_references_to_earlier_results() {
 /// A project with a body and the sewn skirt template.
 fn skirt_project(dir: &std::path::Path) {
     r3d().arg("new").arg(dir).assert().success();
-    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
-    for script in ["demos/m4/body.json", "demos/m4/skirt.json"] {
+    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures");
+    for script in ["body.json", "skirt.json"] {
         r3d()
             .arg("run")
             .arg(dir)

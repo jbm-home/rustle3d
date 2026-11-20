@@ -108,7 +108,6 @@ cargo xtask run [--release] [-- <flutter args>]  # desktop app for this OS (or: 
 cargo xtask build [--release]                # CLI + desktop app for this OS (or: make build / make build-release)
 cargo xtask gen-docs                         # regenerate docs/commands.md (a test checks it)
 UPDATE_GOLDEN=1 cargo test -p r3d-core       # regenerate current-version golden files
-./demos/m15/demo.sh                          # latest milestone demo (one folder per milestone; files in demo-out/m15)
 cargo bench -p r3d-sim                       # CPU solver benchmarks (docs/physics.md §7)
 cargo bench -p r3d-sim-gpu                   # GPU vs CPU on the T-shirt and the dress
 cargo run -p r3d-cli -- simulate X.r3d       # headless drape (cached), then: render X.r3d --view 3d|photo --out a.png
@@ -139,8 +138,8 @@ If `cargo` is not on `PATH`, run `source ~/.cargo/env` first.
 
 - Small, reviewable commits; one feature per branch/PR.
 - At the end of each milestone: run all tests, update docs (architecture,
-  physics, specs, regenerate `docs/commands.md`), and provide a short demo
-  script (CLI or MCP) that exercises the new feature.
+  physics, specs, regenerate `docs/commands.md`). No demo script: the
+  maintainer tests each milestone against its spec.
 - Documentation and code are in English.
 - **User guide for the website**: `docs/user-guide.md` is the source of
   the user documentation on rustle3d.com (plain words, for users, not

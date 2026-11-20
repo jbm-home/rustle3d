@@ -85,4 +85,4 @@ nothing is written. Scripts can refer to earlier results
 
 ## Acceptance criteria
 - Each subcommand has an integration test using `assert_cmd`.
-- Every milestone demo script runs with the CLI only.
+- Everything the command layer does can be scripted with the CLI only.

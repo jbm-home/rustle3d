@@ -15,7 +15,7 @@ use r3d_render::{
 };
 
 fn skirt_project() -> Project {
-    let script = Script::parse(include_str!("../../../demos/m2/skirt.json")).unwrap();
+    let script = Script::parse(include_str!("fixtures/skirt.json")).unwrap();
     let mut s = Session::new(Project::new("t"));
     script.run(|step| s.run_step(step)).unwrap();
     s.project().clone()

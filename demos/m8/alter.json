@@ -1,5 +1,0 @@
-[
-  {"type": "edge.lengthen", "edge": "edge:7", "mm": -30},
-  {"type": "seam.take_in", "seam": "seam:33", "mm": 30, "at": "point:5"},
-  {"type": "seam.list"}
-]
