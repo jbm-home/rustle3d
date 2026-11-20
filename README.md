@@ -18,6 +18,10 @@
 
 ---
 
+<p align="center">
+  <img src="assets/screenshots/app.png" alt="Rustle3D: the pattern of a shirt and trousers on the left, the outfit draped on an avatar in the middle, the inspector on the right" width="900">
+</p>
+
 Rustle3D is a free desktop app for making clothes: draft the pattern in
 2D, sew the pieces together, and watch the garment drape on a body in 3D,
 with a cloth simulation in real time. It covers the core workflow of
