@@ -68,11 +68,9 @@ case "$os" in
     built=app/build/macos/Build/Products/Release
     while IFS= read -r -d '' f; do
       if file -b "$f" | grep -q Mach-O; then
-        archs="$(lipo -archs "$f")"
-        case " $archs " in
-          *" x86_64 "*" arm64 "*|*" arm64 "*" x86_64 "*) ;;
-          *) echo "$f is not universal ($archs)" >&2; exit 1 ;;
-        esac
+        archs=" $(lipo -archs "$f") "
+        case "$archs" in *" x86_64 "*) ;; *) echo "$f has no x86_64 ($archs)" >&2; exit 1 ;; esac
+        case "$archs" in *" arm64 "*) ;; *) echo "$f has no arm64 ($archs)" >&2; exit 1 ;; esac
       fi
     done < <(find "$built/Rustle3D.app" -type f -print0)
     ;;
