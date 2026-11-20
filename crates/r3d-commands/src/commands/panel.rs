@@ -1,6 +1,6 @@
 use r3d_core::measure::FLATTEN_TOLERANCE_MM;
 use r3d_core::{
-    AnyId, Around, Edge, EdgeCurve, MirrorLink, Panel, PanelId, PathSegment, Pin, Placement, Point,
+    AnyId, Around, Edge, EdgeCurve, MirrorLink, Panel, PanelId, PathSegment, Placement, Point,
     Transaction,
 };
 use r3d_geom::{CubicBez, DVec2, polygon};
@@ -351,102 +351,22 @@ impl CommandSpec for PanelTranslate {
     fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
         finite("delta", &self.delta)?;
         let d = v(self.delta);
-        let mut panel = get_panel(tx.project(), self.panel)?;
-        // The pattern abscissa its placement is centred on moves with it.
-        if let Some(place) = &mut panel.placement {
-            place.centre_x_mm = place.centre_x_mm.map(|x| x + d.x);
-        }
-        // A symmetric piece's axis moves with it.
-        if let Some(sym) = &mut panel.symmetry {
-            sym.origin += d;
-            tx.put_panel(self.panel, panel.clone());
-        }
+        let panel = get_panel(tx.project(), self.panel)?;
         // A linked copy is placed by its link's offset; the sync pass then
         // moves its geometry.
         if let Some(link) = &panel.mirror_of {
-            panel.mirror_of = Some(MirrorLink {
+            let mut moved = panel.clone();
+            moved.mirror_of = Some(MirrorLink {
                 offset: link.offset + d,
                 ..link.clone()
             });
-            tx.put_panel(self.panel, panel);
+            if let Some(place) = &mut moved.placement {
+                place.centre_x_mm = place.centre_x_mm.map(|x| x + d.x);
+            }
+            tx.put_panel(self.panel, moved);
             return Ok(CommandOutput::default());
         }
-        for eid in &panel.contour {
-            let edge = tx
-                .project()
-                .edge(*eid)
-                .cloned()
-                .ok_or_else(|| CommandError::not_found(*eid))?;
-            let point = tx
-                .project()
-                .point(edge.start)
-                .cloned()
-                .ok_or_else(|| CommandError::not_found(edge.start))?;
-            tx.put_point(
-                edge.start,
-                Point {
-                    pos: point.pos + d,
-                    ..point
-                },
-            );
-            if let EdgeCurve::Cubic { c1, c2 } = edge.curve {
-                tx.put_edge(
-                    *eid,
-                    Edge {
-                        curve: EdgeCurve::Cubic {
-                            c1: c1 + d,
-                            c2: c2 + d,
-                        },
-                        ..edge
-                    },
-                );
-            }
-        }
-        let lines: Vec<_> = tx
-            .project()
-            .internal_lines()
-            .iter()
-            .filter(|(_, l)| l.panel == self.panel)
-            .map(|(id, l)| (*id, l.clone()))
-            .collect();
-        for (id, line) in lines {
-            tx.put_internal_line(id, super::internal_line::translated(&line, d));
-        }
-        let pins: Vec<_> = tx
-            .project()
-            .pins()
-            .iter()
-            .filter(|(_, p)| p.panel == self.panel)
-            .map(|(id, p)| (*id, *p))
-            .collect();
-        for (id, pin) in pins {
-            tx.put_pin(
-                id,
-                Pin {
-                    at: pin.at + d,
-                    ..pin
-                },
-            );
-        }
-        let buttons: Vec<_> = tx
-            .project()
-            .buttons()
-            .iter()
-            .filter(|(_, b)| b.panel == self.panel || b.hole.panel == self.panel)
-            .map(|(id, b)| (*id, b.clone()))
-            .collect();
-        for (id, mut b) in buttons {
-            if b.panel == self.panel {
-                b.at += d;
-            }
-            if b.hole.panel == self.panel {
-                b.hole.at += d;
-            }
-            tx.put_button(id, b);
-        }
-        if panel.placement.is_some_and(|p| p.centre_x_mm.is_some()) {
-            tx.put_panel(self.panel, panel);
-        }
+        super::transform::map_panel(tx, self.panel, panel, glam::DAffine2::from_translation(d))?;
         Ok(CommandOutput::default())
     }
 

@@ -149,6 +149,7 @@ extension Messages on BuildContext {
       'invalid.not_whole_edges' => l.errNotWholeEdges,
       'invalid.apart' => l.errApart,
       'invalid.has_holes' => l.errHasHoles,
+      'invalid.constrained' => l.errConstrained,
       'invalid.outside_piece' => l.errOutsidePiece,
       'invalid.not_joined' => l.errNotJoined,
       'formula.syntax' => l.errFormulaSyntax(arg('at')),

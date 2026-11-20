@@ -1601,6 +1601,8 @@ class LFr extends L {
       'panel_create_path': 'Ajouter une pièce courbe',
       'panel_rename': 'Renommer la pièce',
       'panel_translate': 'Déplacer la pièce',
+      'panel_rotate': 'Faire pivoter la pièce',
+      'panel_scale': 'Mettre la pièce à l’échelle',
       'panel_set_grain': 'Régler le droit-fil',
       'panel_set_seam_allowance': 'Régler la valeur de couture',
       'panel_mirror': 'Symétrie de la pièce',
@@ -2137,6 +2139,10 @@ class LFr extends L {
 
   @override
   String get errHasHoles => 'Cette pièce a des trous : bouchez-les d’abord.';
+
+  @override
+  String get errConstrained =>
+      'Cette pièce a des cotes ou des contraintes qui ne tiendraient plus : retirez-les d’abord.';
 
   @override
   String get errNotJoined => 'Ces arêtes ne se suivent pas sur une même pièce.';

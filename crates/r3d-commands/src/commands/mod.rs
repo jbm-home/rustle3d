@@ -27,6 +27,7 @@ mod source;
 mod symmetry;
 mod take_in;
 mod template;
+mod transform;
 mod trim;
 
 pub use arrange::*;
@@ -56,6 +57,7 @@ pub use source::*;
 pub use symmetry::*;
 pub use take_in::*;
 pub use template::*;
+pub use transform::*;
 pub use trim::*;
 
 use std::collections::{BTreeMap, BTreeSet};

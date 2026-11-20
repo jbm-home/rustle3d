@@ -38,6 +38,17 @@ that they can later be sewn and draped.
   free contour with cubic Bézier segments (click = corner, drag = smooth).
 - **Edit**: select and move points/edges/panels; convert an edge between line
   and curve; edit Bézier handles; insert/delete points; split an edge.
+- **Move, turn, scale a whole piece**: `panel.translate` (a displacement),
+  `panel.rotate` (degrees, counter-clockwise) and `panel.scale` (a factor
+  across and one up and down), the last two about a point, by default the
+  centre of the piece's bounding box. Everything the piece owns follows:
+  outline, holes, curve handles, grades, internal lines, pins, buttons,
+  grainline, print, symmetry axis. Its constraints follow when they can:
+  a quarter turn swaps horizontal and vertical ones, scaling scales its
+  dimensions; a change they cannot follow (30° with a horizontal edge,
+  stretching one way with a length or an angle, any scaling of a
+  dimension with a formula) is refused. A linked mirror copy is turned
+  and scaled through its source.
 - **Symmetry**: a linked mirror copy of a panel (`panel.mirror`) follows
   every change of its source, including notches, internal lines, grainline
   and seam allowance. It cannot be edited directly, but it can be moved

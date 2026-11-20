@@ -59,10 +59,6 @@ pub(crate) fn mapped(line: &InternalLine, f: impl Fn(DVec2) -> DVec2) -> Interna
     }
 }
 
-pub(crate) fn translated(line: &InternalLine, d: DVec2) -> InternalLine {
-    mapped(line, |p| p + d)
-}
-
 /// Draw an open path inside a panel.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

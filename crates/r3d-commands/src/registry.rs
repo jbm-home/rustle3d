@@ -135,6 +135,8 @@ command_registry! {
     "panel.create_path" => PanelCreatePath,
     "panel.rename" => PanelRename,
     "panel.translate" => PanelTranslate,
+    "panel.rotate" => PanelRotate,
+    "panel.scale" => PanelScale,
     "panel.set_grain" => PanelSetGrain,
     "panel.set_seam_allowance" => PanelSetSeamAllowance,
     "panel.mirror" => PanelMirror,

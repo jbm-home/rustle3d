@@ -112,6 +112,10 @@ fn every_command_round_trips() {
     h.round_trip(json!({"type": "point.move", "point": point, "to": [420, 0]}));
     h.round_trip(json!({"type": "point.set_distance", "from": other_point, "point": point, "distance_mm": 250}));
     h.round_trip(json!({"type": "panel.translate", "panel": panel, "delta": [100, -50]}));
+    h.round_trip(json!({"type": "panel.rotate", "panel": panel, "angle_deg": 30}));
+    h.round_trip(
+        json!({"type": "panel.scale", "panel": panel, "factor": [1.1, 0.9], "centre": [0, 0]}),
+    );
     h.round_trip(json!({"type": "panel.set_grain", "panel": panel, "angle_deg": 45}));
     h.round_trip(json!({"type": "panel.set_seam_allowance", "panel": panel, "mm": 15}));
     h.round_trip(json!({"type": "panel.place", "panel": panel, "angle_deg": 0, "top_cm": 104}));

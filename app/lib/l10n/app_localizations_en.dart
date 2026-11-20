@@ -1585,6 +1585,8 @@ class LEn extends L {
       'panel_create_path': 'Add curved piece',
       'panel_rename': 'Rename piece',
       'panel_translate': 'Move piece',
+      'panel_rotate': 'Rotate piece',
+      'panel_scale': 'Scale piece',
       'panel_set_grain': 'Set grainline',
       'panel_set_seam_allowance': 'Set seam allowance',
       'panel_mirror': 'Mirror piece',
@@ -2115,6 +2117,10 @@ class LEn extends L {
 
   @override
   String get errHasHoles => 'This piece has holes: fill them first.';
+
+  @override
+  String get errConstrained =>
+      'This piece has dimensions or constraints that would no longer hold: remove them first.';
 
   @override
   String get errNotJoined =>

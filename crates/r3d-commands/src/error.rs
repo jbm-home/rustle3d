@@ -78,6 +78,8 @@ pub enum Invalid {
     Apart,
     #[error("has holes: fill them first (panel.remove_hole)")]
     HasHoles,
+    #[error("the piece's dimensions or constraints would no longer hold: remove them first")]
+    Constrained,
     #[error("must be inside the piece")]
     OutsidePiece,
     #[error("must start at 1 and decrease, each above 0, at most five levels")]
@@ -131,6 +133,7 @@ impl Invalid {
             Invalid::Overlaps => "invalid.overlaps",
             Invalid::Apart => "invalid.apart",
             Invalid::HasHoles => "invalid.has_holes",
+            Invalid::Constrained => "invalid.constrained",
             Invalid::OutsidePiece => "invalid.outside_piece",
             Invalid::Lods => "invalid.lods",
             Invalid::TextureSize => "invalid.texture_size",

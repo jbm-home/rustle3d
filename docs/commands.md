@@ -767,6 +767,115 @@ Move a whole panel on the board by a displacement in mm. Works on linked mirror 
 
 </details>
 
+### `panel.rotate`
+
+Turn a whole panel on the board by an angle (degrees, counter-clockwise), about a point (default: the centre of its bounding box). Its lines, pins, buttons, grainline and print turn with it; horizontal and vertical constraints swap on a quarter turn, and any other angle is refused while the panel has them. Not on a linked mirror copy (turn its source).
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "PanelId": {
+      "description": "Identifier of a panel, e.g. `panel:1`.",
+      "pattern": "^panel:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Turn a whole panel on the board.",
+  "properties": {
+    "angle_deg": {
+      "description": "Degrees, counter-clockwise on the board (+X towards +Y).",
+      "format": "double",
+      "type": "number"
+    },
+    "centre": {
+      "description": "The point turned about (mm). Defaults to the centre of the panel's\nbounding box.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "panel": {
+      "$ref": "#/$defs/PanelId"
+    }
+  },
+  "required": [
+    "panel",
+    "angle_deg"
+  ],
+  "title": "PanelRotate",
+  "type": "object"
+}
+```
+
+</details>
+
+### `panel.scale`
+
+Scale a whole panel on the board by a factor across and one up and down (> 0), about a point (default: the centre of its bounding box). Its lines, pins and buttons follow; its dimensions are scaled with it. Refused while a dimension has a formula, or when the two factors differ and a length, a straight distance, an angle or a right angle would no longer hold. Not on a linked mirror copy (scale its source).
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "PanelId": {
+      "description": "Identifier of a panel, e.g. `panel:1`.",
+      "pattern": "^panel:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Scale a whole panel on the board.",
+  "properties": {
+    "centre": {
+      "description": "The point that stays put (mm). Defaults to the centre of the panel's\nbounding box.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "factor": {
+      "description": "Factors across (x) and up and down (y), > 0; `[1.1, 1.1]` makes the\npanel 10 % bigger every way.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+    },
+    "panel": {
+      "$ref": "#/$defs/PanelId"
+    }
+  },
+  "required": [
+    "panel",
+    "factor"
+  ],
+  "title": "PanelScale",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `panel.set_grain`
 
 Set a panel's grainline (warp direction), in degrees from +X.
