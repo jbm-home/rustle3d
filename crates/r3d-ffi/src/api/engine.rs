@@ -178,20 +178,6 @@ fn piece_meshes(
         .collect()
 }
 
-/// The tape measure's loop as a band on the cloth: upright, lifted
-/// outward from the loop's centre.
-fn tape_band(points: &[glam::Vec3]) -> Mesh {
-    let centre = points.iter().copied().sum::<glam::Vec3>() / points.len().max(1) as f32;
-    let along: Vec<(glam::Vec3, glam::Vec3)> = points
-        .iter()
-        .map(|p| {
-            let out = glam::Vec3::new(p.x - centre.x, 0.0, p.z - centre.z);
-            (*p, out.normalize_or(glam::Vec3::Z))
-        })
-        .collect();
-    Mesh::ribbon(&along, TAPE_WIDTH_M, TAPE_LIFT_M)
-}
-
 /// Canvas colours as `0xAARRGGBB` (Flutter's `Color.toARGB32()`).
 #[derive(Debug, Clone)]
 pub struct CanvasColors {
@@ -553,8 +539,10 @@ pub struct Engine {
     photo: Mutex<Option<PhotoJob>>,
     /// The fit map the 3D view colours the cloth by, if any.
     fit_map: Mutex<Option<FitMap>>,
-    /// The loop of the last tape measure taken on the drape (m).
-    tape: Mutex<Option<Vec<glam::Vec3>>>,
+    /// The last tape measure taken on the drape (a loop or the way
+    /// between two points), as a band: each point (m) and its outward
+    /// direction.
+    tape: Mutex<Option<Vec<(glam::Vec3, glam::Vec3)>>>,
     /// The garments' prints, drawn or read once.
     prints: Mutex<Prints>,
 }
@@ -601,8 +589,9 @@ pub struct FitLegend {
     pub tightest_piece: Option<String>,
 }
 
-/// A tape measure taken on the drape (spec 24): at `height_cm` above the
-/// floor, the garment's circumference along the cloth, the body's inside
+/// A tape measure taken on the drape (spec 24): at a point `height_cm`
+/// above the floor, the garment's circumference along the cloth (level
+/// round the torso, square to a slanting sleeve), the body's inside
 /// it (by tape), the ease between them (garment minus body; only when
 /// the cut goes all round, `closed`) and the gap from the clicked cloth
 /// to the body.
@@ -614,6 +603,17 @@ pub struct TapeReading {
     pub body_cm: Option<f64>,
     pub ease_cm: Option<f64>,
     pub gap_mm: Option<f64>,
+}
+
+/// A length taken on the drape between two points (spec 24): straight,
+/// along the cloth (folds included) and by tape (pulled taut over the
+/// folds). The last two are `None` when the cloth does not join the
+/// points.
+#[derive(Debug, Clone)]
+pub struct LengthReading {
+    pub straight_cm: f64,
+    pub along_cm: Option<f64>,
+    pub tape_cm: Option<f64>,
 }
 
 fn poisoned() -> ApiError {
@@ -2141,7 +2141,7 @@ impl Engine {
             .lock()
             .map_err(|_| poisoned())?
             .as_deref()
-            .map(tape_band);
+            .map(|band| Mesh::ribbon(band, TAPE_WIDTH_M, TAPE_LIFT_M));
         let moving = self.moving_avatar(project, published.time)?;
         let mut draws = Vec::with_capacity(pieces.len() + 1);
         if let Some(avatar) = moving.as_ref().or(g.avatar.as_ref().map(|(_, m)| m)) {
@@ -2341,15 +2341,67 @@ impl Engine {
             ease_cm: g.ease().map(cm),
             gap_mm: g.gap.map(|v| f64::from(v) * 1000.0),
         };
-        *self.tape.lock().map_err(|_| poisoned())? = g.garment.map(|l| {
-            let mut points = l.points;
-            match points.first().copied() {
-                Some(first) if l.closed => points.push(first),
-                _ => {}
-            }
-            points
-        });
+        *self.tape.lock().map_err(|_| poisoned())? = g.garment.map(|l| l.band());
         Ok(Some(reading))
+    }
+
+    /// The point of the cloth under pixel (`x`, `y`) of a 3D view, in
+    /// metres (x, y, z), for [`Engine::length_between`]; `None` when no
+    /// cloth is under the pointer.
+    #[frb(sync)]
+    pub fn cloth_point(&self, view: u32, x: f64, y: f64) -> Result<Option<Vec<f64>>, ApiError> {
+        let slot = self.graphics()?;
+        let Some(v) = slot.as_ref().and_then(|g| g.views.get(&view)) else {
+            return Ok(None);
+        };
+        Ok(self
+            .cloth_hit(v, &slot, x, y)?
+            .map(|hit| hit.point.to_array().map(f64::from).to_vec()))
+    }
+
+    /// The length between two points of the cloth (from
+    /// [`Engine::cloth_point`]): straight, along the cloth and pulled taut
+    /// over it. The way along the cloth is drawn on it until
+    /// [`Engine::clear_tape`].
+    #[frb(sync)]
+    pub fn length_between(&self, from: Vec<f64>, to: Vec<f64>) -> Result<LengthReading, ApiError> {
+        let point = |p: &[f64]| match p {
+            [x, y, z] => Ok(glam::Vec3::new(*x as f32, *y as f32, *z as f32)),
+            _ => Err(ApiError::from(
+                Message::new("malformed", "malformed `point`: expected x, y and z")
+                    .arg("name", "point")
+                    .arg("detail", "expected x, y and z"),
+            )),
+        };
+        let (a, b) = (point(&from)?, point(&to)?);
+        let published = self
+            .sim
+            .lock()
+            .map_err(|_| poisoned())?
+            .as_ref()
+            .map(SimThread::latest)
+            .unwrap_or_default();
+        let ws = self.workspace()?;
+        let body = self.live_body(ws.session().project(), published.time)?;
+        drop(ws);
+        let cloth = self.cloth.lock().map_err(|_| poisoned())?;
+        let cm = |m: f32| f64::from(m) * 100.0;
+        let Some(drape) = cloth.as_ref() else {
+            return Ok(LengthReading {
+                straight_cm: cm(a.distance(b)),
+                along_cm: None,
+                tape_cm: None,
+            });
+        };
+        let body = body.as_ref().map(|(p, f)| (&p[..], &f.triangles[..]));
+        let span = fit::span(drape, &published.positions, body, a, b);
+        drop(cloth);
+        *self.tape.lock().map_err(|_| poisoned())? = span.path.is_some().then(|| span.band());
+        Ok(LengthReading {
+            straight_cm: cm(span.straight),
+            along_cm: span.along().map(cm),
+            tape_cm: span.tape.map(cm),
+        })
     }
 
     /// Take the tape measure's loop off the cloth.

@@ -6721,3 +6721,47 @@ A tape measure on the cached drape: at `height_cm`, the garment's circumference 
 
 </details>
 
+### `fit.length`
+
+A length on the cached drape between two points of it (`from`, `to`, m): straight, along the cloth (the cut through both points across the cloth, the way a tape laid from one to the other goes, folds included) and by tape (that way pulled taut, bridging the folds), in cm. `joined` is false when the cloth does not join them (two garments, an opening between): only the straight length then.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A length on the drape between two points of it.",
+  "properties": {
+    "from": {
+      "description": "A point on the drape (m, x right, y up, z forward).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 3,
+      "minItems": 3,
+      "type": "array"
+    },
+    "to": {
+      "description": "Another point on the drape (m).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 3,
+      "minItems": 3,
+      "type": "array"
+    }
+  },
+  "required": [
+    "from",
+    "to"
+  ],
+  "title": "FitLength",
+  "type": "object"
+}
+```
+
+</details>
+

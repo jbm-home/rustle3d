@@ -218,11 +218,17 @@ impl<'a> Surface<'a> {
     }
 
     /// Distance from `p` to the surface (m), or `limit` when farther.
+    pub fn distance(&self, p: Vec3, limit: f32) -> f32 {
+        self.closest(p, limit).map_or(limit, |q| q.distance(p))
+    }
+
+    /// The point of the surface nearest to `p`, if within `limit` (m).
     /// Searches shells of cells outwards: a triangle in shell `r + 1` is
     /// at least `r` cells away.
-    pub fn distance(&self, p: Vec3, limit: f32) -> f32 {
+    pub fn closest(&self, p: Vec3, limit: f32) -> Option<Vec3> {
         let home = cell_of(p);
         let mut best = limit;
+        let mut found = None;
         let shells = (limit / CELL_M).ceil() as i32 + 1;
         for r in 0..=shells {
             for x in -r..=r {
@@ -233,8 +239,11 @@ impl<'a> Surface<'a> {
                         }
                         let key = [home[0] + x, home[1] + y, home[2] + z];
                         for t in self.cells.get(&key).into_iter().flatten() {
-                            if let Some(d) = self.to_triangle(p, *t as usize) {
-                                best = best.min(d);
+                            if let Some(q) = self.to_triangle(p, *t as usize)
+                                && q.distance(p) < best
+                            {
+                                best = q.distance(p);
+                                found = Some(q);
                             }
                         }
                     }
@@ -244,16 +253,15 @@ impl<'a> Surface<'a> {
                 break;
             }
         }
-        best
+        found
     }
 
-    fn to_triangle(&self, p: Vec3, t: usize) -> Option<f32> {
+    fn to_triangle(&self, p: Vec3, t: usize) -> Option<Vec3> {
         let [a, b, c] = self
             .triangles
             .get(t)?
             .map(|v| self.positions.get(v as usize));
-        let (q, _) = closest_feature(p, *a?, *b?, *c?);
-        Some(q.distance(p))
+        Some(closest_feature(p, *a?, *b?, *c?).0)
     }
 }
 
@@ -424,13 +432,60 @@ fn groups(chosen: &[usize], triangles: &[r3d_sim::scene::Triangle]) -> Vec<Vec<u
     out.into_values().collect()
 }
 
-/// A cut through a surface by a horizontal plane.
+/// A plane cutting the cloth or the body.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Plane {
+    /// A point of the plane (m).
+    pub origin: Vec3,
+    /// Unit.
+    pub normal: Vec3,
+}
+
+impl Plane {
+    /// The level plane at height `y` (m).
+    pub fn level(y: f32) -> Self {
+        Self {
+            origin: Vec3::new(0.0, y, 0.0),
+            normal: Vec3::Y,
+        }
+    }
+
+    /// Signed distance from `p` (m).
+    fn side(&self, p: Vec3) -> f32 {
+        (p - self.origin).dot(self.normal)
+    }
+
+    /// Two unit axes in the plane; for a level plane, x and z, so its
+    /// coordinates are the plan seen from above.
+    fn axes(&self) -> (Vec3, Vec3) {
+        let along = |a: Vec3| a - self.normal * a.dot(self.normal);
+        let u = along(Vec3::X)
+            .try_normalize()
+            .or_else(|| along(Vec3::Z).try_normalize())
+            .unwrap_or(Vec3::X);
+        (u, u.cross(self.normal))
+    }
+
+    /// Angle between the plane and the level (degrees).
+    pub fn tilt(&self) -> f32 {
+        self.normal
+            .dot(Vec3::Y)
+            .abs()
+            .clamp(0.0, 1.0)
+            .acos()
+            .to_degrees()
+    }
+}
+
+/// A cut through a surface by a plane.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Loop {
     /// In order along the cut (m).
     pub points: Vec<Vec3>,
     /// The last point joins the first.
     pub closed: bool,
+    /// The plane of the cut.
+    pub plane: Plane,
 }
 
 impl Loop {
@@ -444,14 +499,19 @@ impl Loop {
         open + closing
     }
 
+    /// The points in the plane's coordinates (the plan, for a level cut).
     fn plan(&self) -> Vec<DVec2> {
+        let (u, v) = self.plane.axes();
         self.points
             .iter()
-            .map(|p| DVec2::new(f64::from(p.x), f64::from(p.z)))
+            .map(|p| {
+                let d = *p - self.plane.origin;
+                DVec2::new(f64::from(d.dot(u)), f64::from(d.dot(v)))
+            })
             .collect()
     }
 
-    /// The convex outline seen from above: what a tape around it reads.
+    /// The convex outline in its plane: what a tape around it reads.
     fn hull(&self) -> Vec<DVec2> {
         polygon::convex_hull(&self.plan())
     }
@@ -468,6 +528,12 @@ impl Loop {
 
     /// Distance from `p` to the nearest point of the loop's segments (m).
     fn distance(&self, p: Vec3) -> f32 {
+        self.locate(p).map_or(f32::MAX, |(_, _, d)| d)
+    }
+
+    /// The segment of the loop nearest to `p`: its index, where along it
+    /// (0–1) and the distance (m).
+    fn locate(&self, p: Vec3) -> Option<(usize, f32, f32)> {
         let n = self.points.len();
         let segments = if self.closed { n } else { n.saturating_sub(1) };
         (0..segments)
@@ -476,21 +542,41 @@ impl Loop {
                 let b = *self.points.get((i + 1) % n)?;
                 let ab = b - a;
                 let t = ((p - a).dot(ab) / ab.length_squared().max(1e-12)).clamp(0.0, 1.0);
-                Some((a + ab * t).distance(p))
+                Some((i, t, (a + ab * t).distance(p)))
             })
-            .fold(f32::MAX, f32::min)
+            .min_by(|a, b| a.2.total_cmp(&b.2))
+    }
+
+    /// The loop as a band to draw on the cloth: each point with its
+    /// outward direction, in the plane, away from the loop's middle.
+    pub fn band(&self) -> Vec<(Vec3, Vec3)> {
+        let centre = self.points.iter().copied().sum::<Vec3>() / self.points.len().max(1) as f32;
+        let n = self.plane.normal;
+        let mut out: Vec<(Vec3, Vec3)> = self
+            .points
+            .iter()
+            .map(|p| {
+                let d = *p - centre;
+                (*p, (d - n * d.dot(n)).normalize_or(Vec3::Z))
+            })
+            .collect();
+        if self.closed
+            && let Some(first) = out.first().copied()
+        {
+            out.push(first);
+        }
+        out
     }
 }
 
-/// Cut the triangles of `positions` by the plane at height `y` into
-/// loops. `same` names the vertex a vertex is sewn to (one name for the
+/// Cut the triangles of `positions` by `plane` into loops. `same` names the vertex a vertex is sewn to (one name for the
 /// whole group), so cuts through two pieces join across their seam.
 /// Loops whose ends are close are closed ([`CLOSE_LOOP_M`]).
 pub fn slice(
     positions: &[Vec3],
     triangles: impl Iterator<Item = [u32; 3]>,
     same: &dyn Fn(u32) -> u32,
-    y: f32,
+    plane: Plane,
 ) -> Vec<Loop> {
     type Key = (u32, u32);
     let key = |a: u32, b: u32| {
@@ -508,14 +594,15 @@ pub fn slice(
             else {
                 continue;
             };
-            if (pa.y > y) == (pb.y > y) {
+            let (da, db) = (plane.side(*pa), plane.side(*pb));
+            if (da > 0.0) == (db > 0.0) {
                 continue;
             }
             let k = key(a, b);
             if k.0 == k.1 {
                 continue;
             }
-            let p = pa.lerp(*pb, (y - pa.y) / (pb.y - pa.y));
+            let p = pa.lerp(*pb, da / (da - db));
             let slot = points.entry(k).or_insert((Vec3::ZERO, 0));
             slot.0 += p;
             slot.1 += 1;
@@ -572,7 +659,11 @@ pub fn slice(
                     .first()
                     .zip(points.last())
                     .is_some_and(|(a, b)| a.distance(*b) < CLOSE_LOOP_M));
-        loops.push(Loop { points, closed });
+        loops.push(Loop {
+            points,
+            closed,
+            plane,
+        });
     }
     join(loops)
 }
@@ -633,15 +724,17 @@ fn join(mut loops: Vec<Loop>) -> Vec<Loop> {
 /// Where to take the tape.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Probe {
-    /// Around the body at this height (m).
+    /// Around the body at this height (m), level.
     Height(f32),
-    /// Around the cloth passing nearest to this point, at its height.
+    /// Around the cloth at this point of it, the shortest way round through
+    /// it: level around the torso, across a sleeve on a raised arm.
     Near(Vec3),
 }
 
 /// A tape measure's reading.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Girth {
+    /// Of the point measured (m).
     pub height: f32,
     /// The garment's loop, if the cut found one.
     pub garment: Option<Loop>,
@@ -660,12 +753,13 @@ impl Girth {
         Some(garment.length() - self.body?)
     }
 
-    /// The reading for agents (cm, mm for the gap), named `at`.
+    /// The reading for agents (cm, mm for the gap, degrees), named `at`.
     pub fn to_json(&self, at: &str) -> Value {
         let cm = |v: f32| r1(v * 100.0);
         json!({
             "at": at,
             "height_cm": cm(self.height),
+            "tilt_deg": self.garment.as_ref().map(|l| r1(l.plane.tilt())),
             "garment_cm": self.garment.as_ref().map(|l| cm(l.length())),
             "garment_tape_cm": self.garment.as_ref().filter(|l| l.closed).map(|l| cm(l.tape())),
             "closed": self.garment.as_ref().is_some_and(|l| l.closed),
@@ -676,35 +770,210 @@ impl Girth {
     }
 }
 
+/// The cloth's triangles, and for each particle the one standing for all
+/// those sewn to it, so cuts join across seams.
+struct Cloth<'a> {
+    positions: &'a [Vec3],
+    triangles: Vec<[u32; 3]>,
+    sewn: HashMap<u32, u32>,
+}
+
+impl<'a> Cloth<'a> {
+    fn new(drape: &Drape, positions: &'a [Vec3]) -> Self {
+        Self {
+            positions,
+            triangles: drape.scene.triangles.iter().map(|t| t.vertices).collect(),
+            sewn: sewn_to(drape),
+        }
+    }
+
+    fn slice(&self, plane: Plane) -> Vec<Loop> {
+        let same = |v: u32| self.sewn.get(&v).copied().unwrap_or(v);
+        slice(self.positions, self.triangles.iter().copied(), &same, plane)
+    }
+
+    /// The cut by `plane` passing through `p`, if one does.
+    fn through(&self, plane: Plane, p: Vec3) -> Option<Loop> {
+        self.slice(plane)
+            .into_iter()
+            .map(|l| (l.distance(p), l))
+            .filter(|(d, _)| *d < ON_LOOP_M)
+            .min_by(|a, b| a.0.total_cmp(&b.0))
+            .map(|(_, l)| l)
+    }
+
+    /// Which way the cloth faces at `p`: its triangles' normals within
+    /// [`NORMAL_RADIUS_M`], weighted by area and turned to agree with the
+    /// nearest one's (a pattern piece's two faces look alike).
+    fn normal(&self, p: Vec3) -> Option<Vec3> {
+        let mut nearest: Option<(f32, Vec3)> = None;
+        let mut around = Vec::new();
+        for t in &self.triangles {
+            let [Some(a), Some(b), Some(c)] = t.map(|v| self.positions.get(v as usize).copied())
+            else {
+                continue;
+            };
+            let n = (b - a).cross(c - a);
+            let d = ((a + b + c) / 3.0).distance(p);
+            if d < NORMAL_RADIUS_M {
+                around.push(n);
+            }
+            if nearest.is_none_or(|(e, _)| d < e) {
+                nearest = Some((d, n));
+            }
+        }
+        let (_, reference) = nearest?;
+        around
+            .iter()
+            .map(|n| if n.dot(reference) < 0.0 { -*n } else { *n })
+            .sum::<Vec3>()
+            .try_normalize()
+            .or_else(|| reference.try_normalize())
+    }
+
+    /// Which way the cloth runs at `p` when it wraps round something there
+    /// (an arm, the torso), with its normal: the direction of its tangent
+    /// plane along which its facing changes least over
+    /// [`AXIS_RADIUS_M`], the axis of the tube it forms (on a cylinder the
+    /// normals all lie square to the axis: the smallest eigenvector of
+    /// their scatter). `None` where the cloth is flat or bends alike both
+    /// ways.
+    fn axis(&self, p: Vec3) -> Option<(Vec3, Vec3)> {
+        let n = self.normal(p)?;
+        let t1 = n.any_orthonormal_vector();
+        let t2 = n.cross(t1);
+        let (mut xx, mut xy, mut yy, mut w) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
+        for t in &self.triangles {
+            let [Some(a), Some(b), Some(c)] = t.map(|v| self.positions.get(v as usize).copied())
+            else {
+                continue;
+            };
+            if ((a + b + c) / 3.0).distance(p) > AXIS_RADIUS_M {
+                continue;
+            }
+            let m = (b - a).cross(c - a);
+            let (area, Some(u)) = (m.length() / 2.0, m.try_normalize()) else {
+                continue;
+            };
+            let (x, y) = (u.dot(t1), u.dot(t2));
+            xx += area * x * x;
+            xy += area * x * y;
+            yy += area * y * y;
+            w += area;
+        }
+        if w <= 0.0 {
+            return None;
+        }
+        let (xx, xy, yy) = (xx / w, xy / w, yy / w);
+        let mean = (xx + yy) / 2.0;
+        let spread = (((xx - yy) / 2.0).powi(2) + xy * xy).sqrt();
+        let (low, high) = (mean - spread, mean + spread);
+        if high < CURVED || low > high * ALIKE {
+            return None;
+        }
+        let v = if xy.abs() > 1e-9 {
+            Vec2::new(xy, low - xx)
+        } else if xx <= yy {
+            Vec2::X
+        } else {
+            Vec2::Y
+        };
+        let axis = (t1 * v.x + t2 * v.y).try_normalize()?;
+        Some((n, axis))
+    }
+
+    /// The loop through `p` a tape takes: square to the way the cloth runs
+    /// there ([`Cloth::axis`]), the shortest closed cut within
+    /// [`AXIS_SEARCH_DEG`] of that (every [`ROUND_STEP_DEG`], then to the
+    /// degree), so round a slanting sleeve; but level, as a tape is held
+    /// round the torso, where the cloth does not show its way or the
+    /// level loop is about as short. Without a closed one, the level cut.
+    fn round(&self, p: Vec3) -> Option<Loop> {
+        let level = self.through(Plane::level(p.y), p);
+        let Some((n, axis)) = self.axis(p) else {
+            return level;
+        };
+        let side = n.cross(axis);
+        let plane = |deg: f32| {
+            let (s, c) = deg.to_radians().sin_cos();
+            Plane {
+                origin: p,
+                normal: (axis * c + side * s).normalize_or(Vec3::Y),
+            }
+        };
+        let shortest = |degrees: Vec<f32>| {
+            degrees
+                .into_iter()
+                .filter_map(|deg| {
+                    self.through(plane(deg), p)
+                        .filter(|l| l.closed)
+                        .map(|l| (deg, l))
+                })
+                .min_by(|a, b| a.1.length().total_cmp(&b.1.length()))
+        };
+        let steps = (AXIS_SEARCH_DEG / ROUND_STEP_DEG) as i32;
+        let fine = ROUND_STEP_DEG as i32 - 1;
+        let best = shortest(
+            (-steps..=steps)
+                .map(|k| k as f32 * ROUND_STEP_DEG)
+                .collect(),
+        )
+        .and_then(|(deg, _)| shortest((-fine..=fine).map(|k| deg + k as f32).collect()))
+        .map(|(_, l)| l);
+        match (best, level) {
+            (Some(b), Some(f)) if !f.closed || f.length() > b.length() * LEVEL_SLACK => Some(b),
+            (b, f) => f.or(b),
+        }
+    }
+}
+
+/// A loop this close to a point passes through it (m).
+const ON_LOOP_M: f32 = 0.01;
+/// Radius over which the cloth's facing at a point is averaged (m), so a
+/// small fold does not turn the tape.
+const NORMAL_RADIUS_M: f32 = 0.03;
+/// Radius over which the way the cloth runs is read (m): about the
+/// width of an arm.
+const AXIS_RADIUS_M: f32 = 0.05;
+/// The cloth wraps round something when its facing varies this much over
+/// that radius (mean squared sine of the turn, about 6°)…
+const CURVED: f32 = 0.01;
+/// …and much more one way than the other (ratio of the two).
+const ALIKE: f32 = 0.5;
+/// How far the tape may turn from square to the cloth's way (degrees).
+const AXIS_SEARCH_DEG: f32 = 20.0;
+/// Steps of the search for the shortest way round (degrees).
+const ROUND_STEP_DEG: f32 = 5.0;
+/// The level loop is kept up to this much longer than the shortest (a
+/// tape slanting down the back towards the waist is shorter, but no
+/// longer the chest).
+const LEVEL_SLACK: f32 = 1.03;
+
 /// Take the tape on the cloth of `drape` at `positions`, around `body` if
 /// there is one.
 pub fn girth(drape: &Drape, positions: &[Vec3], body: Option<Body<'_>>, probe: Probe) -> Girth {
-    let height = match probe {
-        Probe::Height(y) => y,
-        Probe::Near(p) => p.y,
+    let cloth = Cloth::new(drape, positions);
+    let (height, garment) = match probe {
+        Probe::Height(y) => (
+            y,
+            around_axis(
+                cloth
+                    .slice(Plane::level(y))
+                    .into_iter()
+                    .filter(|l| l.closed),
+            ),
+        ),
+        Probe::Near(p) => (p.y, cloth.round(p)),
     };
-    let sewn = sewn_to(drape);
-    let same = |v: u32| sewn.get(&v).copied().unwrap_or(v);
-    let cloth = slice(
-        positions,
-        drape.scene.triangles.iter().map(|t| t.vertices),
-        &same,
-        height,
-    );
+    let plane = garment.as_ref().map_or(Plane::level(height), |l| l.plane);
     let bodies = body
         .map(|(p, t)| {
-            slice(p, t.iter().copied(), &|v| v, height)
+            slice(p, t.iter().copied(), &|v| v, plane)
                 .into_iter()
                 .filter(|l| l.closed)
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
-    let garment = match probe {
-        Probe::Near(p) => cloth
-            .into_iter()
-            .min_by(|a, b| a.distance(p).total_cmp(&b.distance(p))),
-        Probe::Height(_) => around_axis(cloth.into_iter().filter(|l| l.closed)),
-    };
     // The body's loop inside the garment's (the torso in a shirt, an arm
     // in a sleeve), the largest; without a closed garment loop, the one
     // nearest the point asked about (an arm at a sleeve's hem: the torso
@@ -733,6 +1002,174 @@ pub fn girth(drape: &Drape, positions: &[Vec3], body: Option<Body<'_>>, probe: P
             _ => None,
         },
     }
+}
+
+/// A length taken on the drape between two points of it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Span {
+    /// Straight from one point to the other (m).
+    pub straight: f32,
+    /// The way along the cloth from the first point to the second, when
+    /// the cloth joins them: the cut through both across the cloth.
+    pub path: Option<Vec<Vec3>>,
+    /// That way pulled taut, bridging the folds (m).
+    pub tape: Option<f32>,
+    /// The side of the path away from the body, square to it in its plane.
+    out: Vec3,
+}
+
+impl Span {
+    /// Length along the cloth (m), folds included.
+    pub fn along(&self) -> Option<f32> {
+        self.path
+            .as_ref()
+            .map(|p| p.windows(2).map(|w| w[0].distance(w[1])).sum())
+    }
+
+    /// The path as a band to draw on the cloth.
+    pub fn band(&self) -> Vec<(Vec3, Vec3)> {
+        self.path.iter().flatten().map(|p| (*p, self.out)).collect()
+    }
+
+    /// The reading for agents (cm).
+    pub fn to_json(&self) -> Value {
+        let cm = |v: f32| r1(v * 100.0);
+        json!({
+            "straight_cm": cm(self.straight),
+            "along_cm": self.along().map(cm),
+            "tape_cm": self.tape.map(cm),
+            "joined": self.path.is_some(),
+        })
+    }
+}
+
+/// The length between `a` and `b` on the cloth of `drape` at `positions`:
+/// straight, and along the cut through both by the plane holding the
+/// cloth's mean normal at them (the way a tape laid from one to the other
+/// goes), as is and pulled taut. A closed cut goes round both ways: the
+/// shorter is taken.
+pub fn span(drape: &Drape, positions: &[Vec3], body: Option<Body<'_>>, a: Vec3, b: Vec3) -> Span {
+    let straight = a.distance(b);
+    let chord = (b - a).normalize_or(Vec3::X);
+    let alone = Span {
+        straight,
+        path: None,
+        tape: None,
+        out: Vec3::Z,
+    };
+    if straight < 1e-3 {
+        return alone;
+    }
+    let cloth = Cloth::new(drape, positions);
+    let n = match (cloth.normal(a), cloth.normal(b)) {
+        (Some(x), Some(y)) => x + if x.dot(y) < 0.0 { -y } else { y },
+        (Some(x), None) | (None, Some(x)) => x,
+        (None, None) => Vec3::Y,
+    };
+    let Some(normal) = [n, Vec3::Y, Vec3::X]
+        .into_iter()
+        .find_map(|n| chord.cross(n).try_normalize())
+    else {
+        return alone;
+    };
+    let plane = Plane { origin: a, normal };
+    let path = cloth.slice(plane).into_iter().find_map(|l| {
+        let (from, to) = (l.locate(a)?, l.locate(b)?);
+        (from.2 < ON_LOOP_M && to.2 < ON_LOOP_M).then(|| between(&l, from, to, a, b))
+    });
+    let Some(path) = path else {
+        return alone;
+    };
+    // Away from the body (or towards the side the path bulges), square to
+    // the chord in the plane.
+    let middle = path.get(path.len() / 2).copied().unwrap_or(a);
+    let away = body
+        .and_then(|b| Surface::new(b).closest(middle, 1.0))
+        .map_or_else(
+            || path.iter().copied().sum::<Vec3>() / path.len() as f32 - (a + b) / 2.0,
+            |q| middle - q,
+        );
+    let out = (away - chord * away.dot(chord) - normal * away.dot(normal))
+        .try_normalize()
+        .unwrap_or_else(|| n.normalize_or(Vec3::Z));
+    Span {
+        straight,
+        tape: Some(taut(&path, chord, out)),
+        path: Some(path),
+        out,
+    }
+}
+
+/// The way along `l` from `a` (at `from`: segment, place along it,
+/// distance) to `b` (at `to`); round a closed loop, the shorter way.
+fn between(
+    l: &Loop,
+    from: (usize, f32, f32),
+    to: (usize, f32, f32),
+    a: Vec3,
+    b: Vec3,
+) -> Vec<Vec3> {
+    let ahead = (from.0, from.1) <= (to.0, to.1);
+    let reversed = |mut p: Vec<Vec3>| {
+        p.reverse();
+        p
+    };
+    let forwards = || onwards(&l.points, from.0, to.0, a, b);
+    let backwards = || reversed(onwards(&l.points, to.0, from.0, b, a));
+    if !l.closed || from.0 == to.0 {
+        // On one segment, the short way is along it.
+        return if ahead { forwards() } else { backwards() };
+    }
+    let length = |p: &[Vec3]| p.windows(2).map(|w| w[0].distance(w[1])).sum::<f32>();
+    let (one, other) = (forwards(), backwards());
+    if length(&one) <= length(&other) {
+        one
+    } else {
+        other
+    }
+}
+
+/// From `start` on segment `i` of `points` forwards (round the end) to
+/// `end` on segment `j`.
+fn onwards(points: &[Vec3], i: usize, j: usize, start: Vec3, end: Vec3) -> Vec<Vec3> {
+    let n = points.len().max(1);
+    let mut path = vec![start];
+    let mut k = i;
+    for _ in 0..n {
+        if k == j {
+            break;
+        }
+        k = (k + 1) % n;
+        if let Some(p) = points.get(k) {
+            path.push(*p);
+        }
+    }
+    path.push(end);
+    path
+}
+
+/// Length of `path` pulled taut on its `out` side: its points seen along
+/// the chord and `out`, kept while they turn one way only (the upper hull
+/// in path order, as in Andrew's monotone chain), so the tape spans the
+/// folds and follows what bulges out.
+fn taut(path: &[Vec3], chord: Vec3, out: Vec3) -> f32 {
+    let Some(origin) = path.first().copied() else {
+        return 0.0;
+    };
+    let flat = |p: Vec3| Vec2::new((p - origin).dot(chord), (p - origin).dot(out));
+    let mut hull: Vec<Vec3> = Vec::with_capacity(path.len());
+    for p in path {
+        while let [.., o, m] = hull[..] {
+            let (o2, m2, q2) = (flat(o), flat(m), flat(*p));
+            if (m2 - o2).perp_dot(q2 - o2) >= 0.0 {
+                hull.pop();
+            } else {
+                break;
+            }
+        }
+        hull.push(*p);
+    }
+    hull.windows(2).map(|w| w[0].distance(w[1])).sum()
 }
 
 /// The loop around the body's vertical axis (x = 0), nearest to it.
@@ -922,6 +1359,40 @@ impl ActionSpec for FitTape {
     }
 }
 
+/// A length on the drape between two points of it.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct FitLength {
+    /// A point on the drape (m, x right, y up, z forward).
+    pub from: [f64; 3],
+    /// Another point on the drape (m).
+    pub to: [f64; 3],
+}
+
+impl Described for FitLength {
+    const SUMMARY: &'static str = "A length on the cached drape between two points of it (`from`, `to`, m): straight, along the cloth (the cut through both points across the cloth, the way a tape laid from one to the other goes, folds included) and by tape (that way pulled taut, bridging the folds), in cm. `joined` is false when the cloth does not join them (two garments, an opening between): only the straight length then.";
+}
+
+impl ActionSpec for FitLength {
+    fn run(&self, ws: &mut Workspace) -> Result<Value, WorkspaceError> {
+        let point = |name: &'static str, p: [f64; 3]| {
+            if p.iter().any(|c| !c.is_finite()) {
+                return Err(CommandError::invalid(name, Invalid::NotFinite));
+            }
+            Ok(Vec3::new(p[0] as f32, p[1] as f32, p[2] as f32))
+        };
+        let (a, b) = (point("from", self.from)?, point("to", self.to)?);
+        let latest = latest(ws)?;
+        let body = latest
+            .body
+            .as_deref()
+            .zip(latest.form.as_ref().map(|f| &f.triangles[..]));
+        let mut out = span(&latest.drape, &latest.positions, body, a, b).to_json();
+        out["drape"] = json!(latest.state());
+        Ok(out)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used)]
@@ -965,14 +1436,14 @@ mod tests {
     #[test]
     fn a_tube_cuts_into_one_closed_loop() {
         let (p, t) = tube(0.2, 64, 4);
-        let loops = slice(&p, t.iter().copied(), &|v| v, 0.37);
+        let loops = slice(&p, t.iter().copied(), &|v| v, Plane::level(0.37));
         assert_eq!(loops.len(), 1);
         let l = &loops[0];
         assert!(l.closed);
         let polygon = 2.0 * 64.0 * 0.2 * (std::f32::consts::PI / 64.0).sin();
         assert!((l.length() - polygon).abs() < 1e-4, "{}", l.length());
         assert!((l.tape() - polygon).abs() < 1e-4);
-        assert!(slice(&p, t.iter().copied(), &|v| v, 1.5).is_empty());
+        assert!(slice(&p, t.iter().copied(), &|v| v, Plane::level(1.5)).is_empty());
     }
 
     #[test]
@@ -984,7 +1455,7 @@ mod tests {
                 .copied()
                 .filter(|tri| !gone.contains(&(tri[0] % 64)))
                 .collect();
-            slice(&p, kept.iter().copied(), &|v| v, 0.5)
+            slice(&p, kept.iter().copied(), &|v| v, Plane::level(0.5))
         };
         // Two opposite gaps of 4 cm: two open halves.
         let halves = cut(0.2, &[0, 1, 32, 33]);
@@ -1003,9 +1474,9 @@ mod tests {
         let ease = |g: &Girth| g.ease().unwrap();
         let body_c = 2.0 * 64.0 * 0.15 * (std::f32::consts::PI / 64.0).sin();
         let cloth_c = 2.0 * 48.0 * 0.17 * (std::f32::consts::PI / 48.0).sin();
-        let lone = slice(&cloth, ct.iter().copied(), &|v| v, 0.5);
+        let lone = slice(&cloth, ct.iter().copied(), &|v| v, Plane::level(0.5));
         assert_eq!(lone.len(), 1);
-        let bodies = slice(&body, bt.iter().copied(), &|v| v, 0.5);
+        let bodies = slice(&body, bt.iter().copied(), &|v| v, Plane::level(0.5));
         let outline = lone[0].hull();
         assert!(polygon::contains(&outline, bodies[0].centre()));
         let surface = Surface::new((&body, &bt));
@@ -1019,6 +1490,100 @@ mod tests {
         };
         assert!((ease(&g) - (cloth_c - body_c)).abs() < 1e-4);
         assert_eq!(g.to_json("x")["closed"], json!(true));
+    }
+
+    fn cloth(positions: &[Vec3], triangles: Vec<[u32; 3]>) -> Cloth<'_> {
+        Cloth {
+            positions,
+            triangles,
+            sewn: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn the_tape_goes_square_round_a_tilted_tube() {
+        // An arm raised 60° from the vertical, then turned about it.
+        let turn = glam::Quat::from_rotation_y(0.7) * glam::Quat::from_rotation_z(1.05);
+        let (p, t) = tube(0.05, 48, 40);
+        let p: Vec<Vec3> = p.iter().map(|v| turn * (*v - Vec3::Y * 0.5)).collect();
+        let c = cloth(&p, t);
+        let at = turn * Vec3::new(0.05, 0.1, 0.0);
+        let round = c.round(at).unwrap();
+        assert!(round.closed);
+        let polygon = 2.0 * 48.0 * 0.05 * (std::f32::consts::PI / 48.0).sin();
+        assert!(
+            (round.length() - polygon).abs() < polygon * 0.01,
+            "{} vs {polygon}",
+            round.length()
+        );
+        assert!(
+            (round.plane.tilt() - 60.0).abs() < 2.0,
+            "{}",
+            round.plane.tilt()
+        );
+        // A level cut of the same tube is much longer.
+        let level = c.through(Plane::level(at.y), at).unwrap();
+        assert!(level.length() > polygon * 1.5);
+    }
+
+    #[test]
+    fn an_upright_tube_is_measured_level() {
+        let (p, t) = tube(0.15, 64, 8);
+        let c = cloth(&p, t);
+        let round = c.round(Vec3::new(0.0, 0.5, 0.15)).unwrap();
+        assert!(round.plane.tilt() < 1.0, "{}", round.plane.tilt());
+    }
+
+    #[test]
+    fn a_taut_tape_bridges_a_fold_and_follows_a_bulge() {
+        // Along x, out is +y: a fold 2 cm deep.
+        let path = [
+            Vec3::ZERO,
+            Vec3::new(0.1, 0.0, 0.0),
+            Vec3::new(0.11, -0.02, 0.0),
+            Vec3::new(0.12, 0.0, 0.0),
+            Vec3::new(0.2, 0.0, 0.0),
+        ];
+        assert!((taut(&path, Vec3::X, Vec3::Y) - 0.2).abs() < 1e-6);
+        // Over a convex arc (a shoulder), the tape lies on it.
+        let arc: Vec<Vec3> = (0..=20)
+            .map(|i| {
+                let a = std::f32::consts::PI * (1.0 - i as f32 / 20.0);
+                Vec3::new(0.1 * a.cos(), 0.1 * a.sin(), 0.0)
+            })
+            .collect();
+        let along: f32 = arc.windows(2).map(|w| w[0].distance(w[1])).sum();
+        assert!((taut(&arc, Vec3::X, Vec3::Y) - along).abs() < 1e-6);
+        // Seen from the other side, it is pulled straight across.
+        assert!((taut(&arc, Vec3::X, -Vec3::Y) - 0.2).abs() < 1e-6);
+    }
+
+    #[test]
+    fn a_span_over_half_a_tube_follows_it() {
+        let (p, t) = tube(0.1, 96, 4);
+        let c = cloth(&p, t);
+        let (a, b) = (Vec3::new(0.1, 0.5, 0.0), Vec3::new(-0.1, 0.5, 0.0));
+        let drape_free = |a: Vec3, b: Vec3| {
+            let straight = a.distance(b);
+            let n = c.normal(a).unwrap() + c.normal(b).unwrap();
+            let normal = (b - a)
+                .normalize()
+                .cross(n)
+                .try_normalize()
+                .unwrap_or(Vec3::Y);
+            let plane = Plane { origin: a, normal };
+            let l = c.through(plane, a).unwrap();
+            let (from, to) = (l.locate(a).unwrap(), l.locate(b).unwrap());
+            (straight, between(&l, from, to, a, b))
+        };
+        let (straight, path) = drape_free(a, b);
+        assert!((straight - 0.2).abs() < 1e-6);
+        let along: f32 = path.windows(2).map(|w| w[0].distance(w[1])).sum();
+        // Half the polygon round the tube.
+        let half = 96.0 * 0.1 * (std::f32::consts::PI / 96.0).sin();
+        assert!((along - half).abs() < 2e-3, "{along} vs {half}");
+        assert_eq!(path.first(), Some(&a));
+        assert_eq!(path.last(), Some(&b));
     }
 
     #[test]

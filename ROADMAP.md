@@ -1033,11 +1033,15 @@ tests below, in the real app):
   on the cloth, a card with height, garment, body, ease, gap). The
   T-shirt on the women's M body: 11.7 cm of ease at the chest, sleeves
   up to 20–40 % strain under the arms.
+- Delivered (2026-11-20): the tape round a point is no longer always
+  level: it goes square to the way the cloth runs there (a slanting
+  sleeve, an arm raised), level round the torso; a length between two
+  points of the drape, along the cloth, by tape (taut over folds) and
+  straight (the Tape measure card's Length mode, `fit.length`).
 - Open: a stress map (force per width: strain times the fabric's
-  stiffness per direction) and a pressure map; a tape around a loop that
-  is not horizontal (a sleeve on a raised arm, a neckline); measuring
-  between two clicked points on the drape; the tape following the cloth
-  as it moves (it is taken at the click).
+  stiffness per direction) and a pressure map; the tape following the
+  cloth as it moves (it is taken at the click); the length of an
+  opening's edge (a neckline, an armhole).
 
 ## M15 — Game-ready export ✅ (2026-11-19)
 - Decimated LODs, wrinkle detail baked into normal maps, back faces or

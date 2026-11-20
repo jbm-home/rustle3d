@@ -700,10 +700,19 @@ positions alone, so the CPU and GPU results read alike:
 - **Gap**: each vertex's distance to the body's triangles (closest
   point on a triangle [18], triangles bucketed in a 4 cm grid). Cloth
   that touches reads 3–5 mm (thickness and the skin margin, §5).
-- **Tape**: a horizontal cut through the cloth's triangles, joined
+- **Tape**: a cut through the cloth's triangles by a plane, joined
   across seams (the seam pairs name one vertex for both sides) and
-  across gaps under 2 cm; the body's cut is measured by its convex hull,
-  as a tape around the body reads it (`r3d_avatar::measure`).
+  across gaps under 2 cm; the body's cut is measured by its convex hull
+  in that plane, as a tape around the body reads it
+  (`r3d_avatar::measure`). At a height the plane is level; round a
+  clicked point it holds the cloth's normal and leans with the way the
+  cloth runs there (the smallest eigenvector of its normals' scatter in
+  the tangent plane, over 5 cm: a tube's axis), the shortest closed loop
+  within 20° of square to it, kept level where the level loop is at
+  most 3 % longer (spec 24).
+- **Length between two points**: the cut by the plane through both
+  holding their mean normal; along the cloth, and pulled taut as the
+  upper hull of the way in path order [24].
 
 ## 9. References
 
@@ -730,5 +739,6 @@ positions alone, so the CPU and GPU results read alike:
 21. A. Jacobson, L. Kavan, O. Sorkine-Hornung. *Robust Inside-Outside Segmentation using Generalized Winding Numbers.* SIGGRAPH 2013.
 22. A. Van Oosterom, J. Strackee. *The Solid Angle of a Plane Triangle.* IEEE Transactions on Biomedical Engineering 30(2), 1983.
 23. E. Guendelman, R. Bridson, R. Fedkiw. *Nonconvex Rigid Bodies with Stacking.* SIGGRAPH 2003 (shock propagation).
+24. A. M. Andrew. *Another efficient algorithm for convex hulls in two dimensions.* Information Processing Letters 9(5), 1979.
 
 Reading order for contributors: [1] → [2] → [3] → [4] → [5] → [7] → [8] → [6].

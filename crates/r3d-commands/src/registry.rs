@@ -9,7 +9,7 @@ use serde_json::Value;
 use crate::actions::*;
 use crate::commands::*;
 use crate::error::CommandError;
-use crate::fit::{FitReport, FitTape};
+use crate::fit::{FitLength, FitReport, FitTape};
 use crate::game::ExportGame;
 use crate::production::*;
 use crate::progress::Progress;
@@ -251,4 +251,5 @@ action_registry! {
     "export.techpack" => ExportTechPack,
     "fit.report" => FitReport,
     "fit.tape" => FitTape,
+    "fit.length" => FitLength,
 }

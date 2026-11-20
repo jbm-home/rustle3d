@@ -2416,11 +2416,11 @@ class LFr extends L {
 
   @override
   String get toolTapeHint =>
-      'Cliquez sur le vêtement 3D : son tour à cet endroit, celui du corps et l\'aisance';
+      'Cliquez sur le vêtement 3D : son tour à cet endroit, celui du corps et l\'aisance ; ou une longueur entre deux points';
 
   @override
   String get hintTape =>
-      'Mètre ruban : cliquez sur le vêtement 3D pour en mesurer le tour · faites glisser pour tourner la vue · V pour arrêter';
+      'Mètre ruban : cliquez sur le vêtement 3D pour en mesurer le tour, ou deux points pour une longueur · faites glisser pour tourner la vue · V pour arrêter';
 
   @override
   String get tapeHint => 'Cliquez sur le vêtement drapé.';
@@ -2446,6 +2446,32 @@ class LFr extends L {
   @override
   String get tapeOpen =>
       'Le vêtement ne fait pas le tour ici : pas d\'aisance.';
+
+  @override
+  String get tapeRound => 'Tour';
+
+  @override
+  String get tapeLength => 'Longueur';
+
+  @override
+  String get tapeFirstPoint =>
+      'Cliquez le premier point sur le vêtement drapé.';
+
+  @override
+  String get tapeSecondPoint => 'Cliquez le second point.';
+
+  @override
+  String get tapeAlong => 'Le long du tissu';
+
+  @override
+  String get tapeTaut => 'Mètre tendu';
+
+  @override
+  String get tapeStraight => 'En ligne droite';
+
+  @override
+  String get tapeNotJoined =>
+      'Le tissu ne relie pas ces points : ligne droite seulement.';
 
   @override
   String get printTitle => 'Imprimé';

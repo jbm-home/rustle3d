@@ -2395,11 +2395,11 @@ class LEn extends L {
 
   @override
   String get toolTapeHint =>
-      'Click on the 3D garment: its circumference there, the body\'s and the ease';
+      'Click on the 3D garment: its circumference there, the body\'s and the ease; or a length between two points';
 
   @override
   String get hintTape =>
-      'Tape measure: click on the 3D garment to measure around it there · drag to turn the view · V to stop';
+      'Tape measure: click on the 3D garment to measure around it there, or two points for a length · drag to turn the view · V to stop';
 
   @override
   String get tapeHint => 'Click on the draped garment.';
@@ -2424,6 +2424,31 @@ class LEn extends L {
 
   @override
   String get tapeOpen => 'The garment does not go all round here: no ease.';
+
+  @override
+  String get tapeRound => 'Round';
+
+  @override
+  String get tapeLength => 'Length';
+
+  @override
+  String get tapeFirstPoint => 'Click the first point on the draped garment.';
+
+  @override
+  String get tapeSecondPoint => 'Click the second point.';
+
+  @override
+  String get tapeAlong => 'Along the cloth';
+
+  @override
+  String get tapeTaut => 'Tape pulled taut';
+
+  @override
+  String get tapeStraight => 'Straight';
+
+  @override
+  String get tapeNotJoined =>
+      'The cloth does not join these points: straight only.';
 
   @override
   String get printTitle => 'Print';

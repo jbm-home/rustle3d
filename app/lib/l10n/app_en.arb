@@ -1161,8 +1161,8 @@
   "fitTight": "tight",
   "fitTightest": "Tightest: {value} on {piece}",
   "toolTape": "Tape measure",
-  "toolTapeHint": "Click on the 3D garment: its circumference there, the body's and the ease",
-  "hintTape": "Tape measure: click on the 3D garment to measure around it there · drag to turn the view · V to stop",
+  "toolTapeHint": "Click on the 3D garment: its circumference there, the body's and the ease; or a length between two points",
+  "hintTape": "Tape measure: click on the 3D garment to measure around it there, or two points for a length · drag to turn the view · V to stop",
   "tapeHint": "Click on the draped garment.",
   "tapeClose": "Put the tape away",
   "tapeHeight": "Height",
@@ -1171,6 +1171,14 @@
   "tapeEase": "Ease",
   "tapeGap": "Gap here",
   "tapeOpen": "The garment does not go all round here: no ease.",
+  "tapeRound": "Round",
+  "tapeLength": "Length",
+  "tapeFirstPoint": "Click the first point on the draped garment.",
+  "tapeSecondPoint": "Click the second point.",
+  "tapeAlong": "Along the cloth",
+  "tapeTaut": "Tape pulled taut",
+  "tapeStraight": "Straight",
+  "tapeNotJoined": "The cloth does not join these points: straight only.",
   "@fitTightest": {
     "placeholders": {
       "value": {

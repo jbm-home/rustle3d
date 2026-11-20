@@ -157,8 +157,17 @@ class _ShellState extends State<Shell> {
   FitLegend? _fitLegend;
   Timer? _fitPoll;
 
-  /// The tape measure's last reading (Tape measure tool).
+  /// The tape measure's last reading round the cloth (Tape measure tool).
   TapeReading? _tape;
+
+  /// The tape measures a length between two points, not round.
+  bool _tapeLength = false;
+
+  /// The length's first point (m), while the second is awaited.
+  List<double>? _lengthFrom;
+
+  /// The last length measured.
+  LengthReading? _length;
 
   @override
   void initState() {
@@ -513,6 +522,41 @@ class _ShellState extends State<Shell> {
     }
   }
 
+  /// Put the tape away: its band off the cloth, the readings cleared.
+  void _clearTape() {
+    _guard(widget.engine.clearTape);
+    _tape = null;
+    _lengthFrom = null;
+    _length = null;
+  }
+
+  /// A click with the tape on pixel (`x`, `y`) of 3D view `view`: round
+  /// the cloth there, or the first or second point of a length.
+  void _measure(int view, double x, double y) {
+    final engine = widget.engine;
+    if (!_tapeLength) {
+      final reading = _guard(() => engine.tapeAt(view: view, x: x, y: y));
+      setState(() => _tape = reading);
+      return;
+    }
+    final point = _guard(() => engine.clothPoint(view: view, x: x, y: y));
+    if (point == null) return;
+    final from = _lengthFrom;
+    if (from == null) {
+      _guard(engine.clearTape);
+      setState(() {
+        _lengthFrom = point;
+        _length = null;
+      });
+      return;
+    }
+    final reading = _guard(() => engine.lengthBetween(from: from, to: point));
+    setState(() {
+      _lengthFrom = null;
+      _length = reading;
+    });
+  }
+
   /// Start, pause or rebuild the drape, off the UI thread: placing the
   /// pieces around the body takes a moment, fitting a new body seconds.
   Future<void> _drape(
@@ -752,10 +796,7 @@ class _ShellState extends State<Shell> {
   }
 
   void _setTool(String tool) => setState(() {
-    if (_tool == 'tape' && tool != 'tape') {
-      _guard(widget.engine.clearTape);
-      _tape = null;
-    }
+    if (_tool == 'tape' && tool != 'tape') _clearTape();
     _tool = tool;
     for (final (group, tools) in _ToolRail.groups) {
       if (tools.contains(tool)) _groupShown[group] = tool;
@@ -2453,9 +2494,7 @@ class _ShellState extends State<Shell> {
                                           _toast(l.toastLineAdded);
                                         },
                                         onMeasure: _tool == 'tape'
-                                            ? (reading) => setState(
-                                                () => _tape = reading,
-                                              )
+                                            ? _measure
                                             : null,
                                         bodyPoints: _showPoints,
                                         onBodyPoint: _refresh,
@@ -2468,7 +2507,14 @@ class _ShellState extends State<Shell> {
                                         left: Space.m,
                                         top: 64,
                                         child: _TapeCard(
+                                          length: _tapeLength,
+                                          onLength: (length) => setState(() {
+                                            _clearTape();
+                                            _tapeLength = length;
+                                          }),
                                           reading: _tape,
+                                          started: _lengthFrom != null,
+                                          lengthReading: _length,
                                           onClose: () => _setTool('select'),
                                         ),
                                       ),

@@ -7,7 +7,7 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-20 (the start screen tells you when a new version is out, and the check can be turned off; Installing: a disk image for macOS, one for Intel and Apple silicon, an installer for Windows, and the first launch on recent macOS, through Privacy & Security; the shirt, T-shirt and dress take their shoulders, neckline and armholes from the avatar's body, and their hem fits over the hips: large sizes no longer have drooping shoulders; the avatar now takes the measurements given in every size of the charts, up to the women's 54: large sizes came out too slim and trousers fell off them; changing the size or the body while draping starts the drape again around the new body; trousers end just above the floor whatever the body; garments worn in layers lie close together: a shirt worn under trousers is tucked into them, and nothing shows through a garment worn over another; the trousers template is a little shorter; a selected piece's panel shows its garment's fabric; the Construction line and Tape measure tools have new icons; the tool rail in four sections, drawing, measuring, sewing and trims, with Dart and Pleat under Darts and pleats and Hole a tool of its own; the guided flow's step bar and banner removed; a more natural walk and a new motion, Stand at ease; captured motions whose rest pose lies flat play upright; pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
+Last updated: 2026-11-20 (the tape measure goes round a slanting sleeve square to it, and measures a length between two points of the garment; the start screen tells you when a new version is out, and the check can be turned off; Installing: a disk image for macOS, one for Intel and Apple silicon, an installer for Windows, and the first launch on recent macOS, through Privacy & Security; the shirt, T-shirt and dress take their shoulders, neckline and armholes from the avatar's body, and their hem fits over the hips: large sizes no longer have drooping shoulders; the avatar now takes the measurements given in every size of the charts, up to the women's 54: large sizes came out too slim and trousers fell off them; changing the size or the body while draping starts the drape again around the new body; trousers end just above the floor whatever the body; garments worn in layers lie close together: a shirt worn under trousers is tucked into them, and nothing shows through a garment worn over another; the trousers template is a little shorter; a selected piece's panel shows its garment's fabric; the Construction line and Tape measure tools have new icons; the tool rail in four sections, drawing, measuring, sewing and trims, with Dart and Pleat under Darts and pleats and Hole a tool of its own; the guided flow's step bar and banner removed; a more natural walk and a new motion, Stand at ease; captured motions whose rest pose lies flat play upright; pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
 hips, so trousers no longer slide with each step; a garment worn over
 trousers starts outside them; captured motions: Motion › Import a captured
 motion… plays a BVH motion capture on the avatar, Motion › Motion
@@ -539,16 +539,27 @@ size to size (its grade), and the other sizes follow.
     5 cm and more to touching (yellow).
   - **Fabric colours** shows the garment as it is again. The colours
     are chosen to read for colour-blind eyes and in grey.
-- **Tape measure** (with the measuring tools): click on the draped
-  garment. The tape goes around the garment at that height and is drawn
-  on it; a card gives the height, the **garment's** circumference (along
-  the cloth, folds included), the **body's** inside it (as a tape around
-  the body reads it), the **ease** between them and the **gap** between
-  the cloth and the body where you clicked. Click on a sleeve to measure
-  around the arm. Where the garment does not go all round (an open
-  front, a hem), there is no ease. The tape is taken when you click:
-  click again after the drape has moved. Drag to turn the view; the ×
-  or another tool puts the tape away.
+- **Tape measure** (with the measuring tools). Its card has two modes:
+  - **Round**: click on the draped garment. The tape goes round the
+    garment there and is drawn on it: level round the body, square to
+    the sleeve on a slanting sleeve, as you would hold a tape. The card
+    gives the height of the point, the **garment's** circumference
+    (along the cloth, folds included), the **body's** inside it (as a
+    tape around the body reads it), the **ease** between them and the
+    **gap** between the cloth and the body where you clicked. Where the
+    garment does not go all round (an open front, a hem), there is no
+    ease.
+  - **Length**: click two points of the garment, for example the
+    shoulder and the hem. The way from one to the other across the
+    cloth is drawn on it; the card gives its length **along the
+    cloth** (folds included), with the **tape pulled taut** (it spans
+    the folds) and in a **straight** line. When the cloth does not join
+    the two points (two garments, an opening between), only the
+    straight length is given.
+
+  The tape is taken when you click: click again after the drape has
+  moved. Drag to turn the view; the × or another tool puts the tape
+  away.
 - The drape runs on the graphics card, about five times faster than on
   the processor; the status bar says **GPU** and the time of a step.
   Without a usable graphics card, or if it fails, the drape carries on
@@ -816,9 +827,10 @@ the tech pack as PDF: open formats only.
   allowance inside them), and a mirrored or symmetric piece cannot have
   holes.
 - Fit maps show the stretch of the cloth, not the force in it (a stiff
-  woven pulls harder for the same stretch). The tape measures
-  horizontally only, and the body's circumference is read inside the
-  garment's loop: at a sleeve's hem cut on a slant there may be none.
+  woven pulls harder for the same stretch). The body's circumference is
+  read inside the garment's loop: at a sleeve's hem cut on a slant there
+  may be none. Near the armpits, the round tape may take in the sleeves
+  or pass under the arms: click a little lower for the chest.
 - Constraints apply to corners and edges of the outline, not to internal
   lines, notches or construction lines. A dimension stays where the
   board draws it (it cannot be moved by hand). A symmetric piece's axis

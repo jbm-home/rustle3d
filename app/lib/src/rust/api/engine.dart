@@ -7,9 +7,9 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `cloth_hit`, `corner_at`, `corner_landing`, `dressed_now`, `edge_spot`, `edited`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form_now`, `form_soon`, `frozen_board`, `gpu_solver`, `graphics`, `import_from`, `live_body`, `long`, `marker_spec`, `moving_avatar`, `new`, `new`, `offset_along`, `parse_track`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `prints_of`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `selected`, `set_busy`, `sim`, `solver`, `tape_band`, `to_theme`, `workspace`
+// These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `cloth_hit`, `corner_at`, `corner_landing`, `dressed_now`, `edge_spot`, `edited`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form_now`, `form_soon`, `frozen_board`, `gpu_solver`, `graphics`, `import_from`, `live_body`, `long`, `marker_spec`, `moving_avatar`, `new`, `new`, `offset_along`, `parse_track`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `prints_of`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `selected`, `set_busy`, `sim`, `solver`, `to_theme`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`
 
 /// The GPU adapter the UI composites on (Windows: its LUID), so the views
 /// render on it and share their textures without a copy. Call it before
@@ -97,6 +97,15 @@ abstract class Engine implements RustOpaqueInterface {
 
   /// Put the photo away: the 3D view shows the live garment again.
   void closePhoto();
+
+  /// The point of the cloth under pixel (`x`, `y`) of a 3D view, in
+  /// metres (x, y, z), for [`Engine::length_between`]; `None` when no
+  /// cloth is under the pointer.
+  Float64List? clothPoint({
+    required int view,
+    required double x,
+    required double y,
+  });
 
   /// The corner within `max_mm` of pattern point (`x_mm`, `y_mm`), or
   /// else the edge, without changing what is picked (the Dimension tool
@@ -207,6 +216,15 @@ abstract class Engine implements RustOpaqueInterface {
   /// when the file did not say how big a unit is). Off the UI thread (a
   /// big PDF takes a while).
   Future<String> importPattern({required String path, String? units});
+
+  /// The length between two points of the cloth (from
+  /// [`Engine::cloth_point`]): straight, along the cloth and pulled taut
+  /// over it. The way along the cloth is drawn on it until
+  /// [`Engine::clear_tape`].
+  LengthReading lengthBetween({
+    required List<double> from,
+    required List<double> to,
+  });
 
   /// Look at the body from one side, framed head to toe.
   void lookFrom({required CameraSide side});
@@ -789,6 +807,30 @@ enum Gesture {
   move,
 }
 
+/// A length taken on the drape between two points (spec 24): straight,
+/// along the cloth (folds included) and by tape (pulled taut over the
+/// folds). The last two are `None` when the cloth does not join the
+/// points.
+class LengthReading {
+  final double straightCm;
+  final double? alongCm;
+  final double? tapeCm;
+
+  const LengthReading({required this.straightCm, this.alongCm, this.tapeCm});
+
+  @override
+  int get hashCode => straightCm.hashCode ^ alongCm.hashCode ^ tapeCm.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LengthReading &&
+          runtimeType == other.runtimeType &&
+          straightCm == other.straightCm &&
+          alongCm == other.alongCm &&
+          tapeCm == other.tapeCm;
+}
+
 /// A pattern change made by dragging in 3D, for the label by the cursor.
 class PatternChange {
   /// `length` (hem moved; positive = longer) or `fit` (seam taken in;
@@ -1099,8 +1141,9 @@ class StepProgress {
           item == other.item;
 }
 
-/// A tape measure taken on the drape (spec 24): at `height_cm` above the
-/// floor, the garment's circumference along the cloth, the body's inside
+/// A tape measure taken on the drape (spec 24): at a point `height_cm`
+/// above the floor, the garment's circumference along the cloth (level
+/// round the torso, square to a slanting sleeve), the body's inside
 /// it (by tape), the ease between them (garment minus body; only when
 /// the cut goes all round, `closed`) and the gap from the clicked cloth
 /// to the body.

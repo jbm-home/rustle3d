@@ -2,7 +2,7 @@
 //! Fit maps and the tape measure on a draped T-shirt (spec 24).
 
 use r3d_commands::drape::Latest;
-use r3d_commands::fit::{FitMap, Probe, girth};
+use r3d_commands::fit::{FitMap, Probe, girth, span};
 use r3d_commands::{Step, Workspace};
 use serde_json::{Value, json};
 
@@ -93,6 +93,100 @@ fn a_draped_t_shirt_reads_its_fit() {
     // The arm inside it, if the cut goes round both.
     assert!(g.body.is_none_or(|b| b < 0.5), "{tape}");
     assert!(g.gap.unwrap() < 0.1, "{tape}");
+
+    // Clicked on the chest: still level, the same girth as by height.
+    let chest_y = chest["height_cm"].as_f64().unwrap() as f32 / 100.0;
+    let level = girth(
+        &latest.drape,
+        &latest.positions,
+        body,
+        Probe::Height(chest_y),
+    );
+    let level_loop = level.garment.as_ref().unwrap();
+    let front = level_loop
+        .points
+        .iter()
+        .copied()
+        .max_by(|a, b| a.z.total_cmp(&b.z))
+        .unwrap();
+    let clicked = girth(&latest.drape, &latest.positions, body, Probe::Near(front));
+    eprintln!("{} {}", level.to_json("level"), clicked.to_json("clicked"));
+    let round = clicked.garment.as_ref().unwrap();
+    assert!(round.closed);
+    assert!(round.plane.tilt() < 10.0, "{}", clicked.to_json("chest"));
+    assert!(
+        (round.length() - level_loop.length()).abs() < level_loop.length() * 0.03,
+        "{}",
+        clicked.to_json("chest")
+    );
+    // All round the chest, front, sides and back: level.
+    for p in level_loop
+        .points
+        .iter()
+        .step_by(level_loop.points.len().max(12) / 12)
+    {
+        let g = girth(&latest.drape, &latest.positions, body, Probe::Near(*p));
+        let tilt = g.garment.as_ref().map_or(0.0, |l| l.plane.tilt());
+        assert!(tilt < 10.0, "{}", g.to_json("chest"));
+    }
+
+    // Between the sleeve's middle and its hem: round the arm, square to the
+    // slanting sleeve, the arm inside.
+    let sleeve_points = &latest.positions[piece.particles.clone()];
+    let middle = (sleeve_points.iter().copied().sum::<glam::Vec3>() / sleeve_points.len() as f32
+        + lowest)
+        / 2.0;
+    let on_sleeve = sleeve_points
+        .iter()
+        .copied()
+        .min_by(|a, b| a.distance(middle).total_cmp(&b.distance(middle)))
+        .unwrap();
+    let arm = girth(
+        &latest.drape,
+        &latest.positions,
+        body,
+        Probe::Near(on_sleeve),
+    );
+    eprintln!("{}", arm.to_json("mid-sleeve"));
+    let sleeve_loop = arm.garment.as_ref().unwrap();
+    assert!(
+        sleeve_loop.closed && sleeve_loop.length() < 0.6,
+        "{}",
+        arm.to_json("arm")
+    );
+    assert!(sleeve_loop.plane.tilt() > 15.0, "{}", arm.to_json("arm"));
+    assert!(
+        arm.ease().is_some_and(|e| e > 0.0),
+        "{}",
+        arm.to_json("arm")
+    );
+
+    // From the chest down the front, 20 cm: along the cloth, by tape,
+    // straight.
+    let below = latest
+        .positions
+        .iter()
+        .copied()
+        .filter(|p| (p.y - (front.y - 0.2)).abs() < 0.02 && p.x.abs() < 0.03 && p.z > 0.0)
+        .max_by(|a, b| a.z.total_cmp(&b.z))
+        .unwrap();
+    let length = span(&latest.drape, &latest.positions, body, front, below);
+    let reading = length.to_json();
+    eprintln!("{reading}");
+    assert_eq!(reading["joined"], true, "{reading}");
+    let (along, tape) = (length.along().unwrap(), length.tape.unwrap());
+    assert!(
+        along + 1e-4 >= tape && tape + 1e-4 >= length.straight,
+        "{reading}"
+    );
+    assert!(along < length.straight * 1.5, "{reading}");
+    let action = run(
+        &mut ws,
+        json!({"type": "fit.length",
+            "from": [front.x, front.y, front.z], "to": [below.x, below.y, below.z]}),
+    );
+    assert_eq!(action["joined"], true, "{action}");
+    assert_eq!(action["drape"], "simulated");
 
     // Maps: finite, one value per particle.
     for map in FitMap::ALL {

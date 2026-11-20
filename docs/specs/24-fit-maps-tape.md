@@ -1,18 +1,19 @@
 # 24 — Fit maps and virtual tape measure
 
-Provenance: maintainer's functional brief (ROADMAP M24: stress and strain in colour on the draped garment to find where it is tight or loose; a tape measure on the drape, circumferences and ease read where the user clicks); general garment-making knowledge (ease = garment circumference minus body circumference at the same level; a tape around the body follows its convex outline); public papers: the deformation gradient of a linear triangle and its principal stretches (Bonet & Wood, *Nonlinear Continuum Mechanics for Finite Element Analysis*, 1997; as used for cloth in Müller et al., *Strain Based Dynamics*, 2014), the viridis colour map (van der Walt & Smith, matplotlib, 2015, CC0; Nuñez, Anderton & Renslow, *Optimizing colormaps with consideration for color vision deficiency*, PLoS ONE 2018, for why a perceptually uniform, monotone-lightness map reads for everyone), closest point on a triangle (Ericson, *Real-Time Collision Detection*, 2004).
+Provenance: maintainer's functional brief (ROADMAP M24: stress and strain in colour on the draped garment to find where it is tight or loose; a tape measure on the drape, circumferences and ease read where the user clicks); general garment-making knowledge (ease = garment circumference minus body circumference at the same level; a tape around the body follows its convex outline); public papers: the deformation gradient of a linear triangle and its principal stretches (Bonet & Wood, *Nonlinear Continuum Mechanics for Finite Element Analysis*, 1997; as used for cloth in Müller et al., *Strain Based Dynamics*, 2014), the viridis colour map (van der Walt & Smith, matplotlib, 2015, CC0; Nuñez, Anderton & Renslow, *Optimizing colormaps with consideration for color vision deficiency*, PLoS ONE 2018, for why a perceptually uniform, monotone-lightness map reads for everyone), closest point on a triangle (Ericson, *Real-Time Collision Detection*, 2004), the upper hull of a chain (Andrew, *Another efficient algorithm for convex hulls in two dimensions*, 1979), for a tape pulled taut over folds; general geometry (the normals of a cylinder all lie square to its axis), for the way the cloth runs at a point.
 
 ## Status (2026-11-19, M24)
 
 Implemented: strain and gap maps from any drape (the app's GPU or CPU
 drape, the headless cached one), drawn on the 3D view with a legend,
 rendered headless (`r3d render --view 3d --fit-map strain|gap`), read by
-agents (`fit.report`, `fit.tape`); the tape measure tool in the app.
+agents (`fit.report`, `fit.tape`, `fit.length`); the tape measure tool
+in the app, round (level round the body, square to a slanting sleeve)
+or a length between two points (2026-11-20).
 
 Not yet: a map of stress (force per width; strain times the fabric's
-stiffness, which differs per direction), a pressure map, a tape around
-an arbitrary (not horizontal) loop, measuring between two clicked points
-on the drape.
+stiffness, which differs per direction), a pressure map, the tape
+following the cloth as it moves.
 
 ## User story
 As a designer, I drape a T-shirt and want to see at a glance where it
@@ -58,14 +59,18 @@ the body's, and the ease between them, as a tailor would with a tape.
   most 10), each with its piece, peak strain, area (cm²), height above
   the floor (cm) and centre on the pattern (mm, base size); and the
   **ease** at the chest, waist and hips (plus any `heights_cm` asked).
-- `fit.tape` (action): the circumference at `height_cm`, of the loop
-  around the body's axis, or of the loop passing nearest to `near` (a
-  point on the drape, m) at that point's height; with `near`, also the
-  gap between the garment and the body there.
+- `fit.tape` (action): the circumference at `height_cm`, of the level
+  loop around the body's axis, or of the loop through `near` (a point on
+  the drape, m) as the tape measure takes it (below); with `near`, also
+  the gap between the garment and the body there. `tilt_deg` says how
+  far the loop leans from level.
+- `fit.length` (action): between `from` and `to` (points on the drape,
+  m), the length straight, along the cloth and by tape (cm), and
+  whether the cloth joins them (`joined`).
 
 ### Tape measure
-- The drape is cut by a horizontal plane at the height asked: each
-  piece's triangles give segments, joined across seams into loops. The
+- The drape is cut by a plane: each piece's triangles give segments,
+  joined across seams into loops. At a height, the plane is level. The
   **garment circumference** is the length of the cloth along its loop
   (folds included: the fabric there, as a flat measure of the garment
   would read). A loop whose two ends are less than 2 cm apart counts as
@@ -82,6 +87,29 @@ the body's, and the ease between them, as a tailor would with a tape.
   their largest (the heights `avatar.get` gives).
 - **Gap at a point**: the distance from the clicked cloth point to the
   nearest body surface (mm).
+- **Round a point** (`near`, a click): the plane holds the cloth's
+  normal there (averaged over 3 cm), so it cuts across the cloth. Its
+  tilt follows the way the cloth runs there: the axis of the tube the
+  cloth forms over 5 cm (the direction its normals vary least, the
+  smallest eigenvector of their scatter in the tangent plane). Within
+  20° of square to that axis, the shortest closed loop through the point
+  is taken (5° steps, then 1°). The level loop through the point is
+  kept instead where the cloth is flat or bends alike both ways (no
+  axis), or where it goes round and is at most 3 % longer: a tape round
+  the torso is held level, while a slanting tape down the back towards
+  the waist would be shorter. So the chest reads level all round, and a
+  short sleeve standing out from the arm is measured square to it.
+  Near the armpits the level cut takes in the sleeves; the loop may
+  then pass under the arms.
+- **Length between two points**: the plane through both points holding
+  the cloth's mean normal at them (the way a tape laid from one to the
+  other goes). The cut through both gives the way **along the cloth**
+  (folds included); round a closed cut, the shorter way. **By tape**:
+  that way pulled taut, the upper hull of its points seen along the
+  chord, on the side away from the body (towards where the way bulges
+  without a body): it spans the folds and follows what bulges out.
+  **Straight**: the distance between the points. When no cut joins the
+  points (two garments, an opening between), only the straight length.
 
 ## UX
 - In the 3D view's header, a **Fit** button (a thermometer-like gauge)
@@ -91,10 +119,13 @@ the body's, and the ease between them, as a tailor would with a tape.
   "50 mm+" … "0 mm"), what yellow means ("tight"), and the largest
   value on the garment and its piece.
 - **Tape measure** tool (rail, under Draw on garment; no key: M already
-  maximizes a view): click on the draped garment; the
-  loop around it at that height is drawn on the cloth, and a card at the
-  top left of the 3D view reads the height, the garment's and the
-  body's circumferences, the ease and the gap at the point. Dragging
+  maximizes a view). A card at the top left of the 3D view switches
+  between **Round** and **Length**. Round: click on the draped garment;
+  the loop round it there is drawn on the cloth, and the card reads the
+  height, the garment's and the body's circumferences, the ease and the
+  gap at the point. Length: click two points of the garment; the way
+  between them is drawn on the cloth, and the card reads the length
+  along the cloth, by tape and straight. Dragging
   still turns the view; the card's × or another tool clears the tape. The values
   are taken when you click: click again after the drape has moved.
 
@@ -110,5 +141,12 @@ the body's, and the ease between them, as a tailor would with a tape.
   positive.
 - `r3d render --view 3d --fit-map strain` writes a PNG in colour;
   `--fit-map gap` too; an unknown map is refused.
+- A tube slanting 60° is measured square to its axis (its section's
+  length); an upright tube, level. On the draped T-shirt, a click
+  anywhere round the chest reads level, and between a sleeve's middle
+  and its hem the loop goes round the arm, leaning with the sleeve.
+- Over a convex arc the taut tape reads the arc; over a fold, the
+  chord; between two points on a tube, half its section.
 - In the app, choosing a map shows the legend; a click with the tape
-  tool shows a reading (integration test).
+  tool shows a reading, and two clicks in Length show a length
+  (integration test).

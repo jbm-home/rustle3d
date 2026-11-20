@@ -96,10 +96,10 @@ class RustView extends StatefulWidget {
   /// Called with the new internal line's id after a stroke.
   final ValueChanged<String>? onDrawn;
 
-  /// The Tape measure tool is active (3D view): a click takes the tape
-  /// on the cloth there and is called with the reading (`null`: no cloth
-  /// under the pointer); drags still turn the view.
-  final ValueChanged<TapeReading?>? onMeasure;
+  /// The Tape measure tool is active (3D view): called with the view and
+  /// the clicked pixel (physical) to measure there; drags still turn the
+  /// view.
+  final void Function(int view, double x, double y)? onMeasure;
 
   /// A press may hold what is under the pointer to drag it (on the board:
   /// a corner or an edge). Off, drags only pan or turn the view.
@@ -552,22 +552,11 @@ class _RustViewState extends State<RustView>
             if (widget.onMeasure case final measure?) {
               final view = _viewId;
               if (view == null || _dragged) return;
-              try {
-                measure(
-                  widget.engine.tapeAt(
-                    view: view,
-                    x: e.localPosition.dx * _ratio,
-                    y: e.localPosition.dy * _ratio,
-                  ),
-                );
-              } on ApiError catch (error) {
-                ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-                  SnackBar(
-                    content: Text(context.error(error)),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              }
+              measure(
+                view,
+                e.localPosition.dx * _ratio,
+                e.localPosition.dy * _ratio,
+              );
               return;
             }
             if (_holding) {

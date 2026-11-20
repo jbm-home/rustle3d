@@ -1,6 +1,7 @@
 // Fit maps and the tape measure (spec 24): the gauge over the 3D view
 // colours the cloth by strain and shows a legend; the Tape measure tool
-// reads the circumferences and the ease where the garment is clicked.
+// reads the circumferences and the ease where the garment is clicked, or
+// a length between two points of it.
 
 import 'dart:convert';
 import 'dart:io';
@@ -70,7 +71,14 @@ void main() {
     expect(find.byKey(const ValueKey('fitLegend')), findsNothing);
 
     // The tape measure: a click on the garment reads it.
-    await tester.tap(find.byIcon(Icons.linear_scale_rounded));
+    final tapeTool = find.byWidgetPredicate(
+      (w) =>
+          w is Tooltip &&
+          (w.richMessage?.toPlainText().startsWith('Tape measure') ?? false),
+    );
+    await tester.ensureVisible(tapeTool);
+    await frames(3);
+    await tester.tap(tapeTool);
     await frames();
     expect(find.byKey(const ValueKey('tapeCard')), findsOneWidget);
     expect(find.text('Click on the draped garment.'), findsOneWidget);
@@ -80,13 +88,34 @@ void main() {
     final rect = tester.getRect(view);
     // The shirt is around the middle of the body, a little above the
     // view's centre: try a few heights until the click lands on it.
+    var onShirt = rect.center;
     for (final dy in [0.0, -0.05, -0.1, -0.15, 0.05]) {
-      await tester.tapAt(rect.center + Offset(0, dy * rect.height));
+      onShirt = rect.center + Offset(0, dy * rect.height);
+      await tester.tapAt(onShirt);
       await frames();
       if (find.text('Ease').evaluate().isNotEmpty) break;
     }
     expect(find.text('Ease'), findsOneWidget);
     expect(find.text('Garment'), findsOneWidget);
+
+    // A length: two points clicked on the shirt, a little apart.
+    await tester.tap(find.text('Length'));
+    await frames();
+    expect(
+      find.text('Click the first point on the draped garment.'),
+      findsOneWidget,
+    );
+    await tester.tapAt(onShirt);
+    await frames();
+    expect(find.text('Click the second point.'), findsOneWidget);
+    // The second point a little beside the first, still on the shirt.
+    for (final dx in [0.03, -0.03, 0.015, -0.015]) {
+      await tester.tapAt(onShirt + Offset(dx * rect.width, 0));
+      await frames();
+      if (find.text('Along the cloth').evaluate().isNotEmpty) break;
+    }
+    expect(find.text('Along the cloth'), findsOneWidget);
+    expect(find.text('Straight'), findsOneWidget);
 
     // Another tool puts the tape away.
     await tester.tap(find.byTooltip('Put the tape away'));

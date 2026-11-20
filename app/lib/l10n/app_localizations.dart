@@ -4102,13 +4102,13 @@ abstract class L {
   /// No description provided for @toolTapeHint.
   ///
   /// In en, this message translates to:
-  /// **'Click on the 3D garment: its circumference there, the body\'s and the ease'**
+  /// **'Click on the 3D garment: its circumference there, the body\'s and the ease; or a length between two points'**
   String get toolTapeHint;
 
   /// No description provided for @hintTape.
   ///
   /// In en, this message translates to:
-  /// **'Tape measure: click on the 3D garment to measure around it there · drag to turn the view · V to stop'**
+  /// **'Tape measure: click on the 3D garment to measure around it there, or two points for a length · drag to turn the view · V to stop'**
   String get hintTape;
 
   /// No description provided for @tapeHint.
@@ -4158,6 +4158,54 @@ abstract class L {
   /// In en, this message translates to:
   /// **'The garment does not go all round here: no ease.'**
   String get tapeOpen;
+
+  /// No description provided for @tapeRound.
+  ///
+  /// In en, this message translates to:
+  /// **'Round'**
+  String get tapeRound;
+
+  /// No description provided for @tapeLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Length'**
+  String get tapeLength;
+
+  /// No description provided for @tapeFirstPoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Click the first point on the draped garment.'**
+  String get tapeFirstPoint;
+
+  /// No description provided for @tapeSecondPoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Click the second point.'**
+  String get tapeSecondPoint;
+
+  /// No description provided for @tapeAlong.
+  ///
+  /// In en, this message translates to:
+  /// **'Along the cloth'**
+  String get tapeAlong;
+
+  /// No description provided for @tapeTaut.
+  ///
+  /// In en, this message translates to:
+  /// **'Tape pulled taut'**
+  String get tapeTaut;
+
+  /// No description provided for @tapeStraight.
+  ///
+  /// In en, this message translates to:
+  /// **'Straight'**
+  String get tapeStraight;
+
+  /// No description provided for @tapeNotJoined.
+  ///
+  /// In en, this message translates to:
+  /// **'The cloth does not join these points: straight only.'**
+  String get tapeNotJoined;
 
   /// No description provided for @printTitle.
   ///

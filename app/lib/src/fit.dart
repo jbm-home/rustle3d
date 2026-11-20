@@ -113,13 +113,32 @@ class _FitLegendCard extends StatelessWidget {
   }
 }
 
-/// The tape measure's reading: the height, the garment's and the body's
-/// circumferences, the ease and the gap at the point clicked.
+/// The tape measure's card. Round: the height, the garment's and the
+/// body's circumferences, the ease and the gap at the point clicked.
+/// Length: between two points clicked on the cloth, along it, by tape
+/// and straight.
 class _TapeCard extends StatelessWidget {
-  const _TapeCard({required this.reading, required this.onClose});
+  const _TapeCard({
+    required this.length,
+    required this.onLength,
+    required this.reading,
+    required this.started,
+    required this.lengthReading,
+    required this.onClose,
+  });
 
-  /// `null` before the first click.
+  /// Measuring a length between two points, not round.
+  final bool length;
+  final ValueChanged<bool> onLength;
+
+  /// Round: `null` before the first click.
   final TapeReading? reading;
+
+  /// Length: the first point is clicked, the second awaited.
+  final bool started;
+
+  /// Length: `null` until both points are clicked.
+  final LengthReading? lengthReading;
   final VoidCallback onClose;
 
   @override
@@ -149,7 +168,46 @@ class _TapeCard extends StatelessWidget {
       ),
     );
 
-    final r = reading;
+    Widget note(String text) => Padding(
+      padding: const EdgeInsets.only(top: Space.xs),
+      child: Text(text, style: ts(fontSize: 11.5, color: p.textMuted)),
+    );
+
+    Widget hint(String text) =>
+        Text(text, style: ts(fontSize: 12, color: p.textMuted));
+
+    final List<Widget> body;
+    if (length) {
+      final r = lengthReading;
+      body = [
+        if (r == null)
+          hint(started ? l.tapeSecondPoint : l.tapeFirstPoint)
+        else ...[
+          row(l.tapeAlong, cm(r.alongCm), strong: true),
+          row(l.tapeTaut, cm(r.tapeCm)),
+          row(l.tapeStraight, cm(r.straightCm)),
+          if (r.alongCm == null) note(l.tapeNotJoined),
+        ],
+      ];
+    } else {
+      final r = reading;
+      body = [
+        if (r == null)
+          hint(l.tapeHint)
+        else ...[
+          row(l.tapeHeight, cm(r.heightCm)),
+          row(l.tapeGarment, cm(r.garmentCm)),
+          row(l.tapeBody, cm(r.bodyCm)),
+          row(l.tapeEase, cm(r.easeCm, true), strong: true),
+          row(
+            l.tapeGap,
+            r.gapMm == null ? '–' : '${context.number(r.gapMm!)} mm',
+          ),
+          if (!r.closed && r.garmentCm != null) note(l.tapeOpen),
+        ],
+      ];
+    }
+
     return Container(
       key: const ValueKey('tapeCard'),
       width: 230,
@@ -179,38 +237,31 @@ class _TapeCard extends StatelessWidget {
               ),
             ],
           ),
-          if (r == null)
-            Padding(
-              padding: const EdgeInsets.only(right: Space.s),
-              child: Text(
-                l.tapeHint,
-                style: ts(fontSize: 12, color: p.textMuted),
-              ),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.only(right: Space.s),
-              child: Column(
-                children: [
-                  row(l.tapeHeight, cm(r.heightCm)),
-                  row(l.tapeGarment, cm(r.garmentCm)),
-                  row(l.tapeBody, cm(r.bodyCm)),
-                  row(l.tapeEase, cm(r.easeCm, true), strong: true),
-                  row(
-                    l.tapeGap,
-                    r.gapMm == null ? '–' : '${context.number(r.gapMm!)} mm',
+          Padding(
+            padding: const EdgeInsets.only(right: Space.s),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: Space.xs),
+                SegmentedButton<bool>(
+                  key: const ValueKey('tapeMode'),
+                  showSelectedIcon: false,
+                  style: const ButtonStyle(
+                    visualDensity: VisualDensity.compact,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  if (!r.closed && r.garmentCm != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: Space.xs),
-                      child: Text(
-                        l.tapeOpen,
-                        style: ts(fontSize: 11.5, color: p.textMuted),
-                      ),
-                    ),
-                ],
-              ),
+                  segments: [
+                    ButtonSegment(value: false, label: Text(l.tapeRound)),
+                    ButtonSegment(value: true, label: Text(l.tapeLength)),
+                  ],
+                  selected: {length},
+                  onSelectionChanged: (s) => onLength(s.first),
+                ),
+                const SizedBox(height: Space.s),
+                ...body,
+              ],
             ),
+          ),
         ],
       ),
     );
