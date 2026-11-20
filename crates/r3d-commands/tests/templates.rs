@@ -239,7 +239,7 @@ fn trousers_fit_a_mens_body() {
     let (low, high) = drape(&mens("trousers"), 180);
     eprintln!("men's trousers: {low:.3}..{high:.3}");
     // They settle a few centimetres under the waist (1.08 m), held by
-    // friction alone: the waist's hold is open (ROADMAP M22).
+    // friction alone: the waist's hold is open (ROADMAP, open points).
     assert!(high > 1.03, "trousers slid down: top at {high}");
     assert!(low > 0.01 && low < 0.05, "hem at {low}");
 }
