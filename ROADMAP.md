@@ -42,6 +42,101 @@ maintainer's briefs that specs cite as "ROADMAP Mxx" in their
 | M21 | Textures and prints ✅ (2026-11-19) | A striped shirt whose stripes follow the grainline on every piece |
 | M31 | Imported avatars ✅ (2026-11-19) | A body scan in OBJ/glTF is checked, the pieces placed around it and draped |
 | M15 | Game-ready export ✅ (2026-11-19) | LODs + baked wrinkle normal maps + skinning, imported in Godot/Unity/Unreal |
+| M33 | Body measurements | A project made with four measurements; later its arm length and neck are set, the avatar and a sleeve drafted from `arm_length` follow |
+| M34 | Construction details 2 | A cuff gathered by elastic, a topstitched yoke, a collar that stands thanks to its interfacing, a quilted panel |
+| M35 | Sketch mode | A half bodice drawn and constrained without the inspector: what fits the selection is offered over the board, one click applies it |
+| M36 | Natural motions | The walk looks human: no hop, a supple trunk, relaxed arms |
+| M37 | Imported avatars in motion, game export checked | A scanned body walks in its garment; the garment and its motion open in a game engine as exported |
+
+Order of the next ones, as set by the maintainer on 2026-11-23: M33,
+M34, M35, M36, M37 (M16's Linux part when the work moves to Linux).
+
+## M33 — Body measurements
+
+Maintainer's brief (2026-11-23): more body measurements (the parametric
+open point of M28: neck, shoulder, arm…), with care for the user's
+experience. Creating a project must not ask for all these values; they
+can be set or changed afterwards.
+
+- A fuller set of measurements, each with a plain definition and a
+  figure of where the tape goes: neck, shoulder width, shoulder length,
+  arm length, upper arm and wrist, back and front waist length, waist
+  and hip heights, crotch depth, inside leg, thigh, knee, ankle.
+- At creation nothing changes: a preset or the four measurements of
+  today. Every other measurement is estimated from them (and the
+  body), shown as estimated until the user types their own; one click
+  brings an estimate back.
+- A body panel to view and change them, grouped (torso, arms, legs),
+  reachable from the avatar at any time; changing one redrafts like the
+  four of today (spec 20). The avatar follows the ones its body can
+  take; one it cannot reach shows the gap.
+- Formulas name them (spec 20); every size of a range has them (spec
+  18), estimated the same way; templates use them where they help (a
+  sleeve from the arm length, a neckline from the neck).
+- Commands, schema migration and golden files as usual; agents and the
+  CLI set and reset them.
+
+## M34 — Construction details 2
+
+Maintainer's brief (2026-11-23): the details left open by M29.
+
+- Elastic (an edge or a line gathered by an elastic of a given relaxed
+  length) and shirring (several parallel elastic lines).
+- Topstitching (one or more rows at a distance from an edge or a seam,
+  thread colour and stitch length), seen on the board, in 3D, in photos
+  and in the tech pack.
+- Interfacing on a piece or part of it (stiffer to bend and stretch),
+  in the bill of materials.
+- Quilting and padding (thickness between stitched lines).
+- Needs solver work: docs/physics.md first.
+
+## M35 — Sketch mode
+
+Maintainer's brief (2026-11-23): drafting in 2D is not practical today.
+Wanted: a sketch mode as in mechanical CAD tools, which work well for
+this, with context buttons over the view for the constraints and
+actions that fit what is selected. Our own layout, icons and terms.
+
+- First a plan, validated by the maintainer before any code: what gets
+  in the way today (walked through on real drafts), the sketching flow
+  proposed, and mockups of the board in that mode (screenshots of
+  variants rather than descriptions).
+- Then the mode itself. It takes in the drafting open points about
+  constraints: points on edges and notches as distance targets;
+  constraints on internal lines, notches and construction lines;
+  snapping to the intersection of two lines; moving a dimension's label
+  by hand.
+
+## M36 — Natural motions
+
+Maintainer's brief (2026-11-23): the motions look robotic. The walk makes
+the avatar hop and moves it like a stiff robot; make every built-in
+motion natural and good-looking.
+
+- A planted foot neither slides nor lifts; the pelvis rises and falls
+  smoothly with the legs (no hop); the weight passes from one foot to
+  the other.
+- A supple trunk (the spine and the shoulders turning against the
+  pelvis, the head steady), relaxed arms and wrists, ease in and out of
+  every move.
+- A skinning that keeps the shoulders and the armpits in shape (e.g.
+  dual quaternions), so arms can go straight overhead.
+- Joint angle curves from published gait studies, cited in the spec.
+
+## M37 — Imported avatars in motion, game export checked
+
+Maintainer's brief (2026-11-23): the animation of imported avatars, and
+the game export.
+
+- An imported body moves: its own skeleton mapped onto ours when it has
+  one, otherwise our skeleton fitted to it and skin weights computed;
+  built-in and captured motions play on it.
+- The game export carries the motion (built-in and captured motions as
+  glTF animations) and skins an imported body.
+- The exports opened in game engines and every problem found fixed (the
+  inside of a shell showing the outside's wrinkles reversed among
+  them); Godot can be checked by the tests, the others by the
+  maintainer with a written check list.
 
 ## M16 — Zero-copy views on Linux (open)
 
@@ -61,12 +156,10 @@ back through the CPU every frame.
 
 As noted when each milestone closed; recheck before taking one up.
 
-- **Drafting (M11, M12, M32)**: points on edges and notches as distance
-  targets; a gathering curve; cutting a piece and its linked mirror copy
-  together (refused today: unlink first); constraints on internal lines,
-  notches and construction lines; holes in mirror copies and symmetric
-  pieces; seam allowance inside holes; moving a dimension's label by
-  hand.
+- **Drafting (M11, M12, M32)** (constraints: see M35): a gathering
+  curve; cutting a piece and its linked mirror copy together (refused
+  today: unlink first); holes in mirror copies and symmetric pieces;
+  seam allowance inside holes.
 - **Interchange (M13)**: sizes and grading (AAMA RUL files), seams in
   the exchange (DXF-AAMA has none), PDFs whose pages hold different
   parts of the pattern, binary DXF, pieces with holes, the tiling
@@ -79,16 +172,17 @@ As noted when each milestone closed; recheck before taking one up.
   under the belly, its hem on the floor); a women's 52 shirt parts a
   little below its last button over the belly (no darts); on the Men L
   body an A-line skirt in denim slides off the hips (weak waist grip;
-  solver convergence, physics.md §7).
+  solver convergence, physics.md §7). On macOS two tests fail just
+  under their threshold, the same weak hold: `trousers_fit_a_mens_body`
+  (top at 1.029 m for 1.03) and, since the avatar is fitted to every
+  chart size (52a8621), `edits_carry_the_drape_over_without_a_jump` (a
+  hem 5 cm longer hangs 1.9 cm lower, 2 asked).
 - **Grading (M22)**: notches graded on their own; an ASTM rule table
   (`.rul`) and grading read from imported files; a graded template
   takes about 6 s to add on 9 sizes.
-- **Parametric (M28)**: more body measurements (neck, shoulder, arm…);
-  Seamly2D/Valentina steps `parallelCurve`, `graduatedCurve`,
+- **Parametric (M28)** (body measurements: see M33): Seamly2D/Valentina steps `parallelCurve`, `graduatedCurve`,
   `ellipticalArcWithLength` and the union of pieces; seam allowances
   that change along the outline.
-- **Construction details (M29)**: elastic and shirring, topstitching,
-  interfacing, quilting and padding (need solver work).
 - **Several garments (M19)**: edge–edge contacts between garments, and
   point–triangle contacts within a garment (its own folds stay a
   particle diameter apart); on the GPU a shirt and trousers step in
@@ -105,8 +199,7 @@ As noted when each milestone closed; recheck before taking one up.
   it, stripe and check matching in the marker, weave relief (normal and
   roughness maps), transparency, a different print on the inside of the
   cloth, a user library of prints shared across projects.
-- **Motion (M23)**: walking along a path, arms straight overhead (needs
-  a skinning that does not fold the armpit, e.g. dual quaternions), a
+- **Motion (M23)** (arms overhead: see M36): walking along a path, a
   timeline and a video of a motion.
 - **Production (M30)**: trims in the bill of materials; the projector in
   the operating system's own full screen and keystone correction; points
@@ -118,16 +211,14 @@ As noted when each milestone closed; recheck before taking one up.
   fabric's stiffness per direction) and a pressure map; the tape
   following the cloth as it moves; the length of an opening's edge (a
   neckline, an armhole).
-- **Imported avatars (M31)**: motions of an imported body (mapping its
-  skeleton, if any, onto ours), an imported body per size of a range,
+- **Imported avatars (M31)** (motions: see M37): an imported body per
+  size of a range,
   automatic fit of the arrangement points as the garment drapes, points
   guessed on a T pose, templates placing their pieces from the points
   rather than from fractions of the height, a disk cache of the distance
   field of large scans, compressed glTF.
-- **Game export (M15)**: imports checked by hand in Godot, Unity and
-  Unreal (no engine was run); the `MSFT_lod` extension; skinning an
-  imported body; dual-quaternion skinning; the inside of a shell shows
-  the outside's wrinkles reversed; roughness or sheen maps.
+- **Game export (M15)** (engines, motions, imported bodies: see M37):
+  the `MSFT_lod` extension; roughness or sheen maps.
 
 ## Later (architecture kept ready, not scheduled)
 
