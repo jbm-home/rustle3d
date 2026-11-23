@@ -9,6 +9,7 @@ import 'package:material_ui/material_ui.dart';
 import 'busy.dart';
 import 'design/tokens.dart';
 import 'i18n.dart';
+import 'measurements.dart';
 import 'rust/api/engine.dart';
 import 'rust/api/library.dart';
 
@@ -73,6 +74,7 @@ class _BodyPanelState extends State<_BodyPanel> {
   double _masculinity = 0;
   final _fields = {for (final k in _ranges.keys) k: TextEditingController()};
   Map<String, dynamic>? _achieved;
+  List<Map<String, dynamic>> _measures = const [];
   String? _error;
   bool _naming = false;
   final _name = TextEditingController();
@@ -87,7 +89,47 @@ class _BodyPanelState extends State<_BodyPanel> {
     if (current is Map<String, dynamic>) {
       _setBody(current['body'] as Map<String, dynamic>);
       _preset = current['preset'] as String?;
-      _achieved = current['achieved'] as Map<String, dynamic>?;
+      _show(current);
+    }
+  }
+
+  /// What `avatar.get` says the body reaches, and the other measurements.
+  void _show(Map<String, dynamic> got) {
+    _achieved = got['achieved'] as Map<String, dynamic>?;
+    _measures = ((got['measures'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>();
+  }
+
+  /// Type one of the other measurements (cm), or with null bring its
+  /// estimate back; the body is fitted again (seconds, off the UI
+  /// thread).
+  Future<void> _setMeasure(String name, double? cm) async {
+    final engine = widget.engine;
+    try {
+      final got = await runBusy(
+        context,
+        engine,
+        context.l.busyBodyTitle,
+        () async {
+          await engine.runLong(
+            stepJson: jsonEncode({
+              'type': 'avatar.set_measures',
+              'measures': {name: cm},
+            }),
+          );
+          return jsonDecode(
+            await engine.runLong(stepJson: '{"type":"avatar.get"}'),
+          );
+        },
+      );
+      if (!mounted) return;
+      setState(() {
+        _error = null;
+        _show(got as Map<String, dynamic>);
+      });
+      widget.onChanged();
+    } on ApiError catch (e) {
+      if (mounted) setState(() => _error = context.error(e));
     }
   }
 
@@ -159,7 +201,7 @@ class _BodyPanelState extends State<_BodyPanel> {
       if (!mounted) return;
       setState(() {
         _error = null;
-        _achieved = got['achieved'] as Map<String, dynamic>;
+        _show(got as Map<String, dynamic>);
       });
       widget.onChanged();
     } on ApiError catch (e) {
@@ -217,7 +259,8 @@ class _BodyPanelState extends State<_BodyPanel> {
     final l = context.l;
     final builtin = _presets.where((x) => x['builtin'] == true);
     final mine = _presets.where((x) => x['builtin'] == false);
-    return Padding(
+    // The other measurements make it taller than some screens.
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(Space.xl),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -321,6 +364,10 @@ class _BodyPanelState extends State<_BodyPanel> {
           if (_achieved != null) ...[
             const SizedBox(height: Space.m),
             _Achieved(achieved: _achieved!),
+          ],
+          if (_measures.isNotEmpty) ...[
+            const SizedBox(height: Space.m),
+            MoreMeasurements(measures: _measures, onSet: _setMeasure),
           ],
           const SizedBox(height: Space.l),
           if (_naming)

@@ -450,35 +450,47 @@ pub fn body_model() -> Result<&'static r3d_avatar::model::BodyModel, CommandErro
         .map_err(|e| CommandError::Internal { detail: e.clone() })
 }
 
-/// The built-in body fitted to `body`. Fitting takes a few seconds, so
+/// The built-in body fitted to `body` and the measurements typed besides
+/// (`typed`, cm; only those the body follows count). Fitting takes a few
+/// seconds, so
 /// the last bodies fitted are kept (a graded template drafts each size,
 /// the drape fits the shown size again), and a body asked for while it
 /// is being fitted waits for that fit instead of doing it again (the app
 /// fits on a thread of its own while a step may need the same body).
 /// Different bodies fit in parallel.
-pub fn fitted(body: &r3d_core::Body) -> Result<r3d_avatar::fit::Fit, CommandError> {
+pub fn fitted(
+    body: &r3d_core::Body,
+    typed: &r3d_core::Measures,
+) -> Result<r3d_avatar::fit::Fit, CommandError> {
+    type Key = (r3d_core::Body, r3d_core::Measures);
     type Cell = std::sync::Arc<std::sync::OnceLock<r3d_avatar::fit::Fit>>;
     const KEPT: usize = 32;
-    static FITS: std::sync::Mutex<Vec<(r3d_core::Body, Cell)>> = std::sync::Mutex::new(Vec::new());
+    static FITS: std::sync::Mutex<Vec<(Key, Cell)>> = std::sync::Mutex::new(Vec::new());
     let model = body_model()?;
+    let followed: r3d_core::Measures = typed
+        .iter()
+        .filter(|(m, _)| r3d_avatar::model::FOLLOWED.iter().any(|(f, _)| f == *m))
+        .map(|(m, v)| (*m, *v))
+        .collect();
+    let key = (*body, followed);
     let cell: Cell = {
         let mut fits = FITS.lock().map_err(|_| CommandError::Internal {
             detail: "fit cache lock poisoned".into(),
         })?;
-        match fits.iter().find(|(b, _)| b == body) {
+        match fits.iter().find(|(k, _)| *k == key) {
             Some((_, cell)) => cell.clone(),
             None => {
                 if fits.len() >= KEPT {
                     fits.remove(0);
                 }
                 let cell = Cell::default();
-                fits.push((*body, cell.clone()));
+                fits.push((key.clone(), cell.clone()));
                 cell
             }
         }
     };
     Ok(cell
-        .get_or_init(|| r3d_avatar::fit::fit(model, body))
+        .get_or_init(|| r3d_avatar::fit::fit_typed(model, &key.0, &key.1))
         .clone())
 }
 
@@ -488,13 +500,29 @@ pub fn fitted(body: &r3d_core::Body) -> Result<r3d_avatar::fit::Fit, CommandErro
 pub struct AvatarGet {}
 
 impl Described for AvatarGet {
-    const SUMMARY: &'static str = "The avatar's requested measurements, its preset, the measurements the fitted 3D body actually reaches (they can differ slightly for extreme sizes), and the heights above the floor (cm) of its waist (narrowest girth), hips (largest girth) and crotch, to draft and place skirts and trousers (panel.place top_cm). Null when there is no avatar.";
+    const SUMMARY: &'static str = "The avatar's requested measurements, its preset, the measurements the fitted 3D body actually reaches (they can differ slightly for extreme sizes), and the heights above the floor (cm) of its waist (narrowest girth), hips (largest girth) and crotch, to draft and place skirts and trousers (panel.place top_cm). `measures`: every other measurement (neck, shoulder_width, arm_length…, as formulas name them) with its group (torso, arms, legs), its value in cm, whether it is `estimated` from the four (else typed with avatar.set_measures), whether the 3D body `follows` it, and what the built-in body `reached_cm` (null on an imported body). Null when there is no avatar.";
 }
 
 impl QuerySpec for AvatarGet {
     fn run(&self, p: &Project) -> Result<Value, CommandError> {
         let Some(avatar) = p.avatar() else {
             return Ok(Value::Null);
+        };
+        let measures = |reached: Option<&r3d_avatar::tape::Taped>| {
+            r3d_core::Measure::ALL
+                .iter()
+                .map(|m| {
+                    let v = avatar.measure(*m);
+                    serde_json::json!({
+                        "name": m.name(),
+                        "group": m.group(),
+                        "cm": v.cm,
+                        "estimated": v.estimated,
+                        "follows": r3d_avatar::model::FOLLOWED.iter().any(|(f, _)| f == m),
+                        "reached_cm": reached.map(|t| (f64::from(t.get(*m)) * 10.0).round() / 10.0),
+                    })
+                })
+                .collect::<Vec<_>>()
         };
         if let Some(mesh) = &avatar.mesh {
             // Taken on the imported body at its points.
@@ -513,15 +541,15 @@ impl QuerySpec for AvatarGet {
                     "crotch": cm(r3d_core::BodyPoint::Crotch),
                 },
                 "imported": mesh,
+                "measures": measures(None),
             }));
         }
         let model = body_model()?;
-        let fit = fitted(&avatar.body)?;
+        let fit = fitted(&avatar.body, &avatar.measures)?;
         let a = fit.achieved;
-        let h = r3d_avatar::measure::heights(
-            &r3d_avatar::fit::fitted_positions(model, &fit),
-            model.triangles(),
-        );
+        let shaped = r3d_avatar::fit::fitted_body(model, &fit);
+        let h = r3d_avatar::measure::heights(&shaped.positions, model.triangles());
+        let taped = r3d_avatar::tape::tape(model, &shaped);
         let r1 = |v: f32| (v as f64 * 10.0).round() / 10.0;
         Ok(serde_json::json!({
             "body": avatar.body,
@@ -537,6 +565,7 @@ impl QuerySpec for AvatarGet {
                 "hips": r1(h.hips * 100.0),
                 "crotch": h.crotch.map(|c| r1(c * 100.0)),
             },
+            "measures": measures(taped.as_ref()),
         }))
     }
 }

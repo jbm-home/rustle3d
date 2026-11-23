@@ -7,7 +7,7 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-20 (with Select, drag a piece to move it, the corners of its frame to scale it and the round handle above it to turn it; Rotate and Scale in the inspector for an exact angle or percentage; the Draw tool also draws on a piece of the pattern, not only on the 3D garment; a shape added from the Shapes menu comes in selected, with the Select tool on; in French, the circle skirt is now called « jupe soleil »; patterns and measurement files from Seamly2D and Valentina come in drafted for their measurements, graded in every size, and can be drafted again for the avatar; the tape measure goes round a slanting sleeve square to it, and measures a length between two points of the garment; the start screen tells you when a new version is out, and the check can be turned off; Installing: a disk image for macOS, one for Intel and Apple silicon, an installer for Windows, and the first launch on recent macOS, through Privacy & Security; the shirt, T-shirt and dress take their shoulders, neckline and armholes from the avatar's body, and their hem fits over the hips: large sizes no longer have drooping shoulders; the avatar now takes the measurements given in every size of the charts, up to the women's 54: large sizes came out too slim and trousers fell off them; changing the size or the body while draping starts the drape again around the new body; trousers end just above the floor whatever the body; garments worn in layers lie close together: a shirt worn under trousers is tucked into them, and nothing shows through a garment worn over another; the trousers template is a little shorter; a selected piece's panel shows its garment's fabric; the Construction line and Tape measure tools have new icons; the tool rail in four sections, drawing, measuring, sewing and trims, with Dart and Pleat under Darts and pleats and Hole a tool of its own; the guided flow's step bar and banner removed; a more natural walk and a new motion, Stand at ease; captured motions whose rest pose lies flat play upright; pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
+Last updated: 2026-11-23 (more body measurements: neck, shoulders, arm length, upper arm, wrist, back and front waist lengths, waist and hip heights, crotch depth, inside leg, thigh, knee and ankle, estimated until you type your own, in the Body panel under More measurements; the avatar follows the neck, shoulders, arms, back length, hip height, inside leg and thigh; formulas can use them; the shirt's sleeve comes from the arm length and the T-shirt's and shirt's neckline from the neck; with Select, drag a piece to move it, the corners of its frame to scale it and the round handle above it to turn it; Rotate and Scale in the inspector for an exact angle or percentage; the Draw tool also draws on a piece of the pattern, not only on the 3D garment; a shape added from the Shapes menu comes in selected, with the Select tool on; in French, the circle skirt is now called « jupe soleil »; patterns and measurement files from Seamly2D and Valentina come in drafted for their measurements, graded in every size, and can be drafted again for the avatar; the tape measure goes round a slanting sleeve square to it, and measures a length between two points of the garment; the start screen tells you when a new version is out, and the check can be turned off; Installing: a disk image for macOS, one for Intel and Apple silicon, an installer for Windows, and the first launch on recent macOS, through Privacy & Security; the shirt, T-shirt and dress take their shoulders, neckline and armholes from the avatar's body, and their hem fits over the hips: large sizes no longer have drooping shoulders; the avatar now takes the measurements given in every size of the charts, up to the women's 54: large sizes came out too slim and trousers fell off them; changing the size or the body while draping starts the drape again around the new body; trousers end just above the floor whatever the body; garments worn in layers lie close together: a shirt worn under trousers is tucked into them, and nothing shows through a garment worn over another; the trousers template is a little shorter; a selected piece's panel shows its garment's fabric; the Construction line and Tape measure tools have new icons; the tool rail in four sections, drawing, measuring, sewing and trims, with Dart and Pleat under Darts and pleats and Hole a tool of its own; the guided flow's step bar and banner removed; a more natural walk and a new motion, Stand at ease; captured motions whose rest pose lies flat play upright; pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
 hips, so trousers no longer slide with each step; a garment worn over
 trousers starts outside them; captured motions: Motion › Import a captured
 motion… plays a BVH motion capture on the avatar, Motion › Motion
@@ -138,6 +138,26 @@ size shown, see Sizes) while the garment drapes starts the drape again
 around it. The avatar takes your measurements to within a centimetre,
 up to a women's 54 or a men's 60; larger, its arms would meet its body,
 and it stays smaller than asked (a women's 56 about 5 cm small).
+
+### More measurements
+Under **More measurements** in the same panel are fifteen more, in three
+groups: **Torso** (neck, shoulder width, shoulder length, back and front
+waist length, waist height, hip height, crotch depth), **Arms** (arm
+length, upper arm, wrist) and **Legs** (inside leg, thigh, knee, ankle).
+Each has a small figure showing where the tape goes. You never have to
+fill them in: until you type your own, each is estimated from height,
+bust, waist and hips (shown in grey, marked "estimated"). Type a value
+and press Enter (or leave the field) to use yours; the circular arrow
+brings the estimate back. Changing the preset or the four measurements
+keeps the ones you typed.
+
+The avatar takes your neck, shoulder width, arm length, upper arm, back
+waist length, hip height, inside leg and thigh. The others (wrist, knee,
+ankle, front waist length, waist height, crotch depth) size patterns but
+do not change the 3D body. When the avatar cannot reach a value you
+typed, the row says what it measures. Templates use them: the shirt's
+sleeve is your arm length less 2 cm (cuff included), the T-shirt's 40 %
+of it, and both necklines follow your neck.
 
 ### Your own body: a scan or a character
 **Body › Import body…** drapes on a body of your own: a 3D scan of a
@@ -349,7 +369,11 @@ others.
 A distance, a length or an angle can follow the body: type a formula
 in place of its value (or click **ƒ** next to it), like `waist / 4 + 10 mm` or
 `hips / 4 + ease`. Formulas use the body's measurements (`height`,
-`bust`, `waist`, `hips`), numbers with their unit (`mm`, `cm`, `in`),
+`bust`, `waist`, `hips`, and the others by their names: `neck`,
+`shoulder_width`, `shoulder_length`, `back_waist_length`,
+`front_waist_length`, `waist_height`, `hip_height`, `crotch_depth`,
+`arm_length`, `upper_arm`, `wrist`, `inside_leg`, `thigh`, `knee`,
+`ankle`), numbers with their unit (`mm`, `cm`, `in`),
 `+ − * /`, parentheses, `min` and `max`, and your own **variables**
 (nothing selected: the **Variables** section of the inspector; **+**
 adds one, like `ease = 2 cm`, click one to change it). A length needs a

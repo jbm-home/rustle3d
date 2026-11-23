@@ -14,7 +14,7 @@ use std::borrow::Cow;
 use glam::DVec2;
 
 use crate::id::{EdgeId, PanelId};
-use crate::model::{Body, EdgeCurve, Grading, PathSegment, Point, Project};
+use crate::model::{Avatar, Body, EdgeCurve, Grading, PathSegment, Point, Project};
 
 /// Below this chord (mm), a curve's handles are not scaled.
 const MIN_CHORD_MM: f64 = 1e-6;
@@ -121,11 +121,20 @@ impl Project {
         pos - field.at(pos)
     }
 
-    /// The body the garment is draped on: the avatar's in the shown size.
-    pub fn shown_body(&self) -> Option<Body> {
+    /// The avatar the garment is draped on: the project's in the shown size: its body and its other measurements
+    /// (those typed graded like their estimates).
+    pub fn shown_avatar(&self) -> Option<Avatar> {
+        let avatar = self.avatar.as_ref()?;
         match &self.grading {
-            Some(g) if g.shown != g.base => self.size_body(g.shown),
-            _ => self.avatar.as_ref().map(|a| a.body),
+            Some(g) if g.shown != g.base => {
+                let body = self.size_body(g.shown)?;
+                Some(Avatar {
+                    measures: crate::body::regraded(&avatar.measures, &avatar.body, &body),
+                    body,
+                    ..avatar.clone()
+                })
+            }
+            _ => Some(avatar.clone()),
         }
     }
 
@@ -217,6 +226,7 @@ impl Project {
         if let Some(avatar) = &mut out.avatar
             && let Some(body) = self.size_body(i)
         {
+            avatar.measures = crate::body::regraded(&avatar.measures, &avatar.body, &body);
             avatar.body = body;
             avatar.preset = None;
         }

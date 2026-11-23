@@ -404,6 +404,132 @@ class LEn extends L {
   }
 
   @override
+  String get bodyMore => 'More measurements';
+
+  @override
+  String get bodyMoreHint =>
+      'Estimated from the four above until you type your own.';
+
+  @override
+  String get bodyTorso => 'Torso';
+
+  @override
+  String get bodyArms => 'Arms';
+
+  @override
+  String get bodyLegs => 'Legs';
+
+  @override
+  String get measEstimated => 'estimated';
+
+  @override
+  String get measReset => 'Back to the estimate';
+
+  @override
+  String get measNeck => 'Neck';
+
+  @override
+  String get measNeckHint => 'Around the base of the neck';
+
+  @override
+  String get measShoulderWidth => 'Shoulder width';
+
+  @override
+  String get measShoulderWidthHint =>
+      'Straight across the back, shoulder tip to shoulder tip';
+
+  @override
+  String get measShoulderLength => 'Shoulder length';
+
+  @override
+  String get measShoulderLengthHint =>
+      'From the side of the neck to the shoulder tip';
+
+  @override
+  String get measBackWaistLength => 'Back waist length';
+
+  @override
+  String get measBackWaistLengthHint =>
+      'From the nape down the spine to the waist';
+
+  @override
+  String get measFrontWaistLength => 'Front waist length';
+
+  @override
+  String get measFrontWaistLengthHint =>
+      'From the side of the neck over the bust to the waist';
+
+  @override
+  String get measWaistHeight => 'Waist height';
+
+  @override
+  String get measWaistHeightHint => 'From the waist down to the floor';
+
+  @override
+  String get measHipHeight => 'Hip height';
+
+  @override
+  String get measHipHeightHint =>
+      'From the fullest part of the hips down to the floor';
+
+  @override
+  String get measCrotchDepth => 'Crotch depth';
+
+  @override
+  String get measCrotchDepthHint =>
+      'From the waist down to the crotch (seated: to the chair)';
+
+  @override
+  String get measArmLength => 'Arm length';
+
+  @override
+  String get measArmLengthHint =>
+      'From the shoulder tip over the bent elbow to the wrist bone';
+
+  @override
+  String get measUpperArm => 'Upper arm';
+
+  @override
+  String get measUpperArmHint => 'Around the upper arm at its fullest';
+
+  @override
+  String get measWrist => 'Wrist';
+
+  @override
+  String get measWristHint => 'Around the wrist';
+
+  @override
+  String get measInsideLeg => 'Inside leg';
+
+  @override
+  String get measInsideLegHint =>
+      'From the crotch down the inside of the leg to the floor';
+
+  @override
+  String get measThigh => 'Thigh';
+
+  @override
+  String get measThighHint =>
+      'Around the thigh at its fullest, just below the crotch';
+
+  @override
+  String get measKnee => 'Knee';
+
+  @override
+  String get measKneeHint => 'Around the knee';
+
+  @override
+  String get measAnkle => 'Ankle';
+
+  @override
+  String get measAnkleHint => 'Just above the ankle bone';
+
+  @override
+  String measAvatarReaches(String value) {
+    return 'The avatar measures $value: its body cannot go further.';
+  }
+
+  @override
   String get allProjects => 'All projects';
 
   @override

@@ -257,7 +257,7 @@ fn the_shown_size_is_draped_on_its_body() {
     let base = r3d_commands::drape::prepare(s.project(), None).unwrap();
     ok(&mut s, json!({"type": "grading.show_size", "size": "52"}));
     let p = s.project();
-    assert_eq!(p.shown_body().unwrap().hips_cm, 128.0);
+    assert_eq!(p.shown_avatar().unwrap().body.hips_cm, 128.0);
     assert_eq!(p.avatar().unwrap().body.hips_cm, 98.0);
     let big = r3d_commands::drape::prepare(p, None).unwrap();
     let extent = |d: &r3d_commands::drape::Drape| {

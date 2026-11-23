@@ -159,7 +159,7 @@ fn a_draped_t_shirt_exports_with_lods_maps_and_skin() {
     // Skinned with the weights exported, the garment follows the walking
     // body: it stays about as far from the skin as at rest.
     assert_eq!(joints, 24, "one root: joints are the bones");
-    let form = Form::of_body(&women()).unwrap();
+    let form = Form::of_body(&women(), &Default::default()).unwrap();
     let walk = Animation::starting(Motion::Walk, 0.0);
     let time = MOTION_START_S + 1.4;
     let transforms = form.transforms(&walk, time).unwrap();
@@ -244,7 +244,7 @@ fn bad_options_and_bodies_without_a_skeleton_are_refused() {
     assert_eq!(err.message().code, "invalid.lods");
 
     // The built-in body imported as a file has no skeleton.
-    let form = Form::of_body(&women()).unwrap();
+    let form = Form::of_body(&women(), &Default::default()).unwrap();
     let mut obj = String::new();
     for p in &form.positions {
         obj += &format!("v {} {} {}\n", p.x, p.y, p.z);

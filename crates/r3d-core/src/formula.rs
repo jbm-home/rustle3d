@@ -2,7 +2,8 @@
 //!
 //! A formula is arithmetic (`+ - * /`, parentheses, `min`, `max`, `abs`,
 //! `sqrt`) on numbers, the body's measurements (`height`, `bust`, `waist`,
-//! `hips`) and the project's named variables. Every value carries its
+//! `hips`, and those of [`Measure`]: `neck`, `arm_length`…) and the
+//! project's named variables. Every value carries its
 //! length dimension (mm¹ for a length, mm⁰ for a plain number or an angle
 //! in degrees), checked as it is computed, so `waist + 2` is refused
 //! (`formula.unit`) while `waist + 2 cm` is a length. Numbers take a unit:
@@ -11,11 +12,41 @@
 
 use std::collections::BTreeMap;
 
+use crate::body::Measure;
 use crate::message::{Localizable, Message};
-use crate::model::Body;
+use crate::model::Avatar;
 
-/// The body measurements a formula may name.
+/// The four measurements a body is made from, as formulas name them.
 pub const BODY_NAMES: [&str; 4] = ["height", "bust", "waist", "hips"];
+
+/// Whether `name` is a body measurement in formulas: one of the four or
+/// of [`Measure`].
+pub fn is_body_name(name: &str) -> bool {
+    BODY_NAMES.contains(&name) || Measure::from_name(name).is_some()
+}
+
+/// `text` with every name `from` written `to` (other names, numbers and
+/// units as they were).
+pub fn rename(text: &str, from: &str, to: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut word = String::new();
+    let flush = |word: &mut String, out: &mut String| {
+        out.push_str(if word == from { to } else { word });
+        word.clear();
+    };
+    for c in text.chars() {
+        let starts = c.is_ascii_alphabetic() || c == '_';
+        let continues = !word.is_empty() && c.is_ascii_digit();
+        if starts || continues {
+            word.push(c);
+        } else {
+            flush(&mut word, &mut out);
+            out.push(c);
+        }
+    }
+    flush(&mut word, &mut out);
+    out
+}
 
 /// Why a formula cannot be computed.
 #[derive(Clone, Debug, PartialEq, thiserror::Error)]
@@ -246,16 +277,16 @@ pub fn valid_name(name: &str) -> bool {
         .next()
         .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
         && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
-        && !BODY_NAMES.contains(&name)
+        && !is_body_name(name)
         && !FUNCTIONS.contains(&name)
         && !["mm", "cm", "m", "in", "deg"].contains(&name)
 }
 
-/// What formulas are computed with: a body (or none) and the named
-/// variables' formulas.
+/// What formulas are computed with: a body (the avatar's measurements,
+/// or none) and the named variables' formulas.
 #[derive(Clone, Copy, Debug)]
 pub struct Scope<'a> {
-    pub body: Option<&'a Body>,
+    pub body: Option<&'a Avatar>,
     pub variables: &'a BTreeMap<String, String>,
 }
 
@@ -271,13 +302,21 @@ impl Scope<'_> {
     }
 
     fn name(&self, name: &str, stack: &mut Vec<String>) -> Result<Quantity, FormulaError> {
-        if let Some(i) = BODY_NAMES.iter().position(|n| *n == name) {
-            let body = self.body.ok_or_else(|| FormulaError::NoBody {
+        if is_body_name(name) {
+            let avatar = self.body.ok_or_else(|| FormulaError::NoBody {
                 name: name.to_owned(),
             })?;
-            let cm = [body.height_cm, body.bust_cm, body.waist_cm, body.hips_cm];
+            let b = &avatar.body;
+            let cm = match (name, Measure::from_name(name)) {
+                ("height", _) => b.height_cm,
+                ("bust", _) => b.bust_cm,
+                ("waist", _) => b.waist_cm,
+                ("hips", _) => b.hips_cm,
+                (_, Some(m)) => avatar.measure(m).cm,
+                (_, None) => 0.0,
+            };
             return Ok(Quantity {
-                value: cm.get(i).copied().unwrap_or_default() * 10.0,
+                value: cm * 10.0,
                 power: 1,
             });
         }
@@ -416,7 +455,7 @@ impl Scope<'_> {
         fn walk(scope: &Scope<'_>, node: &Node, seen: &mut Vec<String>) -> bool {
             match node {
                 Node::Number(..) => false,
-                Node::Name(n) if BODY_NAMES.contains(&n.as_str()) => true,
+                Node::Name(n) if is_body_name(n) => true,
                 Node::Name(n) => {
                     if seen.contains(n) {
                         return false;
@@ -441,13 +480,18 @@ impl Scope<'_> {
 mod tests {
     use super::*;
 
-    fn body() -> Body {
-        Body {
-            masculinity: 0.0,
-            height_cm: 168.0,
-            bust_cm: 90.0,
-            waist_cm: 72.0,
-            hips_cm: 98.0,
+    fn body() -> Avatar {
+        Avatar {
+            body: crate::Body {
+                masculinity: 0.0,
+                height_cm: 168.0,
+                bust_cm: 90.0,
+                waist_cm: 72.0,
+                hips_cm: 98.0,
+            },
+            preset: None,
+            mesh: None,
+            measures: crate::Measures::from([(Measure::Neck, 36.5)]),
         }
     }
 
@@ -470,6 +514,19 @@ mod tests {
         assert_eq!(s.eval_as("-(2 cm) * 2", 1), Ok(-40.0));
         assert!(s.uses_body("quarter"));
         assert!(!s.uses_body("ease * 2"));
+        // The other measurements: typed, or estimated.
+        assert_eq!(s.eval_as("neck / 2", 1), Ok(182.5));
+        let knee = Measure::Knee.estimate(&b.body) * 10.0;
+        assert_eq!(s.eval_as("knee", 1), Ok(knee));
+        assert!(s.uses_body("arm_length - 2 cm"));
+    }
+
+    #[test]
+    fn renames_whole_names_only() {
+        assert_eq!(
+            rename("neck/2 + neckline + 10mm - neck", "neck", "my_neck"),
+            "my_neck/2 + neckline + 10mm - my_neck"
+        );
     }
 
     #[test]
@@ -502,5 +559,6 @@ mod tests {
         );
         assert!(valid_name("ease_2"));
         assert!(!valid_name("waist") && !valid_name("2x") && !valid_name("min"));
+        assert!(!valid_name("arm_length"));
     }
 }

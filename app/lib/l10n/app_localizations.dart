@@ -787,6 +787,234 @@ abstract class L {
   /// **'Fitted body: height {height} · bust {bust} · waist {waist} · hips {hips}'**
   String fittedBody(String height, String bust, String waist, String hips);
 
+  /// No description provided for @bodyMore.
+  ///
+  /// In en, this message translates to:
+  /// **'More measurements'**
+  String get bodyMore;
+
+  /// No description provided for @bodyMoreHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated from the four above until you type your own.'**
+  String get bodyMoreHint;
+
+  /// No description provided for @bodyTorso.
+  ///
+  /// In en, this message translates to:
+  /// **'Torso'**
+  String get bodyTorso;
+
+  /// No description provided for @bodyArms.
+  ///
+  /// In en, this message translates to:
+  /// **'Arms'**
+  String get bodyArms;
+
+  /// No description provided for @bodyLegs.
+  ///
+  /// In en, this message translates to:
+  /// **'Legs'**
+  String get bodyLegs;
+
+  /// No description provided for @measEstimated.
+  ///
+  /// In en, this message translates to:
+  /// **'estimated'**
+  String get measEstimated;
+
+  /// No description provided for @measReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the estimate'**
+  String get measReset;
+
+  /// No description provided for @measNeck.
+  ///
+  /// In en, this message translates to:
+  /// **'Neck'**
+  String get measNeck;
+
+  /// No description provided for @measNeckHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Around the base of the neck'**
+  String get measNeckHint;
+
+  /// No description provided for @measShoulderWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Shoulder width'**
+  String get measShoulderWidth;
+
+  /// No description provided for @measShoulderWidthHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Straight across the back, shoulder tip to shoulder tip'**
+  String get measShoulderWidthHint;
+
+  /// No description provided for @measShoulderLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Shoulder length'**
+  String get measShoulderLength;
+
+  /// No description provided for @measShoulderLengthHint.
+  ///
+  /// In en, this message translates to:
+  /// **'From the side of the neck to the shoulder tip'**
+  String get measShoulderLengthHint;
+
+  /// No description provided for @measBackWaistLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Back waist length'**
+  String get measBackWaistLength;
+
+  /// No description provided for @measBackWaistLengthHint.
+  ///
+  /// In en, this message translates to:
+  /// **'From the nape down the spine to the waist'**
+  String get measBackWaistLengthHint;
+
+  /// No description provided for @measFrontWaistLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Front waist length'**
+  String get measFrontWaistLength;
+
+  /// No description provided for @measFrontWaistLengthHint.
+  ///
+  /// In en, this message translates to:
+  /// **'From the side of the neck over the bust to the waist'**
+  String get measFrontWaistLengthHint;
+
+  /// No description provided for @measWaistHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Waist height'**
+  String get measWaistHeight;
+
+  /// No description provided for @measWaistHeightHint.
+  ///
+  /// In en, this message translates to:
+  /// **'From the waist down to the floor'**
+  String get measWaistHeightHint;
+
+  /// No description provided for @measHipHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Hip height'**
+  String get measHipHeight;
+
+  /// No description provided for @measHipHeightHint.
+  ///
+  /// In en, this message translates to:
+  /// **'From the fullest part of the hips down to the floor'**
+  String get measHipHeightHint;
+
+  /// No description provided for @measCrotchDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'Crotch depth'**
+  String get measCrotchDepth;
+
+  /// No description provided for @measCrotchDepthHint.
+  ///
+  /// In en, this message translates to:
+  /// **'From the waist down to the crotch (seated: to the chair)'**
+  String get measCrotchDepthHint;
+
+  /// No description provided for @measArmLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Arm length'**
+  String get measArmLength;
+
+  /// No description provided for @measArmLengthHint.
+  ///
+  /// In en, this message translates to:
+  /// **'From the shoulder tip over the bent elbow to the wrist bone'**
+  String get measArmLengthHint;
+
+  /// No description provided for @measUpperArm.
+  ///
+  /// In en, this message translates to:
+  /// **'Upper arm'**
+  String get measUpperArm;
+
+  /// No description provided for @measUpperArmHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Around the upper arm at its fullest'**
+  String get measUpperArmHint;
+
+  /// No description provided for @measWrist.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrist'**
+  String get measWrist;
+
+  /// No description provided for @measWristHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Around the wrist'**
+  String get measWristHint;
+
+  /// No description provided for @measInsideLeg.
+  ///
+  /// In en, this message translates to:
+  /// **'Inside leg'**
+  String get measInsideLeg;
+
+  /// No description provided for @measInsideLegHint.
+  ///
+  /// In en, this message translates to:
+  /// **'From the crotch down the inside of the leg to the floor'**
+  String get measInsideLegHint;
+
+  /// No description provided for @measThigh.
+  ///
+  /// In en, this message translates to:
+  /// **'Thigh'**
+  String get measThigh;
+
+  /// No description provided for @measThighHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Around the thigh at its fullest, just below the crotch'**
+  String get measThighHint;
+
+  /// No description provided for @measKnee.
+  ///
+  /// In en, this message translates to:
+  /// **'Knee'**
+  String get measKnee;
+
+  /// No description provided for @measKneeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Around the knee'**
+  String get measKneeHint;
+
+  /// No description provided for @measAnkle.
+  ///
+  /// In en, this message translates to:
+  /// **'Ankle'**
+  String get measAnkle;
+
+  /// No description provided for @measAnkleHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Just above the ankle bone'**
+  String get measAnkleHint;
+
+  /// No description provided for @measAvatarReaches.
+  ///
+  /// In en, this message translates to:
+  /// **'The avatar measures {value}: its body cannot go further.'**
+  String measAvatarReaches(String value);
+
   /// No description provided for @allProjects.
   ///
   /// In en, this message translates to:

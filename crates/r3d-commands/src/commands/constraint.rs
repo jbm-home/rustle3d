@@ -274,7 +274,7 @@ impl CommandSpec for VariableSet {
         variables.insert(name.to_owned(), self.formula.trim().to_owned());
         // It must compute (a body measurement without a body waits).
         let scope = r3d_core::formula::Scope {
-            body: tx.project().avatar().map(|a| &a.body),
+            body: tx.project().avatar(),
             variables: &variables,
         };
         match scope.eval(name) {
@@ -315,7 +315,7 @@ impl CommandSpec for VariableRemove {
         }
         // Still used by another variable: say which.
         let scope = r3d_core::formula::Scope {
-            body: tx.project().avatar().map(|a| &a.body),
+            body: tx.project().avatar(),
             variables: &variables,
         };
         for name in variables.keys() {
@@ -340,7 +340,7 @@ impl CommandSpec for VariableRemove {
 pub struct VariableList {}
 
 impl Described for VariableList {
-    const SUMMARY: &'static str = "List the named variables, each with its formula and its value in the size drawn (`mm` for a length, `number` otherwise; none while it needs a body the project does not have), and the body's measurements formulas can use (mm).";
+    const SUMMARY: &'static str = "List the named variables, each with its formula and its value in the size drawn (`mm` for a length, `number` otherwise; none while it needs a body the project does not have), and the body's measurements formulas can use (mm: the four and the others, typed or estimated).";
 }
 
 impl crate::spec::QuerySpec for VariableList {
@@ -362,12 +362,16 @@ impl crate::spec::QuerySpec for VariableList {
             })
             .collect();
         let body = p.avatar().map(|a| {
-            serde_json::json!({
+            let mut body = serde_json::json!({
                 "height": a.body.height_cm * 10.0,
                 "bust": a.body.bust_cm * 10.0,
                 "waist": a.body.waist_cm * 10.0,
                 "hips": a.body.hips_cm * 10.0,
-            })
+            });
+            for m in r3d_core::Measure::ALL {
+                body[m.name()] = (a.measure(m).cm * 10.0).into();
+            }
+            body
         });
         Ok(serde_json::json!({ "variables": variables, "body": body }))
     }

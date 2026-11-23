@@ -165,6 +165,40 @@ Set the avatar's body: masculinity (0 feminine – 1 masculine) and height, bust
 
 </details>
 
+### `avatar.set_measures`
+
+Set the avatar's other measurements in cm by name: neck, shoulder_width, shoulder_length, back_waist_length, front_waist_length, waist_height, hip_height, crotch_depth (torso); arm_length, upper_arm, wrist (arms); inside_leg, thigh, knee, ankle (legs). Null goes back to the estimate from height, bust, waist and hips. The 3D body follows the ones it can (avatar.get says which and what it reaches); formulas and templates use them all, each size of a range graded like its estimate.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Set or reset the avatar's other measurements (spec 29).",
+  "properties": {
+    "measures": {
+      "additionalProperties": {
+        "format": "double",
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "description": "By name (`neck`, `arm_length`…): the value in cm, or null to go\nback to the estimate.",
+      "type": "object"
+    }
+  },
+  "required": [
+    "measures"
+  ],
+  "title": "AvatarSetMeasures",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `avatar.remove`
 
 Remove the avatar from the project.
@@ -5704,7 +5738,7 @@ Length (mm) along a panel contour from one point to another, walking in contour 
 
 ### `avatar.get`
 
-The avatar's requested measurements, its preset, the measurements the fitted 3D body actually reaches (they can differ slightly for extreme sizes), and the heights above the floor (cm) of its waist (narrowest girth), hips (largest girth) and crotch, to draft and place skirts and trousers (panel.place top_cm). Null when there is no avatar.
+The avatar's requested measurements, its preset, the measurements the fitted 3D body actually reaches (they can differ slightly for extreme sizes), and the heights above the floor (cm) of its waist (narrowest girth), hips (largest girth) and crotch, to draft and place skirts and trousers (panel.place top_cm). `measures`: every other measurement (neck, shoulder_width, arm_length…, as formulas name them) with its group (torso, arms, legs), its value in cm, whether it is `estimated` from the four (else typed with avatar.set_measures), whether the 3D body `follows` it, and what the built-in body `reached_cm` (null on an imported body). Null when there is no avatar.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -5950,7 +5984,7 @@ List the construction lines: each with its ends `a` and `b` (mm).
 
 ### `variable.list`
 
-List the named variables, each with its formula and its value in the size drawn (`mm` for a length, `number` otherwise; none while it needs a body the project does not have), and the body's measurements formulas can use (mm).
+List the named variables, each with its formula and its value in the size drawn (`mm` for a length, `number` otherwise; none while it needs a body the project does not have), and the body's measurements formulas can use (mm: the four and the others, typed or estimated).
 
 <details><summary>Parameters (JSON schema)</summary>
 

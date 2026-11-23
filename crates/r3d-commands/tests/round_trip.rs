@@ -55,12 +55,18 @@ fn every_command_round_trips() {
     let body =
         json!({"masculinity": 0, "height_cm": 168, "bust_cm": 90, "waist_cm": 73, "hips_cm": 98});
     h.round_trip(json!({"type": "avatar.set", "body": body, "preset": "Women M"}));
+    h.round_trip(json!({"type": "avatar.set_measures",
+        "measures": {"neck": 37.5, "arm_length": 58}}));
+    h.round_trip(json!({"type": "avatar.set_measures", "measures": {"neck": null}}));
     h.round_trip(json!({"type": "avatar.remove"}));
 
     // An imported body: the built-in one written as an OBJ, read into
     // memory as `avatar.import` does.
-    let form =
-        r3d_commands::drape::Form::of_body(&serde_json::from_value(body.clone()).unwrap()).unwrap();
+    let form = r3d_commands::drape::Form::of_body(
+        &serde_json::from_value(body.clone()).unwrap(),
+        &Default::default(),
+    )
+    .unwrap();
     let mut obj = String::new();
     for p in &form.positions {
         obj += &format!(

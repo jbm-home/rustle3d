@@ -407,6 +407,131 @@ class LFr extends L {
   }
 
   @override
+  String get bodyMore => 'Plus de mesures';
+
+  @override
+  String get bodyMoreHint =>
+      'Estimées à partir des quatre ci-dessus tant que vous ne saisissez pas les vôtres.';
+
+  @override
+  String get bodyTorso => 'Torse';
+
+  @override
+  String get bodyArms => 'Bras';
+
+  @override
+  String get bodyLegs => 'Jambes';
+
+  @override
+  String get measEstimated => 'estimée';
+
+  @override
+  String get measReset => 'Revenir à l\'estimation';
+
+  @override
+  String get measNeck => 'Tour de cou';
+
+  @override
+  String get measNeckHint => 'Autour de la base du cou';
+
+  @override
+  String get measShoulderWidth => 'Carrure dos';
+
+  @override
+  String get measShoulderWidthHint =>
+      'En ligne droite dans le dos, d\'une pointe d\'épaule à l\'autre';
+
+  @override
+  String get measShoulderLength => 'Longueur d\'épaule';
+
+  @override
+  String get measShoulderLengthHint =>
+      'Du côté du cou à la pointe de l\'épaule';
+
+  @override
+  String get measBackWaistLength => 'Longueur taille dos';
+
+  @override
+  String get measBackWaistLengthHint =>
+      'De la nuque à la taille, le long de la colonne';
+
+  @override
+  String get measFrontWaistLength => 'Longueur taille devant';
+
+  @override
+  String get measFrontWaistLengthHint =>
+      'Du côté du cou à la taille, en passant par la pointe de poitrine';
+
+  @override
+  String get measWaistHeight => 'Hauteur de taille';
+
+  @override
+  String get measWaistHeightHint => 'De la taille au sol';
+
+  @override
+  String get measHipHeight => 'Hauteur de hanches';
+
+  @override
+  String get measHipHeightHint => 'Du plus fort des hanches au sol';
+
+  @override
+  String get measCrotchDepth => 'Montant';
+
+  @override
+  String get measCrotchDepthHint =>
+      'De la taille à l\'entrejambe (assis : jusqu\'à la chaise)';
+
+  @override
+  String get measArmLength => 'Longueur de bras';
+
+  @override
+  String get measArmLengthHint =>
+      'De la pointe de l\'épaule à l\'os du poignet, coude plié';
+
+  @override
+  String get measUpperArm => 'Tour de bras';
+
+  @override
+  String get measUpperArmHint => 'Autour du haut du bras, au plus fort';
+
+  @override
+  String get measWrist => 'Tour de poignet';
+
+  @override
+  String get measWristHint => 'Autour du poignet';
+
+  @override
+  String get measInsideLeg => 'Entrejambe';
+
+  @override
+  String get measInsideLegHint =>
+      'De l\'entrejambe au sol, à l\'intérieur de la jambe';
+
+  @override
+  String get measThigh => 'Tour de cuisse';
+
+  @override
+  String get measThighHint =>
+      'Autour de la cuisse au plus fort, juste sous l\'entrejambe';
+
+  @override
+  String get measKnee => 'Tour de genou';
+
+  @override
+  String get measKneeHint => 'Autour du genou';
+
+  @override
+  String get measAnkle => 'Tour de cheville';
+
+  @override
+  String get measAnkleHint => 'Juste au-dessus de l\'os de la cheville';
+
+  @override
+  String measAvatarReaches(String value) {
+    return 'L\'avatar mesure $value : son corps ne peut pas aller plus loin.';
+  }
+
+  @override
   String get allProjects => 'Tous les projets';
 
   @override

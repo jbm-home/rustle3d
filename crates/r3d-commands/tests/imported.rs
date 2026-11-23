@@ -22,7 +22,7 @@ fn women_m() -> Body {
 
 /// The built-in body (m, Y up, facing +Z) and its triangles.
 fn builtin() -> (Vec<Vec3>, Vec<[u32; 3]>) {
-    let form = Form::of_body(&women_m()).unwrap();
+    let form = Form::of_body(&women_m(), &Default::default()).unwrap();
     (form.positions.clone(), form.triangles.clone())
 }
 
@@ -110,7 +110,9 @@ fn a_body_in_other_units_axes_and_facings_comes_back_the_same() {
         assert!(p["distance_mm"].as_f64().unwrap() < 0.0, "{p}");
     }
     // Measured like the built-in body measures itself.
-    let achieved = r3d_commands::queries::fitted(&women_m()).unwrap().achieved;
+    let achieved = r3d_commands::queries::fitted(&women_m(), &Default::default())
+        .unwrap()
+        .achieved;
     let body: Body = serde_json::from_value(out["body"].clone()).unwrap();
     for (got, want) in [
         (body.height_cm, achieved.height_cm),

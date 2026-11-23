@@ -42,39 +42,14 @@ maintainer's briefs that specs cite as "ROADMAP Mxx" in their
 | M21 | Textures and prints ✅ (2026-11-19) | A striped shirt whose stripes follow the grainline on every piece |
 | M31 | Imported avatars ✅ (2026-11-19) | A body scan in OBJ/glTF is checked, the pieces placed around it and draped |
 | M15 | Game-ready export ✅ (2026-11-19) | LODs + baked wrinkle normal maps + skinning, imported in Godot/Unity/Unreal |
-| M33 | Body measurements | A project made with four measurements; later its arm length and neck are set, the avatar and a sleeve drafted from `arm_length` follow |
+| M33 | Body measurements ✅ (2026-11-23) | A project made with four measurements; later its arm length and neck are set, the avatar and a sleeve drafted from `arm_length` follow |
 | M34 | Construction details 2 | A cuff gathered by elastic, a topstitched yoke, a collar that stands thanks to its interfacing, a quilted panel |
 | M35 | Sketch mode | A half bodice drawn and constrained without the inspector: what fits the selection is offered over the board, one click applies it |
 | M36 | Natural motions | The walk looks human: no hop, a supple trunk, relaxed arms |
 | M37 | Imported avatars in motion, game export checked | A scanned body walks in its garment; the garment and its motion open in a game engine as exported |
 
-Order of the next ones, as set by the maintainer on 2026-11-23: M33,
-M34, M35, M36, M37 (M16's Linux part when the work moves to Linux).
-
-## M33 — Body measurements
-
-Maintainer's brief (2026-11-23): more body measurements (the parametric
-open point of M28: neck, shoulder, arm…), with care for the user's
-experience. Creating a project must not ask for all these values; they
-can be set or changed afterwards.
-
-- A fuller set of measurements, each with a plain definition and a
-  figure of where the tape goes: neck, shoulder width, shoulder length,
-  arm length, upper arm and wrist, back and front waist length, waist
-  and hip heights, crotch depth, inside leg, thigh, knee, ankle.
-- At creation nothing changes: a preset or the four measurements of
-  today. Every other measurement is estimated from them (and the
-  body), shown as estimated until the user types their own; one click
-  brings an estimate back.
-- A body panel to view and change them, grouped (torso, arms, legs),
-  reachable from the avatar at any time; changing one redrafts like the
-  four of today (spec 20). The avatar follows the ones its body can
-  take; one it cannot reach shows the gap.
-- Formulas name them (spec 20); every size of a range has them (spec
-  18), estimated the same way; templates use them where they help (a
-  sleeve from the arm length, a neckline from the neck).
-- Commands, schema migration and golden files as usual; agents and the
-  CLI set and reset them.
+Order of the next ones, as set by the maintainer on 2026-11-23: M34,
+M35, M36, M37 (M16's Linux part when the work moves to Linux).
 
 ## M34 — Construction details 2
 
@@ -180,9 +155,19 @@ As noted when each milestone closed; recheck before taking one up.
 - **Grading (M22)**: notches graded on their own; an ASTM rule table
   (`.rul`) and grading read from imported files; a graded template
   takes about 6 s to add on 9 sizes.
-- **Parametric (M28)** (body measurements: see M33): Seamly2D/Valentina steps `parallelCurve`, `graduatedCurve`,
+- **Parametric (M28)**: Seamly2D/Valentina steps `parallelCurve`, `graduatedCurve`,
   `ellipticalArcWithLength` and the union of pieces; seam allowances
   that change along the outline.
+- **Body measurements (M33)**: the other measurements in the user's
+  own presets; Seamly2D/Valentina measurement files giving them
+  (`neck_base_circ`… still become variables); wrist, knee, ankle, front
+  waist length, waist height and crotch depth on the 3D body (no
+  MakeHuman targets in the pack: `measure-wrist-circ` and the like could
+  be added); the body model's own proportions, which the estimates copy,
+  are short in the arm (51 cm for a 168 cm woman, about 58 usual) and
+  thin at the wrist, knee and ankle; the shirt's sleeve is `arm_length -
+  2 cm` because the whole length let a tucked shirt show through the
+  trousers.
 - **Several garments (M19)**: edge–edge contacts between garments, and
   point–triangle contacts within a garment (its own folds stay a
   particle diameter apart); on the GPU a shirt and trousers step in

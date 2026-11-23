@@ -280,6 +280,13 @@ fn sample() -> Project {
             .into_iter()
             .collect(),
         }),
+        // Measurements typed besides the four (v20).
+        measures: [
+            (r3d_core::Measure::Neck, 36.0),
+            (r3d_core::Measure::ArmLength, 58.5),
+        ]
+        .into_iter()
+        .collect(),
     }));
     let size = |name: &str, bust_cm: f64| Size {
         name: name.into(),

@@ -21,6 +21,9 @@ use crate::error::{CommandError, Invalid, finite};
 use crate::spec::{Described, QuerySpec};
 use crate::workspace::{Workspace, WorkspaceError};
 
+/// Below this (cm) a length over a whole centimetre is rounding noise.
+const YARDAGE_NOISE_CM: f64 = 1e-6;
+
 /// Fabric width of a marker when neither it nor the garment gives one
 /// (mm): the most common width of woven fabric.
 pub const DEFAULT_WIDTH_MM: f64 = 1500.0;
@@ -523,7 +526,9 @@ pub fn compute(project: &Project, spec: &MarkerSpec) -> Result<Marker, CommandEr
         });
     }
     let length = layout.length;
-    let yardage_m = (length / 10.0).ceil() / 100.0;
+    // Rounded up to the centimetre, past rounding noise: a length of
+    // 3000.0000004 mm is 3.00 m, not 3.01.
+    let yardage_m = (length / 10.0 - YARDAGE_NOISE_CM).ceil() / 100.0;
     let price = garment.fabric_details.price_per_m;
     Ok(Marker {
         garment: gid,

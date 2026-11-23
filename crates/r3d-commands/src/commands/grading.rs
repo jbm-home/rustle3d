@@ -406,6 +406,7 @@ impl CommandSpec for GradingUseChart {
                 body: *base_body,
                 preset: None,
                 mesh: None,
+                measures: Default::default(),
             }));
         }
         let sizes: Vec<SizeSpec> = range

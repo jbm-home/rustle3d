@@ -3,13 +3,16 @@
 //! Stature is matched exactly by scaling; its proportions come from the
 //! stature targets. Bust, waist and hips are matched by a regularised
 //! Gauss–Newton search over the body weight and the three girth targets,
-//! with a numerical Jacobian (our own method).
+//! with a numerical Jacobian. The other measurements the user typed that
+//! the model can follow ([`FOLLOWED`]) are then matched one at a time by
+//! a secant search on their targets, and the girths fitted again; twice
+//! (our own method).
 
 use glam::Vec3;
-use r3d_core::Body;
+use r3d_core::{Body, Measure, Measures};
 
 use crate::measure::{Measurements, measure};
-use crate::model::{BodyModel, BodyShape, MAX_EXTRAPOLATION, Shaped};
+use crate::model::{BodyModel, BodyShape, FOLLOWED, MAX_EXTRAPOLATION, Shaped};
 
 /// A fitted body.
 #[derive(Debug, Clone, PartialEq)]
@@ -98,10 +101,93 @@ fn solve4(mut a: [[f32; 4]; 4], mut b: [f32; 4]) -> Option<[f32; 4]> {
 
 /// Find the shape that best matches `spec`.
 pub fn fit(model: &BodyModel, spec: &Body) -> Fit {
+    fit_with(model, spec, [0.0; FOLLOWED.len()])
+}
+
+/// Rounds of following the typed measurements then fitting the girths
+/// again (lengthening a leg shortens the rest once scaled to the height).
+const ROUNDS: usize = 2;
+const SECANT_STEPS: usize = 6;
+/// A followed measurement this close (cm) is reached.
+const FOLLOW_TOLERANCE_CM: f32 = 0.2;
+/// The secant search's first step on a target's weight.
+const FIRST_STEP: f32 = 0.3;
+
+/// Find the shape that best matches `spec` and the measurements typed
+/// besides (cm) that the body model can follow; the others it keeps as
+/// it has them.
+pub fn fit_typed(model: &BodyModel, spec: &Body, typed: &Measures) -> Fit {
+    let goals: Vec<(usize, Measure, f32)> = FOLLOWED
+        .iter()
+        .enumerate()
+        .filter_map(|(i, (m, _))| Some((i, *m, *typed.get(m)? as f32)))
+        .collect();
+    let mut followed = [0.0; FOLLOWED.len()];
+    let mut f = fit_with(model, spec, followed);
+    if goals.is_empty() {
+        return f;
+    }
+    for _ in 0..ROUNDS {
+        for &(i, m, want) in &goals {
+            if let Some(slot) = followed.get_mut(i) {
+                *slot = follow(model, &f, i, m, want);
+            }
+        }
+        f = fit_with(model, spec, followed);
+    }
+    f
+}
+
+/// The weight of followed target `i` that gives `m` the value `want`
+/// (cm), the rest of `f` as it is; the best found if none does.
+fn follow(model: &BodyModel, f: &Fit, i: usize, m: Measure, want: f32) -> f32 {
+    let height = f.achieved.height_cm / 100.0;
+    let at = |u: f32| {
+        let mut shape = f.shape;
+        if let Some(slot) = shape.followed.get_mut(i) {
+            *slot = u;
+        }
+        let mut shaped = model.shaped(&shape);
+        let top = shaped.positions.iter().map(|p| p.y).fold(0.0, f32::max);
+        let k = if top > 0.0 { height / top } else { 1.0 };
+        for p in shaped.positions.iter_mut().chain(&mut shaped.joints) {
+            *p *= k;
+        }
+        crate::tape::take(model, &shaped, m)
+    };
+    let mut u0 = f.shape.followed.get(i).copied().unwrap_or_default();
+    let Some(mut v0) = at(u0) else {
+        return u0;
+    };
+    let mut best = (u0, (v0 - want).abs());
+    let step = if v0 < want { FIRST_STEP } else { -FIRST_STEP };
+    let mut u1 = (u0 + step).clamp(-1.0, MAX_EXTRAPOLATION);
+    for _ in 0..SECANT_STEPS {
+        if best.1 < FOLLOW_TOLERANCE_CM || u1 == u0 {
+            break;
+        }
+        let Some(v1) = at(u1) else {
+            break;
+        };
+        if (v1 - want).abs() < best.1 {
+            best = (u1, (v1 - want).abs());
+        }
+        if (v1 - v0).abs() < 1e-4 {
+            break;
+        }
+        let u2 = (u1 - (v1 - want) * (u1 - u0) / (v1 - v0)).clamp(-1.0, MAX_EXTRAPOLATION);
+        (u0, v0, u1) = (u1, v1, u2);
+    }
+    best.0
+}
+
+/// [`fit`] with the followed targets at `followed`.
+fn fit_with(model: &BodyModel, spec: &Body, followed: [f32; FOLLOWED.len()]) -> Fit {
     let height_cm = spec.height_cm as f32;
     // Stature proportions: interpolate between the short and tall targets.
     let neutral = BodyShape {
         masculinity: (spec.masculinity as f32).clamp(0.0, 1.0),
+        followed,
         ..BodyShape::default()
     };
     let height_of = |stature: f32| {

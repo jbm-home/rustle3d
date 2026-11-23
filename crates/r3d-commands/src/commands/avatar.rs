@@ -1,4 +1,6 @@
-use r3d_core::{Avatar, AvatarMesh, Body, BodyPoint, Transaction, UpAxis};
+use std::collections::BTreeMap;
+
+use r3d_core::{Avatar, AvatarMesh, Body, BodyPoint, Measure, Transaction, UpAxis};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -51,17 +53,65 @@ impl CommandSpec for AvatarSet {
         }
         // An imported body stays: these measurements only size templates
         // and formulas then.
-        let mesh = tx.project().avatar().and_then(|a| a.mesh.clone());
+        // The measurements typed besides the four stay too.
+        let current = tx.project().avatar();
+        let mesh = current.and_then(|a| a.mesh.clone());
+        let measures = current.map(|a| a.measures.clone()).unwrap_or_default();
         tx.set_avatar(Some(Avatar {
             body: self.body,
             preset: self.preset.as_deref().map(str::trim).map(str::to_owned),
             mesh,
+            measures,
         }));
         Ok(CommandOutput::default())
     }
 
     fn merge_key(&self) -> Option<String> {
         Some("avatar.set".into())
+    }
+}
+
+/// Set or reset the avatar's other measurements (spec 29).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AvatarSetMeasures {
+    /// By name (`neck`, `arm_length`…): the value in cm, or null to go
+    /// back to the estimate.
+    pub measures: BTreeMap<Measure, Option<f64>>,
+}
+
+impl Described for AvatarSetMeasures {
+    const SUMMARY: &'static str = "Set the avatar's other measurements in cm by name: neck, shoulder_width, shoulder_length, back_waist_length, front_waist_length, waist_height, hip_height, crotch_depth (torso); arm_length, upper_arm, wrist (arms); inside_leg, thigh, knee, ankle (legs). Null goes back to the estimate from height, bust, waist and hips. The 3D body follows the ones it can (avatar.get says which and what it reaches); formulas and templates use them all, each size of a range graded like its estimate.";
+}
+
+impl CommandSpec for AvatarSetMeasures {
+    fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        if self.measures.is_empty() {
+            return Err(CommandError::invalid("measures", Invalid::Empty));
+        }
+        let mut avatar = tx
+            .project()
+            .avatar()
+            .cloned()
+            .ok_or_else(|| CommandError::invalid("measures", Invalid::NoBody))?;
+        for (m, value) in &self.measures {
+            match value {
+                Some(cm) => {
+                    in_range(m.name(), *cm, m.range_cm())?;
+                    avatar.measures.insert(*m, *cm);
+                }
+                None => {
+                    avatar.measures.remove(m);
+                }
+            }
+        }
+        tx.set_avatar(Some(avatar));
+        Ok(CommandOutput::default())
+    }
+
+    fn merge_key(&self) -> Option<String> {
+        let names: Vec<&str> = self.measures.keys().map(|m| m.name()).collect();
+        Some(format!("avatar.set_measures:{}", names.join(",")))
     }
 }
 
@@ -108,10 +158,16 @@ fn use_mesh(tx: &mut Transaction<'_>, mut mesh: AvatarMesh) -> Result<(), Comman
     let placed = crate::bodies::placed(&mesh)?;
     mesh.points = crate::bodies::guess_points(&placed);
     let (body, _) = crate::bodies::measure(&placed, &mesh.points);
+    let measures = tx
+        .project()
+        .avatar()
+        .map(|a| a.measures.clone())
+        .unwrap_or_default();
     tx.set_avatar(Some(Avatar {
         body,
         preset: None,
         mesh: Some(mesh),
+        measures,
     }));
     Ok(())
 }

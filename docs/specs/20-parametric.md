@@ -12,8 +12,9 @@ measurements (the points the formulas move get their grades from them).
 Project files: schema v12 (`variables`). The app: a formula button on
 each dimension in the inspector, a Variables section (nothing selected).
 
-Not yet: other body measurements than height, bust, waist and hips
-(neck, shoulder, arm length…); formulas on grade rules. Seamly2D and
+Since M33 (2026-11-23, spec 29) formulas also name fifteen other
+measurements (`neck`, `arm_length`…), typed or estimated. Not yet:
+formulas on grade rules. Seamly2D and
 Valentina patterns and measurement files come in through spec 28
 (2026-11-20): their own drafting steps are run for each body, not turned
 into constraints. Since M32 (2026-11-18) a formula can also be typed in place of
@@ -30,7 +31,7 @@ the rest of what I fixed (lengths, angles) stays.
 - **Formulas.** Arithmetic (`+ - * /`, parentheses, `min`, `max`, `abs`,
   `sqrt`) on numbers with units (`mm`, `cm`, `m`, `in`; `deg` or none for
   plain numbers), the body's measurements (`height`, `bust`, `waist`,
-  `hips`, as lengths) and named variables. Units are checked as the
+  `hips` and those of spec 29, as lengths) and named variables. Units are checked as the
   formula is computed: lengths add to lengths, `waist / 4` is a length,
   `waist + 2` is refused. A distance's or a length's formula must give a
   positive length, an angle's a plain number from 0 to 180 (degrees).

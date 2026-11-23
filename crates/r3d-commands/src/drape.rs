@@ -800,14 +800,20 @@ impl Form {
         if let Some(mesh) = project.avatar().and_then(|a| a.mesh.as_ref()) {
             return Ok(Some(crate::bodies::form(mesh)?.as_ref().clone()));
         }
-        project.shown_body().map(|b| Self::of_body(&b)).transpose()
+        project
+            .shown_avatar()
+            .map(|a| Self::of_body(&a.body, &a.measures))
+            .transpose()
     }
 
-    /// The built-in body fitted to `body`, with its skeleton (seconds the
-    /// first time).
-    pub fn of_body(body: &r3d_core::Body) -> Result<Self, CommandError> {
+    /// The built-in body fitted to `body` and the measurements typed
+    /// besides, with its skeleton (seconds the first time).
+    pub fn of_body(
+        body: &r3d_core::Body,
+        typed: &r3d_core::Measures,
+    ) -> Result<Self, CommandError> {
         let model = body_model()?;
-        let shaped = fitted_body(model, &fitted(body)?);
+        let shaped = fitted_body(model, &fitted(body, typed)?);
         let skeleton = Skeleton::new(model, &shaped);
         let arms = clearance::Arms::new(&skeleton, &shaped.positions, model.weights());
         let rig = Rig {
@@ -835,7 +841,7 @@ pub(crate) fn arm_drop(project: &Project) -> Result<f64, CommandError> {
     let arm = match project.avatar() {
         Some(avatar) => {
             let model = body_model()?;
-            let positions = fitted_positions(model, &fitted(&avatar.body)?);
+            let positions = fitted_positions(model, &fitted(&avatar.body, &avatar.measures)?);
             let height = positions.iter().map(|p| p.y).fold(0.0, f32::max);
             Arm::find(&positions, height, 1.0)
         }

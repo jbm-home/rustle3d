@@ -110,7 +110,7 @@ fn a_t_shirt_drapes_on_an_imported_body_on_the_gpu() {
     let body: r3d_core::Body = serde_json::from_value(json!({"masculinity": 0,
         "height_cm": 168, "bust_cm": 90, "waist_cm": 73, "hips_cm": 98}))
     .unwrap();
-    let form = Form::of_body(&body).unwrap();
+    let form = Form::of_body(&body, &Default::default()).unwrap();
     let mut obj = String::new();
     for p in &form.positions {
         obj += &format!(

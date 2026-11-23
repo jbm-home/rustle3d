@@ -24,7 +24,7 @@ pub(crate) fn waist_height_cm(p: &Project) -> Result<f64, CommandError> {
     {
         return Ok(waist[1] / 10.0);
     }
-    let fit = crate::queries::fitted(&avatar.body)?;
+    let fit = crate::queries::fitted(&avatar.body, &avatar.measures)?;
     Ok(f64::from(fit.achieved.waist_height_cm))
 }
 

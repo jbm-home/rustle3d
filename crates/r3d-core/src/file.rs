@@ -20,7 +20,7 @@ use crate::model::Project;
 /// Identifies a Rustle3D project file.
 pub const FORMAT: &str = "rustle3d.project";
 /// Version written by this build.
-pub const SCHEMA_VERSION: u32 = 19;
+pub const SCHEMA_VERSION: u32 = 20;
 
 type Migration = fn(Value) -> Result<Value, FileError>;
 
@@ -44,6 +44,7 @@ const MIGRATIONS: &[Migration] = &[
     migrate_v16_to_v17,
     migrate_v17_to_v18,
     migrate_v18_to_v19,
+    migrate_v19_to_v20,
 ];
 
 fn object<'a>(
@@ -53,6 +54,72 @@ fn object<'a>(
     value.as_object_mut().ok_or_else(|| FileError::Json {
         detail: format!("{what} is not an object"),
     })
+}
+
+/// v20 adds the avatar's other measurements (`measures`, absent: all
+/// estimated) and with them new names in formulas (`neck`, `arm_length`…,
+/// spec 29): a variable that had one of these names is renamed `my_<name>`
+/// (`my_my_<name>`… if that is taken too), and every formula naming it
+/// follows.
+fn migrate_v19_to_v20(mut project: Value) -> Result<Value, FileError> {
+    let p = object(&mut project, "project")?;
+    let Some(Value::Object(vars)) = p.get("variables") else {
+        return Ok(project);
+    };
+    let mut renames = Vec::new();
+    for name in vars.keys() {
+        if crate::Measure::from_name(name).is_some() {
+            let mut to = format!("my_{name}");
+            while vars.contains_key(&to) || crate::Measure::from_name(&to).is_some() {
+                to = format!("my_{to}");
+            }
+            renames.push((name.clone(), to));
+        }
+    }
+    if renames.is_empty() {
+        return Ok(project);
+    }
+    let rename = |text: &str| {
+        renames.iter().fold(text.to_owned(), |t, (from, to)| {
+            crate::formula::rename(&t, from, to)
+        })
+    };
+    if let Some(Value::Object(vars)) = p.get_mut("variables") {
+        let old = std::mem::take(vars);
+        for (name, formula) in old {
+            let name = renames
+                .iter()
+                .find(|(from, _)| *from == name)
+                .map_or(name, |(_, to)| to.clone());
+            let formula = match formula {
+                Value::String(f) => Value::String(rename(&f)),
+                other => other,
+            };
+            vars.insert(name, formula);
+        }
+    }
+    if let Some(Value::Object(constraints)) = p.get_mut("constraints") {
+        for c in constraints.values_mut() {
+            rename_formulas(c, &rename);
+        }
+    }
+    Ok(project)
+}
+
+/// Rename in every `formula` string under `value`.
+fn rename_formulas(value: &mut Value, rename: &dyn Fn(&str) -> String) {
+    match value {
+        Value::Object(map) => {
+            for (k, v) in map.iter_mut() {
+                match v {
+                    Value::String(f) if k == "formula" => *f = rename(f),
+                    _ => rename_formulas(v, rename),
+                }
+            }
+        }
+        Value::Array(items) => items.iter_mut().for_each(|v| rename_formulas(v, rename)),
+        _ => {}
+    }
 }
 
 /// v19 adds a garment's parametric source pattern (absent: none).
@@ -375,6 +442,29 @@ pub fn from_json(text: &str) -> Result<LoadedProject, FileError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn v20_renames_variables_named_like_a_measurement() {
+        let v19 = serde_json::json!({
+            "variables": {
+                "neck": "38 cm",
+                "my_neck": "1 cm",
+                "collar": "neck / 2 + my_neck",
+            },
+            "constraints": { "constraint:1": {
+                "kind": "distance", "mm": 190.0, "formula": "neck/2 - 5 mm"
+            } },
+        });
+        let p = &migrate_v19_to_v20(v19).unwrap();
+        assert_eq!(p["variables"]["my_my_neck"], "38 cm");
+        assert_eq!(p["variables"]["my_neck"], "1 cm");
+        assert_eq!(p["variables"]["collar"], "my_my_neck / 2 + my_neck");
+        assert!(p["variables"].get("neck").is_none());
+        assert_eq!(
+            p["constraints"]["constraint:1"]["formula"],
+            "my_my_neck/2 - 5 mm"
+        );
+    }
 
     #[test]
     fn round_trip_new_project() {

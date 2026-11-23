@@ -2,6 +2,8 @@
 
 use glam::Vec3;
 
+use r3d_core::Measure;
+
 use crate::measure::Landmarks;
 use crate::pack::{BodyPack, Bone, Influences, PackError, Target};
 
@@ -28,6 +30,20 @@ impl Girth {
     }
 }
 
+/// The measurements besides the four that the body model can follow
+/// (spec 29), each with the stems of the targets that change it (both
+/// moved together: an arm is lengthened above and below the elbow).
+pub const FOLLOWED: [(Measure, &[&str]); 8] = [
+    (Measure::Neck, &["neck-circ"]),
+    (Measure::ShoulderWidth, &["shoulder-dist"]),
+    (Measure::ArmLength, &["upperarm-length", "lowerarm-length"]),
+    (Measure::UpperArm, &["upperarm-circ"]),
+    (Measure::BackWaistLength, &["napetowaist-dist"]),
+    (Measure::HipHeight, &["waisttohip-dist"]),
+    (Measure::InsideLeg, &["upperleg-height", "lowerleg-height"]),
+    (Measure::Thigh, &["thigh-circ"]),
+];
+
 /// Shape parameters. All are dimensionless; `0` is the neutral base body.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct BodyShape {
@@ -40,6 +56,9 @@ pub struct BodyShape {
     /// Local girth adjustments, -1..1 (up to [`MAX_EXTRAPOLATION`]), in
     /// [`Girth::ALL`] order.
     pub girths: [f32; 3],
+    /// Adjustments of the measurements of [`FOLLOWED`], in its order,
+    /// -1..1 (up to [`MAX_EXTRAPOLATION`]).
+    pub followed: [f32; FOLLOWED.len()],
 }
 
 /// Targets are linear, so they can be pushed past their authored range to
@@ -193,6 +212,15 @@ impl BodyModel {
                 &format!("measure-{stem}-incr"),
             );
             list.extend(pick(pair, value, 1.0));
+        }
+        for ((_, stems), value) in FOLLOWED.iter().zip(shape.followed) {
+            for stem in *stems {
+                let pair = self.signed(
+                    &format!("measure-{stem}-decr"),
+                    &format!("measure-{stem}-incr"),
+                );
+                list.extend(pick(pair, value, 1.0));
+            }
         }
         list.retain(|(_, w)| *w != 0.0);
         list

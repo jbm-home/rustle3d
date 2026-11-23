@@ -9,6 +9,8 @@
 //! - [`model`]: shape parameters → vertex positions.
 //! - [`measure`]: stature and girths, measured like a tailor would.
 //! - [`fit`]: the shape that matches given measurements.
+//! - [`tape`]: every measurement of a body (neck, shoulders, arms,
+//!   legs…).
 //! - [`presets`]: built-in sizes and the user's own presets.
 //! - [`skeleton`]: the body's bones, poses and skinning.
 //! - [`motion`]: walking, turning, raising the arms, captured motions.
@@ -27,3 +29,4 @@ pub mod motion_library;
 pub mod pack;
 pub mod presets;
 pub mod skeleton;
+pub mod tape;

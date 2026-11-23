@@ -10,6 +10,7 @@ use glam::{DVec2, DVec3};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::body::{Measure, Measures};
 use crate::id::{
     ButtonId, ConstraintId, EdgeId, GarmentId, GuideId, InternalLineId, NotchId, PanelId, PinId,
     PointId, SeamId, ZipperId,
@@ -313,6 +314,17 @@ pub struct Avatar {
     /// fitted to `body`; `body` then holds measurements taken on it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mesh: Option<crate::imported::AvatarMesh>,
+    /// The other measurements the user typed (cm, spec 29): neck, arm
+    /// length… Those left out are estimated from `body`.
+    #[serde(default, skip_serializing_if = "Measures::is_empty")]
+    pub measures: Measures,
+}
+
+impl Avatar {
+    /// Every measurement besides the four of `body`: typed or estimated.
+    pub fn measure(&self, m: Measure) -> crate::body::MeasureValue {
+        crate::body::value(&self.body, &self.measures, m)
+    }
 }
 
 /// A group of panels worn together, in one fabric and colour. A project
@@ -960,7 +972,7 @@ impl Project {
     /// and the variables.
     pub fn formula_scope(&self) -> crate::formula::Scope<'_> {
         crate::formula::Scope {
-            body: self.avatar.as_ref().map(|a| &a.body),
+            body: self.avatar.as_ref(),
             variables: &self.variables,
         }
     }

@@ -13,8 +13,8 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use rayon::prelude::*;
 
 use r3d_core::{
-    AnyId, Around, Avatar, Body, Edge, EdgeCurve, EdgeId, Fabric, Garment, GarmentId, PanelId,
-    Point, Project, TemplateRef, Transaction,
+    AnyId, Around, Avatar, Body, Edge, EdgeCurve, EdgeId, Fabric, Garment, GarmentId, Measure,
+    PanelId, Point, Project, TemplateRef, Transaction,
 };
 use r3d_geom::{CubicBez, DVec2};
 use schemars::JsonSchema;
@@ -145,6 +145,17 @@ const STANDARD: Body = Body {
     hips_cm: 98.0,
 };
 
+/// The avatar templates are drafted for: the project's, or one of the
+/// standard size without one.
+fn avatar_of(p: &Project) -> Avatar {
+    p.avatar().cloned().unwrap_or(Avatar {
+        body: STANDARD,
+        preset: None,
+        mesh: None,
+        measures: Default::default(),
+    })
+}
+
 /// Garment proportions, as fractions of stature (general anthropometry
 /// for adults, in the base body's A pose).
 const NECK_HEIGHT: f64 = 0.855;
@@ -182,8 +193,9 @@ impl Upper {
     /// The upper body of `p`'s avatar: its measured body fitted (an
     /// imported body's measurements, too).
     fn of(p: &Project) -> Result<Self, CommandError> {
-        let body = p.avatar().map_or(STANDARD, |a| a.body);
-        let fit = crate::queries::fitted(&body)?;
+        // The body follows a typed neck and shoulder width (spec 29).
+        let avatar = avatar_of(p);
+        let fit = crate::queries::fitted(&avatar.body, &avatar.measures)?;
         r3d_avatar::fit::upper_body(crate::queries::body_model()?, &fit)
             .map(Self)
             .ok_or_else(|| internal("the body's shoulders and neck were not found".into()))
@@ -210,15 +222,25 @@ impl Upper {
     }
 }
 
+/// A shirt's sleeve (cuff included) ends this much short of the arm's
+/// length (cm). The whole arm's length, 2 cm more than before on the
+/// women's M, let a tucked shirt show through the trousers' waist after
+/// the drape (`a_shirt_under_trousers_is_tucked_in`).
+const LONG_SLEEVE_SHORT_CM: f64 = 2.0;
+
+/// A T-shirt's sleeve, as a fraction of the arm's length.
+const SHORT_SLEEVE: f64 = 0.4;
+
 /// Trousers end this far above the floor by default (cm): their length
 /// is the waist's height less this. A fraction of the stature left the
 /// hem on the floor of one body and 19 cm above it on another.
 const TROUSER_HEM_CM: f64 = 4.0;
 
 impl Sizes {
-    /// Every size `template` reads, filled in from `body`, whose waist (its
-    /// narrowest girth) is `waist_height_cm` above the floor.
-    pub fn resolve(self, template: Template, body: &Body, waist_height_cm: f64) -> Sizes {
+    /// Every size `template` reads, filled in from `avatar`, whose waist
+    /// (its narrowest girth) is `waist_height_cm` above the floor.
+    pub fn resolve(self, template: Template, avatar: &Avatar, waist_height_cm: f64) -> Sizes {
+        let body = &avatar.body;
         let h = body.height_cm;
         let (length, ease) = match template {
             Template::StraightSkirt => (0.33 * h, 2.0),
@@ -229,9 +251,12 @@ impl Sizes {
             Template::Dress => (0.55 * h, 8.0),
             Template::ToteBag => (40.0, 0.0),
         };
+        // A long sleeve ends just above the wrist, a short one at mid
+        // upper arm.
+        let arm = avatar.measure(Measure::ArmLength).cm;
         let sleeve = match template {
-            Template::Shirt => 0.29 * h,
-            _ => 0.12 * h,
+            Template::Shirt => arm - LONG_SLEEVE_SHORT_CM,
+            _ => SHORT_SLEEVE * arm,
         };
         let all = Sizes {
             waist_cm: Some(self.waist_cm.unwrap_or(body.waist_cm)),
@@ -270,14 +295,14 @@ pub struct TemplateInfo {
 /// Every template with its default sizes for `project`'s avatar (or the
 /// standard size).
 pub fn list(project: &Project) -> Result<Vec<TemplateInfo>, CommandError> {
-    let body = project.avatar().map_or(STANDARD, |a| a.body);
+    let avatar = avatar_of(project);
     let waist = waist_height_cm(project)?;
     Ok(Template::ALL
         .into_iter()
         .map(|t| TemplateInfo {
             template: t,
             title: t.title(),
-            sizes: Sizes::default().resolve(t, &body, waist),
+            sizes: Sizes::default().resolve(t, &avatar, waist),
         })
         .collect())
 }
@@ -759,7 +784,7 @@ fn draft_size(
     sizes: Sizes,
     i: usize,
 ) -> Result<Drafted, CommandError> {
-    let body = size_body(p, i).ok_or_else(|| internal(format!("no size {i}")))?;
+    let avatar = size_avatar(p, i).ok_or_else(|| internal(format!("no size {i}")))?;
     let size = p
         .grading()
         .and_then(|g| g.sizes.get(i))
@@ -772,11 +797,7 @@ fn draft_size(
     };
     let mut project = Project::new("");
     let mut tx = Transaction::begin(&mut project);
-    tx.set_avatar(Some(Avatar {
-        body,
-        preset: None,
-        mesh: None,
-    }));
+    tx.set_avatar(Some(avatar));
     let (_, origins) = draft_in(&mut tx, template, sizes, &[])?;
     Ok(Drafted {
         origins,
@@ -784,17 +805,24 @@ fn draft_size(
     })
 }
 
-/// The body a template is drafted for in size `i`: the avatar's (or a
-/// standard one) changed by the size's differences.
-fn size_body(p: &Project, i: usize) -> Option<Body> {
-    let body = p.avatar().map_or(STANDARD, |a| a.body);
+/// The avatar a template is drafted for in size `i`: the project's (or a
+/// standard one) changed by the size's differences, its typed
+/// measurements graded like their estimates.
+fn size_avatar(p: &Project, i: usize) -> Option<Avatar> {
+    let avatar = avatar_of(p);
     let size = p.grading()?.sizes.get(i)?;
-    Some(Body {
-        height_cm: body.height_cm + size.height_cm,
-        bust_cm: body.bust_cm + size.bust_cm,
-        waist_cm: body.waist_cm + size.waist_cm,
-        hips_cm: body.hips_cm + size.hips_cm,
-        ..body
+    let body = Body {
+        height_cm: avatar.body.height_cm + size.height_cm,
+        bust_cm: avatar.body.bust_cm + size.bust_cm,
+        waist_cm: avatar.body.waist_cm + size.waist_cm,
+        hips_cm: avatar.body.hips_cm + size.hips_cm,
+        ..avatar.body
+    };
+    Some(Avatar {
+        measures: r3d_core::body::regraded(&avatar.measures, &avatar.body, &body),
+        body,
+        preset: None,
+        mesh: None,
     })
 }
 
@@ -897,8 +925,8 @@ fn draft_in(
     sizes: Sizes,
     room: &[(f64, f64)],
 ) -> Result<(Vec<AnyId>, BTreeMap<PanelId, f64>), CommandError> {
-    let body = tx.project().avatar().map_or(STANDARD, |a| a.body);
-    let sizes = sizes.resolve(template, &body, waist_height_cm(tx.project())?);
+    let avatar = avatar_of(tx.project());
+    let sizes = sizes.resolve(template, &avatar, waist_height_cm(tx.project())?);
     let fresh = tx.project().panels().is_empty();
     let x = tx
         .project()
@@ -917,12 +945,12 @@ fn draft_in(
         room,
     };
     match template {
-        Template::StraightSkirt => skirt(&mut d, &sizes, &body, 0.0)?,
-        Template::ALineSkirt => skirt(&mut d, &sizes, &body, 0.2)?,
-        Template::TShirt => t_shirt(&mut d, &sizes, &body)?,
-        Template::Shirt => shirt(&mut d, &sizes, &body)?,
-        Template::Trousers => trousers(&mut d, &sizes, &body)?,
-        Template::Dress => dress(&mut d, &sizes, &body)?,
+        Template::StraightSkirt => skirt(&mut d, &sizes, &avatar.body, 0.0)?,
+        Template::ALineSkirt => skirt(&mut d, &sizes, &avatar.body, 0.2)?,
+        Template::TShirt => t_shirt(&mut d, &sizes, &avatar.body)?,
+        Template::Shirt => shirt(&mut d, &sizes, &avatar.body)?,
+        Template::Trousers => trousers(&mut d, &sizes, &avatar.body)?,
+        Template::Dress => dress(&mut d, &sizes, &avatar.body)?,
         Template::ToteBag => tote_bag(&mut d, &sizes)?,
     }
     let fabric = match template {

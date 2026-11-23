@@ -6,13 +6,13 @@ use std::sync::Arc;
 
 use r3d_commands::CommandError;
 use r3d_commands::drape::Form;
-use r3d_core::{AvatarMesh, Body, Project};
+use r3d_core::{AvatarMesh, Body, Measures, Project};
 
 /// What a dress form is made from: the built-in body fitted to
 /// measurements, or a body imported from a file (spec 27).
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum FormKey {
-    Fitted(Body),
+    Fitted(Body, Measures),
     Imported(Box<AvatarMesh>),
 }
 
@@ -21,7 +21,9 @@ impl FormKey {
     pub(crate) fn of(project: &Project) -> Option<Self> {
         match project.avatar().and_then(|a| a.mesh.clone()) {
             Some(mesh) => Some(Self::Imported(Box::new(mesh))),
-            None => project.shown_body().map(Self::Fitted),
+            None => project
+                .shown_avatar()
+                .map(|a| Self::Fitted(a.body, a.measures)),
         }
     }
 
@@ -29,7 +31,7 @@ impl FormKey {
     /// once built).
     pub(crate) fn build(&self) -> Result<Arc<Form>, CommandError> {
         match self {
-            Self::Fitted(body) => Form::of_body(body).map(Arc::new),
+            Self::Fitted(body, typed) => Form::of_body(body, typed).map(Arc::new),
             Self::Imported(mesh) => r3d_commands::bodies::form(mesh),
         }
     }
@@ -39,7 +41,7 @@ impl FormKey {
     pub(crate) fn id(&self) -> u64 {
         use std::hash::{Hash, Hasher};
         let text = match self {
-            Self::Fitted(b) => format!("{b:?}"),
+            Self::Fitted(b, typed) => format!("{b:?}{typed:?}"),
             Self::Imported(m) => format!("{m:?}"),
         };
         let mut h = std::collections::hash_map::DefaultHasher::new();

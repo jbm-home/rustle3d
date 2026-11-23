@@ -124,6 +124,7 @@ command_registry! {
     "project.rename" => ProjectRename,
     "project.set_display_unit" => ProjectSetDisplayUnit,
     "avatar.set" => AvatarSet,
+    "avatar.set_measures" => AvatarSetMeasures,
     "avatar.remove" => AvatarRemove,
     "avatar.import_mesh" => AvatarImportMesh,
     "avatar.orient" => AvatarOrient,

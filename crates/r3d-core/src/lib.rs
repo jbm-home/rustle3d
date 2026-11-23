@@ -8,6 +8,7 @@
 //! records every entity change so that undo/redo is generic and cannot drift
 //! from what a command actually did. See `docs/architecture.md` §3–4.
 
+pub mod body;
 pub mod constraints;
 pub mod edit;
 pub mod file;
@@ -24,6 +25,7 @@ pub mod project_dir;
 pub mod seam;
 pub mod trim;
 
+pub use body::{Measure, MeasureGroup, MeasureValue, Measures};
 pub use edit::{ChangeSet, Transaction};
 pub use id::{
     AnyId, ButtonId, ConstraintId, EdgeId, GarmentId, GuideId, InternalLineId, NotchId, PanelId,

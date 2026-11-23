@@ -809,7 +809,7 @@ pub fn formula_grades(project: &Project) -> Result<FormulaGrades, Unsolvable> {
         .collect();
     for i in (0..n).filter(|i| *i != grading.base) {
         let mut sized = start.at_size(i);
-        let scope_body = sized.avatar.as_ref().map(|a| a.body);
+        let scope_body = sized.avatar.clone();
         let values: Vec<(ConstraintId, f64)> = {
             let scope = Scope {
                 body: scope_body.as_ref(),
