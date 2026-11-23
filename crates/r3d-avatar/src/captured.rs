@@ -576,7 +576,10 @@ fn best_loop(
     costs
         .into_iter()
         .filter(|c| c.2 <= worst)
-        .max_by(|a, b| (a.1 - a.0).cmp(&(b.1 - b.0)).then(b.2.total_cmp(&a.2)))
+        // The longest, then the first: every loop kept matches well, and
+        // ranking equal lengths by their cost would let rounding pick the
+        // start (a capture written in other axes would start elsewhere).
+        .max_by(|a, b| (a.1 - a.0).cmp(&(b.1 - b.0)).then(b.0.cmp(&a.0)))
         .map(|(i, j, _)| (i, j))
         .ok_or(MotionError::TooShort {
             seconds: (needed * 10.0).ceil() / 10.0,

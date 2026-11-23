@@ -76,7 +76,7 @@ whether the shirt rides up at the waist.
   - The loop is the longest stretch (at least 1 s, at most the first
     30 s) whose end matches its start, poses and speeds compared over
     seven frames, within a tenth of the way from the best match to an
-    average one; its last quarter second blends into the frames before
+    average one (of the longest, the one starting first); its last quarter second blends into the frames before
     its start. The hips' heading over the loop loses its linear trend, so
     a walk drifting into a curve faces forward and loops. The avatar
     stays on the spot (the captured travel is dropped) with its lowest
