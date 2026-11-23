@@ -5,8 +5,8 @@
 //! Ctrl+C goes to Flutter, which closes the app; this task waits for it
 //! instead of dying first and giving the prompt back over Flutter's output.
 
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::path::Path;
+use std::process::Command;
 
 /// What `run` and `build` do.
 #[derive(Clone, Copy)]
@@ -43,7 +43,7 @@ fn flutter() -> Result<Command, String> {
         .map(|dir| dir.join("flutter.bat"))
         .find(|bat| bat.is_file())
         .ok_or("flutter.bat is not in PATH (see docs/building.md)")?;
-    let root: PathBuf = bat
+    let root: std::path::PathBuf = bat
         .parent()
         .and_then(Path::parent)
         .ok_or("flutter.bat is not in Flutter's bin folder")?
@@ -51,8 +51,8 @@ fn flutter() -> Result<Command, String> {
     let mut update = Command::new(&bat);
     update
         .arg("--version")
-        .stdin(Stdio::null())
-        .stdout(Stdio::null());
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null());
     status(update)?;
     let cache = root.join("bin").join("cache");
     let mut cmd = Command::new(cache.join("dart-sdk").join("bin").join("dart.exe"));
