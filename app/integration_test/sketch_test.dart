@@ -1,8 +1,9 @@
-// Sketching on the board (spec 19): a half piece drawn with Polygon and
-// Half piece is unfolded; edges picked with a click and a ⇧-click get a
-// constraint from the inspector's chips; a dimension typed in the
-// Constraints section redraws the piece; a construction line is drawn
-// with G; an ellipse is added from the Shapes dialog.
+// Sketching on the board (specs 19, 30): a half piece drawn with Polygon
+// and Half piece is unfolded; edges picked with a click and a Ctrl-click
+// get a constraint from the action bar; a dimension added from the bar
+// opens its value field on the board, and the value typed there redraws
+// the piece; two corners get a width the same way; a construction line is
+// drawn with G; an ellipse is added from the Shapes dialog.
 
 import 'dart:convert';
 import 'dart:io';
@@ -114,30 +115,26 @@ void main() {
     await clickEdge(drawn[0]);
     await clickEdge(drawn[2], extend: true);
     expect(engine.selectedEdges(), [drawn[0]['id'], drawn[2]['id']]);
-    await tester.tap(find.widgetWithText(ActionChip, 'Parallel'));
+    await tester.tap(find.byKey(const ValueKey('bar_parallel')));
     await frames();
     var list = run({'type': 'constraint.list', 'panel': piece['id']}) as Map;
     expect((list['constraints'] as List).single['kind'], 'parallel');
 
-    // One edge: keep its length, then type a new one in the Constraints
-    // section: the piece is redrawn.
+    // One edge: Length in the bar keeps its length and opens the value
+    // field on the board; the value typed there redraws the piece.
     await clickEdge(drawn[1]);
-    await tester.tap(find.widgetWithText(ActionChip, 'Length'));
+    await tester.tap(find.byKey(const ValueKey('bar_length')));
     await frames();
     list = run({'type': 'constraint.list', 'panel': piece['id']}) as Map;
     final length = (list['constraints'] as List).firstWhere(
       (c) => c['kind'] == 'length',
     );
-    final field = find.byKey(ValueKey('${length['id']}-${length['mm']}'));
-    await tester.scrollUntilVisible(
-      field,
-      100,
-      scrollable: find.byType(Scrollable).last,
+    final field = find.descendant(
+      of: find.byKey(ValueKey('placed-${length['id']}')),
+      matching: find.byType(TextField),
     );
-    await tester.enterText(
-      find.descendant(of: field, matching: find.byType(TextField)),
-      '12',
-    );
+    expect(field, findsOneWidget);
+    await tester.enterText(field, '12');
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await frames();
     got = run({'type': 'panel.get', 'panel': piece['id']}) as Map;
@@ -160,6 +157,59 @@ void main() {
     );
     expect(byFormula['length_mm'], closeTo(waist / 6, 0.01));
 
+    // Two corners (the waist's ends): Width, typed 1 cm wider.
+    Future<void> clickCorner(Map pos, {bool extend = false}) async {
+      final xy = pos['pos'] as List;
+      for (var view = 0; view < 8; view++) {
+        final px = engine.toView(
+          view: view,
+          xMm: (xy[0] as num).toDouble(),
+          yMm: (xy[1] as num).toDouble(),
+        );
+        if (px == null) continue;
+        final p = board.topLeft + Offset(px[0], px[1]) / ratio;
+        if (!board.contains(p)) continue;
+        final ctrl = LogicalKeyboardKey.controlLeft;
+        if (extend) await tester.sendKeyDownEvent(ctrl);
+        await tester.tapAt(p);
+        if (extend) await tester.sendKeyUpEvent(ctrl);
+        await frames(4);
+        if (engine.selectedPoints().any((q) => q.id == pos['id'])) return;
+      }
+    }
+
+    got = run({'type': 'panel.get', 'panel': piece['id']}) as Map;
+    final waistEdge = (got['edges'] as List).firstWhere(
+      (e) => e['id'] == drawn[0]['id'],
+    );
+    await clickCorner(waistEdge['start'] as Map);
+    await clickCorner(waistEdge['end'] as Map, extend: true);
+    expect(engine.selectedPoints().length, 2);
+    expect(find.byKey(const ValueKey('bar_coincident')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('bar_width')));
+    await frames();
+    list = run({'type': 'constraint.list', 'panel': piece['id']}) as Map;
+    final width = (list['constraints'] as List).firstWhere(
+      (c) => c['kind'] == 'distance' && c['along'] == 'horizontal',
+    );
+    final widthField = find.descendant(
+      of: find.byKey(ValueKey('placed-${width['id']}')),
+      matching: find.byType(TextField),
+    );
+    final wider = (width['mm'] as num) / 10 + 1;
+    await tester.enterText(widthField, wider.toStringAsFixed(1));
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await frames();
+    list = run({'type': 'constraint.list', 'panel': piece['id']}) as Map;
+    final typed = (list['constraints'] as List).firstWhere(
+      (c) => c['id'] == width['id'],
+    );
+    expect(
+      (typed['mm'] as num).toDouble(),
+      closeTo(double.parse(wider.toStringAsFixed(1)) * 10, 0.01),
+    );
+    expect(typed['holds'], true);
+
     // A construction line: G, two clicks (above the view's corner
     // buttons).
     board = tester.getRect(boardFinder);
@@ -173,6 +223,9 @@ void main() {
 
     // A dart, from the Details group: click the half piece's side.
     await tester.sendKeyEvent(LogicalKeyboardKey.keyV);
+    await frames(2);
+    // The rail scrolls in a short window.
+    await tester.ensureVisible(find.bySemanticsLabel('Darts and pleats'));
     await frames(2);
     await tester.tap(find.bySemanticsLabel('Darts and pleats'));
     await frames();

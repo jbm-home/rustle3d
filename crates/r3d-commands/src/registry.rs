@@ -215,6 +215,8 @@ command_registry! {
     "panel.create_sector" => PanelCreateSector,
     "edge.set_arc" => EdgeSetArc,
     "constraint.set_formula" => ConstraintSetFormula,
+    "constraint.rename" => ConstraintRename,
+    "constraint.place_label" => ConstraintPlaceLabel,
     "variable.set" => VariableSet,
     "variable.remove" => VariableRemove,
 }

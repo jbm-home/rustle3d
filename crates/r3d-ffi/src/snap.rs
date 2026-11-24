@@ -1,6 +1,6 @@
 //! Snapping on the board: a pointer near something worth landing on (a
-//! corner, an edge's middle, an edge, a construction line, a symmetry
-//! axis) or level with a point it is drawn from lands exactly there, and
+//! corner, an edge's middle, where two lines cross, an edge, a
+//! construction line, a symmetry axis) or level with a point it is drawn from lands exactly there, and
 //! the board says why (`kind`, shown as a hint).
 
 use r3d_core::{PointId, Project};
@@ -10,8 +10,8 @@ use r3d_geom::DVec2;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Landing {
     pub at: DVec2,
-    /// `point`, `midpoint`, `edge`, `guide`, `axis`, `horizontal`,
-    /// `vertical`, or `free`.
+    /// `point`, `midpoint`, `crossing`, `edge`, `guide`, `axis`,
+    /// `horizontal`, `vertical`, or `free`.
     pub kind: &'static str,
     /// The point it is level with (`horizontal`, `vertical`).
     pub from: Option<DVec2>,
@@ -51,8 +51,67 @@ fn on_polyline(p: DVec2, pts: &[DVec2]) -> Option<DVec2> {
         .min_by(|x, y| x.distance(p).total_cmp(&y.distance(p)))
 }
 
+/// Where the segments `a0`–`a1` and `b0`–`b1` cross (`a_line`, `b_line`:
+/// that one is a whole line, not a segment).
+fn crossing(
+    (a0, a1, a_line): (DVec2, DVec2, bool),
+    (b0, b1, b_line): (DVec2, DVec2, bool),
+) -> Option<DVec2> {
+    let (da, db) = (a1 - a0, b1 - b0);
+    let den = da.perp_dot(db);
+    if den.abs() < 1e-12 * da.length() * db.length() {
+        return None;
+    }
+    let t = (b0 - a0).perp_dot(db) / den;
+    let u = (b0 - a0).perp_dot(da) / den;
+    let inside = |k: f64, line: bool| line || (-1e-9..=1.0 + 1e-9).contains(&k);
+    (inside(t, a_line) && inside(u, b_line)).then(|| a0 + da * t)
+}
+
+/// Where two of the lines near `p` cross, if within `max_mm`: two
+/// construction lines, a line and an edge, two edges (of different pieces
+/// or apart on one; an edge's own corners are corners), symmetry axes.
+fn crossing_near(
+    p: DVec2,
+    max_mm: f64,
+    polylines: &[Vec<DVec2>],
+    lines: &[(DVec2, DVec2)],
+) -> Option<DVec2> {
+    // Each candidate: a segment or a whole line, and what it belongs to.
+    let mut parts: Vec<((DVec2, DVec2, bool), usize)> = Vec::new();
+    for (k, pts) in polylines.iter().enumerate() {
+        for w in pts.windows(2) {
+            if let [a, b] = w
+                && on_polyline(p, &[*a, *b]).is_some_and(|q| q.distance(p) <= 2.0 * max_mm)
+            {
+                parts.push(((*a, *b, false), k));
+            }
+        }
+    }
+    for (k, (a, b)) in lines.iter().enumerate() {
+        if distance_to_line(p, *a, *b) <= 2.0 * max_mm {
+            parts.push(((*a, *b, true), polylines.len() + k));
+        }
+    }
+    let mut best: Option<DVec2> = None;
+    for (i, (a, owner_a)) in parts.iter().enumerate() {
+        for (b, owner_b) in parts.iter().skip(i + 1) {
+            if owner_a == owner_b {
+                continue;
+            }
+            if let Some(c) = crossing(*a, *b)
+                && c.distance(p) <= max_mm
+                && best.is_none_or(|x| c.distance(p) < x.distance(p))
+            {
+                best = Some(c);
+            }
+        }
+    }
+    best
+}
+
 /// Where `p` lands within `max_mm`: on a corner (but `skip`), an edge's
-/// middle, level with one of `align` (horizontally or vertically), on an
+/// middle, where two lines cross, level with one of `align` (horizontally or vertically), on an
 /// edge, a construction line or a symmetry axis; otherwise where it is.
 pub(crate) fn land(
     project: &Project,
@@ -99,6 +158,25 @@ pub(crate) fn land(
         return Landing {
             at,
             kind: "midpoint",
+            from: None,
+        };
+    }
+    let whole_lines: Vec<(DVec2, DVec2)> = project
+        .guides()
+        .values()
+        .map(|g| (g.a, g.b))
+        .chain(
+            project
+                .panels()
+                .values()
+                .filter_map(|panel| panel.symmetry.as_ref())
+                .map(|sym| (sym.origin, sym.origin + sym.dir)),
+        )
+        .collect();
+    if let Some(at) = crossing_near(p, max_mm, &polylines, &whole_lines) {
+        return Landing {
+            at,
+            kind: "crossing",
             from: None,
         };
     }
@@ -244,5 +322,27 @@ mod tests {
             None,
         );
         assert_eq!((l.kind, l.at), ("guide", DVec2::new(250.0, 300.0)));
+    }
+
+    #[test]
+    fn lands_where_two_lines_cross() {
+        let mut s = square();
+        let step = json!({"type": "guide.add", "a": [400, 0], "b": [410, 500]});
+        s.run_step(&Step::from_value(step).unwrap()).unwrap();
+        let p = s.project();
+        // Two construction lines: (400, 0)–(410, 500) meets y = 300 at
+        // x = 406.
+        let l = land(p, DVec2::new(404.0, 302.0), 5.0, &[], None);
+        assert_eq!(l.kind, "crossing");
+        assert!(l.at.distance(DVec2::new(406.0, 300.0)) < 1e-9, "{:?}", l.at);
+        // A line across an edge: x = 400 + y / 50 meets the square's
+        // top (y = 100)? No: x = 402 is outside it. The level line
+        // y = 300 meets nothing of the square either; its side x = 100
+        // extended is not a line. Nothing to cross there.
+        let l = land(p, DVec2::new(100.0, 297.0), 5.0, &[], None);
+        assert_eq!(l.kind, "guide");
+        // An edge's own corner is a corner, not a crossing.
+        let l = land(p, DVec2::new(97.0, 97.0), 5.0, &[], None);
+        assert_eq!(l.kind, "point");
     }
 }

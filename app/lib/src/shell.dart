@@ -29,6 +29,7 @@ part 'marker.dart';
 part 'game_export.dart';
 part 'fit.dart';
 part 'sketch.dart';
+part 'action_bar.dart';
 
 class Shell extends StatefulWidget {
   const Shell({
@@ -86,15 +87,31 @@ class _ShellState extends State<Shell> {
   /// stop is at its end (the click was nearer the end).
   (String, bool)? _zipFirst;
 
-  /// Every edge picked (one, or two picked with ⇧), and the construction
-  /// line picked.
+  /// What is picked on the board besides corners: edges, notches (with
+  /// where they are) and construction lines.
   List<String> _edges = const [];
-  String? _pickedGuide;
+  List<PickedPoint> _notches = const [];
+  List<String> _guides = const [];
 
-  /// The selected piece's constraints and how constrained it is
-  /// (`constraint.list`).
+  /// Every construction line (`guide.list`), to show those picked.
+  List<dynamic> _guideList = const [];
+
+  /// Every piece's constraints (`constraint.list`), drawn on the board;
+  /// the selected piece's, and how constrained it is, in the inspector.
+  List<dynamic> _allConstraints = const [];
   List<dynamic> _constraints = const [];
   List<dynamic> _constraintGroups = const [];
+
+  /// A dimension just added from the action bar: its value field opens
+  /// where its label is drawn.
+  String? _fieldFor;
+
+  /// Where each dimension's label was drawn (board pixels).
+  final List<(Map<String, dynamic>, Rect)> _labelRects = [];
+
+  /// A label being dragged: the dimension, its offset when pressed (mm),
+  /// where it was pressed (mm), and whether it moved.
+  (Map<String, dynamic>, Offset, Offset, bool)? _labelDrag;
   String _tool = 'select';
 
   /// The undo history: every step's command name, oldest first, and how
@@ -470,14 +487,23 @@ class _ShellState extends State<Shell> {
       _seams = (_run({'type': 'seam.list'}) as List<dynamic>?) ?? const [];
       _edge = _guard<String?>(widget.engine.selectedEdge);
       _edges = _guard(widget.engine.selectedEdges) ?? const [];
-      _pickedGuide = _guard<String?>(widget.engine.selectedGuide);
+      _guides = _guard(widget.engine.selectedGuides) ?? const [];
+      _notches = _guard(widget.engine.selectedNotches) ?? const [];
       _points = _guard(widget.engine.selectedPoints) ?? const [];
-      final constraints = _selection.length == 1
-          ? _run({'type': 'constraint.list', 'panel': _selection.first})
-                as Map<String, dynamic>?
-          : null;
-      _constraints = (constraints?['constraints'] as List?) ?? const [];
-      _constraintGroups = (constraints?['groups'] as List?) ?? const [];
+      _guideList = (_run({'type': 'guide.list'}) as List?) ?? const [];
+      final constraints =
+          _run({'type': 'constraint.list'}) as Map<String, dynamic>?;
+      _allConstraints = (constraints?['constraints'] as List?) ?? const [];
+      final piece = _selection.length == 1 ? _selection.first : null;
+      _constraints = [
+        for (final c in _allConstraints)
+          if (c['panel'] == piece) c,
+      ];
+      final ids = {for (final c in _constraints) c['id']};
+      _constraintGroups = [
+        for (final g in (constraints?['groups'] as List?) ?? const [])
+          if ((g['constraints'] as List).any(ids.contains)) g,
+      ];
       final history = _run({'type': 'history.list'}) as Map<String, dynamic>?;
       _history = [
         for (final step in (history?['steps'] as List<dynamic>? ?? const []))
@@ -1618,8 +1644,47 @@ class _ShellState extends State<Shell> {
         _paintSnap(context, canvas, toScreen, s, p);
       }
     }
-    if (_constraints.isNotEmpty) {
-      _paintConstraints(context, canvas, toScreen, _constraints, p);
+    for (final g in _guideList.cast<Map<String, dynamic>>()) {
+      if (!_guides.contains(g['id'])) continue;
+      final (a, b) = (_at(g['a']), _at(g['b']));
+      final d = (b - a) / max((b - a).distance, 1e-9);
+      canvas.drawLine(
+        toScreen(a - d * 1e5),
+        toScreen(b + d * 1e5),
+        Paint()
+          ..color = p.accent.withValues(alpha: 0.45)
+          ..strokeWidth = 4,
+      );
+    }
+    for (final n in _notches) {
+      final at = toScreen(Offset(n.xMm, n.yMm));
+      canvas.drawCircle(at, 7, line);
+      point(at, 3);
+    }
+    _labelRects
+      ..clear()
+      ..addAll(
+        _paintConstraints(
+          context,
+          canvas,
+          toScreen,
+          _allConstraints,
+          _selection,
+          p,
+        ),
+      );
+    // A dimension just added: its field opens on its label.
+    if (_fieldFor case final id?) {
+      final placed = _labelRects.where((r) => r.$1['id'] == id).firstOrNull;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          _fieldFor = null;
+          if (placed != null) {
+            _dimField = (placed.$1, placed.$2.center - const Offset(0, 22));
+          }
+        });
+      });
     }
     if (_tool == 'select' && _points.isNotEmpty) {
       final pts = [for (final q in _points) toScreen(Offset(q.xMm, q.yMm))];
@@ -1638,6 +1703,49 @@ class _ShellState extends State<Shell> {
         point(q, 5);
       }
     }
+  }
+
+  /// Open the value field of dimension `id` where its label is drawn
+  /// (once drawn).
+  void _openField(String id) => setState(() => _fieldFor = id);
+
+  /// A press on a dimension's label (Select): held, to drag the label or,
+  /// without moving, to open its value field.
+  bool _labelPress(Offset mm) {
+    final hit = _labelRects.reversed
+        .where((r) => r.$2.inflate(2).contains(_boardDown))
+        .firstOrNull;
+    if (hit == null) return false;
+    final c = hit.$1;
+    final at = c['label'] == null ? Offset.zero : _at(c['label']);
+    _labelDrag = (c, at, mm, false);
+    return true;
+  }
+
+  void _labelDragTo(Offset mm) {
+    final (c, at, from, _) = _labelDrag!;
+    _labelDrag = (c, at, from, true);
+    final to = at + (mm - from);
+    // One undo step for the whole drag (the command merges).
+    _run({
+      'type': 'constraint.place_label',
+      'constraint': c['id'],
+      'offset': [to.dx, to.dy],
+    });
+    _refresh();
+  }
+
+  void _labelRelease() {
+    final drag = _labelDrag;
+    if (drag == null) return;
+    _labelDrag = null;
+    if (drag.$4) return;
+    // A click on a label: its value field.
+    final rect = _labelRects.where((r) => r.$1['id'] == drag.$1['id']);
+    if (rect.isEmpty) return;
+    setState(
+      () => _dimField = (drag.$1, rect.first.$2.center - const Offset(0, 22)),
+    );
   }
 
   /// The pick's points on the board (mm): a corner, or an edge's polyline.
@@ -1707,6 +1815,30 @@ class _ShellState extends State<Shell> {
       [final a, final b] => {'kind': 'angle', 'a': a.id, 'b': b.id, 'deg': 90},
       _ => {'kind': 'length', 'edge': first.id, 'mm': 1},
     };
+    // The label stays where the dimension was placed.
+    Offset halfway(List<Offset> pts) {
+      final total = [
+        for (var i = 1; i < pts.length; i++) (pts[i] - pts[i - 1]).distance,
+      ].fold(0.0, (a, b) => a + b);
+      var walked = 0.0;
+      for (var i = 1; i < pts.length; i++) {
+        final len = (pts[i] - pts[i - 1]).distance;
+        if (walked + len >= total / 2 && len > 0) {
+          return Offset.lerp(pts[i - 1], pts[i], (total / 2 - walked) / len)!;
+        }
+        walked += len;
+      }
+      return pts.first;
+    }
+
+    final marks = [
+      for (final pick in picks)
+        _isCorner(pick) ? _pickPoints(pick).first : halfway(_pickPoints(pick)),
+    ];
+    if (_labelAnchor(c, marks) case final anchor?) {
+      final off = mm - anchor;
+      c['label'] = [off.dx, off.dy];
+    }
     setState(picks.clear);
     final out = _run({
       'type': 'constraint.add',
@@ -2259,9 +2391,15 @@ class _ShellState extends State<Shell> {
   }
 
   Future<void> _deleteSelected() async {
-    // A construction line, or a single corner, goes without asking.
-    if (_pickedGuide case final guide?) {
-      _run({'type': 'guide.remove', 'guide': guide});
+    // Construction lines, notches, or a single corner, go without asking.
+    if (_guides.isNotEmpty || _notches.isNotEmpty) {
+      _run({
+        'type': 'batch',
+        'commands': [
+          for (final g in _guides) {'type': 'guide.remove', 'guide': g},
+          for (final n in _notches) {'type': 'notch.remove', 'notch': n.id},
+        ],
+      });
       return _refresh();
     }
     if (_tool == 'select' && _points.length == 1 && _edges.isEmpty) {
@@ -2405,6 +2543,7 @@ class _ShellState extends State<Shell> {
                 onLearn: () => _scaffold.currentState?.openEndDrawer(),
                 onHome: widget.onHome,
               ),
+              _ActionBar(picked: _pickedText(l), groups: _barActions(l)),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(Space.s, 0, Space.m, 0),
@@ -2507,12 +2646,16 @@ class _ShellState extends State<Shell> {
                                             ),
                                             'select' => PatternPointer(
                                               onPress: (mm, k) =>
+                                                  _labelPress(mm) ||
                                                   _framePress(mm, k) ||
                                                   _handlePress(mm, k),
-                                              onDrag: (mm) => _frameDrag != null
+                                              onDrag: (mm) => _labelDrag != null
+                                                  ? _labelDragTo(mm)
+                                                  : _frameDrag != null
                                                   ? _frameDragTo(mm)
                                                   : _handleDrag(mm),
                                               onRelease: () {
+                                                _labelRelease();
                                                 _frameRelease();
                                                 _handleRelease();
                                               },
@@ -4218,15 +4361,6 @@ class _PanelInspector extends StatelessWidget {
         if (_TrimsCard.on(trims, id)) ...[
           const SizedBox(height: Space.m),
           _TrimsCard(panel: id, trims: trims, run: run),
-        ],
-        if (!linked && (points.isNotEmpty || edges.isNotEmpty)) ...[
-          const SizedBox(height: Space.m),
-          _ConstrainCard(
-            points: points,
-            edges: edges,
-            constraints: constraints,
-            run: run,
-          ),
         ],
         if (points.isNotEmpty) ...[
           const SizedBox(height: Space.m),

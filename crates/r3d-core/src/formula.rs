@@ -3,7 +3,7 @@
 //! A formula is arithmetic (`+ - * /`, parentheses, `min`, `max`, `abs`,
 //! `sqrt`) on numbers, the body's measurements (`height`, `bust`, `waist`,
 //! `hips`, and those of [`Measure`]: `neck`, `arm_length`…) and the
-//! project's named variables. Every value carries its
+//! project's named variables and dimensions. Every value carries its
 //! length dimension (mm¹ for a length, mm⁰ for a plain number or an angle
 //! in degrees), checked as it is computed, so `waist + 2` is refused
 //! (`formula.unit`) while `waist + 2 cm` is a length. Numbers take a unit:
@@ -13,8 +13,9 @@
 use std::collections::BTreeMap;
 
 use crate::body::Measure;
+use crate::id::ConstraintId;
 use crate::message::{Localizable, Message};
-use crate::model::Avatar;
+use crate::model::{Avatar, Constraint};
 
 /// The four measurements a body is made from, as formulas name them.
 pub const BODY_NAMES: [&str; 4] = ["height", "bust", "waist", "hips"];
@@ -283,14 +284,16 @@ pub fn valid_name(name: &str) -> bool {
 }
 
 /// What formulas are computed with: a body (the avatar's measurements,
-/// or none) and the named variables' formulas.
+/// or none), the named variables' formulas and the named dimensions
+/// (their formula, else their value).
 #[derive(Clone, Copy, Debug)]
 pub struct Scope<'a> {
     pub body: Option<&'a Avatar>,
     pub variables: &'a BTreeMap<String, String>,
+    pub dimensions: &'a BTreeMap<ConstraintId, Constraint>,
 }
 
-impl Scope<'_> {
+impl<'a> Scope<'a> {
     /// Compute `text`.
     pub fn eval(&self, text: &str) -> Result<Quantity, FormulaError> {
         self.eval_in(text, &mut Vec::new())
@@ -320,10 +323,24 @@ impl Scope<'_> {
                 power: 1,
             });
         }
-        let Some(formula) = self.variables.get(name) else {
-            return Err(FormulaError::UnknownName {
-                name: name.to_owned(),
-            });
+        let formula = match self.variables.get(name) {
+            Some(f) => f,
+            None => {
+                let c = self
+                    .dimension(name)
+                    .ok_or_else(|| FormulaError::UnknownName {
+                        name: name.to_owned(),
+                    })?;
+                match (c.formula(), c.value(), c.value_power()) {
+                    (Some(f), ..) => f,
+                    (None, Some(value), Some(power)) => return Ok(Quantity { value, power }),
+                    _ => {
+                        return Err(FormulaError::UnknownName {
+                            name: name.to_owned(),
+                        });
+                    }
+                }
+            }
         };
         if stack.iter().any(|n| n == name) {
             return Err(FormulaError::Cycle {
@@ -436,6 +453,11 @@ impl Scope<'_> {
         }
     }
 
+    /// The dimension named `name`, if any.
+    pub fn dimension(&self, name: &str) -> Option<&'a Constraint> {
+        self.dimensions.values().find(|c| c.name() == Some(name))
+    }
+
     /// Compute `text` as a value of length dimension `power`: a length in
     /// mm (1) or a plain number (0, an angle in degrees).
     pub fn eval_as(&self, text: &str, power: i32) -> Result<f64, FormulaError> {
@@ -464,6 +486,8 @@ impl Scope<'_> {
                     scope
                         .variables
                         .get(n)
+                        .map(String::as_str)
+                        .or_else(|| scope.dimension(n).and_then(Constraint::formula))
                         .and_then(|f| parse(f).ok())
                         .is_some_and(|inner| walk(scope, &inner, seen))
                 }
@@ -505,6 +529,7 @@ mod tests {
         let s = Scope {
             body: Some(&b),
             variables: &vars,
+            dimensions: &BTreeMap::new(),
         };
         assert_eq!(s.eval_as("waist / 4 + 10 mm", 1), Ok(190.0));
         assert_eq!(s.eval_as("quarter", 1), Ok(200.0));
@@ -539,6 +564,7 @@ mod tests {
         let s = Scope {
             body: Some(&b),
             variables: &vars,
+            dimensions: &BTreeMap::new(),
         };
         let code = |t: &str, p: i32| s.eval_as(t, p).map_err(|e| e.message().code);
         assert_eq!(code("waist + 2", 1), Err("formula.unit"));
@@ -552,6 +578,7 @@ mod tests {
         let none = Scope {
             body: None,
             variables: &vars,
+            dimensions: &BTreeMap::new(),
         };
         assert_eq!(
             none.eval_as("hips", 1).map_err(|e| e.message().code),

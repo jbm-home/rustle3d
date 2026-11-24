@@ -2026,10 +2026,179 @@ class LEn extends L {
       'height': 'Height',
       'length': 'Length',
       'angle': 'Angle',
+      'on_guide': 'On the line',
+      'notch_distance': 'Notch distance',
+      'guide_distance': 'Distance to the line',
       'other': '$kind',
     });
     return '$_temp0';
   }
+
+  @override
+  String get barHint =>
+      'Pick corners, edges, notches or construction lines on the board (⇧- or ⌘-click adds one) to constrain them.';
+
+  @override
+  String barCorners(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count corners',
+      one: '1 corner',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String barEdges(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count edges',
+      one: '1 edge',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String barNotches(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count notches',
+      one: '1 notch',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String barLines(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count lines',
+      one: '1 line',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get barFixedHint =>
+      'The corner stays where it is when the drawing is solved.';
+
+  @override
+  String get barSmoothHint =>
+      'No corner: the outline passes smoothly through the point.';
+
+  @override
+  String get barCornerHint =>
+      'A corner again: the two edges no longer line up.';
+
+  @override
+  String get barRemovePointHint =>
+      'Remove the corner; its two edges become one.';
+
+  @override
+  String get barWidthHint =>
+      'Dimension the distance across between the two corners, then type it.';
+
+  @override
+  String get barHeightHint =>
+      'Dimension the distance up and down between the two corners, then type it.';
+
+  @override
+  String get barDistanceHint =>
+      'Dimension the straight distance between the two corners, then type it.';
+
+  @override
+  String get barJoinedHint =>
+      'The two corners at the same place (on two pieces, usually).';
+
+  @override
+  String get barLengthHint =>
+      'Dimension the edge\'s length along its curve, then type it.';
+
+  @override
+  String get barHorizontalHint => 'The edge\'s ends at the same height.';
+
+  @override
+  String get barVerticalHint => 'The edge\'s ends one above the other.';
+
+  @override
+  String get barAngleHint =>
+      'Dimension the angle between the two edges, then type it.';
+
+  @override
+  String get barSameLengthHint => 'The edges as long as the first one picked.';
+
+  @override
+  String get barParallelHint => 'The edges parallel to the first one picked.';
+
+  @override
+  String get barSquareHint => 'The two edges at right angles.';
+
+  @override
+  String get barOnEdgeHint =>
+      'The corner on the edge (on its line, extended, for a straight edge).';
+
+  @override
+  String get barNotchStart => 'From the start';
+
+  @override
+  String get barNotchStartHint =>
+      'Dimension the notch\'s distance along its edge from the edge\'s start; it keeps it when the edge changes.';
+
+  @override
+  String get barNotchEnd => 'From the end';
+
+  @override
+  String get barNotchEndHint =>
+      'Dimension the notch\'s distance along its edge from the edge\'s end; it keeps it when the edge changes.';
+
+  @override
+  String get barRemoveNotch => 'Remove notch';
+
+  @override
+  String get barRemoveNotchHint => 'Remove the notch.';
+
+  @override
+  String get barGuideDistanceHint =>
+      'Dimension the corner\'s distance from the line, then type it; moving the line moves the corner.';
+
+  @override
+  String get barOnGuideHint =>
+      'The corner on the line; moving the line moves the corner.';
+
+  @override
+  String get barLevel => 'Level';
+
+  @override
+  String get barLevelHint =>
+      'Turn the line about its first end so that it is level.';
+
+  @override
+  String get barUpright => 'Upright';
+
+  @override
+  String get barUprightHint =>
+      'Turn the line about its first end so that it is upright.';
+
+  @override
+  String get barRemoveLine => 'Remove line';
+
+  @override
+  String get barRemoveLineHint =>
+      'Remove the construction line (and its constraints).';
+
+  @override
+  String get dimensionRename => 'Name: formulas can use this dimension';
+
+  @override
+  String get dimensionNameTitle => 'Name of the dimension';
+
+  @override
+  String get dimensionNameHelp =>
+      'Letters, digits and _, starting with a letter. Formulas then use it like a variable: a sleeve cap\'s length can be \"armhole + 1.5 cm\". Empty: no name.';
 
   @override
   String get constrain => 'Constrain';
@@ -2063,6 +2232,7 @@ class LEn extends L {
     String _temp0 = intl.Intl.selectLogic(kind, {
       'point': 'Point',
       'midpoint': 'Middle',
+      'crossing': 'Crossing',
       'edge': 'On edge',
       'guide': 'On line',
       'axis': 'On axis',

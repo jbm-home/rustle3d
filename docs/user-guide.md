@@ -7,7 +7,7 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-23 (more body measurements: neck, shoulders, arm length, upper arm, wrist, back and front waist lengths, waist and hip heights, crotch depth, inside leg, thigh, knee and ankle, estimated until you type your own, in the Body panel under More measurements; the avatar follows the neck, shoulders, arms, back length, hip height, inside leg and thigh; formulas can use them; the shirt's sleeve comes from the arm length and the T-shirt's and shirt's neckline from the neck; with Select, drag a piece to move it, the corners of its frame to scale it and the round handle above it to turn it; Rotate and Scale in the inspector for an exact angle or percentage; the Draw tool also draws on a piece of the pattern, not only on the 3D garment; a shape added from the Shapes menu comes in selected, with the Select tool on; in French, the circle skirt is now called « jupe soleil »; patterns and measurement files from Seamly2D and Valentina come in drafted for their measurements, graded in every size, and can be drafted again for the avatar; the tape measure goes round a slanting sleeve square to it, and measures a length between two points of the garment; the start screen tells you when a new version is out, and the check can be turned off; Installing: a disk image for macOS, one for Intel and Apple silicon, an installer for Windows, and the first launch on recent macOS, through Privacy & Security; the shirt, T-shirt and dress take their shoulders, neckline and armholes from the avatar's body, and their hem fits over the hips: large sizes no longer have drooping shoulders; the avatar now takes the measurements given in every size of the charts, up to the women's 54: large sizes came out too slim and trousers fell off them; changing the size or the body while draping starts the drape again around the new body; trousers end just above the floor whatever the body; garments worn in layers lie close together: a shirt worn under trousers is tucked into them, and nothing shows through a garment worn over another; the trousers template is a little shorter; a selected piece's panel shows its garment's fabric; the Construction line and Tape measure tools have new icons; the tool rail in four sections, drawing, measuring, sewing and trims, with Dart and Pleat under Darts and pleats and Hole a tool of its own; the guided flow's step bar and banner removed; a more natural walk and a new motion, Stand at ease; captured motions whose rest pose lies flat play upright; pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
+Last updated: 2026-11-24 (the action bar above the pattern and the garment: pick corners, edges, notches or construction lines, as many as you like, and it offers the constraints and dimensions that fit; a dimension added from it opens its value field on the board; drag a dimension's label to move it, click it to type a new value; dimensions can be named and used in formulas; a notch keeps its distance from the start or the end of its edge; corners on a construction line or at a distance from it follow the line; drawing snaps to where two lines cross; every piece's dimensions are shown; more body measurements: neck, shoulders, arm length, upper arm, wrist, back and front waist lengths, waist and hip heights, crotch depth, inside leg, thigh, knee and ankle, estimated until you type your own, in the Body panel under More measurements; the avatar follows the neck, shoulders, arms, back length, hip height, inside leg and thigh; formulas can use them; the shirt's sleeve comes from the arm length and the T-shirt's and shirt's neckline from the neck; with Select, drag a piece to move it, the corners of its frame to scale it and the round handle above it to turn it; Rotate and Scale in the inspector for an exact angle or percentage; the Draw tool also draws on a piece of the pattern, not only on the 3D garment; a shape added from the Shapes menu comes in selected, with the Select tool on; in French, the circle skirt is now called « jupe soleil »; patterns and measurement files from Seamly2D and Valentina come in drafted for their measurements, graded in every size, and can be drafted again for the avatar; the tape measure goes round a slanting sleeve square to it, and measures a length between two points of the garment; the start screen tells you when a new version is out, and the check can be turned off; Installing: a disk image for macOS, one for Intel and Apple silicon, an installer for Windows, and the first launch on recent macOS, through Privacy & Security; the shirt, T-shirt and dress take their shoulders, neckline and armholes from the avatar's body, and their hem fits over the hips: large sizes no longer have drooping shoulders; the avatar now takes the measurements given in every size of the charts, up to the women's 54: large sizes came out too slim and trousers fell off them; changing the size or the body while draping starts the drape again around the new body; trousers end just above the floor whatever the body; garments worn in layers lie close together: a shirt worn under trousers is tucked into them, and nothing shows through a garment worn over another; the trousers template is a little shorter; a selected piece's panel shows its garment's fabric; the Construction line and Tape measure tools have new icons; the tool rail in four sections, drawing, measuring, sewing and trims, with Dart and Pleat under Darts and pleats and Hole a tool of its own; the guided flow's step bar and banner removed; a more natural walk and a new motion, Stand at ease; captured motions whose rest pose lies flat play upright; pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
 hips, so trousers no longer slide with each step; a garment worn over
 trousers starts outside them; captured motions: Motion › Import a captured
 motion… plays a BVH motion capture on the avatar, Motion › Motion
@@ -203,7 +203,7 @@ a menu of related tools (the last one used stays on the button).
 
 | Tool | Key | What it does |
 |---|---|---|
-| Select | V | Click a piece, a corner or an edge (⌘-click or ⇧-click a second corner or edge); drag a piece to move it; drag a corner or an edge to reshape the piece; a selected piece has a frame: drag a corner of it to scale the piece, the round handle above it to turn it (⇧ turns by 15° steps, or scales both ways at once); a picked curved edge, or a corner between curves, shows its handles: drag them to bend the curve (a smooth point keeps its two handles lined up) |
+| Select | V | Click a piece, a corner, an edge, a notch or a construction line (⌘-click or ⇧-click adds more, or takes one away); drag a piece to move it; drag a corner or an edge to reshape the piece; a selected piece has a frame: drag a corner of it to scale the piece, the round handle above it to turn it (⇧ turns by 15° steps, or scales both ways at once); a picked curved edge, or a corner between curves, shows its handles: drag them to bend the curve (a smooth point keeps its two handles lined up) |
 | Shapes → Rectangle | R | Adds a rectangular piece; like every shape, it comes in selected, with the Select tool on |
 | Shapes → Ellipse | E | Adds a circle or an ellipse of the width and height you type |
 | Shapes → Circle skirt | | Adds the pieces of a full, half or quarter circle skirt from the waist and the skirt's length |
@@ -308,17 +308,35 @@ something else); click **Opened** to go back to the start.
 
 ### Constraints and dimensions
 Constraints keep a piece the way you want it while you change the rest.
-Pick what to constrain on the board: a corner or an edge, and ⌘-click (or ⇧-click) a
-second one. The inspector offers what fits:
-- one edge: **Horizontal**, **Vertical**, **Length** (keeps the length it
-  has now);
-- two edges: **Parallel**, **Square**, **Same length**, **Angle**;
+Pick what to constrain on the board with Select: corners, edges,
+notches or construction lines, on one piece or several; ⌘-click (or
+⇧-click) adds one, or takes it away. The **action bar**, the row above
+the pattern and the garment, says what is picked and offers what fits
+(hover a button to see what it does):
 - one corner: **Fixed** (it stays put while the rest adjusts),
   **Smooth** (no corner there: the curves pass through it smoothly) or
   **Corner**, **Remove point**;
-- two corners: **Distance**, **Width** (across), **Height** (up and
-  down), **Joined** (at the same place, for corners of two pieces);
-- a corner and an edge: **On the edge**.
+- two corners: **Width** (across), **Height** (up and down),
+  **Distance** (straight), **Joined** (at the same place, for corners of
+  two pieces);
+- one edge: **Length**, **Horizontal**, **Vertical**;
+- two edges: **Angle**, **Same length**, **Parallel**, **Square**;
+- three edges or more: **Same length** or **Parallel**, all like the
+  first one picked;
+- a corner and an edge: **On the edge**;
+- a notch: its distance **From the start** or **From the end** of its
+  edge (it keeps it when the edge changes), **Remove notch**;
+- a construction line: **Level**, **Upright** (turned about its first
+  end), **Remove line**;
+- a corner and a construction line: **Distance to the line**, **On the
+  line**. Construction lines are the frame you draft from: move a line
+  and the corners on it, or at a distance from it, follow. Moving a
+  piece takes along the lines only its corners use.
+
+A dimension (width, height, distance, length, angle, a notch's distance,
+a distance to a line) keeps the value the drawing has, and its value
+field opens on the board at once: type the value (or a formula) and
+press Enter, or Esc to keep it.
 
 With **Dimension** (T) you put a dimension straight on the pattern:
 click an edge (its length), a corner then another corner (the distance
@@ -329,8 +347,11 @@ distance; the value follows the pointer. A field opens where you
 clicked: type the value (or a formula) and press Enter, or Esc to keep
 the value it has.
 
-The piece's constraints are listed under **Constraints** in the
-inspector and drawn on the board when it is selected. Type a new value
+Every piece's constraints and dimensions are drawn on the board (the
+selected piece's brighter). Drag a dimension's label to move it (only
+the label moves); click it to type a new value. The selected piece's
+constraints are listed under **Constraints** in the inspector, a
+dimension under its name if it has one. Type a new value
 for a distance, a length or an angle: the piece is redrawn so that this
 value and every other constraint hold, moving as little as possible;
 the other half of a half piece follows. Drag a corner: it stays where
@@ -379,6 +400,13 @@ in place of its value (or click **ƒ** next to it), like `waist / 4 + 10 mm` or
 adds one, like `ease = 2 cm`, click one to change it). A length needs a
 unit: `waist / 4 + 10` is refused, `waist / 4 + 10 mm` is fine; the
 message says what is wrong.
+
+A dimension can have a **name** (the label button next to it in the
+inspector's list): formulas then use it like a variable, its formula if
+it has one, otherwise its value. Name the armhole's length `armhole`
+and give the sleeve cap's length the formula `armhole + 1.5 cm`: the
+cap follows when the armhole changes. Renaming a dimension changes the
+formulas that use it.
 
 When you change the body's measurements or a variable, every piece with
 formulas is drawn again for it. With **sizes**, each size is drafted
@@ -889,10 +917,11 @@ the tech pack as PDF: open formats only.
   read inside the garment's loop: at a sleeve's hem cut on a slant there
   may be none. Near the armpits, the round tape may take in the sleeves
   or pass under the arms: click a little lower for the chest.
-- Constraints apply to corners and edges of the outline, not to internal
-  lines, notches or construction lines. A dimension stays where the
-  board draws it (it cannot be moved by hand). A symmetric piece's axis
-  is straight.
+- Constraints apply to corners and edges of the outline, notches and
+  construction lines, not to internal lines. A construction line never
+  moves to satisfy a constraint: the corners follow it. A notch's
+  distance is along its edge, not straight to a corner. A symmetric
+  piece's axis is straight.
 - Sizes: notches keep their distance along the edge in every size, and
   a grade is set per point, not per edge, in the app. The avatar's
   shoulders do not widen with its build: the shirt, T-shirt and dress

@@ -3412,8 +3412,236 @@ abstract class L {
   /// A constraint or a dimension on the board, by its kind.
   ///
   /// In en, this message translates to:
-  /// **'{kind, select, fixed{Fixed} coincident{Joined} horizontal{Horizontal} vertical{Vertical} parallel{Parallel} perpendicular{Square} tangent{Smooth} equal_length{Same length} on_edge{On the edge} distance{Distance} width{Width} height{Height} length{Length} angle{Angle} other{{kind}}}'**
+  /// **'{kind, select, fixed{Fixed} coincident{Joined} horizontal{Horizontal} vertical{Vertical} parallel{Parallel} perpendicular{Square} tangent{Smooth} equal_length{Same length} on_edge{On the edge} distance{Distance} width{Width} height{Height} length{Length} angle{Angle} on_guide{On the line} notch_distance{Notch distance} guide_distance{Distance to the line} other{{kind}}}'**
   String constraintKind(String kind);
+
+  /// No description provided for @barHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick corners, edges, notches or construction lines on the board (⇧- or ⌘-click adds one) to constrain them.'**
+  String get barHint;
+
+  /// No description provided for @barCorners.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 corner} other{{count} corners}}'**
+  String barCorners(int count);
+
+  /// No description provided for @barEdges.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 edge} other{{count} edges}}'**
+  String barEdges(int count);
+
+  /// No description provided for @barNotches.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 notch} other{{count} notches}}'**
+  String barNotches(int count);
+
+  /// No description provided for @barLines.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 line} other{{count} lines}}'**
+  String barLines(int count);
+
+  /// No description provided for @barFixedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The corner stays where it is when the drawing is solved.'**
+  String get barFixedHint;
+
+  /// No description provided for @barSmoothHint.
+  ///
+  /// In en, this message translates to:
+  /// **'No corner: the outline passes smoothly through the point.'**
+  String get barSmoothHint;
+
+  /// No description provided for @barCornerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A corner again: the two edges no longer line up.'**
+  String get barCornerHint;
+
+  /// No description provided for @barRemovePointHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the corner; its two edges become one.'**
+  String get barRemovePointHint;
+
+  /// No description provided for @barWidthHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Dimension the distance across between the two corners, then type it.'**
+  String get barWidthHint;
+
+  /// No description provided for @barHeightHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Dimension the distance up and down between the two corners, then type it.'**
+  String get barHeightHint;
+
+  /// No description provided for @barDistanceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Dimension the straight distance between the two corners, then type it.'**
+  String get barDistanceHint;
+
+  /// No description provided for @barJoinedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The two corners at the same place (on two pieces, usually).'**
+  String get barJoinedHint;
+
+  /// No description provided for @barLengthHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Dimension the edge\'s length along its curve, then type it.'**
+  String get barLengthHint;
+
+  /// No description provided for @barHorizontalHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The edge\'s ends at the same height.'**
+  String get barHorizontalHint;
+
+  /// No description provided for @barVerticalHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The edge\'s ends one above the other.'**
+  String get barVerticalHint;
+
+  /// No description provided for @barAngleHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Dimension the angle between the two edges, then type it.'**
+  String get barAngleHint;
+
+  /// No description provided for @barSameLengthHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The edges as long as the first one picked.'**
+  String get barSameLengthHint;
+
+  /// No description provided for @barParallelHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The edges parallel to the first one picked.'**
+  String get barParallelHint;
+
+  /// No description provided for @barSquareHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The two edges at right angles.'**
+  String get barSquareHint;
+
+  /// No description provided for @barOnEdgeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The corner on the edge (on its line, extended, for a straight edge).'**
+  String get barOnEdgeHint;
+
+  /// No description provided for @barNotchStart.
+  ///
+  /// In en, this message translates to:
+  /// **'From the start'**
+  String get barNotchStart;
+
+  /// No description provided for @barNotchStartHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Dimension the notch\'s distance along its edge from the edge\'s start; it keeps it when the edge changes.'**
+  String get barNotchStartHint;
+
+  /// No description provided for @barNotchEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'From the end'**
+  String get barNotchEnd;
+
+  /// No description provided for @barNotchEndHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Dimension the notch\'s distance along its edge from the edge\'s end; it keeps it when the edge changes.'**
+  String get barNotchEndHint;
+
+  /// No description provided for @barRemoveNotch.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove notch'**
+  String get barRemoveNotch;
+
+  /// No description provided for @barRemoveNotchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the notch.'**
+  String get barRemoveNotchHint;
+
+  /// No description provided for @barGuideDistanceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Dimension the corner\'s distance from the line, then type it; moving the line moves the corner.'**
+  String get barGuideDistanceHint;
+
+  /// No description provided for @barOnGuideHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The corner on the line; moving the line moves the corner.'**
+  String get barOnGuideHint;
+
+  /// No description provided for @barLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Level'**
+  String get barLevel;
+
+  /// No description provided for @barLevelHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn the line about its first end so that it is level.'**
+  String get barLevelHint;
+
+  /// No description provided for @barUpright.
+  ///
+  /// In en, this message translates to:
+  /// **'Upright'**
+  String get barUpright;
+
+  /// No description provided for @barUprightHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn the line about its first end so that it is upright.'**
+  String get barUprightHint;
+
+  /// No description provided for @barRemoveLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove line'**
+  String get barRemoveLine;
+
+  /// No description provided for @barRemoveLineHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the construction line (and its constraints).'**
+  String get barRemoveLineHint;
+
+  /// No description provided for @dimensionRename.
+  ///
+  /// In en, this message translates to:
+  /// **'Name: formulas can use this dimension'**
+  String get dimensionRename;
+
+  /// No description provided for @dimensionNameTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Name of the dimension'**
+  String get dimensionNameTitle;
+
+  /// No description provided for @dimensionNameHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Letters, digits and _, starting with a letter. Formulas then use it like a variable: a sleeve cap\'s length can be \"armhole + 1.5 cm\". Empty: no name.'**
+  String get dimensionNameHelp;
 
   /// No description provided for @constrain.
   ///
@@ -3472,7 +3700,7 @@ abstract class L {
   /// What a point snapped to on the board.
   ///
   /// In en, this message translates to:
-  /// **'{kind, select, point{Point} midpoint{Middle} edge{On edge} guide{On line} axis{On axis} horizontal{Level} vertical{Aligned} other{{kind}}}'**
+  /// **'{kind, select, point{Point} midpoint{Middle} crossing{Crossing} edge{On edge} guide{On line} axis{On axis} horizontal{Level} vertical{Aligned} other{{kind}}}'**
   String snapKind(String kind);
 
   /// No description provided for @errDerived.

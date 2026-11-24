@@ -11,7 +11,8 @@
 
 use glam::{DAffine2, DMat2};
 use r3d_core::{
-    Along, Constraint, ConstraintId, Edge, EdgeCurve, Panel, PanelId, Pin, Point, Transaction,
+    Along, Constraint, ConstraintId, Edge, EdgeCurve, Guide, Panel, PanelId, Pin, Point,
+    Transaction,
 };
 use r3d_geom::{DVec2, polygon};
 use schemars::JsonSchema;
@@ -202,17 +203,56 @@ fn own_constraints(tx: &Transaction<'_>, panel: PanelId) -> Vec<(ConstraintId, C
 }
 
 fn with_along(c: &Constraint, to: Along) -> Constraint {
-    match c.clone() {
-        Constraint::Distance {
-            a, b, mm, formula, ..
-        } => Constraint::Distance {
-            a,
-            b,
-            mm,
-            along: to,
-            formula,
-        },
-        other => other,
+    let mut c = c.clone();
+    if let Constraint::Distance { along, .. } = &mut c {
+        *along = to;
+    }
+    c
+}
+
+/// The construction lines the panel's points are constrained to follow
+/// the panel when only its points are (they are its frame); the panel's
+/// constraints to a line other pieces use too are dropped.
+fn carry_guides(tx: &mut Transaction<'_>, id: PanelId, map: DAffine2) {
+    let p = tx.project();
+    let on_panel = |c: &Constraint| {
+        c.points()
+            .iter()
+            .all(|pt| p.point(*pt).is_some_and(|pt| pt.panel == id))
+    };
+    let mut carried = Vec::new();
+    let mut dropped = Vec::new();
+    for (g, guide) in p.guides() {
+        let users: Vec<_> = p
+            .constraints()
+            .iter()
+            .filter(|(_, c)| c.guide() == Some(*g))
+            .collect();
+        let ours: Vec<ConstraintId> = users
+            .iter()
+            .filter(|(_, c)| on_panel(c))
+            .map(|(cid, _)| **cid)
+            .collect();
+        if ours.is_empty() {
+            continue;
+        }
+        if ours.len() == users.len() {
+            carried.push((
+                *g,
+                Guide {
+                    a: map.transform_point2(guide.a),
+                    b: map.transform_point2(guide.b),
+                },
+            ));
+        } else {
+            dropped.extend(ours);
+        }
+    }
+    for (g, guide) in carried {
+        tx.put_guide(g, guide);
+    }
+    for c in dropped {
+        tx.remove_constraint(c);
     }
 }
 
@@ -342,5 +382,6 @@ pub(crate) fn map_panel(
     if after != before {
         tx.put_panel(id, after);
     }
+    carry_guides(tx, id, map);
     Ok(())
 }

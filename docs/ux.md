@@ -27,6 +27,11 @@ Every feature spec has a "UX" section that applies these principles.
   line: drawing (select, shapes, polygon, curve, edit curves, cut, hole,
   draw on garment), measuring (construction line, dimension, tape
   measure), sewing (notch, darts and pleats, sew) and trims.
+- **Actions next to the work.** The action bar, a row above the 2D and
+  3D views drawn like the rail, says what is picked on the board and
+  offers the constraints and dimensions that fit it (spec 30); the
+  inspector keeps the lists and the values. A dimension added there
+  opens its value field on the board, where the eye already is.
 - **Progressive disclosure.** The default inspector shows only the essentials
   (e.g. fabric: preset and color). An "Advanced" fold shows the physical
   parameters. Expert tools sit behind a clearly labelled "More tools" area.

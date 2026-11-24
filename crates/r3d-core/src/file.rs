@@ -20,7 +20,7 @@ use crate::model::Project;
 /// Identifies a Rustle3D project file.
 pub const FORMAT: &str = "rustle3d.project";
 /// Version written by this build.
-pub const SCHEMA_VERSION: u32 = 20;
+pub const SCHEMA_VERSION: u32 = 21;
 
 type Migration = fn(Value) -> Result<Value, FileError>;
 
@@ -45,6 +45,7 @@ const MIGRATIONS: &[Migration] = &[
     migrate_v17_to_v18,
     migrate_v18_to_v19,
     migrate_v19_to_v20,
+    migrate_v20_to_v21,
 ];
 
 fn object<'a>(
@@ -54,6 +55,13 @@ fn object<'a>(
     value.as_object_mut().ok_or_else(|| FileError::Json {
         detail: format!("{what} is not an object"),
     })
+}
+
+/// v21 adds constraints on notches and construction lines, and a
+/// dimension's name and label place (absent: none, where it is drawn by
+/// default). Nothing to convert.
+fn migrate_v20_to_v21(project: Value) -> Result<Value, FileError> {
+    Ok(project)
 }
 
 /// v20 adds the avatar's other measurements (`measures`, absent: all

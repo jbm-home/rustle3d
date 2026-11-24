@@ -44,12 +44,12 @@ maintainer's briefs that specs cite as "ROADMAP Mxx" in their
 | M15 | Game-ready export ✅ (2026-11-19) | LODs + baked wrinkle normal maps + skinning, imported in Godot/Unity/Unreal |
 | M33 | Body measurements ✅ (2026-11-23) | A project made with four measurements; later its arm length and neck are set, the avatar and a sleeve drafted from `arm_length` follow |
 | M34 | Construction details 2 | A cuff gathered by elastic, a topstitched yoke, a collar that stands thanks to its interfacing, a quilted panel |
-| M35 | Sketch mode | A half bodice drawn and constrained without the inspector: what fits the selection is offered over the board, one click applies it |
+| M35 | Sketching on the board: the action bar ✅ (2026-11-24) | A half bodice drawn and constrained without the inspector: what fits the selection is offered above the board, one click applies it |
 | M36 | Natural motions | The walk looks human: no hop, a supple trunk, relaxed arms |
 | M37 | Imported avatars in motion, game export checked | A scanned body walks in its garment; the garment and its motion open in a game engine as exported |
 
 Order of the next ones, as set by the maintainer on 2026-11-23: M34,
-M35, M36, M37 (M16's Linux part when the work moves to Linux).
+M36, M37 (M16's Linux part when the work moves to Linux).
 
 ## M34 — Construction details 2
 
@@ -64,23 +64,6 @@ Maintainer's brief (2026-11-23): the details left open by M29.
   in the bill of materials.
 - Quilting and padding (thickness between stitched lines).
 - Needs solver work: docs/physics.md first.
-
-## M35 — Sketch mode
-
-Maintainer's brief (2026-11-23): drafting in 2D is not practical today.
-Wanted: a sketch mode as in mechanical CAD tools, which work well for
-this, with context buttons over the view for the constraints and
-actions that fit what is selected. Our own layout, icons and terms.
-
-- First a plan, validated by the maintainer before any code: what gets
-  in the way today (walked through on real drafts), the sketching flow
-  proposed, and mockups of the board in that mode (screenshots of
-  variants rather than descriptions).
-- Then the mode itself. It takes in the drafting open points about
-  constraints: points on edges and notches as distance targets;
-  constraints on internal lines, notches and construction lines;
-  snapping to the intersection of two lines; moving a dimension's label
-  by hand.
 
 ## M36 — Natural motions
 
@@ -131,7 +114,15 @@ back through the CPU every frame.
 
 As noted when each milestone closed; recheck before taking one up.
 
-- **Drafting (M11, M12, M32)** (constraints: see M35): a gathering
+- **Sketching (M35)**: constraints on internal lines (their points
+  need an identity first: a schema change); a notch as the end of a
+  straight distance; construction lines moved by their constraints
+  (today they are references the corners follow); a point snapped on a
+  crossing stays there only through constraints added after;
+  single-letter keys for the action bar's buttons; a named dimension
+  without a formula gives the drawn size's value in every size of a
+  range.
+- **Drafting (M11, M12, M32)**: a gathering
   curve; cutting a piece and its linked mirror copy together (refused
   today: unlink first); holes in mirror copies and symmetric pieces;
   seam allowance inside holes.

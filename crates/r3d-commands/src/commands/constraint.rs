@@ -3,11 +3,13 @@
 
 use r3d_core::Localizable;
 use r3d_core::constraints::{
-    Touched, Update, formula_grades, formula_value, formula_values, measure, solve_project,
+    Touched, Update, formula_grades, formula_value, formula_values, measure, notch_places,
+    solve_project,
 };
 use r3d_core::edit::Change;
 use r3d_core::{
-    AnyId, Constraint, ConstraintId, Edge, EdgeCurve, Guide, GuideId, Point, PointId, Transaction,
+    AnyId, Constraint, ConstraintId, Edge, EdgeCurve, EdgeEnd, Guide, GuideId, Notch, Point,
+    PointId, Transaction,
 };
 use r3d_geom::DVec2;
 use schemars::JsonSchema;
@@ -55,7 +57,11 @@ fn check_ref(tx: &Transaction<'_>, id: AnyId) -> Result<(), CommandError> {
 /// The kind of constraint with its points and edges, ignoring a
 /// dimension's value: two constraints with the same key say the same.
 fn key(c: &Constraint) -> Option<Constraint> {
-    let mut k = c.with_value(0.0).unwrap_or_else(|| c.clone());
+    let mut k = c
+        .with_value(0.0)
+        .and_then(|c| c.with_name(None))
+        .and_then(|c| c.with_label(None))
+        .unwrap_or_else(|| c.clone());
     // Symmetric relations say the same either way round.
     match &mut k {
         Constraint::Coincident { a, b } => {
@@ -97,6 +103,22 @@ impl CommandSpec for ConstraintAdd {
         }
         for e in c.edges() {
             check_ref(tx, e.into())?;
+        }
+        if let Some(n) = c.notch() {
+            let edge = tx
+                .project()
+                .notch(n)
+                .ok_or_else(|| CommandError::not_found(n))?
+                .edge;
+            check_ref(tx, edge.into())?;
+        }
+        if let Some(g) = c.guide() {
+            tx.project()
+                .guide(g)
+                .ok_or_else(|| CommandError::not_found(g))?;
+        }
+        if let Some(name) = c.name() {
+            check_name(tx, None, name)?;
         }
         let same = match c {
             Constraint::Coincident { a, b } | Constraint::Distance { a, b, .. } => a == b,
@@ -196,6 +218,154 @@ impl CommandSpec for ConstraintSetValue {
     }
 }
 
+/// Refuse a dimension name that formulas could not use, or that a
+/// variable or another dimension (than `own`) has.
+fn check_name(
+    tx: &Transaction<'_>,
+    own: Option<ConstraintId>,
+    name: &str,
+) -> Result<(), CommandError> {
+    if !r3d_core::formula::valid_name(name) {
+        return Err(CommandError::Formula {
+            of: name.to_owned(),
+            error: r3d_core::formula::FormulaError::BadName {
+                name: name.to_owned(),
+            },
+        });
+    }
+    let p = tx.project();
+    let taken = p.variables().contains_key(name)
+        || p.constraints()
+            .iter()
+            .any(|(id, c)| Some(*id) != own && c.name() == Some(name));
+    if taken {
+        return Err(CommandError::invalid("name", Invalid::Duplicate));
+    }
+    Ok(())
+}
+
+/// Name a dimension, so that formulas can use it, or take its name away.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ConstraintRename {
+    pub constraint: ConstraintId,
+    /// As a variable's: a letter or _, then letters, digits or _ (not a
+    /// body measurement, a function, a unit, a variable or another
+    /// dimension's name). Omitted: no name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
+impl Described for ConstraintRename {
+    const SUMMARY: &'static str = "Name a dimension (e.g. \"armhole\"): formulas can then use it like a variable (its formula when it has one, else its value), e.g. a sleeve cap's length \"armhole + 1.5 cm\". Renaming rewrites the formulas that use the old name; taking the name away is refused while a formula uses it (formula.unknown_name).";
+}
+
+/// Whether `text` names `name`.
+fn names(text: &str, name: &str) -> bool {
+    r3d_core::formula::rename(text, name, "_") != text
+}
+
+impl CommandSpec for ConstraintRename {
+    fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        let c = tx
+            .project()
+            .constraint(self.constraint)
+            .ok_or_else(|| CommandError::not_found(self.constraint))?
+            .clone();
+        let name = self
+            .name
+            .as_deref()
+            .map(str::trim)
+            .filter(|n| !n.is_empty());
+        if let Some(n) = name {
+            check_name(tx, Some(self.constraint), n)?;
+        }
+        let renamed = c
+            .with_name(name.map(str::to_owned))
+            .ok_or_else(|| CommandError::invalid("constraint", Invalid::NotDimension))?;
+        if let Some(old) = c.name()
+            && Some(old) != name
+        {
+            let p = tx.project();
+            let users: Vec<(ConstraintId, Constraint)> = p
+                .constraints()
+                .iter()
+                .filter(|(_, o)| o.formula().is_some_and(|f| names(f, old)))
+                .map(|(id, o)| (*id, o.clone()))
+                .collect();
+            let mut variables = p.variables().clone();
+            let used_by_variable = variables.values().any(|f| names(f, old));
+            match name {
+                None if !users.is_empty() || used_by_variable => {
+                    return Err(CommandError::Formula {
+                        of: self.constraint.to_string(),
+                        error: r3d_core::formula::FormulaError::UnknownName {
+                            name: old.to_owned(),
+                        },
+                    });
+                }
+                None => {}
+                Some(new) => {
+                    for (id, o) in users {
+                        let f = o.formula().map(|f| r3d_core::formula::rename(f, old, new));
+                        if let Some(o) = o.with_formula(f) {
+                            tx.put_constraint(id, o);
+                        }
+                    }
+                    if used_by_variable {
+                        for f in variables.values_mut() {
+                            *f = r3d_core::formula::rename(f, old, new);
+                        }
+                        tx.set_variables(variables);
+                    }
+                }
+            }
+        }
+        // A formula renamed with it is read again from the new name.
+        let renamed = match tx.project().constraint(self.constraint) {
+            Some(now) => now.with_name(name.map(str::to_owned)).unwrap_or(renamed),
+            None => renamed,
+        };
+        tx.put_constraint(self.constraint, renamed);
+        Ok(CommandOutput::default())
+    }
+}
+
+/// Place a dimension's label by hand.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ConstraintPlaceLabel {
+    pub constraint: ConstraintId,
+    /// mm from where the label is drawn by default (the middle of the
+    /// dimension line, of the edge, of the angle). Omitted: back there.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub offset: Option<Vec2>,
+}
+
+impl Described for ConstraintPlaceLabel {
+    const SUMMARY: &'static str = "Move a dimension's label (only the label: the drawing stays as it is), as an offset in mm from where it is drawn by default; without `offset`, back there.";
+}
+
+impl CommandSpec for ConstraintPlaceLabel {
+    fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        if let Some(o) = &self.offset {
+            finite("offset", o)?;
+        }
+        let c = tx
+            .project()
+            .constraint(self.constraint)
+            .ok_or_else(|| CommandError::not_found(self.constraint))?
+            .with_label(self.offset)
+            .ok_or_else(|| CommandError::invalid("constraint", Invalid::NotDimension))?;
+        tx.put_constraint(self.constraint, c);
+        Ok(CommandOutput::default())
+    }
+
+    fn merge_key(&self) -> Option<String> {
+        Some(format!("constraint.place_label:{}", self.constraint))
+    }
+}
+
 /// Give a dimension a formula, or take it away.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -270,12 +440,16 @@ impl CommandSpec for VariableSet {
                 },
             });
         }
+        if tx.project().formula_scope().dimension(name).is_some() {
+            return Err(CommandError::invalid("name", Invalid::Duplicate));
+        }
         let mut variables = tx.project().variables().clone();
         variables.insert(name.to_owned(), self.formula.trim().to_owned());
         // It must compute (a body measurement without a body waits).
         let scope = r3d_core::formula::Scope {
             body: tx.project().avatar(),
             variables: &variables,
+            dimensions: tx.project().constraints(),
         };
         match scope.eval(name) {
             Ok(_) | Err(r3d_core::formula::FormulaError::NoBody { .. }) => {}
@@ -317,6 +491,7 @@ impl CommandSpec for VariableRemove {
         let scope = r3d_core::formula::Scope {
             body: tx.project().avatar(),
             variables: &variables,
+            dimensions: tx.project().constraints(),
         };
         for name in variables.keys() {
             match scope.eval(name) {
@@ -600,6 +775,11 @@ pub(crate) fn settle_constraints(tx: &mut Transaction<'_>) -> Result<(), Command
                 || c.edges()
                     .iter()
                     .any(|e| p.edge(*e).is_none() || p.is_derived_edge(*e))
+                || c.notch().is_some_and(|n| {
+                    p.notch(n)
+                        .is_none_or(|n| p.edge(n.edge).is_none() || p.is_derived_edge(n.edge))
+                })
+                || c.guide().is_some_and(|g| p.guide(g).is_none())
         })
         .map(|(id, _)| *id)
         .collect();
@@ -635,6 +815,12 @@ pub(crate) fn settle_constraints(tx: &mut Transaction<'_>) -> Result<(), Command
                     tx.put_edge(id, Edge { curve, ..e });
                 }
             }
+        }
+    }
+    // Notches where their dimensions put them on the edges as they now are.
+    for (id, offset_mm) in notch_places(tx.project()) {
+        if let Some(n) = tx.project().notch(id).cloned() {
+            tx.put_notch(id, Notch { offset_mm, ..n });
         }
     }
     // Then every size of the range, drafted with its own measurements.
@@ -701,6 +887,7 @@ impl crate::spec::QuerySpec for ConstraintList {
                     || c.edges()
                         .iter()
                         .any(|e| p.edge(*e).is_some_and(|e| e.panel == panel))
+                    || p.constraint_panel(c) == Some(panel)
             })
         };
         let round = |x: f64| (x * 1000.0).round() / 1000.0;
@@ -734,6 +921,11 @@ impl crate::spec::QuerySpec for ConstraintList {
                             marks.push([round(at.x), round(at.y)]);
                         }
                     }
+                    marks.extend(
+                        extra_marks(p, c)
+                            .into_iter()
+                            .map(|at| [round(at.x), round(at.y)]),
+                    );
                     obj.insert("marks".into(), serde_json::json!(marks));
                 }
                 out
@@ -756,6 +948,45 @@ impl crate::spec::QuerySpec for ConstraintList {
             })
             .collect();
         Ok(serde_json::json!({ "constraints": constraints, "groups": groups }))
+    }
+}
+
+/// Where to draw what a constraint names besides its points and edges:
+/// a notch dimension's edge end and notch, the foot of a point's
+/// perpendicular on a construction line.
+fn extra_marks(p: &r3d_core::Project, c: &Constraint) -> Vec<DVec2> {
+    match c {
+        Constraint::NotchDistance { notch, from, .. } => {
+            let Some(n) = p.notch(*notch) else {
+                return Vec::new();
+            };
+            let Some(edge) = p.edge(n.edge) else {
+                return Vec::new();
+            };
+            let end = match from {
+                EdgeEnd::Start => edge.start,
+                EdgeEnd::End => edge.end,
+            };
+            let at = p.edge_geometry(n.edge).map(|g| {
+                let length = g.length();
+                g.point_at_length(n.offset_mm.min(length)).0
+            });
+            p.point(end)
+                .map(|pt| pt.pos)
+                .into_iter()
+                .chain(at)
+                .collect()
+        }
+        Constraint::OnGuide { point, guide } | Constraint::GuideDistance { point, guide, .. } => {
+            match (p.point(*point), p.guide(*guide)) {
+                (Some(pt), Some(g)) => {
+                    let dir = (g.b - g.a).normalize_or_zero();
+                    vec![g.a + dir * dir.dot(pt.pos - g.a)]
+                }
+                _ => Vec::new(),
+            }
+        }
+        _ => Vec::new(),
     }
 }
 

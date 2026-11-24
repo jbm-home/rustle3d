@@ -4672,7 +4672,7 @@ Add a constraint (fixed, coincident, horizontal, vertical, parallel, perpendicul
       ]
     },
     "Constraint": {
-      "description": "A relation the drawing keeps between points and edges: after every\nchange, the constraint solver moves the geometry so that all of them\nhold again (`docs/specs/19-constraints.md`). Dimensions (`distance`,\n`length`, `angle`) carry a value; the others are geometric.",
+      "description": "A relation the drawing keeps between points, edges, notches and\nconstruction lines: after every change, the constraint solver moves the\ngeometry so that all of them hold again (`docs/specs/19-constraints.md`,\n`docs/specs/30-action-bar.md`). Dimensions (`distance`, `length`,\n`angle`, `notch_distance`, `guide_distance`) carry a value, and may have\na name formulas use and a label placed by hand; the others are\ngeometric.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -4858,6 +4858,28 @@ Add a constraint (fixed, coincident, horizontal, vertical, parallel, perpendicul
         },
         {
           "additionalProperties": false,
+          "description": "The point lies on the construction line (extended).",
+          "properties": {
+            "guide": {
+              "$ref": "#/$defs/GuideId"
+            },
+            "kind": {
+              "const": "on_guide",
+              "type": "string"
+            },
+            "point": {
+              "$ref": "#/$defs/PointId"
+            }
+          },
+          "required": [
+            "kind",
+            "point",
+            "guide"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
           "description": "A dimension: the distance between two points.",
           "properties": {
             "a": {
@@ -4881,10 +4903,30 @@ Add a constraint (fixed, coincident, horizontal, vertical, parallel, perpendicul
               "const": "distance",
               "type": "string"
             },
+            "label": {
+              "description": "Where its label sits, mm from where it is drawn by default.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "mm": {
               "description": "mm, > 0.",
               "format": "double",
               "type": "number"
+            },
+            "name": {
+              "description": "The name formulas know it by.",
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           "required": [
@@ -4903,7 +4945,6 @@ Add a constraint (fixed, coincident, horizontal, vertical, parallel, perpendicul
               "$ref": "#/$defs/EdgeId"
             },
             "formula": {
-              "description": "Computes `mm` from the body and the variables (a length).",
               "type": [
                 "string",
                 "null"
@@ -4913,10 +4954,28 @@ Add a constraint (fixed, coincident, horizontal, vertical, parallel, perpendicul
               "const": "length",
               "type": "string"
             },
+            "label": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "mm": {
               "description": "mm, > 0.",
               "format": "double",
               "type": "number"
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           "required": [
@@ -4942,7 +5001,7 @@ Add a constraint (fixed, coincident, horizontal, vertical, parallel, perpendicul
               "type": "number"
             },
             "formula": {
-              "description": "Computes `deg` from the body and the variables (a plain\nnumber).",
+              "description": "Computes `deg` (a plain number).",
               "type": [
                 "string",
                 "null"
@@ -4951,6 +5010,24 @@ Add a constraint (fixed, coincident, horizontal, vertical, parallel, perpendicul
             "kind": {
               "const": "angle",
               "type": "string"
+            },
+            "label": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           "required": [
@@ -4960,12 +5037,134 @@ Add a constraint (fixed, coincident, horizontal, vertical, parallel, perpendicul
             "deg"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A dimension: a notch's distance along its edge from the edge's start\nor end. The notch is put there after every change (at the edge's\nend when the edge is shorter).",
+          "properties": {
+            "formula": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "from": {
+              "$ref": "#/$defs/EdgeEnd",
+              "default": "start"
+            },
+            "kind": {
+              "const": "notch_distance",
+              "type": "string"
+            },
+            "label": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "mm": {
+              "description": "mm, > 0.",
+              "format": "double",
+              "type": "number"
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "notch": {
+              "$ref": "#/$defs/NotchId"
+            }
+          },
+          "required": [
+            "kind",
+            "notch",
+            "mm"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A dimension: a point's distance from a construction line, on the\nside it is on.",
+          "properties": {
+            "formula": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "guide": {
+              "$ref": "#/$defs/GuideId"
+            },
+            "kind": {
+              "const": "guide_distance",
+              "type": "string"
+            },
+            "label": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "mm": {
+              "description": "mm, > 0.",
+              "format": "double",
+              "type": "number"
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "point": {
+              "$ref": "#/$defs/PointId"
+            }
+          },
+          "required": [
+            "kind",
+            "point",
+            "guide",
+            "mm"
+          ],
+          "type": "object"
         }
       ]
+    },
+    "EdgeEnd": {
+      "description": "Which end of an edge a distance along it is measured from.",
+      "enum": [
+        "start",
+        "end"
+      ],
+      "type": "string"
     },
     "EdgeId": {
       "description": "Identifier of a edge, e.g. `edge:1`.",
       "pattern": "^edge:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "GuideId": {
+      "description": "Identifier of a guide, e.g. `guide:1`.",
+      "pattern": "^guide:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "NotchId": {
+      "description": "Identifier of a notch, e.g. `notch:1`.",
+      "pattern": "^notch:[1-9][0-9]*$",
       "type": "string"
     },
     "PointId": {
@@ -5479,6 +5678,92 @@ Give a dimension a formula of the body's measurements and the variables (e.g. "w
     "constraint"
   ],
   "title": "ConstraintSetFormula",
+  "type": "object"
+}
+```
+
+</details>
+
+### `constraint.rename`
+
+Name a dimension (e.g. "armhole"): formulas can then use it like a variable (its formula when it has one, else its value), e.g. a sleeve cap's length "armhole + 1.5 cm". Renaming rewrites the formulas that use the old name; taking the name away is refused while a formula uses it (formula.unknown_name).
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "ConstraintId": {
+      "description": "Identifier of a constraint, e.g. `constraint:1`.",
+      "pattern": "^constraint:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Name a dimension, so that formulas can use it, or take its name away.",
+  "properties": {
+    "constraint": {
+      "$ref": "#/$defs/ConstraintId"
+    },
+    "name": {
+      "description": "As a variable's: a letter or _, then letters, digits or _ (not a\nbody measurement, a function, a unit, a variable or another\ndimension's name). Omitted: no name.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "constraint"
+  ],
+  "title": "ConstraintRename",
+  "type": "object"
+}
+```
+
+</details>
+
+### `constraint.place_label`
+
+Move a dimension's label (only the label: the drawing stays as it is), as an offset in mm from where it is drawn by default; without `offset`, back there.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "ConstraintId": {
+      "description": "Identifier of a constraint, e.g. `constraint:1`.",
+      "pattern": "^constraint:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Place a dimension's label by hand.",
+  "properties": {
+    "constraint": {
+      "$ref": "#/$defs/ConstraintId"
+    },
+    "offset": {
+      "description": "mm from where the label is drawn by default (the middle of the\ndimension line, of the edge, of the angle). Omitted: back there.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": [
+        "array",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "constraint"
+  ],
+  "title": "ConstraintPlaceLabel",
   "type": "object"
 }
 ```

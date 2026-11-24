@@ -376,8 +376,11 @@ abstract class Engine implements RustOpaqueInterface {
   /// Every edge picked (one, or two picked with ⇧).
   List<String> selectedEdges();
 
-  /// The construction line picked on the board, if any.
-  String? selectedGuide();
+  /// The construction lines picked on the board.
+  List<String> selectedGuides();
+
+  /// The notches picked on the board, each with where it is (mm).
+  List<PickedPoint> selectedNotches();
 
   /// The corners picked on the board: one, or two to measure between.
   List<PickedPoint> selectedPoints();

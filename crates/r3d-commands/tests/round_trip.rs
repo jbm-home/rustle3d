@@ -280,6 +280,10 @@ fn every_command_round_trips() {
     h.round_trip(json!({"type": "variable.set", "name": "ease", "formula": "2 cm"}));
     h.round_trip(json!({"type": "constraint.set_formula", "constraint": len,
         "formula": "ease * 15"}));
+    h.round_trip(json!({"type": "constraint.rename", "constraint": len, "name": "side"}));
+    h.round_trip(json!({"type": "constraint.place_label", "constraint": len,
+        "offset": [10, -20]}));
+    h.round_trip(json!({"type": "constraint.rename", "constraint": len}));
     h.round_trip(json!({"type": "constraint.remove", "constraint": len}));
     h.round_trip(json!({"type": "variable.remove", "name": "ease"}));
     h.round_trip(json!({"type": "point.set_smooth", "point": q_pts[2], "smooth": true}));

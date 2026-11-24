@@ -19,10 +19,10 @@ or edge), the Half piece option of Polygon and Curve, the Construction
 line tool (G), the Shapes group (rectangle, ellipse, circle skirt), the
 Arc tool, snapping with a hint while drawing and dragging corners.
 
-Not yet: constraints on internal lines and notches, construction lines
-in constraints (a point on a construction line), moving a dimension's
-label by hand, snapping to the intersection of two lines, curved
-symmetry axes.
+Not yet: constraints on internal lines, curved symmetry axes. Since
+M35 (spec 30): notches and construction lines in constraints, labels
+moved by hand, named dimensions in formulas, the crossing snap, and the
+constraint chips moved from the inspector to the action bar.
 
 Since M32 (2026-11-18): the Dimension tool (T) puts a dimension on the
 board: an edge's length, the distance between two corners (direct,
@@ -102,10 +102,10 @@ previous point.
   point or edge they name (red when one does not hold), dimensions with
   their value, a dashed line for a distance. Symmetry axes are drawn
   dash-dotted, construction lines dashed across the board.
-- Picking: click a corner or an edge; ⌘-click (Ctrl-click on Windows
-  and Linux) or ⇧-click adds a second one (two at most). The inspector then offers the constraints that fit what is
-  picked, and lists the piece's constraints with their values (typed, in
-  cm or degrees) and a remove button, and the degrees of freedom left.
+- Picking: see spec 30 (any number, the action bar offers what fits).
+  The inspector lists the piece's constraints with their values (typed,
+  in cm or degrees) and a remove button, and the degrees of freedom
+  left.
 - Drawing tools snap within a few pixels to corners, middles of edges,
   edges, construction lines and axes, and level with the previous point
   (or the first one), with a hint naming what was snapped to; a dragged

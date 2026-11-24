@@ -3,6 +3,10 @@
 
 part of 'shell.dart';
 
+/// Whether a constraint (as `constraint.list` gives it) is a dimension.
+bool _isDimension(Map<String, dynamic> c) =>
+    c.containsKey('mm') || c.containsKey('deg');
+
 /// A constraint's kind, named for the user (a distance along an axis is a
 /// width or a height).
 String _kindName(L l, Map<String, dynamic> c) {
@@ -14,169 +18,7 @@ String _kindName(L l, Map<String, dynamic> c) {
   };
 }
 
-/// What can be constrained in what is picked on the board: one or two
-/// corners, one or two edges, or a corner and an edge.
-class _ConstrainCard extends StatelessWidget {
-  const _ConstrainCard({
-    required this.points,
-    required this.edges,
-    required this.constraints,
-    required this.run,
-  });
-
-  final List<PickedPoint> points;
-  final List<String> edges;
-
-  /// The piece's constraints (`constraint.list`).
-  final List<dynamic> constraints;
-  final ValueChanged<Map<String, Object?>> run;
-
-  void _add(Map<String, Object?> c, {bool measure = false}) => run({
-    'type': 'constraint.add',
-    'constraint': c,
-    if (measure) 'measure': true,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final p = Tokens.of(context);
-    final l = context.l;
-    final pts = [for (final q in points) q.id];
-    Widget chip(String label, VoidCallback onTap, {IconData? icon}) =>
-        ActionChip(
-          avatar: icon == null ? null : Icon(icon, size: 16),
-          label: Text(label, style: ts(fontSize: 12.5)),
-          onPressed: onTap,
-        );
-    final smooth =
-        pts.length == 1 &&
-        constraints.any(
-          (c) => c['kind'] == 'tangent' && c['point'] == pts.first,
-        );
-    final List<Widget> chips = switch ((pts.length, edges.length)) {
-      (0, 1) => [
-        chip(
-          l.constraintKind('horizontal'),
-          () => _add({'kind': 'horizontal', 'edge': edges[0]}),
-        ),
-        chip(
-          l.constraintKind('vertical'),
-          () => _add({'kind': 'vertical', 'edge': edges[0]}),
-        ),
-        chip(
-          l.constraintKind('length'),
-          () => _add({
-            'kind': 'length',
-            'edge': edges[0],
-            'mm': 1,
-          }, measure: true),
-          icon: Icons.straighten_rounded,
-        ),
-      ],
-      (0, 2) => [
-        chip(
-          l.constraintKind('parallel'),
-          () => _add({'kind': 'parallel', 'a': edges[0], 'b': edges[1]}),
-        ),
-        chip(
-          l.constraintKind('perpendicular'),
-          () => _add({'kind': 'perpendicular', 'a': edges[0], 'b': edges[1]}),
-        ),
-        chip(
-          l.constraintKind('equal_length'),
-          () => _add({'kind': 'equal_length', 'a': edges[0], 'b': edges[1]}),
-        ),
-        chip(
-          l.constraintKind('angle'),
-          () => _add({
-            'kind': 'angle',
-            'a': edges[0],
-            'b': edges[1],
-            'deg': 90,
-          }, measure: true),
-          icon: Icons.architecture_rounded,
-        ),
-      ],
-      (1, 0) => [
-        chip(
-          l.constraintKind('fixed'),
-          () => _add({'kind': 'fixed', 'point': pts[0]}),
-          icon: Icons.lock_outline_rounded,
-        ),
-        chip(
-          smooth ? l.pointCorner : l.pointSmooth,
-          () => run({
-            'type': 'point.set_smooth',
-            'point': pts[0],
-            'smooth': !smooth,
-          }),
-        ),
-        chip(
-          l.pointRemove,
-          () => run({'type': 'point.remove', 'point': pts[0]}),
-          icon: Icons.remove_circle_outline_rounded,
-        ),
-      ],
-      (2, 0) => [
-        for (final along in ['direct', 'horizontal', 'vertical'])
-          chip(
-            l.constraintKind(switch (along) {
-              'horizontal' => 'width',
-              'vertical' => 'height',
-              _ => 'distance',
-            }),
-            () => _add({
-              'kind': 'distance',
-              'a': pts[0],
-              'b': pts[1],
-              'mm': 1,
-              'along': along,
-            }, measure: true),
-            icon: Icons.straighten_rounded,
-          ),
-        chip(
-          l.constraintKind('coincident'),
-          () => _add({'kind': 'coincident', 'a': pts[0], 'b': pts[1]}),
-        ),
-      ],
-      (1, 1) => [
-        chip(
-          l.constraintKind('on_edge'),
-          () => _add({'kind': 'on_edge', 'point': pts[0], 'edge': edges[0]}),
-        ),
-      ],
-      _ => const [],
-    };
-    if (chips.isEmpty) return const SizedBox.shrink();
-    return Container(
-      padding: const EdgeInsets.all(Space.m),
-      decoration: BoxDecoration(
-        color: p.surfaceMuted,
-        borderRadius: BorderRadius.circular(Tokens.radius(context)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            l.constrain,
-            style: ts(fontSize: 13, fontWeight: FontWeight.w600, color: p.text),
-          ),
-          const SizedBox(height: Space.s),
-          // Keys stay with the board (Delete, Enter, the tools).
-          ExcludeFocus(
-            child: Wrap(
-              spacing: Space.xs,
-              runSpacing: Space.xs,
-              children: chips,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// The piece's constraints and dimensions: each removable, a dimension's
+//// The piece's constraints and dimensions: each removable, a dimension's
 /// value typed in; and how constrained the piece is.
 class _ConstraintsCard extends StatelessWidget {
   const _ConstraintsCard({
@@ -240,18 +82,40 @@ class _ConstraintsCard extends StatelessWidget {
                 const SizedBox(width: Space.s),
                 Expanded(
                   child: Tooltip(
-                    message: c['holds'] == true ? '' : l.constraintBroken,
-                    child: Text(
-                      _kindName(l, c),
-                      style: ts(
-                        fontSize: 13,
-                        color: c['holds'] == true ? p.text : p.danger,
+                    message: c['holds'] != true
+                        ? l.constraintBroken
+                        : _isDimension(c)
+                        ? l.dimensionRename
+                        : '',
+                    // A dimension's name (or kind): click to name it.
+                    child: InkWell(
+                      key: ValueKey('name-${c['id']}'),
+                      onTap: !_isDimension(c)
+                          ? null
+                          : () async {
+                              final n = await _askName(
+                                context,
+                                c['name'] as String? ?? '',
+                              );
+                              if (n == null) return;
+                              run({
+                                'type': 'constraint.rename',
+                                'constraint': c['id'],
+                                if (n.isNotEmpty) 'name': n,
+                              });
+                            },
+                      child: Text(
+                        (c['name'] as String?) ?? _kindName(l, c),
+                        style: ts(
+                          fontSize: 13,
+                          color: c['holds'] == true ? p.text : p.danger,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ),
-                if (c['kind'] case 'distance' || 'length' || 'angle') ...[
+                if (_isDimension(c)) ...[
                   SizedBox(
                     width: 84,
                     child: _DimensionField(
@@ -481,8 +345,8 @@ void _glyph(Canvas canvas, Offset at, String kind, Color color, double r) {
   }
 }
 
-/// Text in a pill over the board, centred on `at`.
-void _pill(Canvas canvas, Offset at, String text, Color fg, Color bg) {
+//// Text in a pill over the board, centred on `at`. Returns where it is.
+Rect _pill(Canvas canvas, Offset at, String text, Color fg, Color bg) {
   final painter = TextPainter(
     text: TextSpan(
       text: text,
@@ -501,18 +365,63 @@ void _pill(Canvas canvas, Offset at, String text, Color fg, Color bg) {
   );
   painter.paint(canvas, box.topLeft + const Offset(6, 3));
   painter.dispose();
+  return box;
 }
 
-/// The constraints of the selected piece over the board: a sign at each
-/// edge or point they name, dimensions with their value.
-void _paintConstraints(
+/// The kinds drawn as a dimension line between two marks.
+const _lineDimensions = {'distance', 'notch_distance', 'guide_distance'};
+
+/// The two ends of a dimension line (mm): a distance's points (across or
+/// up and down, the second level with the first), a notch's edge end and
+/// the notch, a corner and its foot on a line.
+(Offset, Offset) _dimensionLine(Map<String, dynamic> c, List<Offset> marks) {
+  final (a, b) = (marks[0], marks[1]);
+  return switch (c['along']) {
+    'horizontal' => (a, Offset(b.dx, a.dy)),
+    'vertical' => (a, Offset(a.dx, b.dy)),
+    _ => (a, b),
+  };
+}
+
+/// Where a dimension's label is drawn by default (mm), from its marks:
+/// the middle of its line, of its edge, between its two edges.
+Offset? _labelAnchor(Map<String, dynamic> c, List<Offset> marks) {
+  if (marks.isEmpty) return null;
+  final kind = c['kind'] as String;
+  if (_lineDimensions.contains(kind) && marks.length == 2) {
+    final (a, b) = _dimensionLine(c, marks);
+    return Offset.lerp(a, b, 0.5);
+  }
+  if (kind == 'angle' && marks.length == 2) {
+    return Offset.lerp(marks[0], marks[1], 0.5);
+  }
+  return marks.first;
+}
+
+/// A dimension's label: its name, if any, and its value.
+String _labelText(BuildContext context, Map<String, dynamic> c) {
+  final value = c['kind'] == 'angle'
+      ? '${context.number(c['deg'] as num, 1)}°'
+      : '${context.number((c['mm'] as num) / 10, 1)} ${context.l.cm}';
+  return switch (c['name']) {
+    final String name => '$name  $value',
+    _ => value,
+  };
+}
+
+/// Every piece's constraints over the board (the selected pieces' in
+/// full, the others fainter): a sign at each edge or point they name,
+/// dimensions with their value where their label is placed. Returns each
+/// dimension's label and where it was drawn (board pixels).
+List<(Map<String, dynamic>, Rect)> _paintConstraints(
   BuildContext context,
   Canvas canvas,
   Offset Function(Offset mm) toScreen,
   List<dynamic> constraints,
+  List<String> selection,
   Palette p,
 ) {
-  Offset at(Object? xy) => toScreen(_ShellState._at(xy));
+  final labels = <(Map<String, dynamic>, Rect)>[];
   // Several signs on one spot sit side by side.
   final taken = <Offset, int>{};
   Offset slot(Offset where) {
@@ -527,62 +436,79 @@ void _paintConstraints(
 
   for (final c in constraints.cast<Map<String, dynamic>>()) {
     final kind = c['kind'] as String;
-    final color = c['holds'] == true ? p.accent : p.danger;
-    final marks = [for (final m in (c['marks'] as List? ?? const [])) at(m)];
+    final faint = !selection.contains(c['panel']);
+    final color = (c['holds'] == true ? p.accent : p.danger).withValues(
+      alpha: faint ? 0.5 : 1,
+    );
+    final marks = [
+      for (final m in (c['marks'] as List? ?? const [])) _ShellState._at(m),
+    ];
     if (marks.isEmpty) continue;
-    if (kind == 'distance' && marks.length == 2) {
-      final dash = Paint()
-        ..color = color.withValues(alpha: 0.7)
-        ..strokeWidth = 1;
-      final (a, b) = switch (c['along']) {
-        'horizontal' => (marks[0], Offset(marks[1].dx, marks[0].dy)),
-        'vertical' => (marks[0], Offset(marks[0].dx, marks[1].dy)),
-        _ => (marks[0], marks[1]),
-      };
+    if (!_isDimension(c)) {
+      for (final m in marks) {
+        final o = slot(toScreen(m));
+        canvas.drawCircle(o, 9, Paint()..color = p.surface);
+        canvas.drawCircle(
+          o,
+          9,
+          Paint()
+            ..color = color
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1,
+        );
+        _glyph(canvas, o, kind, color, 8);
+      }
+      continue;
+    }
+    final anchor = _labelAnchor(c, marks)!;
+    final offset = c['label'] == null ? null : _ShellState._at(c['label']);
+    final thin = Paint()
+      ..color = color.withValues(alpha: 0.7)
+      ..strokeWidth = 1;
+    void dashed(Offset a, Offset b) {
       final n = ((b - a).distance / 6).floor();
       for (var i = 0; i < n; i += 2) {
         canvas.drawLine(
           Offset.lerp(a, b, i / n)!,
           Offset.lerp(a, b, (i + 1) / n)!,
-          dash,
+          thin,
         );
       }
-      _pill(
-        canvas,
-        Offset.lerp(a, b, 0.5)!,
-        '${context.number((c['mm'] as num) / 10, 1)} ${context.l.cm}',
-        p.surface,
-        color,
-      );
-      continue;
     }
-    if (kind == 'length' || kind == 'angle') {
-      final where = kind == 'angle' && marks.length == 2
-          ? Offset.lerp(marks[0], marks[1], 0.5)!
-          : marks.first;
-      final text = kind == 'angle'
-          ? '${context.number(c['deg'] as num, 1)}°'
-          : '${context.number((c['mm'] as num) / 10, 1)} ${context.l.cm}';
-      _pill(canvas, slot(where), text, p.surface, color);
-      continue;
+
+    Offset where;
+    if (_lineDimensions.contains(kind) && marks.length == 2) {
+      // The line moves out with its label, across itself.
+      final (a, b) = _dimensionLine(c, marks);
+      var shift = Offset.zero;
+      if (offset != null && (b - a).distance > 1e-9) {
+        final u = (b - a) / (b - a).distance;
+        final n = Offset(-u.dy, u.dx);
+        shift = n * (offset.dx * n.dx + offset.dy * n.dy);
+      }
+      if (shift != Offset.zero) {
+        canvas.drawLine(toScreen(marks[0]), toScreen(a + shift), thin);
+        canvas.drawLine(toScreen(marks[1]), toScreen(b + shift), thin);
+      } else if (kind == 'distance' && c['along'] != 'direct') {
+        canvas.drawLine(toScreen(marks[1]), toScreen(b), thin);
+      }
+      dashed(toScreen(a + shift), toScreen(b + shift));
+      where = toScreen(anchor + (offset ?? Offset.zero));
+    } else if (offset != null) {
+      where = toScreen(anchor + offset);
+      dashed(toScreen(anchor), where);
+    } else {
+      where = slot(toScreen(anchor));
     }
-    for (final m in marks) {
-      final o = slot(m);
-      canvas.drawCircle(o, 9, Paint()..color = p.surface);
-      canvas.drawCircle(
-        o,
-        9,
-        Paint()
-          ..color = color
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1,
-      );
-      _glyph(canvas, o, kind, color, 8);
-    }
+    labels.add((
+      c,
+      _pill(canvas, where, _labelText(context, c), p.surface, color),
+    ));
   }
+  return labels;
 }
 
-/// Where the pointer snaps: a ring on the spot, what it snapped to, and a
+// Where the pointer snaps: a ring on the spot, what it snapped to, and a
 /// dashed line to the point it is level with.
 void _paintSnap(
   BuildContext context,
@@ -709,6 +635,56 @@ Future<(List<double>, int)?> _askNumbers(
 
 /// Ask for a dimension's formula (empty: no formula). Returns it, or null
 /// when cancelled.
+/// Ask for a dimension's name ('' for none; null when cancelled).
+Future<String?> _askName(BuildContext context, String current) {
+  final text = TextEditingController(text: current);
+  return showDialog<String>(
+    context: context,
+    builder: (context) {
+      final l = context.l;
+      final p = Tokens.of(context);
+      return AlertDialog(
+        title: Text(l.dimensionNameTitle),
+        content: SizedBox(
+          width: 360,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                key: const Key('dimension_name'),
+                controller: text,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'armhole',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                onSubmitted: (v) => Navigator.pop(context, v.trim()),
+              ),
+              const SizedBox(height: Space.s),
+              Text(
+                l.dimensionNameHelp,
+                style: ts(fontSize: 12.5, height: 1.45, color: p.textMuted),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, text.text.trim()),
+            child: Text(l.apply),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 Future<String?> _askFormula(BuildContext context, String current) {
   final text = TextEditingController(text: current);
   return showDialog<String>(

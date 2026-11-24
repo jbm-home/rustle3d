@@ -34,10 +34,10 @@ pub use id::{
 pub use imported::{AvatarMesh, BodyPoint, UpAxis};
 pub use message::{Localizable, Message};
 pub use model::{
-    Along, Around, Avatar, Body, Constraint, DisplayUnit, Edge, EdgeCurve, Fabric, FabricDetails,
-    FabricLook, Garment, Grading, Guide, InternalLine, MirrorLink, Notch, Panel, PathSegment,
-    PatternSource, Pin, Placement, Point, Project, Seam, SeamSide, Size, SourcePiece, Symmetry,
-    TemplateRef,
+    Along, Around, Avatar, Body, Constraint, DisplayUnit, Edge, EdgeCurve, EdgeEnd, Fabric,
+    FabricDetails, FabricLook, Garment, Grading, Guide, InternalLine, MirrorLink, Notch, Panel,
+    PathSegment, PatternSource, Pin, Placement, Point, Project, Seam, SeamSide, Size, SourcePiece,
+    Symmetry, TemplateRef,
 };
 pub use print::{BuiltinPrint, Print, PrintPlacement, PrintSource, Texture, UvFrame};
 pub use trim::{Button, Buttonhole, Zipper};

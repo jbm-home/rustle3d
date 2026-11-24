@@ -996,7 +996,73 @@
   },
   "constraintsRedundant": "Some constraints repeat others.",
   "constraintBroken": "Does not hold",
-  "constraintKind": "{kind, select, fixed{Fixed} coincident{Joined} horizontal{Horizontal} vertical{Vertical} parallel{Parallel} perpendicular{Square} tangent{Smooth} equal_length{Same length} on_edge{On the edge} distance{Distance} width{Width} height{Height} length{Length} angle{Angle} other{{kind}}}",
+  "constraintKind": "{kind, select, fixed{Fixed} coincident{Joined} horizontal{Horizontal} vertical{Vertical} parallel{Parallel} perpendicular{Square} tangent{Smooth} equal_length{Same length} on_edge{On the edge} distance{Distance} width{Width} height{Height} length{Length} angle{Angle} on_guide{On the line} notch_distance{Notch distance} guide_distance{Distance to the line} other{{kind}}}",
+  "barHint": "Pick corners, edges, notches or construction lines on the board (⇧- or ⌘-click adds one) to constrain them.",
+  "barCorners": "{count, plural, =1{1 corner} other{{count} corners}}",
+  "@barCorners": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "barEdges": "{count, plural, =1{1 edge} other{{count} edges}}",
+  "@barEdges": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "barNotches": "{count, plural, =1{1 notch} other{{count} notches}}",
+  "@barNotches": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "barLines": "{count, plural, =1{1 line} other{{count} lines}}",
+  "@barLines": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "barFixedHint": "The corner stays where it is when the drawing is solved.",
+  "barSmoothHint": "No corner: the outline passes smoothly through the point.",
+  "barCornerHint": "A corner again: the two edges no longer line up.",
+  "barRemovePointHint": "Remove the corner; its two edges become one.",
+  "barWidthHint": "Dimension the distance across between the two corners, then type it.",
+  "barHeightHint": "Dimension the distance up and down between the two corners, then type it.",
+  "barDistanceHint": "Dimension the straight distance between the two corners, then type it.",
+  "barJoinedHint": "The two corners at the same place (on two pieces, usually).",
+  "barLengthHint": "Dimension the edge's length along its curve, then type it.",
+  "barHorizontalHint": "The edge's ends at the same height.",
+  "barVerticalHint": "The edge's ends one above the other.",
+  "barAngleHint": "Dimension the angle between the two edges, then type it.",
+  "barSameLengthHint": "The edges as long as the first one picked.",
+  "barParallelHint": "The edges parallel to the first one picked.",
+  "barSquareHint": "The two edges at right angles.",
+  "barOnEdgeHint": "The corner on the edge (on its line, extended, for a straight edge).",
+  "barNotchStart": "From the start",
+  "barNotchStartHint": "Dimension the notch's distance along its edge from the edge's start; it keeps it when the edge changes.",
+  "barNotchEnd": "From the end",
+  "barNotchEndHint": "Dimension the notch's distance along its edge from the edge's end; it keeps it when the edge changes.",
+  "barRemoveNotch": "Remove notch",
+  "barRemoveNotchHint": "Remove the notch.",
+  "barGuideDistanceHint": "Dimension the corner's distance from the line, then type it; moving the line moves the corner.",
+  "barOnGuideHint": "The corner on the line; moving the line moves the corner.",
+  "barLevel": "Level",
+  "barLevelHint": "Turn the line about its first end so that it is level.",
+  "barUpright": "Upright",
+  "barUprightHint": "Turn the line about its first end so that it is upright.",
+  "barRemoveLine": "Remove line",
+  "barRemoveLineHint": "Remove the construction line (and its constraints).",
+  "dimensionRename": "Name: formulas can use this dimension",
+  "dimensionNameTitle": "Name of the dimension",
+  "dimensionNameHelp": "Letters, digits and _, starting with a letter. Formulas then use it like a variable: a sleeve cap's length can be \"armhole + 1.5 cm\". Empty: no name.",
   "@constraintKind": {
     "description": "A constraint or a dimension on the board, by its kind.",
     "placeholders": {
@@ -1014,7 +1080,7 @@
   "unlinkHalves": "Separate halves",
   "unfold": "Unfold here",
   "makeArc": "Arc",
-  "snapKind": "{kind, select, point{Point} midpoint{Middle} edge{On edge} guide{On line} axis{On axis} horizontal{Level} vertical{Aligned} other{{kind}}}",
+  "snapKind": "{kind, select, point{Point} midpoint{Middle} crossing{Crossing} edge{On edge} guide{On line} axis{On axis} horizontal{Level} vertical{Aligned} other{{kind}}}",
   "@snapKind": {
     "description": "What a point snapped to on the board.",
     "placeholders": {

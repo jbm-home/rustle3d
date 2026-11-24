@@ -486,6 +486,16 @@ impl Project {
                         .into_iter()
                         .find(|e| !self.edges.contains_key(e))
                         .map(AnyId::from)
+                })
+                .or_else(|| {
+                    c.notch()
+                        .filter(|n| !self.notches.contains_key(n))
+                        .map(AnyId::from)
+                })
+                .or_else(|| {
+                    c.guide()
+                        .filter(|g| !self.guides.contains_key(g))
+                        .map(AnyId::from)
                 });
             if let Some(missing) = missing {
                 return Err(E::DanglingReference { entity, missing });
@@ -493,13 +503,20 @@ impl Project {
             let derived = c.points().into_iter().any(|p| self.is_derived_point(p))
                 || c.edges().into_iter().any(|e| self.is_derived_edge(e));
             let value_ok = match c {
-                Constraint::Distance { mm, .. } | Constraint::Length { mm, .. } => {
-                    mm.is_finite() && *mm > 0.0
-                }
                 Constraint::Angle { deg, .. } => (0.0..=180.0).contains(deg),
-                _ => true,
+                c => c.value().is_none_or(|mm| mm.is_finite() && mm > 0.0),
             };
-            if derived || !value_ok {
+            let name_ok = c.name().is_none_or(|n| {
+                crate::formula::valid_name(n)
+                    && !self.variables.contains_key(n)
+                    && self
+                        .constraints
+                        .values()
+                        .filter(|o| o.name() == Some(n))
+                        .count()
+                        == 1
+            });
+            if derived || !value_ok || !name_ok {
                 return Err(E::BadValue { entity });
             }
         }

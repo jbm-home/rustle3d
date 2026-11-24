@@ -28,8 +28,8 @@ use crate::photo::{PhotoJob, Subject};
 use crate::sim::SimThread;
 use r3d_core::seam::Track;
 use r3d_core::{
-    BodyPoint, EdgeId, Fabric, GuideId, InternalLineId, Localizable, Message, PanelId, PointId,
-    SeamSide,
+    BodyPoint, EdgeId, Fabric, GuideId, InternalLineId, Localizable, Message, NotchId, PanelId,
+    PointId, SeamSide,
 };
 use r3d_render::board::BoardView;
 use r3d_render::fitmap;
@@ -493,14 +493,15 @@ pub struct Engine {
     graphics: Mutex<Option<Graphics>>,
     /// Selection shared by every view (not saved, not undoable).
     selection: Mutex<Vec<PanelId>>,
-    /// The edges picked within the selection (one, or two to constrain
-    /// together).
+    /// The edges picked on the board (to constrain, alone or together).
     selected_edges: Mutex<Vec<EdgeId>>,
-    /// The construction line picked, if any.
-    selected_guide: Mutex<Option<GuideId>>,
+    /// The construction lines picked.
+    selected_guides: Mutex<Vec<GuideId>>,
+    /// The notches picked.
+    selected_notches: Mutex<Vec<NotchId>>,
     /// Where the corner being dragged landed, and why (a snap hint).
     drag_snap: Mutex<Option<Snap>>,
-    /// Corners picked on the board (one, or two to measure between).
+    /// Corners picked on the board.
     selected_points: Mutex<Vec<PointId>>,
     /// The simulation thread, started on first use.
     sim: Mutex<Option<SimThread>>,
@@ -649,7 +650,8 @@ impl Engine {
             graphics: Mutex::new(None),
             selection: Mutex::new(Vec::new()),
             selected_edges: Mutex::new(Vec::new()),
-            selected_guide: Mutex::new(None),
+            selected_guides: Mutex::new(Vec::new()),
+            selected_notches: Mutex::new(Vec::new()),
             drag_snap: Mutex::new(None),
             selected_points: Mutex::new(Vec::new()),
             sim: Mutex::new(None),
@@ -1096,10 +1098,14 @@ impl Engine {
             .lock()
             .map_err(|_| poisoned())?
             .retain(|e| project.edge(*e).is_some());
-        let mut guide = self.selected_guide.lock().map_err(|_| poisoned())?;
-        if guide.is_some_and(|g| !project.guides().contains_key(&g)) {
-            *guide = None;
-        }
+        self.selected_guides
+            .lock()
+            .map_err(|_| poisoned())?
+            .retain(|g| project.guide(*g).is_some());
+        self.selected_notches
+            .lock()
+            .map_err(|_| poisoned())?
+            .retain(|n| project.notch(*n).is_some());
         Ok(())
     }
 
@@ -2618,59 +2624,72 @@ impl Engine {
                 None => (None, None),
             },
         };
-        // A construction line, where nothing else is.
-        let guide = match (v.kind, frozen, panel) {
-            (ViewKind::Board, Some((bv, w, h)), None) => {
-                let p = bv.to_board(x, y, w, h);
-                project
+        // On the board, a notch near the pointer comes before its edge, and
+        // a construction line where nothing else is (or added to picks).
+        let mut notch = None;
+        let mut guide = None;
+        if let (ViewKind::Board, Some((bv, w, h))) = (v.kind, frozen) {
+            let p = bv.to_board(x, y, w, h);
+            if corner.is_none() {
+                notch = project
+                    .notches()
+                    .keys()
+                    .filter_map(|n| Some((*n, project.notch_placement(*n)?.pos.distance(p))))
+                    .filter(|(_, d)| *d <= CORNER_PICK_PX * bv.mm_per_px)
+                    .min_by(|a, b| a.1.total_cmp(&b.1))
+                    .map(|(n, _)| n);
+            }
+            if corner.is_none() && notch.is_none() && edge.is_none() && (panel.is_none() || extend)
+            {
+                guide = project
                     .guides()
                     .iter()
                     .map(|(id, g)| (*id, crate::snap::distance_to_line(p, g.a, g.b)))
                     .filter(|(_, d)| *d <= EDGE_PICK_PX * bv.mm_per_px)
                     .min_by(|a, b| a.1.total_cmp(&b.1))
-                    .map(|(id, _)| id)
+                    .map(|(id, _)| id);
             }
-            _ => None,
-        };
-        *self.selected_guide.lock().map_err(|_| poisoned())? = guide;
+        }
+        let edge = if notch.is_some() { None } else { edge };
         let mut points = self.selected_points.lock().map_err(|_| poisoned())?;
         let mut edges = self.selected_edges.lock().map_err(|_| poisoned())?;
-        // ⇧- or ⌘/Ctrl-click adds a second corner or edge (to measure or constrain
-        // them together): two picks at most, the oldest dropped.
-        match (corner, edge) {
-            (Some((_, point, _)), _) if extend => {
-                if !points.contains(&point) {
-                    points.push(point);
+        let mut notches = self.selected_notches.lock().map_err(|_| poisoned())?;
+        let mut guides = self.selected_guides.lock().map_err(|_| poisoned())?;
+        /// Add `item`, or take it away if it is there.
+        fn toggle<T: PartialEq>(list: &mut Vec<T>, item: T) {
+            match list.iter().position(|x| *x == item) {
+                Some(i) => {
+                    list.remove(i);
                 }
-            }
-            (Some((_, point, _)), _) => {
-                *points = vec![point];
-                edges.clear();
-            }
-            (None, Some(e)) if extend => {
-                if !edges.contains(&e) {
-                    edges.push(e);
-                }
-            }
-            (None, Some(e)) => {
-                *edges = vec![e];
-                points.clear();
-            }
-            (None, None) => {
-                points.clear();
-                edges.clear();
+                None => list.push(item),
             }
         }
-        while points.len() + edges.len() > 2 {
-            if edges.len() > points.len() || points.is_empty() {
-                edges.remove(0);
-            } else {
-                points.remove(0);
-            }
+        let picked = corner.is_some() || notch.is_some() || edge.is_some() || guide.is_some();
+        // ⇧- or ⌘/Ctrl-click adds a corner, an edge, a notch or a line to
+        // what is picked (or takes it away); a plain click picks it alone.
+        if !(extend && picked) {
+            points.clear();
+            edges.clear();
+            notches.clear();
+            guides.clear();
         }
+        if let Some((_, point, _)) = corner {
+            toggle(&mut points, point);
+        } else if let Some(n) = notch {
+            toggle(&mut notches, n);
+        } else if let Some(e) = edge {
+            toggle(&mut edges, e);
+        } else if let Some(g) = guide {
+            toggle(&mut guides, g);
+        }
+        let notch_panel = notch
+            .and_then(|n| project.notch(n))
+            .and_then(|n| project.edge(n.edge))
+            .map(|e| e.panel);
+        let panel = panel.or(notch_panel);
         let mut selected = self.selected()?;
         // Extending keeps the piece picked first.
-        if !(extend && !selected.is_empty() && (corner.is_some() || edge.is_some())) {
+        if !(extend && !selected.is_empty() && picked) {
             *selected = panel.into_iter().collect();
         }
         Ok(selected.iter().map(ToString::to_string).collect())
@@ -3101,14 +3120,37 @@ impl Engine {
             .collect())
     }
 
-    /// The construction line picked on the board, if any.
+    /// The construction lines picked on the board.
     #[frb(sync)]
-    pub fn selected_guide(&self) -> Result<Option<String>, ApiError> {
+    pub fn selected_guides(&self) -> Result<Vec<String>, ApiError> {
         Ok(self
-            .selected_guide
+            .selected_guides
             .lock()
             .map_err(|_| poisoned())?
-            .map(|g| g.to_string()))
+            .iter()
+            .map(ToString::to_string)
+            .collect())
+    }
+
+    /// The notches picked on the board, each with where it is (mm).
+    #[frb(sync)]
+    pub fn selected_notches(&self) -> Result<Vec<PickedPoint>, ApiError> {
+        let ws = self.workspace()?;
+        let project = ws.session().project();
+        Ok(self
+            .selected_notches
+            .lock()
+            .map_err(|_| poisoned())?
+            .iter()
+            .filter_map(|id| {
+                let at = project.notch_placement(*id)?.pos;
+                Some(PickedPoint {
+                    id: id.to_string(),
+                    x_mm: at.x,
+                    y_mm: at.y,
+                })
+            })
+            .collect())
     }
 
     /// Where a pointer at pattern point (`x_mm`, `y_mm`) lands within
@@ -3822,7 +3864,11 @@ impl Engine {
         let ws = self.workspace()?;
         let project = ws.session().project();
         self.selected_edges.lock().map_err(|_| poisoned())?.clear();
-        *self.selected_guide.lock().map_err(|_| poisoned())? = None;
+        self.selected_guides.lock().map_err(|_| poisoned())?.clear();
+        self.selected_notches
+            .lock()
+            .map_err(|_| poisoned())?
+            .clear();
         let mut selected = self.selected()?;
         *selected = panels
             .iter()

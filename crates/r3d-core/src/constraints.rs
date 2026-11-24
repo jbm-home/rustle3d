@@ -22,8 +22,8 @@ use r3d_geom::CubicBez;
 use r3d_geom::solve::{Options, System, solve};
 
 use crate::formula::{FormulaError, Scope};
-use crate::id::{ConstraintId, EdgeId, PointId};
-use crate::model::{Along, Constraint, EdgeCurve, Project};
+use crate::id::{ConstraintId, EdgeId, NotchId, PointId};
+use crate::model::{Along, Constraint, EdgeCurve, EdgeEnd, Project};
 
 /// Length that turns angular residuals (radians) into millimetres, so that
 /// both weigh alike in the solver.
@@ -87,8 +87,12 @@ enum Eq {
     Length(EdgeId, f64),
     /// Radians; the shared point, if any.
     Angle(EdgeId, EdgeId, f64, Option<PointId>),
-    /// A symmetric piece's half ends on its axis (origin, unit direction).
+    /// A symmetric piece's half ends on its axis (origin, unit direction);
+    /// a point on a construction line alike.
     OnAxis(PointId, DVec2, DVec2),
+    /// A point's distance from a line (origin, unit direction), on the
+    /// side `sign` says (as it was found).
+    LineDistance(PointId, DVec2, DVec2, f64, f64),
 }
 
 /// The geometry the equations read, with the variables plugged in.
@@ -324,6 +328,9 @@ impl<'a> Sketch<'a> {
                 ANGLE_SCALE_MM * (ua.perp_dot(ub).abs().atan2(ua.dot(ub)) - rad)
             }
             Eq::OnAxis(p, origin, dir) => dir.perp_dot(self.pos(*p, x) - *origin),
+            Eq::LineDistance(p, origin, dir, mm, sign) => {
+                dir.perp_dot(self.pos(*p, x) - *origin) * sign - mm
+            }
         }
     }
 
@@ -481,7 +488,62 @@ fn equations(project: &Project, c: &Constraint) -> Vec<Eq> {
             deg.to_radians(),
             shared_point(project, *a, *b),
         )],
+        // Placed after solving (`notch_places`).
+        Constraint::NotchDistance { .. } => Vec::new(),
+        Constraint::OnGuide { point, guide } => match project.guide(*guide) {
+            Some(g) => vec![Eq::OnAxis(*point, g.a, unit(g.b - g.a))],
+            None => Vec::new(),
+        },
+        Constraint::GuideDistance {
+            point, guide, mm, ..
+        } => match (project.guide(*guide), project.point(*point)) {
+            (Some(g), Some(p)) => {
+                let dir = unit(g.b - g.a);
+                let sign = if dir.perp_dot(p.pos - g.a) < 0.0 {
+                    -1.0
+                } else {
+                    1.0
+                };
+                vec![Eq::LineDistance(*point, g.a, dir, *mm, sign)]
+            }
+            _ => Vec::new(),
+        },
     }
+}
+
+/// Where a notch dimension puts its notch: its offset from the edge's
+/// start (mm), at most the edge's length.
+fn notch_offset(project: &Project, c: &Constraint) -> Option<(NotchId, f64)> {
+    let Constraint::NotchDistance {
+        notch, from, mm, ..
+    } = c
+    else {
+        return None;
+    };
+    let length = project.edge_length(project.notch(*notch)?.edge)?;
+    let along = mm.min(length);
+    Some((
+        *notch,
+        match from {
+            EdgeEnd::Start => along,
+            EdgeEnd::End => length - along,
+        },
+    ))
+}
+
+/// The notches whose dimension puts them elsewhere than they are, with
+/// their offset there (after the solver has moved the edges).
+pub fn notch_places(project: &Project) -> Vec<(NotchId, f64)> {
+    project
+        .constraints()
+        .values()
+        .filter_map(|c| notch_offset(project, c))
+        .filter(|(n, offset)| {
+            project
+                .notch(*n)
+                .is_some_and(|n| (n.offset_mm - offset).abs() > TOLERANCE_MM)
+        })
+        .collect()
 }
 
 /// The two ends of a symmetric piece's drawn half, which stay on its axis,
@@ -612,6 +674,11 @@ pub fn holds(project: &Project, id: ConstraintId) -> bool {
     let Some(c) = project.constraint(id) else {
         return true;
     };
+    if let Some((n, offset)) = notch_offset(project, c) {
+        return project
+            .notch(n)
+            .is_some_and(|n| (n.offset_mm - offset).abs() <= TOLERANCE_MM);
+    }
     let (points, curves) = reach(project, c);
     let s = sketch(
         project,
@@ -814,6 +881,7 @@ pub fn formula_grades(project: &Project) -> Result<FormulaGrades, Unsolvable> {
             let scope = Scope {
                 body: scope_body.as_ref(),
                 variables: &sized.variables,
+                dimensions: &sized.constraints,
             };
             sized
                 .constraints
@@ -907,6 +975,15 @@ pub fn status(project: &Project) -> Vec<GroupStatus> {
 /// A dimension's current value as the geometry is now (mm or degrees);
 /// `None` for other constraints or missing geometry.
 pub fn measure(project: &Project, c: &Constraint) -> Option<f64> {
+    if let Constraint::NotchDistance { notch, from, .. } = c {
+        let n = project.notch(*notch)?;
+        let length = project.edge_length(n.edge)?;
+        let at = n.offset_mm.min(length);
+        return Some(match from {
+            EdgeEnd::Start => at,
+            EdgeEnd::End => length - at,
+        });
+    }
     let s = Sketch {
         project,
         points: BTreeMap::new(),
@@ -1012,6 +1089,8 @@ mod tests {
                 edge: edges[0],
                 mm: 120.0,
                 formula: None,
+                name: None,
+                label: None,
             },
         );
         apply(&mut p, &Touched::default());
@@ -1072,6 +1151,8 @@ mod tests {
                 edge: edges[0],
                 mm: 50.0,
                 formula: None,
+                name: None,
+                label: None,
             },
         );
         let err = solve_project(&p, &Touched::default()).unwrap_err();
@@ -1145,6 +1226,8 @@ mod tests {
             mm: 1.0,
             along: Along::Direct,
             formula: None,
+            name: None,
+            label: None,
         };
         assert!((measure(&p, &d).unwrap() - 50.0).abs() < 1e-9);
         let a = Constraint::Angle {
@@ -1152,6 +1235,8 @@ mod tests {
             b: edges[1],
             deg: 1.0,
             formula: None,
+            name: None,
+            label: None,
         };
         assert!((measure(&p, &a).unwrap() - 90.0).abs() < 1e-9);
         let h = Constraint::Distance {
@@ -1160,6 +1245,8 @@ mod tests {
             mm: 1.0,
             along: Along::Horizontal,
             formula: None,
+            name: None,
+            label: None,
         };
         assert!((measure(&p, &h).unwrap() - 30.0).abs() < 1e-9);
     }

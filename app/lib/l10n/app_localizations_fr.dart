@@ -2044,10 +2044,183 @@ class LFr extends L {
       'height': 'Hauteur',
       'length': 'Longueur',
       'angle': 'Angle',
+      'on_guide': 'Sur la ligne',
+      'notch_distance': 'Distance du cran',
+      'guide_distance': 'Distance à la ligne',
       'other': '$kind',
     });
     return '$_temp0';
   }
+
+  @override
+  String get barHint =>
+      'Choisissez des coins, des arêtes, des crans ou des lignes de construction sur le patron (⇧- ou ⌘-clic en ajoute) pour les contraindre.';
+
+  @override
+  String barCorners(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count coins',
+      one: '1 coin',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String barEdges(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count arêtes',
+      one: '1 arête',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String barNotches(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count crans',
+      one: '1 cran',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String barLines(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count lignes',
+      one: '1 ligne',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get barFixedHint =>
+      'Le coin reste où il est quand le dessin est recalculé.';
+
+  @override
+  String get barSmoothHint =>
+      'Sans angle : le contour passe en douceur par le point.';
+
+  @override
+  String get barCornerHint =>
+      'De nouveau un angle : les deux arêtes ne sont plus alignées.';
+
+  @override
+  String get barRemovePointHint =>
+      'Supprimer le coin ; ses deux arêtes n’en font plus qu’une.';
+
+  @override
+  String get barWidthHint =>
+      'Coter l’écart en largeur entre les deux coins, puis le taper.';
+
+  @override
+  String get barHeightHint =>
+      'Coter l’écart en hauteur entre les deux coins, puis le taper.';
+
+  @override
+  String get barDistanceHint =>
+      'Coter la distance en ligne droite entre les deux coins, puis la taper.';
+
+  @override
+  String get barJoinedHint =>
+      'Les deux coins au même endroit (sur deux pièces, en général).';
+
+  @override
+  String get barLengthHint =>
+      'Coter la longueur de l’arête le long de sa courbe, puis la taper.';
+
+  @override
+  String get barHorizontalHint =>
+      'Les extrémités de l’arête à la même hauteur.';
+
+  @override
+  String get barVerticalHint =>
+      'Les extrémités de l’arête l’une au-dessus de l’autre.';
+
+  @override
+  String get barAngleHint =>
+      'Coter l’angle entre les deux arêtes, puis le taper.';
+
+  @override
+  String get barSameLengthHint =>
+      'Les arêtes aussi longues que la première choisie.';
+
+  @override
+  String get barParallelHint => 'Les arêtes parallèles à la première choisie.';
+
+  @override
+  String get barSquareHint => 'Les deux arêtes à angle droit.';
+
+  @override
+  String get barOnEdgeHint =>
+      'Le coin sur l’arête (sur son prolongement, pour une arête droite).';
+
+  @override
+  String get barNotchStart => 'Depuis le début';
+
+  @override
+  String get barNotchStartHint =>
+      'Coter la distance du cran le long de son arête depuis le début de l’arête ; il la garde quand l’arête change.';
+
+  @override
+  String get barNotchEnd => 'Depuis la fin';
+
+  @override
+  String get barNotchEndHint =>
+      'Coter la distance du cran le long de son arête depuis la fin de l’arête ; il la garde quand l’arête change.';
+
+  @override
+  String get barRemoveNotch => 'Supprimer le cran';
+
+  @override
+  String get barRemoveNotchHint => 'Supprimer le cran.';
+
+  @override
+  String get barGuideDistanceHint =>
+      'Coter la distance du coin à la ligne, puis la taper ; déplacer la ligne déplace le coin.';
+
+  @override
+  String get barOnGuideHint =>
+      'Le coin sur la ligne ; déplacer la ligne déplace le coin.';
+
+  @override
+  String get barLevel => 'À l’horizontale';
+
+  @override
+  String get barLevelHint =>
+      'Tourner la ligne autour de sa première extrémité pour la mettre à l’horizontale.';
+
+  @override
+  String get barUpright => 'À la verticale';
+
+  @override
+  String get barUprightHint =>
+      'Tourner la ligne autour de sa première extrémité pour la mettre à la verticale.';
+
+  @override
+  String get barRemoveLine => 'Supprimer la ligne';
+
+  @override
+  String get barRemoveLineHint =>
+      'Supprimer la ligne de construction (et ses contraintes).';
+
+  @override
+  String get dimensionRename =>
+      'Nom : les formules peuvent utiliser cette cote';
+
+  @override
+  String get dimensionNameTitle => 'Nom de la cote';
+
+  @override
+  String get dimensionNameHelp =>
+      'Lettres, chiffres et _, en commençant par une lettre. Les formules l’utilisent alors comme une variable : la longueur d’une tête de manche peut être « armhole + 1.5 cm ». Vide : pas de nom.';
 
   @override
   String get constrain => 'Contraindre';
@@ -2081,6 +2254,7 @@ class LFr extends L {
     String _temp0 = intl.Intl.selectLogic(kind, {
       'point': 'Point',
       'midpoint': 'Milieu',
+      'crossing': 'Croisement',
       'edge': 'Sur l’arête',
       'guide': 'Sur la ligne',
       'axis': 'Sur l’axe',

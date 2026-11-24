@@ -13,7 +13,7 @@ use glam::DVec2;
 use r3d_core::file::{self, SCHEMA_VERSION};
 use r3d_core::{
     Along, Around, Avatar, AvatarMesh, Body, BodyPoint, Button, Buttonhole, Constraint, Edge,
-    EdgeCurve, Fabric, FabricDetails, Garment, Grading, Guide, InternalLine, Notch, Panel,
+    EdgeCurve, EdgeEnd, Fabric, FabricDetails, Garment, Grading, Guide, InternalLine, Notch, Panel,
     PathSegment, PatternSource, Pin, Placement, Point, Print, PrintPlacement, PrintSource, Project,
     Seam, SeamSide, Size, SourcePiece, Symmetry, TemplateRef, Transaction, UpAxis, Zipper,
 };
@@ -309,12 +309,17 @@ fn sample() -> Project {
             mm: 400.0,
             along: Along::Horizontal,
             formula: Some("bust / 2 - ease".into()),
+            // A name and a label placed by hand (v21).
+            name: Some("half_bust".into()),
+            label: Some([0.0, -30.0]),
         },
         Constraint::Angle {
             a: contour[0],
             b: contour[1],
             deg: 92.0,
             formula: None,
+            name: None,
+            label: None,
         },
     ] {
         let id = tx.new_constraint_id();
@@ -329,6 +334,32 @@ fn sample() -> Project {
             b: DVec2::new(450.0, 300.0),
         },
     );
+    // Constraints on a notch and a construction line (v21).
+    for c in [
+        Constraint::NotchDistance {
+            notch,
+            from: EdgeEnd::End,
+            mm: 40.0,
+            formula: Some("half_bust / 10".into()),
+            name: None,
+            label: None,
+        },
+        Constraint::OnGuide {
+            point: pts[2],
+            guide,
+        },
+        Constraint::GuideDistance {
+            point: pts[1],
+            guide,
+            mm: 150.0,
+            formula: None,
+            name: Some("hem_depth".into()),
+            label: None,
+        },
+    ] {
+        let id = tx.new_constraint_id();
+        tx.put_constraint(id, c);
+    }
     let button = tx.new_button_id();
     tx.put_button(
         button,

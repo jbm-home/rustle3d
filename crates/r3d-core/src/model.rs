@@ -65,10 +65,13 @@ pub struct Project {
     pub(crate) zippers: IdMap<ZipperId, Zipper>,
 }
 
-/// A relation the drawing keeps between points and edges: after every
-/// change, the constraint solver moves the geometry so that all of them
-/// hold again (`docs/specs/19-constraints.md`). Dimensions (`distance`,
-/// `length`, `angle`) carry a value; the others are geometric.
+/// A relation the drawing keeps between points, edges, notches and
+/// construction lines: after every change, the constraint solver moves the
+/// geometry so that all of them hold again (`docs/specs/19-constraints.md`,
+/// `docs/specs/30-action-bar.md`). Dimensions (`distance`, `length`,
+/// `angle`, `notch_distance`, `guide_distance`) carry a value, and may have
+/// a name formulas use and a label placed by hand; the others are
+/// geometric.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Constraint {
@@ -93,6 +96,8 @@ pub enum Constraint {
     /// The point lies on the edge (on its line, extended, for a straight
     /// edge).
     OnEdge { point: PointId, edge: EdgeId },
+    /// The point lies on the construction line (extended).
+    OnGuide { point: PointId, guide: GuideId },
     /// A dimension: the distance between two points.
     Distance {
         a: PointId,
@@ -104,15 +109,24 @@ pub enum Constraint {
         /// Computes `mm` from the body and the variables (a length).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         formula: Option<String>,
+        /// The name formulas know it by.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        name: Option<String>,
+        /// Where its label sits, mm from where it is drawn by default.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        label: Option<[f64; 2]>,
     },
     /// A dimension: the edge's length along its curve.
     Length {
         edge: EdgeId,
         /// mm, > 0.
         mm: f64,
-        /// Computes `mm` from the body and the variables (a length).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         formula: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        name: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        label: Option<[f64; 2]>,
     },
     /// A dimension: the angle between two edges (at their common point
     /// when they share one, between their chords otherwise).
@@ -121,10 +135,43 @@ pub enum Constraint {
         b: EdgeId,
         /// Degrees, 0–180.
         deg: f64,
-        /// Computes `deg` from the body and the variables (a plain
-        /// number).
+        /// Computes `deg` (a plain number).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         formula: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        name: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        label: Option<[f64; 2]>,
+    },
+    /// A dimension: a notch's distance along its edge from the edge's start
+    /// or end. The notch is put there after every change (at the edge's
+    /// end when the edge is shorter).
+    NotchDistance {
+        notch: NotchId,
+        #[serde(default)]
+        from: EdgeEnd,
+        /// mm, > 0.
+        mm: f64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        formula: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        name: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        label: Option<[f64; 2]>,
+    },
+    /// A dimension: a point's distance from a construction line, on the
+    /// side it is on.
+    GuideDistance {
+        point: PointId,
+        guide: GuideId,
+        /// mm, > 0.
+        mm: f64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        formula: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        name: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        label: Option<[f64; 2]>,
     },
 }
 
@@ -141,13 +188,87 @@ pub enum Along {
     Vertical,
 }
 
+/// Which end of an edge a distance along it is measured from.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum EdgeEnd {
+    #[default]
+    Start,
+    End,
+}
+
+/// A dimension's value, formula, name and label, read or changed alike on
+/// every kind.
+struct DimensionFields<'a> {
+    value: &'a mut f64,
+    formula: &'a mut Option<String>,
+    name: &'a mut Option<String>,
+    label: &'a mut Option<[f64; 2]>,
+}
+
 impl Constraint {
+    fn dimension(&mut self) -> Option<DimensionFields<'_>> {
+        match self {
+            Constraint::Distance {
+                mm,
+                formula,
+                name,
+                label,
+                ..
+            }
+            | Constraint::Length {
+                mm,
+                formula,
+                name,
+                label,
+                ..
+            }
+            | Constraint::NotchDistance {
+                mm,
+                formula,
+                name,
+                label,
+                ..
+            }
+            | Constraint::GuideDistance {
+                mm,
+                formula,
+                name,
+                label,
+                ..
+            }
+            | Constraint::Angle {
+                deg: mm,
+                formula,
+                name,
+                label,
+                ..
+            } => Some(DimensionFields {
+                value: mm,
+                formula,
+                name,
+                label,
+            }),
+            _ => None,
+        }
+    }
+
+    /// A copy with one of the dimension's fields changed; `None` for the
+    /// other constraints.
+    fn with_dimension(&self, change: impl FnOnce(DimensionFields<'_>)) -> Option<Constraint> {
+        let mut c = self.clone();
+        change(c.dimension()?);
+        Some(c)
+    }
+
     /// The points it names.
     pub fn points(&self) -> Vec<PointId> {
         match self {
             Constraint::Fixed { point }
             | Constraint::Tangent { point }
-            | Constraint::OnEdge { point, .. } => vec![*point],
+            | Constraint::OnEdge { point, .. }
+            | Constraint::OnGuide { point, .. }
+            | Constraint::GuideDistance { point, .. } => vec![*point],
             Constraint::Coincident { a, b } | Constraint::Distance { a, b, .. } => vec![*a, *b],
             _ => Vec::new(),
         }
@@ -168,10 +289,31 @@ impl Constraint {
         }
     }
 
+    /// The notch it names, if any.
+    pub fn notch(&self) -> Option<NotchId> {
+        match self {
+            Constraint::NotchDistance { notch, .. } => Some(*notch),
+            _ => None,
+        }
+    }
+
+    /// The construction line it names, if any.
+    pub fn guide(&self) -> Option<GuideId> {
+        match self {
+            Constraint::OnGuide { guide, .. } | Constraint::GuideDistance { guide, .. } => {
+                Some(*guide)
+            }
+            _ => None,
+        }
+    }
+
     /// A dimension's value (mm or degrees); `None` for the others.
     pub fn value(&self) -> Option<f64> {
         match self {
-            Constraint::Distance { mm, .. } | Constraint::Length { mm, .. } => Some(*mm),
+            Constraint::Distance { mm, .. }
+            | Constraint::Length { mm, .. }
+            | Constraint::NotchDistance { mm, .. }
+            | Constraint::GuideDistance { mm, .. } => Some(*mm),
             Constraint::Angle { deg, .. } => Some(*deg),
             _ => None,
         }
@@ -182,7 +324,34 @@ impl Constraint {
         match self {
             Constraint::Distance { formula, .. }
             | Constraint::Length { formula, .. }
-            | Constraint::Angle { formula, .. } => formula.as_deref(),
+            | Constraint::Angle { formula, .. }
+            | Constraint::NotchDistance { formula, .. }
+            | Constraint::GuideDistance { formula, .. } => formula.as_deref(),
+            _ => None,
+        }
+    }
+
+    /// A dimension's name, if it has one: formulas use it.
+    pub fn name(&self) -> Option<&str> {
+        match self {
+            Constraint::Distance { name, .. }
+            | Constraint::Length { name, .. }
+            | Constraint::Angle { name, .. }
+            | Constraint::NotchDistance { name, .. }
+            | Constraint::GuideDistance { name, .. } => name.as_deref(),
+            _ => None,
+        }
+    }
+
+    /// Where a dimension's label sits, mm from where it is drawn by
+    /// default; `None` there.
+    pub fn label(&self) -> Option<[f64; 2]> {
+        match self {
+            Constraint::Distance { label, .. }
+            | Constraint::Length { label, .. }
+            | Constraint::Angle { label, .. }
+            | Constraint::NotchDistance { label, .. }
+            | Constraint::GuideDistance { label, .. } => *label,
             _ => None,
         }
     }
@@ -190,39 +359,39 @@ impl Constraint {
     /// The same dimension with another formula (or none); `None` for the
     /// others.
     pub fn with_formula(&self, f: Option<String>) -> Option<Constraint> {
-        let mut c = self.clone();
-        match &mut c {
-            Constraint::Distance { formula, .. }
-            | Constraint::Length { formula, .. }
-            | Constraint::Angle { formula, .. } => *formula = f,
-            _ => return None,
-        }
-        Some(c)
+        self.with_dimension(|d| *d.formula = f)
     }
 
-    /// The length dimension a dimension's value has: 1 (mm) for a
-    /// distance or a length, 0 for an angle (degrees).
-    pub fn value_power(&self) -> Option<i32> {
-        match self {
-            Constraint::Distance { .. } | Constraint::Length { .. } => Some(1),
-            Constraint::Angle { .. } => Some(0),
-            _ => None,
-        }
+    /// The same dimension with another name (or none); `None` for the
+    /// others.
+    pub fn with_name(&self, n: Option<String>) -> Option<Constraint> {
+        self.with_dimension(|d| *d.name = n)
+    }
+
+    /// The same dimension with its label elsewhere (`None`: where it is
+    /// drawn by default); `None` for the others.
+    pub fn with_label(&self, at: Option<[f64; 2]>) -> Option<Constraint> {
+        self.with_dimension(|d| *d.label = at)
     }
 
     /// The same dimension with another value; `None` for the others.
     pub fn with_value(&self, value: f64) -> Option<Constraint> {
-        let mut c = self.clone();
-        match &mut c {
-            Constraint::Distance { mm, .. } | Constraint::Length { mm, .. } => *mm = value,
-            Constraint::Angle { deg, .. } => *deg = value,
-            _ => return None,
+        self.with_dimension(|d| *d.value = value)
+    }
+
+    /// The length dimension a dimension's value has: 0 for an angle
+    /// (degrees), 1 (mm) for the others.
+    pub fn value_power(&self) -> Option<i32> {
+        match self {
+            Constraint::Angle { .. } => Some(0),
+            c => c.value().map(|_| 1),
         }
-        Some(c)
     }
 
     /// The same constraint on other points and edges (`map_point` and
-    /// `map_edge` give each one's replacement); `None` when one has none.
+    /// `map_edge` give each one's replacement), without a name (names are
+    /// unique); `None` when one has none, and for a constraint on a notch
+    /// or a construction line.
     pub fn remapped(
         &self,
         map_point: impl Fn(PointId) -> Option<PointId>,
@@ -251,12 +420,15 @@ impl Constraint {
                 *a = map_edge(*a)?;
                 *b = map_edge(*b)?;
             }
+            Constraint::NotchDistance { .. }
+            | Constraint::OnGuide { .. }
+            | Constraint::GuideDistance { .. } => return None,
         }
-        Some(c)
+        c.with_name(None).or(Some(c))
     }
 }
 
-/// A construction line between two board points (mm).
+// A construction line between two board points (mm).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Guide {
@@ -960,6 +1132,10 @@ impl Project {
         self.constraints.get(&id)
     }
 
+    pub fn guide(&self, id: GuideId) -> Option<&Guide> {
+        self.guides.get(&id)
+    }
+
     pub fn guides(&self) -> &IdMap<GuideId, Guide> {
         &self.guides
     }
@@ -974,6 +1150,7 @@ impl Project {
         crate::formula::Scope {
             body: self.avatar.as_ref(),
             variables: &self.variables,
+            dimensions: &self.constraints,
         }
     }
 
@@ -987,6 +1164,10 @@ impl Project {
                 c.edges()
                     .first()
                     .and_then(|e| self.edge(*e).map(|e| e.panel))
+            })
+            .or_else(|| {
+                let notch = self.notch(c.notch()?)?;
+                self.edge(notch.edge).map(|e| e.panel)
             })
     }
 
