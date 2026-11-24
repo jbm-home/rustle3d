@@ -1,5 +1,5 @@
 // Attached agents: allowed from the Agents dialog (which shows how to add
-// the server), an agent connects with the token, its change shows at once;
+// the server, or saves an extension), an agent connects with the token, its change shows at once;
 // the user disconnects it.
 
 import 'dart:async';
@@ -46,6 +46,14 @@ void main() {
       find.byKey(const ValueKey('agentsConfig')),
     );
     expect(config.data, contains('"args": ["mcp", "--attach"]'));
+    // For desktop assistants that install extensions: a file to save
+    // instead of settings to copy.
+    await tester.tap(find.text('Claude Desktop'));
+    await frames();
+    expect(find.byKey(const ValueKey('agentsSaveExtension')), findsOneWidget);
+    expect(find.byKey(const ValueKey('agentsConfig')), findsNothing);
+    await tester.tap(find.text('JSON'));
+    await frames();
     await tester.tap(find.byKey(const ValueKey('agentsAllow')));
     await frames();
     expect(find.text('Agents: waiting'), findsOneWidget);

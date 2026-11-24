@@ -1,6 +1,8 @@
 //! Attached mode (docs/specs/09-mcp-connector.md): the desktop app serves
-//! its open project to one agent at a time, so the user sees every change
-//! live and can undo it. The app listens on a local TCP port (loopback
+//! its open project to agents, so the user sees every change live and can
+//! undo it. Several agents may be connected at once (a desktop assistant
+//! starts one server for its chat and another for its coding sessions);
+//! their calls take turns on the one project. The app listens on a local TCP port (loopback
 //! only) and writes the port and a secret token to `agent.json` in its
 //! support folder; `r3d mcp --attach` reads that file, connects, sends the
 //! token and relays the agent's stdio. Nothing listens until the user
@@ -9,7 +11,7 @@
 use std::hash::{BuildHasher, Hasher};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use rmcp::ServiceExt;
@@ -17,6 +19,7 @@ use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Notify;
+use tokio::task::JoinSet;
 
 use crate::{ServeError, Server};
 
@@ -43,12 +46,13 @@ pub struct Endpoint {
 pub enum AgentState {
     /// Listening; no agent yet.
     Waiting,
-    /// An agent is connected.
+    /// At least one agent is connected.
     Connected,
 }
 
 struct Shared {
-    connected: AtomicBool,
+    /// Agents connected now.
+    connected: AtomicUsize,
     disconnect: Notify,
     stop: Notify,
 }
@@ -92,7 +96,7 @@ impl Host {
     /// project), and write the endpoint into `dir`.
     pub fn start(server: Server, dir: &Path, project: &str) -> Result<Self, ServeError> {
         let shared = Arc::new(Shared {
-            connected: AtomicBool::new(false),
+            connected: AtomicUsize::new(0),
             disconnect: Notify::new(),
             stop: Notify::new(),
         });
@@ -139,14 +143,14 @@ impl Host {
     }
 
     pub fn state(&self) -> AgentState {
-        if self.shared.connected.load(Ordering::SeqCst) {
+        if self.shared.connected.load(Ordering::SeqCst) > 0 {
             AgentState::Connected
         } else {
             AgentState::Waiting
         }
     }
 
-    /// Close the connected agent's session (others may connect again).
+    /// Close the connected agents' sessions (they may connect again).
     pub fn disconnect(&self) {
         self.shared.disconnect.notify_waiters();
     }
@@ -163,7 +167,7 @@ impl Drop for Host {
     }
 }
 
-/// Accept agents one after the other until stopped.
+/// Accept agents, each served on its own task, until stopped.
 async fn accept(
     server: Server,
     shared: Arc<Shared>,
@@ -186,24 +190,23 @@ async fn accept(
             return;
         }
     }
+    // Dropped on return: every session still open is aborted.
+    let mut sessions = JoinSet::new();
     loop {
-        let stream = tokio::select! {
-            _ = shared.stop.notified() => return,
-            accepted = listener.accept() => match accepted {
-                Ok((stream, _)) => stream,
-                Err(_) => continue,
-            },
-        };
         tokio::select! {
             _ = shared.stop.notified() => return,
-            _ = session(&server, &shared, &token, stream) => {}
+            accepted = listener.accept() => if let Ok((stream, _)) = accepted {
+                sessions.spawn(session(server.clone(), shared.clone(), token.clone(), stream));
+            },
+            // Reap the sessions that ended.
+            Some(_) = sessions.join_next() => {}
         }
     }
 }
 
 /// One agent: check its token, then serve it until it leaves or the user
 /// disconnects it.
-async fn session(server: &Server, shared: &Shared, token: &str, stream: TcpStream) {
+async fn session(server: Server, shared: Arc<Shared>, token: String, stream: TcpStream) {
     let (read, mut write) = stream.into_split();
     let mut reader = BufReader::new(read);
     let mut hello = String::new();
@@ -213,15 +216,15 @@ async fn session(server: &Server, shared: &Shared, token: &str, stream: TcpStrea
         let _ = write.write_all(b"denied\n").await;
         return;
     }
-    let Ok(service) = server.clone().serve((reader, write)).await else {
+    let Ok(service) = server.serve((reader, write)).await else {
         return;
     };
-    shared.connected.store(true, Ordering::SeqCst);
+    shared.connected.fetch_add(1, Ordering::SeqCst);
     tokio::select! {
         _ = shared.disconnect.notified() => {}
         _ = service.waiting() => {}
     }
-    shared.connected.store(false, Ordering::SeqCst);
+    shared.connected.fetch_sub(1, Ordering::SeqCst);
 }
 
 /// Where the app writes its endpoint, by platform (its support folder).

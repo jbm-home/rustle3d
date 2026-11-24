@@ -70,7 +70,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 482359944;
+  int get rustContentHash => 349799923;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -521,6 +521,11 @@ abstract class RustLibApi extends BaseApi {
   String crateApiProjectsRenameProject({
     required String path,
     required String name,
+  });
+
+  void crateApiEngineSaveAgentExtension({
+    required String r3D,
+    required String out,
   });
 
   void crateApiLibrarySaveBodyPreset({
@@ -3675,6 +3680,36 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  void crateApiEngineSaveAgentExtension({
+    required String r3D,
+    required String out,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(r3D, serializer);
+          sse_encode_String(out, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 96)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_api_error,
+        ),
+        constMeta: kCrateApiEngineSaveAgentExtensionConstMeta,
+        argValues: [r3D, out],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEngineSaveAgentExtensionConstMeta =>
+      const TaskConstMeta(
+        debugName: "save_agent_extension",
+        argNames: ["r3D", "out"],
+      );
+
+  @override
   void crateApiLibrarySaveBodyPreset({
     required String libraryDir,
     required String name,
@@ -3687,7 +3722,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(libraryDir, serializer);
           sse_encode_String(name, serializer);
           sse_encode_String(bodyJson, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 96)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 97)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -3713,7 +3748,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_i_64(luid, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 97)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 98)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -3736,7 +3771,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(bodyJson, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 98)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 99)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -3770,7 +3805,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 99,
+            funcId: 100,
             port: port_,
           );
         },
@@ -6039,7 +6074,7 @@ class EngineImpl extends RustOpaque implements Engine {
   void detachView({required int view}) => RustLib.instance.api
       .crateApiEngineEngineDetachView(that: this, view: view);
 
-  /// Close the connected agent's session; agents stay allowed.
+  /// Close the connected agents' sessions; agents stay allowed.
   void disconnectAgent() =>
       RustLib.instance.api.crateApiEngineEngineDisconnectAgent(that: this);
 

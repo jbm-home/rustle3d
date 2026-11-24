@@ -475,6 +475,42 @@ abstract class L {
   /// **'Skip this version'**
   String get updateSkip;
 
+  /// No description provided for @updatesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Updates'**
+  String get updatesTitle;
+
+  /// No description provided for @updateAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for updates once a day'**
+  String get updateAuto;
+
+  /// No description provided for @updateAutoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The app asks rustle3d.com for the latest version number, sending only its own version and system. It never downloads or installs anything by itself.'**
+  String get updateAutoHint;
+
+  /// No description provided for @updateCheckNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Check now'**
+  String get updateCheckNow;
+
+  /// No description provided for @updateLatest.
+  ///
+  /// In en, this message translates to:
+  /// **'You have the latest version.'**
+  String get updateLatest;
+
+  /// No description provided for @updateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'rustle3d.com could not be reached. Check your connection and try again.'**
+  String get updateFailed;
+
   /// No description provided for @updateCheck.
   ///
   /// In en, this message translates to:
@@ -1206,6 +1242,24 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Most desktop assistants read this in their MCP settings file; merge it into the file\'s \"mcpServers\".'**
   String get agentsJsonHint;
+
+  /// No description provided for @agentsExtensionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'An extension file for Claude Desktop and other assistants that install MCP bundles (.mcpb): save it, then open it, or drop it into the assistant\'s Settings > Extensions. It runs r3d from where the app is installed, so it keeps working after an update; if you move the app, save it again.'**
+  String get agentsExtensionHint;
+
+  /// No description provided for @agentsSaveExtension.
+  ///
+  /// In en, this message translates to:
+  /// **'Save rustle3d.mcpb…'**
+  String get agentsSaveExtension;
+
+  /// No description provided for @agentsExtensionSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved: {path}. Open it to install it in your assistant.'**
+  String agentsExtensionSaved(String path);
 
   /// No description provided for @agentsCopy.
   ///

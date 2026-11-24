@@ -423,12 +423,17 @@ class _StartScreenState extends State<StartScreen> {
                           ),
                           if (widget.updates case final updates?)
                             TextButton.icon(
-                              onPressed: () =>
-                                  updates.enabled = !updates.enabled,
-                              icon: Icon(
-                                updates.enabled
-                                    ? Icons.check_box_outlined
-                                    : Icons.check_box_outline_blank_rounded,
+                              key: const ValueKey('updatesButton'),
+                              onPressed: () => showUpdates(
+                                context,
+                                updates: updates,
+                                onDownload: () => _launch(
+                                  context,
+                                  downloadUrl(widget.language),
+                                ),
+                              ),
+                              icon: const Icon(
+                                Icons.system_update_alt_rounded,
                                 size: 16,
                               ),
                               label: Text(l.updateCheck),

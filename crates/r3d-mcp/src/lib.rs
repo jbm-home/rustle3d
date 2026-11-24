@@ -18,6 +18,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 pub mod attach;
+pub mod bundle;
 pub mod render;
 
 use base64::Engine as _;

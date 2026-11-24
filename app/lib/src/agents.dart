@@ -1,11 +1,12 @@
 // Connecting an AI agent to the open project: allow it, add Rustle3D to the
-// agent's MCP servers (the command with r3d's full path, ready to copy),
-// and see it connect.
+// agent's MCP servers (the command with r3d's full path, ready to copy, or
+// an extension file for desktop assistants), and see it connect.
 
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -36,8 +37,9 @@ String? _r3dPath() {
   return File(path).existsSync() ? path : null;
 }
 
-/// How an agent's configuration names the server.
-enum _Client { json, claudeCode, codex }
+/// How an agent's configuration names the server: settings to copy, or an
+/// extension file (`.mcpb`) to install.
+enum _Client { json, claudeCode, codex, extension }
 
 class _Agents extends StatefulWidget {
   const _Agents({
@@ -59,6 +61,10 @@ class _AgentsState extends State<_Agents> {
   _Client _client = _Client.json;
   AgentStatus _status = AgentStatus.off;
   bool _copied = false;
+
+  /// Where the extension was saved, or why it could not be.
+  String? _saved;
+  String? _saveError;
   Timer? _poll;
 
   @override
@@ -103,7 +109,30 @@ class _AgentsState extends State<_Agents> {
         '[mcp_servers.rustle3d]\n'
             'command = ${jsonEncode(command)}\n'
             'args = ["mcp", "--attach"]',
+      _Client.extension => '',
     };
+  }
+
+  Future<void> _saveExtension(String r3d) async {
+    final location = await getSaveLocation(
+      suggestedName: 'rustle3d.mcpb',
+      acceptedTypeGroups: [
+        const XTypeGroup(label: 'MCP Bundle', extensions: ['mcpb']),
+      ],
+    );
+    if (location == null || !mounted) return;
+    try {
+      saveAgentExtension(r3D: r3d, out: location.path);
+      setState(() {
+        _saved = location.path;
+        _saveError = null;
+      });
+    } on ApiError catch (e) {
+      setState(() {
+        _saved = null;
+        _saveError = context.error(e);
+      });
+    }
   }
 
   static String _quoted(String s) => s.contains(' ') ? '"$s"' : s;
@@ -205,41 +234,65 @@ class _AgentsState extends State<_Agents> {
                       value: _Client.codex,
                       label: Text('Codex'),
                     ),
+                    const ButtonSegment(
+                      value: _Client.extension,
+                      label: Text('Claude Desktop'),
+                    ),
                   ],
                   selected: {_client},
                   onSelectionChanged: (s) => setState(() => _client = s.first),
                 ),
                 if (_client == _Client.json) hint(l.agentsJsonHint),
-                const SizedBox(height: Space.s),
-                Container(
-                  padding: const EdgeInsets.all(Space.m),
-                  decoration: BoxDecoration(
-                    color: p.surfaceMuted,
-                    border: Border.all(color: p.border),
-                    borderRadius: BorderRadius.circular(kRadius),
+                if (_client == _Client.extension) ...[
+                  hint(l.agentsExtensionHint),
+                  const SizedBox(height: Space.s),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      key: const ValueKey('agentsSaveExtension'),
+                      icon: const Icon(Icons.download, size: 18),
+                      label: Text(l.agentsSaveExtension),
+                      onPressed: switch (_r3d) {
+                        final r3d? => () => _saveExtension(r3d),
+                        null => null,
+                      },
+                    ),
                   ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: SelectableText(
-                          _config(),
-                          key: const ValueKey('agentsConfig'),
-                          style: ts(fontSize: 12, height: 1.4, color: p.text),
+                  if (_saved case final saved?)
+                    hint(l.agentsExtensionSaved(saved)),
+                  if (_saveError case final error?) hint(error),
+                ] else ...[
+                  const SizedBox(height: Space.s),
+                  Container(
+                    padding: const EdgeInsets.all(Space.m),
+                    decoration: BoxDecoration(
+                      color: p.surfaceMuted,
+                      border: Border.all(color: p.border),
+                      borderRadius: BorderRadius.circular(kRadius),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: SelectableText(
+                            _config(),
+                            key: const ValueKey('agentsConfig'),
+                            style: ts(fontSize: 12, height: 1.4, color: p.text),
+                          ),
                         ),
-                      ),
-                      IconButton(
-                        key: const ValueKey('agentsCopy'),
-                        tooltip: l.agentsCopy,
-                        icon: Icon(
-                          _copied ? Icons.check : Icons.content_copy,
-                          size: 18,
+                        IconButton(
+                          key: const ValueKey('agentsCopy'),
+                          tooltip: l.agentsCopy,
+                          icon: Icon(
+                            _copied ? Icons.check : Icons.content_copy,
+                            size: 18,
+                          ),
+                          onPressed: _copy,
                         ),
-                        onPressed: _copy,
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
+                ],
                 if (_r3d == null) hint(l.agentsNoR3d),
               ]),
               step(3, l.agentsStepAsk, [

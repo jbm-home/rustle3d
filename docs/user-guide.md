@@ -7,7 +7,7 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-24 (quilted and topstitched garments draw much faster in the 3D view; zoomed out, the pattern draws stitches as a line; the Agents button opens a guide to connect an AI agent: allow it, copy the server's settings for your agent with r3d's full path, and see it connect; the shirt template has a yoke across its back, topstitched, and its collar and cuffs interfaced; quilting: select a piece and choose Quilting in the action bar, diamonds or channels over a padding; the garment puffs between the stitched lines in 3D and in photos, and the tech pack lists the padding; interfacing: select a piece and choose Interfacing in the action bar, or pick an edge for a band along it; light, medium or heavy, it makes the cloth hold its shape, and the tech pack lists its area; lines inside a piece may now cross; topstitching: pick an edge, then Topstitch in the action bar: one to three rows of stitches, seen on the pattern, on the 3D garment, in photos and in the tech pack; photos now show buttons and zippers; elastic: pick an edge, then Elastic in the action bar, and it gathers when draped; Shirring adds rows of elastic across a piece; the tech pack lists the elastic per size; moving a piece on the pattern no longer moves it on the avatar; the action bar's buttons are larger, with a short name under each, and it says Nothing picked when nothing is; a piece selected alone, the action bar offers Rotate, Scale, Mirror, Join, Cut out and Delete, no longer in the inspector; the action bar above the pattern and the garment: pick corners, edges, notches or construction lines, as many as you like, and it offers the constraints and dimensions that fit; a dimension added from it opens its value field on the board; drag a dimension's label to move it, click it to type a new value; dimensions can be named and used in formulas; a notch keeps its distance from the start or the end of its edge; corners on a construction line or at a distance from it follow the line; drawing snaps to where two lines cross; every piece's dimensions are shown; more body measurements: neck, shoulders, arm length, upper arm, wrist, back and front waist lengths, waist and hip heights, crotch depth, inside leg, thigh, knee and ankle, estimated until you type your own, in the Body panel under More measurements; the avatar follows the neck, shoulders, arms, back length, hip height, inside leg and thigh; formulas can use them; the shirt's sleeve comes from the arm length and the T-shirt's and shirt's neckline from the neck; with Select, drag a piece to move it, the corners of its frame to scale it and the round handle above it to turn it; Rotate and Scale in the inspector for an exact angle or percentage; the Draw tool also draws on a piece of the pattern, not only on the 3D garment; a shape added from the Shapes menu comes in selected, with the Select tool on; in French, the circle skirt is now called « jupe soleil »; patterns and measurement files from Seamly2D and Valentina come in drafted for their measurements, graded in every size, and can be drafted again for the avatar; the tape measure goes round a slanting sleeve square to it, and measures a length between two points of the garment; the start screen tells you when a new version is out, and the check can be turned off; Installing: a disk image for macOS, one for Intel and Apple silicon, an installer for Windows, and the first launch on recent macOS, through Privacy & Security; the shirt, T-shirt and dress take their shoulders, neckline and armholes from the avatar's body, and their hem fits over the hips: large sizes no longer have drooping shoulders; the avatar now takes the measurements given in every size of the charts, up to the women's 54: large sizes came out too slim and trousers fell off them; changing the size or the body while draping starts the drape again around the new body; trousers end just above the floor whatever the body; garments worn in layers lie close together: a shirt worn under trousers is tucked into them, and nothing shows through a garment worn over another; the trousers template is a little shorter; a selected piece's panel shows its garment's fabric; the Construction line and Tape measure tools have new icons; the tool rail in four sections, drawing, measuring, sewing and trims, with Dart and Pleat under Darts and pleats and Hole a tool of its own; the guided flow's step bar and banner removed; a more natural walk and a new motion, Stand at ease; captured motions whose rest pose lies flat play upright; pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
+Last updated: 2026-11-24 (Check for updates on the start screen opens a window: the daily check on or off, and Check now; portable .zip packages for macOS and Windows, to run without installing; the Agents guide saves an extension for Claude Desktop (.mcpb); several agents can be connected at once, so an assistant's chat and coding sessions both reach the project; quilted and topstitched garments draw much faster in the 3D view; zoomed out, the pattern draws stitches as a line; the Agents button opens a guide to connect an AI agent: allow it, copy the server's settings for your agent with r3d's full path, and see it connect; the shirt template has a yoke across its back, topstitched, and its collar and cuffs interfaced; quilting: select a piece and choose Quilting in the action bar, diamonds or channels over a padding; the garment puffs between the stitched lines in 3D and in photos, and the tech pack lists the padding; interfacing: select a piece and choose Interfacing in the action bar, or pick an edge for a band along it; light, medium or heavy, it makes the cloth hold its shape, and the tech pack lists its area; lines inside a piece may now cross; topstitching: pick an edge, then Topstitch in the action bar: one to three rows of stitches, seen on the pattern, on the 3D garment, in photos and in the tech pack; photos now show buttons and zippers; elastic: pick an edge, then Elastic in the action bar, and it gathers when draped; Shirring adds rows of elastic across a piece; the tech pack lists the elastic per size; moving a piece on the pattern no longer moves it on the avatar; the action bar's buttons are larger, with a short name under each, and it says Nothing picked when nothing is; a piece selected alone, the action bar offers Rotate, Scale, Mirror, Join, Cut out and Delete, no longer in the inspector; the action bar above the pattern and the garment: pick corners, edges, notches or construction lines, as many as you like, and it offers the constraints and dimensions that fit; a dimension added from it opens its value field on the board; drag a dimension's label to move it, click it to type a new value; dimensions can be named and used in formulas; a notch keeps its distance from the start or the end of its edge; corners on a construction line or at a distance from it follow the line; drawing snaps to where two lines cross; every piece's dimensions are shown; more body measurements: neck, shoulders, arm length, upper arm, wrist, back and front waist lengths, waist and hip heights, crotch depth, inside leg, thigh, knee and ankle, estimated until you type your own, in the Body panel under More measurements; the avatar follows the neck, shoulders, arms, back length, hip height, inside leg and thigh; formulas can use them; the shirt's sleeve comes from the arm length and the T-shirt's and shirt's neckline from the neck; with Select, drag a piece to move it, the corners of its frame to scale it and the round handle above it to turn it; Rotate and Scale in the inspector for an exact angle or percentage; the Draw tool also draws on a piece of the pattern, not only on the 3D garment; a shape added from the Shapes menu comes in selected, with the Select tool on; in French, the circle skirt is now called « jupe soleil »; patterns and measurement files from Seamly2D and Valentina come in drafted for their measurements, graded in every size, and can be drafted again for the avatar; the tape measure goes round a slanting sleeve square to it, and measures a length between two points of the garment; the start screen tells you when a new version is out, and the check can be turned off; Installing: a disk image for macOS, one for Intel and Apple silicon, an installer for Windows, and the first launch on recent macOS, through Privacy & Security; the shirt, T-shirt and dress take their shoulders, neckline and armholes from the avatar's body, and their hem fits over the hips: large sizes no longer have drooping shoulders; the avatar now takes the measurements given in every size of the charts, up to the women's 54: large sizes came out too slim and trousers fell off them; changing the size or the body while draping starts the drape again around the new body; trousers end just above the floor whatever the body; garments worn in layers lie close together: a shirt worn under trousers is tucked into them, and nothing shows through a garment worn over another; the trousers template is a little shorter; a selected piece's panel shows its garment's fabric; the Construction line and Tape measure tools have new icons; the tool rail in four sections, drawing, measuring, sewing and trims, with Dart and Pleat under Darts and pleats and Hole a tool of its own; the guided flow's step bar and banner removed; a more natural walk and a new motion, Stand at ease; captured motions whose rest pose lies flat play upright; pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
 hips, so trousers no longer slide with each step; a garment worn over
 trousers starts outside them; captured motions: Motion › Import a captured
 motion… plays a BVH motion capture on the avatar, Motion › Motion
@@ -54,10 +54,16 @@ Download the package for your system from rustle3d.com:
 - **Linux** (x64, with GTK 3): unpack the `.tar.gz` and keep the folder
   where you like.
 
+Rather not install? macOS and Windows also have a portable `.zip`
+(`-macos-universal.zip`, `-windows-x64.zip`): unpack it anywhere, a USB
+stick too, and open Rustle3D from there. To remove it, delete the
+folder. Your projects and settings are kept in your user folder either
+way, as with the installed app.
+
 Each package holds the app, `r3d` (the command-line tool, for scripts
 and AI agents), the licences and a README. On macOS they are inside the
 app: `/Applications/Rustle3D.app/Contents/MacOS/r3d`; on Windows, in the
-folder Rustle3D is installed in.
+folder Rustle3D is installed (or unpacked) in.
 
 The packages are not signed yet, so your system asks you to confirm the
 first launch:
@@ -70,8 +76,9 @@ first launch:
   the same. If macOS says the app is damaged, run `xattr -dr
   com.apple.quarantine /Applications/Rustle3D.app` in Terminal, then open
   it.
-- **Windows**: if Windows protected your PC when you run the installer,
-  click **More info**, then **Run anyway**.
+- **Windows**: if Windows protected your PC when you run the installer
+  (or `rustle3d.exe` from the portable folder), click **More info**, then
+  **Run anyway**.
 - **Linux**: run `./rustle3d` in the folder.
 
 You only do this once. Each download comes with a checksum in
@@ -105,9 +112,12 @@ this version** hides the card until the next version. The app never
 downloads or installs anything by itself.
 
 The request only says which version of Rustle3D asks and on which system
-(macOS, Windows or Linux): no name, no project, no identifier. Untick
-**Check for updates** at the bottom of the start screen to turn it off.
-Offline, nothing happens.
+(macOS, Windows or Linux): no name, no project, no identifier.
+**Check for updates** at the bottom of the start screen opens a small
+window: turn **Check for updates once a day** off (or on again), or
+click **Check now** to ask at once, even with the daily check off; it
+says whether you have the latest version, and offers the download if
+not. Offline, nothing happens.
 
 ### Free software, and supporting it
 Rustle3D is free and open source, under the GNU GPL (version 3 or later).
@@ -927,10 +937,17 @@ Protocol):
   your agent (a JSON block for most desktop assistants, or the command
   line for Claude Code or Codex; it names `r3d` by its full path, the
   command-line tool installed with the app) and restart the agent; then
-  ask it to work on your project. One agent at a time edits the open
-  project; the button reads "Agent connected" while one is attached,
-  even during a long action such as a drape. You see every change live
-  and can undo it, or disconnect the agent from the guide.
+  ask it to work on your project. For Claude Desktop, and other
+  assistants that install MCP bundles, choose **Claude Desktop** and
+  **Save rustle3d.mcpb**: open the file (or drop it into the
+  assistant's Settings > Extensions) to install Rustle3D as an
+  extension. It runs `r3d` from where the app is installed: save it
+  again if you move the app. Several agents can be connected at once
+  (an assistant's chat and its coding sessions, say), taking turns on
+  the open project; the button reads "Agent connected" while one is
+  attached, even during a long action such as a drape. You see every
+  change live and can undo it, or disconnect the agents from the
+  guide.
 - **Without the app**: `r3d mcp --project My.r3d` serves a project
   headless. Drapes made there (and with `r3d simulate`) run on the
   processor, so they give the same result every time. A drape can make

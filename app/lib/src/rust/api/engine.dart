@@ -17,6 +17,12 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 void setUiAdapter({required PlatformInt64 luid}) =>
     RustLib.instance.api.crateApiEngineSetUiAdapter(luid: luid);
 
+/// Save to `out` an MCP Bundle (`.mcpb`) that desktop assistants install
+/// as an extension: its server is `r3d mcp --attach`, with `r3d` the full
+/// path of the command-line tool next to the app.
+void saveAgentExtension({required String r3D, required String out}) =>
+    RustLib.instance.api.crateApiEngineSaveAgentExtension(r3D: r3D, out: out);
+
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Engine>>
 abstract class Engine implements RustOpaqueInterface {
   /// Add a notch on the edge within `max_mm` of pattern point (`x_mm`,
@@ -119,7 +125,7 @@ abstract class Engine implements RustOpaqueInterface {
   /// Stop rendering into a view (its UI texture is about to go away).
   void detachView({required int view});
 
-  /// Close the connected agent's session; agents stay allowed.
+  /// Close the connected agents' sessions; agents stay allowed.
   void disconnectAgent();
 
   /// A drag of (`dx`, `dy`) pixels: orbit the 3D camera, pan the board.

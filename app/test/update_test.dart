@@ -93,6 +93,20 @@ void main() {
     expect(next.enabled, isFalse);
   });
 
+  test('checking now asks even when turned off, within the day', () async {
+    final asked = <Uri>[];
+    final updates = checker('26.11.21', asked);
+    await updates.check(now: day);
+    updates.enabled = false;
+    asked.clear();
+    expect(await updates.checkNow(now: day), '26.11.21');
+    expect(asked, hasLength(1));
+    // Still off: the start screen offers nothing.
+    expect(updates.available, isNull);
+    final offline = checker(null, asked);
+    expect(await offline.checkNow(now: day), isNull);
+  });
+
   test('an unreadable file starts over', () async {
     File('${dir.path}/update.json').writeAsStringSync('not json');
     final asked = <Uri>[];

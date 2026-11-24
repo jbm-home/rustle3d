@@ -40,7 +40,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 482359944;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 349799923;
 
 // Section: executor
 
@@ -4532,6 +4532,37 @@ fn wire__crate__api__projects__rename_project_impl(
         },
     )
 }
+fn wire__crate__api__engine__save_agent_extension_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "save_agent_extension",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_r3d = <String>::sse_decode(&mut deserializer);
+            let api_out = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, crate::api::engine::ApiError>((move || {
+                let output_ok = crate::api::engine::save_agent_extension(api_r3d, api_out)?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
 fn wire__crate__api__library__save_body_preset_impl(
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -5462,7 +5493,7 @@ fn pde_ffi_dispatcher_primary_impl(
         93 => {
             wire__crate__api__templates__project_thumbnail_impl(port, ptr, rust_vec_len, data_len)
         }
-        99 => {
+        100 => {
             wire__crate__api__templates__template_thumbnail_impl(port, ptr, rust_vec_len, data_len)
         }
         _ => unreachable!(),
@@ -5554,9 +5585,10 @@ fn pde_ffi_dispatcher_sync_impl(
         92 => wire__crate__api__library__library_motions_impl(ptr, rust_vec_len, data_len),
         94 => wire__crate__api__library__rename_library_motion_impl(ptr, rust_vec_len, data_len),
         95 => wire__crate__api__projects__rename_project_impl(ptr, rust_vec_len, data_len),
-        96 => wire__crate__api__library__save_body_preset_impl(ptr, rust_vec_len, data_len),
-        97 => wire__crate__api__engine__set_ui_adapter_impl(ptr, rust_vec_len, data_len),
-        98 => wire__crate__api__templates__template_list_impl(ptr, rust_vec_len, data_len),
+        96 => wire__crate__api__engine__save_agent_extension_impl(ptr, rust_vec_len, data_len),
+        97 => wire__crate__api__library__save_body_preset_impl(ptr, rust_vec_len, data_len),
+        98 => wire__crate__api__engine__set_ui_adapter_impl(ptr, rust_vec_len, data_len),
+        99 => wire__crate__api__templates__template_list_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }

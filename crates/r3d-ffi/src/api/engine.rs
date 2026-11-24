@@ -389,6 +389,14 @@ pub fn set_ui_adapter(luid: i64) {
     crate::surface::set_ui_adapter(luid);
 }
 
+/// Save to `out` an MCP Bundle (`.mcpb`) that desktop assistants install
+/// as an extension: its server is `r3d mcp --attach`, with `r3d` the full
+/// path of the command-line tool next to the app.
+#[frb(sync)]
+pub fn save_agent_extension(r3d: String, out: String) -> Result<(), ApiError> {
+    r3d_mcp::bundle::write(Path::new(&r3d), Path::new(&out)).map_err(err)
+}
+
 /// A fabric choice for the UI.
 #[derive(Debug, Clone)]
 pub struct FabricSwatch {
@@ -1153,7 +1161,7 @@ impl Engine {
         })
     }
 
-    /// Close the connected agent's session; agents stay allowed.
+    /// Close the connected agents' sessions; agents stay allowed.
     #[frb(sync)]
     pub fn disconnect_agent(&self) -> Result<(), ApiError> {
         if let Some(host) = self.agents.lock().map_err(|_| poisoned())?.as_ref() {

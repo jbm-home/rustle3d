@@ -8,14 +8,22 @@ Implemented: headless (M2) and attached (M9). Attached: the app's Agents
 button opens a three-step guide: allow agents (off by default; nothing
 listens before), the server's settings to copy into the agent (a JSON
 `mcpServers` entry, or the command line of two common agents, naming
-the `r3d` shipped next to the app by its full path), and the live
+the `r3d` shipped next to the app by its full path; or an MCP Bundle,
+`rustle3d.mcpb`, saved for desktop assistants that install extensions
+from a file: a zip with `manifest.json` (MCPB manifest 0.3) and the
+app's icon, whose server is that same `r3d mcp --attach`, so it follows
+the app's updates and is made for this machine only), and the live
 status with a Disconnect button. Once allowed, the app
 then listens on a loopback TCP port and writes the port and a secret
 token to `agent.json` in its support folder. `r3d mcp --attach
 [--endpoint file]` reads it, sends `R3D-ATTACH <token>` and relays stdio;
-a wrong token is refused. One agent at a time; its changes are saved,
+a wrong token is refused. Several agents may be connected at once (a
+desktop assistant starts one server for its chat and another for its
+coding sessions; served one after the other, the second timed out
+waiting), their calls taking turns on the project; their changes are saved,
 go into the app's undo history and show at once (pattern, inspector,
-live drape). The app shows "Agent connected" and can disconnect it; it
+live drape). The app shows "Agent connected" and Disconnect closes every
+agent's session; it
 asks for the status and the agent's changes on a timer, as the views do
 not redraw while an agent's long action holds the project, and never
 waits for the project to ask. `avatar_get` gives the body's waist, hips

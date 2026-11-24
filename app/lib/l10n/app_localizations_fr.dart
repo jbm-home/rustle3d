@@ -223,6 +223,26 @@ class LFr extends L {
   String get updateSkip => 'Ignorer cette version';
 
   @override
+  String get updatesTitle => 'Mises à jour';
+
+  @override
+  String get updateAuto => 'Rechercher les mises à jour une fois par jour';
+
+  @override
+  String get updateAutoHint =>
+      'L’application demande à rustle3d.com le numéro de la dernière version, en n’envoyant que sa propre version et son système. Elle ne télécharge ni n’installe jamais rien d’elle-même.';
+
+  @override
+  String get updateCheckNow => 'Vérifier maintenant';
+
+  @override
+  String get updateLatest => 'Vous avez la dernière version.';
+
+  @override
+  String get updateFailed =>
+      'Impossible de joindre rustle3d.com. Vérifiez votre connexion et réessayez.';
+
+  @override
   String get updateCheck => 'Rechercher les mises à jour';
 
   @override
@@ -661,6 +681,18 @@ class LFr extends L {
   @override
   String get agentsJsonHint =>
       'La plupart des assistants de bureau lisent ceci dans leur fichier de réglages MCP ; fusionnez-le dans son « mcpServers ».';
+
+  @override
+  String get agentsExtensionHint =>
+      'Un fichier d’extension pour Claude Desktop et les autres assistants qui installent les paquets MCP (.mcpb) : enregistrez-le, puis ouvrez-le, ou déposez-le dans Réglages > Extensions de l’assistant. Il lance r3d depuis le dossier de l’application, il reste donc valable après une mise à jour ; si vous déplacez l’application, enregistrez-le à nouveau.';
+
+  @override
+  String get agentsSaveExtension => 'Enregistrer rustle3d.mcpb…';
+
+  @override
+  String agentsExtensionSaved(String path) {
+    return 'Enregistré : $path. Ouvrez-le pour l’installer dans votre assistant.';
+  }
 
   @override
   String get agentsCopy => 'Copier';

@@ -3,8 +3,8 @@
 // by the website when it is built for a release). A newer version shows a
 // card on the start screen, never while someone works. Nothing is installed
 // by the app: the card opens the download page. Offline or on any error the
-// app says nothing and asks again at the next launch. The user can turn the
-// check off on the start screen.
+// app says nothing and asks again at the next launch. The start screen's
+// Updates dialog turns the check off or on, and checks at once.
 
 import 'dart:async';
 import 'dart:convert';
@@ -128,13 +128,22 @@ class UpdateCheck extends ChangeNotifier {
         today.difference(last) < _checkGap) {
       return;
     }
+    await _ask(today);
+  }
+
+  /// Ask the site now, even with the check off (the user asked): the
+  /// latest version, null if the site could not be reached.
+  Future<String?> checkNow({DateTime? now}) => _ask(now ?? DateTime.now());
+
+  Future<String?> _ask(DateTime today) async {
     final latest = await fetch(
       latestUrl.replace(
         queryParameters: {'v': current, 'os': Platform.operatingSystem},
       ),
     );
-    if (latest == null || !_versionPattern.hasMatch(latest)) return;
+    if (latest == null || !_versionPattern.hasMatch(latest)) return null;
     _save({..._state, 'checked': today.toIso8601String(), 'latest': latest});
+    return latest;
   }
 
   /// Don't offer this version again (a later one is offered).
@@ -222,6 +231,154 @@ class UpdateCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The Updates dialog of the start screen: the daily check on or off, and
+/// a check at once, with what it found.
+Future<void> showUpdates(
+  BuildContext context, {
+  required UpdateCheck updates,
+  required VoidCallback onDownload,
+}) {
+  return showDialog<void>(
+    context: context,
+    builder: (_) => _Updates(updates: updates, onDownload: onDownload),
+  );
+}
+
+/// Where a check started from the dialog stands.
+enum _Checked { no, running, failed, found }
+
+class _Updates extends StatefulWidget {
+  const _Updates({required this.updates, required this.onDownload});
+
+  final UpdateCheck updates;
+  final VoidCallback onDownload;
+
+  @override
+  State<_Updates> createState() => _UpdatesState();
+}
+
+class _UpdatesState extends State<_Updates> {
+  _Checked _checked = _Checked.no;
+  String? _latest;
+
+  void _changed() => setState(() {});
+
+  @override
+  void initState() {
+    super.initState();
+    widget.updates.addListener(_changed);
+  }
+
+  @override
+  void dispose() {
+    widget.updates.removeListener(_changed);
+    super.dispose();
+  }
+
+  Future<void> _check() async {
+    setState(() => _checked = _Checked.running);
+    final latest = await widget.updates.checkNow();
+    if (!mounted) return;
+    setState(() {
+      _latest = latest;
+      _checked = latest == null ? _Checked.failed : _Checked.found;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final l = context.l;
+    final updates = widget.updates;
+    final newer = switch (_latest) {
+      final latest? when isNewer(latest, updates.current) => latest,
+      _ => null,
+    };
+    Widget note(String text, {bool strong = false}) => Text(
+      text,
+      key: const ValueKey('updatesResult'),
+      style: ts(
+        fontSize: 13,
+        height: 1.45,
+        fontWeight: strong ? FontWeight.w600 : FontWeight.w400,
+        color: strong ? p.text : p.textMuted,
+      ),
+    );
+    return AlertDialog(
+      title: Text(l.updatesTitle),
+      content: SizedBox(
+        width: 440,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              l.appVersion(updates.current),
+              style: ts(fontSize: 13, color: p.textMuted),
+            ),
+            const SizedBox(height: Space.s),
+            SwitchListTile(
+              key: const ValueKey('updatesAuto'),
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: Text(l.updateAuto, style: ts(fontSize: 13.5)),
+              subtitle: Text(
+                l.updateAutoHint,
+                style: ts(fontSize: 12.5, height: 1.4, color: p.textMuted),
+              ),
+              value: updates.enabled,
+              onChanged: (on) => updates.enabled = on,
+            ),
+            const SizedBox(height: Space.m),
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  key: const ValueKey('updatesCheckNow'),
+                  onPressed: _checked == _Checked.running ? null : _check,
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: Text(l.updateCheckNow),
+                ),
+                const SizedBox(width: Space.m),
+                if (_checked == _Checked.running)
+                  const SizedBox.square(
+                    dimension: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+              ],
+            ),
+            if (_checked == _Checked.failed) ...[
+              const SizedBox(height: Space.s),
+              note(l.updateFailed),
+            ],
+            if (_checked == _Checked.found) ...[
+              const SizedBox(height: Space.s),
+              if (newer != null) ...[
+                note(l.updateTitle(newer), strong: true),
+                const SizedBox(height: Space.s),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.icon(
+                    onPressed: widget.onDownload,
+                    icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                    label: Text(l.updateDownload),
+                  ),
+                ),
+              ] else
+                note(l.updateLatest),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l.close),
+        ),
+      ],
     );
   }
 }

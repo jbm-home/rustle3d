@@ -221,6 +221,26 @@ class LEn extends L {
   String get updateSkip => 'Skip this version';
 
   @override
+  String get updatesTitle => 'Updates';
+
+  @override
+  String get updateAuto => 'Check for updates once a day';
+
+  @override
+  String get updateAutoHint =>
+      'The app asks rustle3d.com for the latest version number, sending only its own version and system. It never downloads or installs anything by itself.';
+
+  @override
+  String get updateCheckNow => 'Check now';
+
+  @override
+  String get updateLatest => 'You have the latest version.';
+
+  @override
+  String get updateFailed =>
+      'rustle3d.com could not be reached. Check your connection and try again.';
+
+  @override
   String get updateCheck => 'Check for updates';
 
   @override
@@ -658,6 +678,18 @@ class LEn extends L {
   @override
   String get agentsJsonHint =>
       'Most desktop assistants read this in their MCP settings file; merge it into the file\'s \"mcpServers\".';
+
+  @override
+  String get agentsExtensionHint =>
+      'An extension file for Claude Desktop and other assistants that install MCP bundles (.mcpb): save it, then open it, or drop it into the assistant\'s Settings > Extensions. It runs r3d from where the app is installed, so it keeps working after an update; if you move the app, save it again.';
+
+  @override
+  String get agentsSaveExtension => 'Save rustle3d.mcpb…';
+
+  @override
+  String agentsExtensionSaved(String path) {
+    return 'Saved: $path. Open it to install it in your assistant.';
+  }
 
   @override
   String get agentsCopy => 'Copy';
