@@ -490,7 +490,9 @@ code stays **i18n-ready** for more:
 
 - **2D → 3D**: every pattern edit is a command. The sim bridge remeshes only
   the changed panels, carries positions over by barycentric remapping, and
-  the drape keeps going: no reset, no jump.
+  the drape keeps going: no reset, no jump. A piece only moved on the
+  board (all its corners by the same displacement) is looked up where it
+  was: where a piece lies on the board never moves it in 3D.
 - **3D → 2D**: every simulated vertex keeps its **pattern coordinates**
   (panel, triangle, barycentric position in the 2D rest shape). A 3D gesture
   is therefore mapped back to the pattern and emitted as ordinary pattern

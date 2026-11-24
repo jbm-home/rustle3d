@@ -27,7 +27,9 @@ use r3d_avatar::motion::{EASE_IN_S, Motion, ease};
 use r3d_avatar::pack::Influences;
 use r3d_avatar::skeleton::{Skeleton, skin};
 use r3d_core::seam::{Span, Track};
-use r3d_core::{Around, ButtonId, EdgeId, Fabric, GarmentId, PanelId, PinId, Project, SeamSide};
+use r3d_core::{
+    Around, ButtonId, EdgeId, Fabric, GarmentId, PanelId, PinId, PointId, Project, SeamSide,
+};
 use r3d_geom::DVec2;
 use r3d_geom::Rigid;
 use r3d_geom::mesh::mesh_panel;
@@ -70,6 +72,10 @@ pub struct Piece {
     pub particles: Range<usize>,
     /// Triangle corners, indices local to `particles`.
     pub indices: Vec<u32>,
+    /// Where the panel's outline corners are on the pattern (m, as the
+    /// particles' rest positions): a piece moved on the board is told
+    /// apart from a reshaped one when edits are carried over.
+    pub corners: BTreeMap<PointId, Vec2>,
 }
 
 /// The dress form garments are draped on: the fitted body (m), its
@@ -1601,6 +1607,18 @@ pub fn build(
             panel: l.panel,
             particles: offset as usize..scene.particles.len(),
             indices: mesh.triangles.iter().flatten().copied().collect(),
+            corners: panel
+                .contour
+                .iter()
+                .filter_map(|e| {
+                    let id = project.edge(*e)?.start;
+                    let at = project.point(id)?.pos;
+                    Some((
+                        id,
+                        Vec2::new((at.x / 1000.0) as f32, (at.y / 1000.0) as f32),
+                    ))
+                })
+                .collect(),
         });
         let grain = (panel.grain_angle_deg as f32).to_radians();
         let warp = Vec2::new(grain.cos(), grain.sin());
@@ -2010,10 +2028,18 @@ impl<'a> LinesOnCloth<'a> {
 /// the old triangle that contains it, or extrapolated from the nearest one
 /// when the panel grew. Particles of new panels, and pinned ones, keep
 /// their own start. This is how pattern edits reach a running simulation
-/// without a jump (architecture §7.8).
+/// without a jump (architecture §7.8). A piece only moved on the board
+/// (every corner by the same displacement) is looked up where it was:
+/// where it lies on the board does not change the drape.
 pub fn carry_over(old: &Drape, positions: &[Vec3], new: &mut Drape) {
     let locator = Locator::new(old);
     for piece in &new.pieces {
+        let moved = old
+            .pieces
+            .iter()
+            .find(|o| o.panel == piece.panel)
+            .and_then(|o| moved_by(&o.corners, &piece.corners))
+            .unwrap_or(Vec2::ZERO);
         for i in piece.particles.clone() {
             let Some(p) = new.scene.particles.get_mut(i) else {
                 continue;
@@ -2021,11 +2047,31 @@ pub fn carry_over(old: &Drape, positions: &[Vec3], new: &mut Drape) {
             if p.pinned {
                 continue;
             }
-            if let Some(at) = locator.position(piece.panel, p.rest, positions) {
+            if let Some(at) = locator.position(piece.panel, p.rest - moved, positions) {
                 p.position = at;
             }
         }
     }
+}
+
+/// The displacement every corner of a piece shares from `old` to `new`
+/// (the same corners, all moved alike), if any.
+fn moved_by(old: &BTreeMap<PointId, Vec2>, new: &BTreeMap<PointId, Vec2>) -> Option<Vec2> {
+    /// How far apart two corners' moves may be and still be one (m).
+    const SAME_M: f32 = 1e-5;
+    if old.len() != new.len() || old.is_empty() {
+        return None;
+    }
+    let mut by = None;
+    for (id, to) in new {
+        let d = *to - *old.get(id)?;
+        match by {
+            None => by = Some(d),
+            Some(b) if (d - b).length() > SAME_M => return None,
+            Some(_) => {}
+        }
+    }
+    by
 }
 
 /// Bin size of the carry-over grid on the pattern (m).

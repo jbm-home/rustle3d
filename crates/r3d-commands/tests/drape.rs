@@ -234,3 +234,47 @@ fn style_lines_and_edges_follow_the_cloth() {
     let edge = on.edge(hem).unwrap();
     assert!(edge.len() > 10);
 }
+
+#[test]
+fn a_piece_moved_on_the_board_stays_where_it_hangs() {
+    let mut s = Session::new(Project::new("t"));
+    common::women_m(&mut s);
+    let front = common::a_line_skirt(&mut s);
+    let form = Form::of_project(s.project()).unwrap().unwrap();
+    let old = build(s.project(), Some(&form), DEFAULT_SPACING_MM).unwrap();
+    let mut solver = CpuSolver::new(old.scene.clone());
+    for _ in 0..60 {
+        solver.step(1.0 / 60.0).unwrap();
+    }
+    let draped = solver.positions().to_vec();
+
+    let step = serde_json::json!({"type": "panel.translate", "panel": front.panel, "delta": [-400.0, 250.0]});
+    s.run_step(&Step::from_value(step).unwrap()).unwrap();
+    let mut new = build(s.project(), Some(&form), DEFAULT_SPACING_MM).unwrap();
+    r3d_commands::drape::carry_over(&old, &draped, &mut new);
+
+    // The board's mesh differs a little once moved: compare the pieces'
+    // middles, and each new particle with the nearest old one.
+    let (o, n) = (&old.pieces[0], &new.pieces[0]);
+    let middle = |ps: Vec<glam::Vec3>| ps.iter().sum::<glam::Vec3>() / ps.len() as f32;
+    let before = middle(o.particles.clone().map(|i| draped[i]).collect());
+    let after = middle(
+        n.particles
+            .clone()
+            .map(|j| new.scene.particles[j].position)
+            .collect(),
+    );
+    assert!(before.distance(after) < 0.003, "{before} -> {after}");
+    let worst = n
+        .particles
+        .clone()
+        .map(|j| {
+            let at = new.scene.particles[j].position;
+            o.particles
+                .clone()
+                .map(|i| draped[i].distance(at))
+                .fold(f32::MAX, f32::min)
+        })
+        .fold(0.0_f32, f32::max);
+    assert!(worst < 0.02, "a particle {worst} m from the old drape");
+}
