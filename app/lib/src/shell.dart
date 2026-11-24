@@ -6229,18 +6229,19 @@ class _TrimsCard extends StatelessWidget {
                     style: label,
                   ),
                 ),
-                Text(
-                  l.trimButtoned,
-                  style: ts(fontSize: 12, color: p.textMuted),
-                ),
-                Switch(
-                  key: ValueKey('buttoned-${b['id']}'),
-                  value: b['closed'] == true,
-                  onChanged: (on) => run({
-                    'type': 'button.set_closed',
-                    'buttons': [b['id']],
-                    'closed': on,
-                  }),
+                // Its name as a tip: written on every row, it left the
+                // button's own label a few letters a line.
+                Tooltip(
+                  message: l.trimButtoned,
+                  child: Switch(
+                    key: ValueKey('buttoned-${b['id']}'),
+                    value: b['closed'] == true,
+                    onChanged: (on) => run({
+                      'type': 'button.set_closed',
+                      'buttons': [b['id']],
+                      'closed': on,
+                    }),
+                  ),
                 ),
                 remove({'type': 'button.remove', 'button': b['id']}),
               ],
