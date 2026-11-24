@@ -26,12 +26,12 @@ use rayon::prelude::*;
 
 use crate::collide::BAND;
 use crate::layers::{Cloth, Touch};
-use crate::model::{Hinge, Membrane, Model};
+use crate::model::{ElasticLink, Hinge, Membrane, Model};
 use crate::motion::{Posed, touch};
 use crate::scene::SimScene;
 use crate::solver::{
     CLOSURE_COMPLIANCE, GRAB_COMPLIANCE, NEAR, SKIN, SUBSTEPS, Solver, StepError, StepStats,
-    closure_target, dihedral, grabbed, sewing,
+    closure_target, dihedral, elastic_target, grabbed, sewing,
 };
 
 /// A patch of cloth held by the user.
@@ -138,6 +138,9 @@ impl CpuSolver {
         }
         for [a, b] in &self.model.closures {
             close(&mut self.x, &self.prev, w, [*a as usize, *b as usize], h);
+        }
+        for link in &self.model.elastics {
+            stretch(&mut self.x, w, link, elastic_target(link, self.time), h2);
         }
         self.model.self_contact.solve(&self.pairs, &mut self.x, w);
         let m = &self.model;
@@ -410,6 +413,26 @@ fn close(x: &mut [Vec3], prev: &[Vec3], w: &[f32], [a, b]: [usize; 2], h: f32) {
     x[b] -= n * (dl * wb);
 }
 
+/// An elastic segment: XPBD on `|x_b − x_a| ≤ target` (it only pulls),
+/// with the compliance of a spring of `stiffness / target` N/m.
+fn stretch(x: &mut [Vec3], w: &[f32], link: &ElasticLink, target: f32, h2: f32) {
+    let [a, b] = link.v.map(|i| i as usize);
+    let d = x[b] - x[a];
+    let len = d.length();
+    if len <= target || len <= 1e-9 {
+        return;
+    }
+    let n = d / len;
+    project(
+        x,
+        w,
+        &[a, b],
+        &[-n, n],
+        len - target,
+        target / link.stiffness / h2,
+    );
+}
+
 fn membrane(x: &mut [Vec3], w: &[f32], m: &Membrane, h2: f32) {
     let [i0, i1, i2] = m.v.map(|i| i as usize);
     let idx = [i0, i1, i2];
@@ -420,6 +443,9 @@ fn membrane(x: &mut [Vec3], w: &[f32], m: &Membrane, h2: f32) {
         if len > 1e-9 {
             let n = f / len;
             let (g1, g2) = (n * coef.x, n * coef.y);
+            if len < 1.0 && m.buckles {
+                continue;
+            }
             project(x, w, &idx, &[-(g1 + g2), g1, g2], len - 1.0, alpha / h2);
         }
     }

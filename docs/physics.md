@@ -141,22 +141,42 @@ without a jolt; a scene rebuilt later starts at `rᵢ`.
 
 Real cloth sewn to a stretched elastic gathers in folds a few
 millimetres wide, far below the mesh. A membrane that resists
-compression as much as stretch would hold the elastic open. Cloth
-buckles under very little compressive force [25]. The triangles that
-touch an elastic therefore take a **buckling** factor: when stretched
-along the warp or the weft they resist as usual, and when compressed
-their compliance is 1 000 times larger. The elastic shortens them freely
-and the cloth beyond, at full length, folds out of the plane.
+compression as much as stretch holds the elastic open, and cloth
+buckles under very little compressive force [25], so the triangles
+within 4 cm of an elastic on the pattern **buckle**: their warp and
+weft resist stretching only (shear is unchanged). A compliance 1 000
+times larger in compression was tried first and did nothing: with one
+iteration per substep a constraint whose `α̃` is small against
+`w |∇C|²` still corrects almost all of its error every substep, so
+the elastic and the membrane split the difference whatever their
+stiffnesses (a 10× stiffer elastic left a sheet's edge at the same
+88 %). A band only one row of triangles wide was too narrow: the cloth
+just beyond took the whole gathering in a few coarse folds and held a
+sleeve's hem 25 % open; at 4 cm the hem closes within 2 %. The
+gathered cloth lies in folds on itself: within 8 cm along the cloth
+around each point of an elastic it does not repel itself (as around a
+button), which closed the last 5 %.
 
-To make those folds smaller than the default 25 mm, the cloth along an
-elastic is meshed finer: points of a triangular lattice at 8 mm
-(at most the piece's spacing), three rows on each side of the line, are
-added before the refinement (`r3d_geom::mesh_panel`'s fine zones), which
-grades the triangles back to the piece's spacing around them.
+To make the folds beyond the band smaller than the default 25 mm, the
+cloth along an elastic is meshed finer: points of a triangular lattice
+at 8 mm (at most the piece's spacing), three rows on each side of the
+line, are added before the refinement (`r3d_geom::mesh_panel`'s fine
+zones), which grades the triangles back to the piece's spacing around
+them; the elastic's side is sampled at 8 mm, and a seam on it gets as
+many points on its other side.
 
 On the GPU the elastic segments are coloured like seams and solved in
-their own dispatches after the closures; the buckling factor is a field
-of each membrane.
+their own dispatches after the closures; whether a membrane buckles is
+the fourth of its compliances, and the sewing ramp a field of the
+substep's uniforms.
+
+Checked on both backends (`an_elastic_gathers_the_edge_it_is_sewn_on`):
+a 40 cm sheet hung by its top, an elastic of ratio 0.6 on its bottom
+edge, closes to 24 cm ± 8 % (gravity opens it a little) with gathers
+beside it. In `r3d-commands` `tests/elastic.rs`, a T-shirt sleeve's hem
+(327 mm, ratio 0.6) past the hand closes to the elastic's 196 mm within
+5 %; on the forearm, thicker than the elastic, it stays stretched on
+it, touching it.
 
 ### Composite cloth: topstitching, interfacing, quilting (M34)
 

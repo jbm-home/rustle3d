@@ -28,15 +28,16 @@ use r3d_avatar::pack::Influences;
 use r3d_avatar::skeleton::{Skeleton, skin};
 use r3d_core::seam::{Span, Track};
 use r3d_core::{
-    Around, ButtonId, EdgeId, Fabric, GarmentId, PanelId, PinId, PointId, Project, SeamSide,
+    Around, ButtonId, DetailId, EdgeId, Fabric, GarmentId, PanelId, PinId, PointId, Project,
+    SeamSide,
 };
 use r3d_geom::DVec2;
 use r3d_geom::Rigid;
-use r3d_geom::mesh::mesh_panel;
+use r3d_geom::mesh::{FineZone, mesh_panel};
 use r3d_sim::collide::{Skin, StaticMesh};
 use r3d_sim::motion::BodyMotion;
 use r3d_sim::scene::{Closure, Particle, Triangle};
-use r3d_sim::{CpuSolver, FabricPreset, SUBSTEPS, SimScene, Solver, StepStats};
+use r3d_sim::{CpuSolver, ElasticLine, FabricPreset, SUBSTEPS, SimScene, Solver, StepStats};
 
 mod clearance;
 
@@ -63,6 +64,35 @@ pub struct Drape {
     pub pins: Vec<(PinId, Vec<usize>)>,
     /// The particles along each simulated contour edge, start to end.
     pub edges: BTreeMap<EdgeId, Vec<usize>>,
+    /// The elastic of each of `scene.elastics`, in its order.
+    pub elastics: Vec<DetailId>,
+}
+
+impl Drape {
+    /// Each elastic's length on the cloth at `positions` and its relaxed
+    /// length (m).
+    pub fn elastic_lengths(&self, positions: &[Vec3]) -> Vec<(DetailId, f32, f32)> {
+        self.elastics
+            .iter()
+            .zip(&self.scene.elastics)
+            .map(|(id, line)| {
+                let mut on = 0.0;
+                let mut rest = 0.0;
+                for w in line.particles.windows(2) {
+                    let &[a, b] = w else { continue };
+                    let (pa, pb) = (positions.get(a as usize), positions.get(b as usize));
+                    if let (Some(pa), Some(pb)) = (pa, pb) {
+                        on += pa.distance(*pb);
+                    }
+                    let flat = |i: u32| self.scene.particles.get(i as usize).map(|p| p.rest);
+                    if let (Some(ra), Some(rb)) = (flat(a), flat(b)) {
+                        rest += ra.distance(rb) * line.ratio;
+                    }
+                }
+                (*id, on, rest)
+            })
+            .collect()
+    }
 }
 
 /// The particles and triangles of one panel, to draw it on its own.
@@ -1240,6 +1270,34 @@ fn split(n: usize, spans: &[Span]) -> Vec<usize> {
     out
 }
 
+/// Along an elastic the cloth is meshed this fine at most (mm), so its
+/// gathers are small (docs/physics.md, "Elastic").
+const ELASTIC_SPACING_MM: f64 = 8.0;
+/// Rows of finer triangles on each side of an elastic.
+const ELASTIC_ROWS: usize = 3;
+
+/// `[from, to]` without the parts `taken` covers (sorted pieces).
+fn subtract(from: f64, to: f64, taken: &[(f64, f64)]) -> Vec<(f64, f64)> {
+    let mut sorted: Vec<(f64, f64)> = taken.to_vec();
+    sorted.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let mut out = Vec::new();
+    let mut cursor = from;
+    for (a, b) in sorted {
+        if a > cursor {
+            out.push((cursor, a.min(to)));
+        }
+        cursor = cursor.max(b);
+        if cursor >= to {
+            break;
+        }
+    }
+    if cursor < to {
+        out.push((cursor, to));
+    }
+    out.retain(|(a, b)| b - a > 1e-9);
+    out
+}
+
 /// A seam side's stretches with some length.
 fn spans(project: &Project, side: &SeamSide) -> Option<Vec<Span>> {
     let spans: Vec<Span> = project
@@ -1257,6 +1315,34 @@ fn spans(project: &Project, side: &SeamSide) -> Option<Vec<Span>> {
 /// Contour and hole edges are tracks; internal lines are when sewn.
 fn sample_tracks(project: &Project, spacing: f64) -> BTreeMap<Track, Vec<f64>> {
     let count = |len: f64| ((len / spacing).ceil() as usize).max(1);
+    let fine = spacing.min(ELASTIC_SPACING_MM);
+    // The stretches elastics cover, sampled finer.
+    let mut elastic: BTreeMap<Track, Vec<(f64, f64)>> = BTreeMap::new();
+    for (_, e) in project.elastics() {
+        if project
+            .side_panel(&e.side)
+            .and_then(|p| project.panel(p))
+            .is_none_or(|p| p.placement.is_none())
+        {
+            continue;
+        }
+        for span in spans(project, &e.side).unwrap_or_default() {
+            elastic
+                .entry(span.track)
+                .or_default()
+                .push((span.from, span.to));
+        }
+    }
+    // Segments a stretch needs: finer where an elastic covers it.
+    let count_span = |span: &Span| {
+        let covered: f64 = elastic.get(&span.track).map_or(0.0, |list| {
+            list.iter()
+                .map(|(a, b)| (b.min(span.to) - a.max(span.from)).max(0.0))
+                .sum()
+        });
+        let rest = (span.length() - covered).max(0.0);
+        ((covered / fine + rest / spacing).ceil() as usize).max(1)
+    };
     let placed = |panel: Option<PanelId>| {
         panel
             .and_then(|p| project.panel(p))
@@ -1276,7 +1362,7 @@ fn sample_tracks(project: &Project, spacing: f64) -> BTreeMap<Track, Vec<f64>> {
         let (Some(a), Some(b)) = (spans(project, side_a), spans(project, side_b)) else {
             continue;
         };
-        let need = |side: &[Span]| side.iter().map(|s| count(s.length())).sum::<usize>();
+        let need = |side: &[Span]| side.iter().map(count_span).sum::<usize>();
         let n = need(&a).max(need(&b));
         for side in [&a, &b] {
             for (span, k) in side.iter().zip(split(n, side)) {
@@ -1284,6 +1370,19 @@ fn sample_tracks(project: &Project, spacing: f64) -> BTreeMap<Track, Vec<f64>> {
                     .entry(span.track)
                     .or_default()
                     .push((span.from, span.to, k));
+            }
+        }
+    }
+    // Elastics where seams have not set the samples already.
+    for (track, list) in &elastic {
+        let taken: Vec<(f64, f64)> = fixed
+            .get(track)
+            .map(|l| l.iter().map(|(a, b, _)| (*a, *b)).collect())
+            .unwrap_or_default();
+        for (from, to) in list {
+            for (a, b) in subtract(*from, *to, &taken) {
+                let k = (((b - a) / fine).ceil() as usize).max(1);
+                fixed.entry(*track).or_default().push((a, b, k));
             }
         }
     }
@@ -1434,7 +1533,32 @@ pub fn build(
             .filter(|(_, p)| clear_of(*p, &boundary, &hole_pts, 0.25 * spacing))
             .collect();
         line_pts.extend(ends.iter().map(|(_, p)| vec![*p]));
-        let mesh = mesh_panel(&boundary, &hole_pts, &line_pts, spacing)
+        // Finer triangles along the piece's elastics.
+        let fine: Vec<FineZone> = project
+            .elastics()
+            .filter(|(_, e)| project.side_panel(&e.side) == Some(*panel_id))
+            .filter_map(|(_, e)| {
+                let mut line: Vec<DVec2> = Vec::new();
+                for span in spans(project, &e.side)? {
+                    let at = samples.get(&span.track)?;
+                    for s in at
+                        .iter()
+                        .filter(|s| **s >= span.from - 1e-6 && **s <= span.to + 1e-6)
+                    {
+                        let (p, _) = project.track_point(span.track, *s)?;
+                        if line.last().is_none_or(|q| q.distance(p) > 1e-9) {
+                            line.push(p);
+                        }
+                    }
+                }
+                Some(FineZone {
+                    line,
+                    spacing: spacing.min(ELASTIC_SPACING_MM),
+                    rows: ELASTIC_ROWS,
+                })
+            })
+            .collect();
+        let mesh = mesh_panel(&boundary, &hole_pts, &line_pts, &fine, spacing)
             .map_err(|e| internal(format!("{panel_id}: {e}")))?;
         let mut trims: BTreeMap<(ButtonId, usize), u32> = BTreeMap::new();
         for (k, (key, _)) in ends.iter().enumerate() {
@@ -1668,6 +1792,19 @@ pub fn build(
         }
     }
 
+    // Elastics, along their sides' particles.
+    let mut elastics = Vec::new();
+    for (id, e) in project.elastics() {
+        if let Some(particles) = side_particles(&e.side) {
+            elastics.push(id);
+            scene.elastics.push(ElasticLine {
+                particles,
+                ratio: e.ratio as f32,
+                stiffness: e.stiffness_n() as f32,
+            });
+        }
+    }
+
     // Closures: buttoned buttons, and zippers from their bottom stop up
     // to the slider (the stop always holds, as on a real zipper).
     for (id, b) in project.buttons() {
@@ -1736,6 +1873,7 @@ pub fn build(
         pieces,
         pins,
         edges,
+        elastics,
     })
 }
 

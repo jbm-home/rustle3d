@@ -217,7 +217,7 @@ fn default_frames() -> u32 {
 }
 
 impl Described for Simulate {
-    const SUMMARY: &'static str = "Drape the placed and sewn panels on the avatar for a number of frames (1/60 s each, deterministic) and cache the result in the project, so `r3d render --view 3d` shows it. With `motion`, the avatar walks, turns or raises its arms after 1.5 s and the cloth follows (or, with `motion_file`, plays a motion captured on a person from a BVH file in the project folder); renders and exports then show the body and the garment as they are at the last frame. Returns the garment's extent, how open the seams are, how many points buttons and closed zippers hold and how far apart they still are, and whether the cloth has settled.";
+    const SUMMARY: &'static str = "Drape the placed and sewn panels on the avatar for a number of frames (1/60 s each, deterministic) and cache the result in the project, so `r3d render --view 3d` shows it. With `motion`, the avatar walks, turns or raises its arms after 1.5 s and the cloth follows (or, with `motion_file`, plays a motion captured on a person from a BVH file in the project folder); renders and exports then show the body and the garment as they are at the last frame. Returns the garment's extent, how open the seams are, how many points buttons and closed zippers hold and how far apart they still are, each elastic's length on the cloth against its relaxed length, and whether the cloth has settled.";
 }
 
 impl ActionSpec for Simulate {
@@ -258,6 +258,18 @@ impl ActionSpec for Simulate {
         let top = ys.clone().fold(f32::MIN, f32::max);
         let bottom = ys.fold(f32::MAX, f32::min);
         let r3 = |v: f64| (v * 1000.0).round() / 1000.0;
+        let elastics: Vec<Value> = out
+            .drape
+            .elastic_lengths(&out.positions)
+            .into_iter()
+            .map(|(id, on, rest)| {
+                json!({
+                    "elastic": id,
+                    "length_mm": r3(f64::from(on) * 1000.0),
+                    "relaxed_mm": r3(f64::from(rest) * 1000.0),
+                })
+            })
+            .collect();
         Ok(json!({
             "frames": out.frames,
             "simulated_s": r3(f64::from(out.frames) / 60.0),
@@ -269,6 +281,7 @@ impl ActionSpec for Simulate {
             "max_seam_gap_mm": r3(f64::from(out.stats.max_seam_gap) * 1000.0),
             "closures": out.drape.scene.closures.len(),
             "max_closure_gap_mm": r3(f64::from(out.stats.max_closure_gap) * 1000.0),
+            "elastics": elastics,
             "max_speed_m_s": r3(out.stats.max_speed.into()),
             "settled": out.stats.max_speed < SETTLED_SPEED,
             "motion": out.animation.as_ref().map(|a| a.motion.name()),

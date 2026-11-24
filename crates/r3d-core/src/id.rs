@@ -175,6 +175,12 @@ define_id!(
     Zipper,
     "zipper"
 );
+define_id!(
+    /// A construction detail on a piece: an elastic (spec 31).
+    DetailId,
+    Detail,
+    "detail"
+);
 
 /// Any entity ID, for messages and command outputs.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -191,6 +197,7 @@ pub enum AnyId {
     Guide(GuideId),
     Button(ButtonId),
     Zipper(ZipperId),
+    Detail(DetailId),
 }
 
 impl fmt::Display for AnyId {
@@ -208,6 +215,7 @@ impl fmt::Display for AnyId {
             AnyId::Guide(id) => id.fmt(f),
             AnyId::Button(id) => id.fmt(f),
             AnyId::Zipper(id) => id.fmt(f),
+            AnyId::Detail(id) => id.fmt(f),
         }
     }
 }
@@ -235,9 +243,10 @@ impl FromStr for AnyId {
             GuideId::PREFIX => s.parse().map(AnyId::Guide),
             ButtonId::PREFIX => s.parse().map(AnyId::Button),
             ZipperId::PREFIX => s.parse().map(AnyId::Zipper),
+            DetailId::PREFIX => s.parse().map(AnyId::Detail),
             _ => Err(ParseIdError {
                 text: s.to_owned(),
-                expected: "garment|panel|point|edge|notch|line|seam|pin|constraint|guide|button|zipper",
+                expected: "garment|panel|point|edge|notch|line|seam|pin|constraint|guide|button|zipper|detail",
             }),
         }
     }
@@ -263,7 +272,7 @@ impl JsonSchema for AnyId {
     fn json_schema(_: &mut SchemaGenerator) -> Schema {
         json_schema!({
             "type": "string",
-            "pattern": "^(garment|panel|point|edge|notch|line|seam|pin|constraint|guide|button|zipper):[1-9][0-9]*$",
+            "pattern": "^(garment|panel|point|edge|notch|line|seam|pin|constraint|guide|button|zipper|detail):[1-9][0-9]*$",
         })
     }
 }

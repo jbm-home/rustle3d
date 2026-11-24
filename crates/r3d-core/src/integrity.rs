@@ -203,6 +203,16 @@ impl Project {
                 });
             }
         }
+        for (id, d) in &self.details {
+            let ok = match d {
+                crate::detail::Detail::Elastic(e) => self.side_ok(&e.side) && e.valid(),
+            };
+            if !ok {
+                return Err(E::BadValue {
+                    entity: (*id).into(),
+                });
+            }
+        }
         for (id, panel) in &self.panels {
             if let Some(p) = &panel.placement
                 && ![p.angle_deg, p.top_cm, p.offset_mm]
@@ -242,7 +252,8 @@ impl Project {
             .chain(self.constraints.keys().map(|k| (AnyId::from(*k), k.raw())))
             .chain(self.guides.keys().map(|k| (AnyId::from(*k), k.raw())))
             .chain(self.buttons.keys().map(|k| (AnyId::from(*k), k.raw())))
-            .chain(self.zippers.keys().map(|k| (AnyId::from(*k), k.raw())));
+            .chain(self.zippers.keys().map(|k| (AnyId::from(*k), k.raw())))
+            .chain(self.details.keys().map(|k| (AnyId::from(*k), k.raw())));
         for (entity, raw) in ids {
             if raw >= self.next_id {
                 return Err(E::IdCounter { entity });

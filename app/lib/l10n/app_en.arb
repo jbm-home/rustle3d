@@ -1714,5 +1714,31 @@
         "type": "String"
       }
     }
-  }
+  },
+  "barElastic": "Elastic",
+  "barElasticHint": "Sew an elastic along this edge: it gathers when draped.",
+  "barShirring": "Shirring",
+  "barShirringHint": "Rows of elastic across the piece, parallel to this edge.",
+  "elasticTitle": "Elastic",
+  "elasticRatio": "Relaxed length",
+  "elasticWidth": "Width",
+  "shirringTitle": "Shirring",
+  "shirringRows": "Rows",
+  "shirringFirst": "First row from the edge",
+  "shirringGap": "Between rows",
+  "detailsTitle": "Construction details",
+  "detailElastic": "Elastic · {cm} cm, {width} mm wide",
+  "@detailElastic": {
+    "placeholders": {
+      "cm": {
+        "type": "String"
+      },
+      "width": {
+        "type": "String"
+      }
+    }
+  },
+  "tpElastic": "Elastic",
+  "tpElasticBySize": "Elastic per garment by size (cm)",
+  "errHasElastic": "This stretch already has an elastic."
 }

@@ -3364,4 +3364,56 @@ class LEn extends L {
   String errLibraryIo(String detail) {
     return 'The motion library cannot be read or written: $detail';
   }
+
+  @override
+  String get barElastic => 'Elastic';
+
+  @override
+  String get barElasticHint =>
+      'Sew an elastic along this edge: it gathers when draped.';
+
+  @override
+  String get barShirring => 'Shirring';
+
+  @override
+  String get barShirringHint =>
+      'Rows of elastic across the piece, parallel to this edge.';
+
+  @override
+  String get elasticTitle => 'Elastic';
+
+  @override
+  String get elasticRatio => 'Relaxed length';
+
+  @override
+  String get elasticWidth => 'Width';
+
+  @override
+  String get shirringTitle => 'Shirring';
+
+  @override
+  String get shirringRows => 'Rows';
+
+  @override
+  String get shirringFirst => 'First row from the edge';
+
+  @override
+  String get shirringGap => 'Between rows';
+
+  @override
+  String get detailsTitle => 'Construction details';
+
+  @override
+  String detailElastic(String cm, String width) {
+    return 'Elastic · $cm cm, $width mm wide';
+  }
+
+  @override
+  String get tpElastic => 'Elastic';
+
+  @override
+  String get tpElasticBySize => 'Elastic per garment by size (cm)';
+
+  @override
+  String get errHasElastic => 'This stretch already has an elastic.';
 }

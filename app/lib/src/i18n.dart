@@ -151,6 +151,7 @@ extension Messages on BuildContext {
       'invalid.has_holes' => l.errHasHoles,
       'invalid.constrained' => l.errConstrained,
       'invalid.outside_piece' => l.errOutsidePiece,
+      'invalid.has_elastic' => l.errHasElastic,
       'invalid.not_joined' => l.errNotJoined,
       'formula.syntax' => l.errFormulaSyntax(arg('at')),
       'formula.unknown_name' => l.errFormulaUnknown(arg('name')),

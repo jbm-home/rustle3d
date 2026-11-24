@@ -4,8 +4,13 @@ Provenance: maintainer's functional brief (ROADMAP M34, 2026-11-23: elastic on a
 
 ## Status
 
-Planned (M34). Built in four steps, each one commit: elastic and
-shirring, topstitching, interfacing, quilting; then the shirt template.
+Built in four steps, each one commit; then the shirt template.
+
+- Elastic and shirring (2026-11-24): the document (schema v22, details
+  `detail:N`), `elastic.add`, `elastic.set`, `elastic.remove`,
+  `elastic.shirr`, `detail.list`; the drape on both solvers; the board,
+  the tech pack, the action bar and the inspector.
+- Topstitching, interfacing, quilting: planned.
 
 ## User story
 As a designer, I gather a sleeve's cuff with an elastic two thirds its
@@ -33,6 +38,8 @@ and the topstitching.
 - Its **width** (2–50 mm; default 10) sets how strongly it pulls: about
   0.8 N per mm of width when stretched to twice its length (general
   knowledge of knitted and braided elastics; an estimate to calibrate).
+  On the body, an elastic shorter than what it goes round (an arm, a
+  waist) stays stretched on it.
 - A side can carry one elastic (a stretch of it, another); an elastic
   and a seam or a zipper may share a side (an elastic sewn into a
   waistband seam).
@@ -96,6 +103,8 @@ and the topstitching.
   (it buckles, finer than the mesh can show), and the cloth beyond it
   folds. Along elastic lines the cloth is meshed finer (about 8 mm, in
   a band of three triangles on each side), so the gathers are small.
+  Shirring rows must not cross another line sewn inside the piece (the
+  piece cannot be meshed: the drape reports it).
 - **Topstitching, interfacing, quilting** change the cloth where they
   are: the triangles there take the garment's fabric combined with
   them. Their boundaries (an interfacing's edge, the stitched lines of a
@@ -108,8 +117,8 @@ and the topstitching.
   is from its relaxed length.
 
 ### Board
-- Elastic: a zigzag along its side, with its ratio. Shirring: each row
-  likewise.
+- Elastic: a green zigzag along its side (its ratio is in the
+  inspector). Shirring: each row likewise.
 - Topstitching: its rows dashed at the stitch length, in the thread's
   colour.
 - Interfacing: its area hatched.
@@ -149,22 +158,22 @@ and the topstitching.
   and quilting (its area, its stitched lines' total length).
 
 ## UX
-- The action bar (spec 30): an edge picked offers **Elastic** and
-  **Topstitch**; a piece alone offers **Interfacing**, **Quilting** and
-  **Shirring**. Each opens a small card under its button with the
-  values (and, for Shirring, the edge the rows follow: the picked one,
-  else the piece's first edge), Apply.
-- The inspector lists the selected piece's elastics, topstitches,
-  interfacings and quiltings, each with its values to edit and a remove
-  action.
+- The action bar (spec 30): an edge picked offers **Elastic**,
+  **Shirring** (rows parallel to that edge) and **Topstitch**; a piece
+  alone offers **Interfacing** and **Quilting**. Each asks for its
+  values in a small dialog.
+- The inspector's **Construction details** card lists the selected
+  piece's elastics (relaxed length and width; a Relaxed length slider),
+  topstitches, interfacings and quiltings, each with a remove action.
 
 ## Acceptance criteria
 - Every command round-trips apply → undo → redo; a golden file per new
   schema version holds the new details; older files load unchanged.
-- **A cuff gathered by elastic**: a 300 mm sleeve hem with an elastic
-  of ratio 0.6 drapes with its hem 180 mm ± 5 % around (on the cloth),
-  gathered (the cloth's surface beside it is at least 20 % longer than
-  its straight line), no NaN.
+- **A cuff gathered by elastic**: a T-shirt's sleeve hem (≈ 330 mm)
+  with an elastic of ratio 0.6 closes to the elastic's length ± 5 % on
+  the cloth where nothing holds it open; on the forearm it stays
+  stretched on it. On a hanging sheet the cloth beside the elastic
+  gathers (its rows are at least 20 % longer than they span). No NaN.
 - **A topstitched yoke**: two rows on the yoke's seam edge show on the
   board, in the 3D view and in a photo (their pixels in the thread's
   colour), and in the tech pack.

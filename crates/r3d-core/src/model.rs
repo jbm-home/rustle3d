@@ -11,6 +11,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::body::{Measure, Measures};
+use crate::detail::Detail;
+use crate::id::DetailId;
 use crate::id::{
     ButtonId, ConstraintId, EdgeId, GarmentId, GuideId, InternalLineId, NotchId, PanelId, PinId,
     PointId, SeamId, ZipperId,
@@ -63,6 +65,9 @@ pub struct Project {
     /// Zippers (M20).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub(crate) zippers: IdMap<ZipperId, Zipper>,
+    /// Construction details: elastics (M34).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub(crate) details: IdMap<DetailId, Detail>,
 }
 
 /// A relation the drawing keeps between points, edges, notches and
@@ -1061,6 +1066,7 @@ impl Project {
             variables: BTreeMap::new(),
             buttons: IdMap::new(),
             zippers: IdMap::new(),
+            details: IdMap::new(),
         }
     }
 
@@ -1106,6 +1112,10 @@ impl Project {
 
     pub fn zippers(&self) -> &IdMap<ZipperId, Zipper> {
         &self.zippers
+    }
+
+    pub fn details(&self) -> &IdMap<DetailId, Detail> {
+        &self.details
     }
 
     /// The seam an edge belongs to, if any.

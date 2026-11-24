@@ -25,6 +25,30 @@ pub struct Membrane {
     pub alpha_u: f32,
     pub alpha_v: f32,
     pub alpha_s: f32,
+    /// Along an elastic: warp and weft resist stretching only. The cloth
+    /// there gathers in folds finer than the mesh rather than compresses
+    /// (Choi and Ko 2002).
+    pub buckles: bool,
+}
+
+/// How far from an elastic the cloth gathers in folds finer than the
+/// mesh, on the pattern (m; docs/physics.md, "Elastic"). Narrower, the
+/// cloth just beyond had to take the whole gathering in a few coarse
+/// folds and held a sleeve's hem 25 % open.
+pub const BUCKLING_BAND: f32 = 0.04;
+
+/// One segment of an elastic: a distance that only pulls, between two
+/// consecutive particles of its line.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ElasticLink {
+    pub v: [u32; 2],
+    /// Their distance on the pattern (m): the rest length at the start of
+    /// the sewing ramp.
+    pub full: f32,
+    /// The elastic's relaxed length there (m), reached at its end.
+    pub rest: f32,
+    /// Newtons per unit strain (> 0).
+    pub stiffness: f32,
 }
 
 /// Dihedral bending on an interior edge (rest: flat).
@@ -56,6 +80,7 @@ pub struct Model {
     pub seams: Vec<[u32; 2]>,
     /// Vertex pairs held by closures (buttons, closed zippers).
     pub closures: Vec<[u32; 2]>,
+    pub elastics: Vec<ElasticLink>,
     /// Mesh edges, each once, sorted.
     pub edges: Vec<[u32; 2]>,
     pub self_contact: SelfContact,
@@ -90,6 +115,55 @@ impl Model {
             .filter(|c| valid(&c.pair) && c.pair[0] != c.pair[1])
             .copied()
             .collect();
+        // Elastic segments, and the particles they gather.
+        let mut elastics = Vec::new();
+        for line in &scene.elastics {
+            if !(line.stiffness > 0.0 && line.ratio > 0.0 && line.ratio <= 1.0) {
+                continue;
+            }
+            for w in line.particles.windows(2) {
+                let &[a, b] = w else { continue };
+                let (Some(pa), Some(pb)) = (
+                    scene.particles.get(a as usize),
+                    scene.particles.get(b as usize),
+                ) else {
+                    continue;
+                };
+                let full = pa.rest.distance(pb.rest);
+                if a == b || full <= 1e-9 {
+                    continue;
+                }
+                elastics.push(ElasticLink {
+                    v: [a, b],
+                    full,
+                    rest: full * line.ratio,
+                    stiffness: line.stiffness,
+                });
+            }
+        }
+        // The cloth near an elastic on the pattern gathers in folds finer
+        // than the mesh.
+        let segments: Vec<(Vec2, Vec2)> = elastics
+            .iter()
+            .filter_map(|l| {
+                let [a, b] = l.v.map(|i| scene.particles.get(i as usize).map(|p| p.rest));
+                Some((a?, b?))
+            })
+            .collect();
+        let gathers = |t: &crate::scene::Triangle| {
+            let c = t
+                .vertices
+                .iter()
+                .filter_map(|i| scene.particles.get(*i as usize))
+                .map(|p| p.rest)
+                .sum::<Vec2>()
+                / 3.0;
+            segments.iter().any(|(a, b)| {
+                let ab = *b - *a;
+                let s = ((c - *a).dot(ab) / ab.length_squared().max(1e-12)).clamp(0.0, 1.0);
+                c.distance(*a + ab * s) < BUCKLING_BAND
+            })
+        };
         let mut membranes = Vec::with_capacity(triangles.len());
         let mut rest_area = Vec::with_capacity(triangles.len());
         let rest = |i: u32| {
@@ -126,6 +200,7 @@ impl Model {
                 alpha_u: 1.0 / (fabric.stretch_warp * area),
                 alpha_v: 1.0 / (fabric.stretch_weft * area),
                 alpha_s: 1.0 / (fabric.shear * area),
+                buckles: gathers(t),
             });
             for i in t.vertices {
                 let i = i as usize;
@@ -190,10 +265,18 @@ impl Model {
             .copied()
             .chain(closures.iter().map(|c| c.pair))
             .collect();
+        // Gathered cloth lies in folds on itself: within twice the band
+        // around each point of an elastic (along the cloth), it does not
+        // repel itself (a narrower patch held a sleeve's hem 5 % open).
         let overlaps: Vec<([u32; 2], f32)> = closures
             .iter()
             .filter(|c| c.overlap > 0.0)
             .map(|c| (c.pair, c.overlap))
+            .chain(
+                elastics
+                    .iter()
+                    .map(|l| ([l.v[0], l.v[0]], 2.0 * BUCKLING_BAND)),
+            )
             .collect();
         let rest_positions: Vec<Vec2> = scene.particles.iter().map(|p| p.rest).collect();
         let corners: Vec<[u32; 3]> = triangles.iter().map(|t| t.vertices).collect();
@@ -229,6 +312,7 @@ impl Model {
             hinges,
             seams,
             closures: closures.iter().map(|c| c.pair).collect(),
+            elastics,
             edges,
             self_contact,
             layers,

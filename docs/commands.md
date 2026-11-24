@@ -3254,6 +3254,300 @@ Remove a zipper: its sides are free again.
 
 </details>
 
+### `elastic.add`
+
+Sew an elastic along a side (given as a seam's: a whole `edge`, consecutive outline `edges` or an internal `line`, maybe only `from_mm`/`to_mm` along it): the drape gathers it to `ratio` × its length (0.2–1, default 0.75), or to `relaxed_mm`. `width_mm` (2–50, default 10) sets how strongly it pulls. The ratio is kept when the side changes length or in other sizes. A stretch may carry one elastic; it may also be sewn. Returns the elastic (a detail).
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "EdgeId": {
+      "description": "Identifier of a edge, e.g. `edge:1`.",
+      "pattern": "^edge:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "InternalLineId": {
+      "description": "Identifier of a line, e.g. `line:1`.",
+      "pattern": "^line:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "SeamSideSpec": {
+      "additionalProperties": false,
+      "description": "One side of a new seam: a whole edge, a run of edges, or an internal\nline; all of it or part of it.",
+      "properties": {
+        "edge": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EdgeId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "One edge."
+        },
+        "edges": {
+          "description": "Or consecutive outline edges of one piece, in their order around it\n(e.g. a pocket's sides and bottom).",
+          "items": {
+            "$ref": "#/$defs/EdgeId"
+          },
+          "type": "array"
+        },
+        "from_mm": {
+          "description": "Only from here along the path (mm from its start). Omitted: its\nstart.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "line": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InternalLineId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Or an internal line (a pocket's placement line, a tuck's line)."
+        },
+        "reversed": {
+          "description": "Walk the side from its end instead of its start. Omitted: `false`\nfor side `a`; for side `b`, an edge sewn to its linked mirror image\nmeets it mirrored point to mirrored point (a centre seam), other\nsides are walked both the same way on the pattern (what sewing two\npanels laid side by side needs).",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "to_mm": {
+          "description": "Only to here (mm from the path's start). Omitted: its end.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Add an elastic along a side.",
+  "properties": {
+    "ratio": {
+      "description": "Its relaxed length over the side's (0.2–1). Omitted (and no\n`relaxed_mm`): 0.75.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "relaxed_mm": {
+      "description": "Or its relaxed length (mm), turned into the ratio.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "side": {
+      "$ref": "#/$defs/SeamSideSpec",
+      "description": "Where it is sewn, as a seam's side."
+    },
+    "width_mm": {
+      "description": "Its width (2–50 mm): how strongly it pulls. Omitted: 10 mm.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "side"
+  ],
+  "title": "ElasticAdd",
+  "type": "object"
+}
+```
+
+</details>
+
+### `elastic.set`
+
+Change an elastic: its `ratio` (or `relaxed_mm`) and its `width_mm`; what is omitted stays. A running drape follows without starting again.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "DetailId": {
+      "description": "Identifier of a detail, e.g. `detail:1`.",
+      "pattern": "^detail:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Change an elastic.",
+  "properties": {
+    "elastic": {
+      "$ref": "#/$defs/DetailId"
+    },
+    "ratio": {
+      "description": "Its relaxed length over the side's (0.2–1).",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "relaxed_mm": {
+      "description": "Or its relaxed length (mm).",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "width_mm": {
+      "description": "Its width (2–50 mm).",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "elastic"
+  ],
+  "title": "ElasticSet",
+  "type": "object"
+}
+```
+
+</details>
+
+### `elastic.remove`
+
+Remove an elastic: its side no longer gathers.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "DetailId": {
+      "description": "Identifier of a detail, e.g. `detail:1`.",
+      "pattern": "^detail:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Remove an elastic.",
+  "properties": {
+    "elastic": {
+      "$ref": "#/$defs/DetailId"
+    }
+  },
+  "required": [
+    "elastic"
+  ],
+  "title": "ElasticRemove",
+  "type": "object"
+}
+```
+
+</details>
+
+### `elastic.shirr`
+
+Shirr a piece: `rows` parallel rows of elastic across it, along `edge`'s chord, the first `first_mm` inside it (default 15), then every `gap_mm` (default 15), each an internal line with its elastic (`ratio`, default 0.75; `width_mm`, default 2), stopping 1 mm short of the outline. One undo step. Returns the lines and the elastics.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "EdgeId": {
+      "description": "Identifier of a edge, e.g. `edge:1`.",
+      "pattern": "^edge:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "PanelId": {
+      "description": "Identifier of a panel, e.g. `panel:1`.",
+      "pattern": "^panel:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Shirr a piece: parallel rows of elastic.",
+  "properties": {
+    "edge": {
+      "$ref": "#/$defs/EdgeId",
+      "description": "The outline edge the rows run along (parallel to its chord)."
+    },
+    "first_mm": {
+      "description": "The first row's distance from the edge (mm). Omitted: 15 mm.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "gap_mm": {
+      "description": "The distance between rows (mm). Omitted: 15 mm.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "panel": {
+      "$ref": "#/$defs/PanelId"
+    },
+    "ratio": {
+      "description": "Each row's elastic ratio (0.2–1). Omitted: 0.75.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "rows": {
+      "description": "How many rows (1–30).",
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "width_mm": {
+      "description": "The elastic's width (2–50 mm). Omitted: 2 mm (shirring elastic).",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "panel",
+    "edge",
+    "rows"
+  ],
+  "title": "ElasticShirr",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `garment.set_fabric`
 
 Choose what the garment is made of: cotton, denim, jersey, silk or wool. Sets how it drapes and how it looks.
@@ -6129,6 +6423,24 @@ Every trim: buttons (the piece and point they are sewn at, diameter, the buttonh
 
 </details>
 
+### `detail.list`
+
+Every construction detail: elastics (their side, piece, ratio, width, the side's length and the relaxed length in each size of the range, or in the drawn size; mm).
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Every construction detail of spec 31.",
+  "title": "DetailList",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `template.list`
 
 The starter garments template.apply can draft, each with the sizes it reads (cm), filled in from the avatar's measurements (or a standard size without one).
@@ -6478,7 +6790,7 @@ Export all panels as an SVG at 1:1 scale (cutting and sewing lines, notches, int
 
 ### `simulate`
 
-Drape the placed and sewn panels on the avatar for a number of frames (1/60 s each, deterministic) and cache the result in the project, so `r3d render --view 3d` shows it. With `motion`, the avatar walks, turns or raises its arms after 1.5 s and the cloth follows (or, with `motion_file`, plays a motion captured on a person from a BVH file in the project folder); renders and exports then show the body and the garment as they are at the last frame. Returns the garment's extent, how open the seams are, how many points buttons and closed zippers hold and how far apart they still are, and whether the cloth has settled.
+Drape the placed and sewn panels on the avatar for a number of frames (1/60 s each, deterministic) and cache the result in the project, so `r3d render --view 3d` shows it. With `motion`, the avatar walks, turns or raises its arms after 1.5 s and the cloth follows (or, with `motion_file`, plays a motion captured on a person from a BVH file in the project folder); renders and exports then show the body and the garment as they are at the last frame. Returns the garment's extent, how open the seams are, how many points buttons and closed zippers hold and how far apart they still are, each elastic's length on the cloth against its relaxed length, and whether the cloth has settled.
 
 <details><summary>Parameters (JSON schema)</summary>
 

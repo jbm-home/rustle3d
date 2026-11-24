@@ -8,6 +8,8 @@
 use std::collections::BTreeMap;
 use std::mem;
 
+use crate::detail::Detail;
+use crate::id::DetailId;
 use crate::id::{
     ButtonId, ConstraintId, EdgeId, GarmentId, GuideId, InternalLineId, NotchId, PanelId, PinId,
     PointId, SeamId, ZipperId,
@@ -42,6 +44,7 @@ pub enum Change {
     Guide(Box<EntityChange<GuideId, Guide>>),
     Button(Box<EntityChange<ButtonId, Button>>),
     Zipper(Box<EntityChange<ZipperId, Zipper>>),
+    Detail(Box<EntityChange<DetailId, Detail>>),
     Avatar {
         before: Option<Box<Avatar>>,
         after: Option<Box<Avatar>>,
@@ -95,6 +98,7 @@ impl Change {
             Change::Guide(c) => set(&mut p.guides, c.id, pick!(c)),
             Change::Button(c) => set(&mut p.buttons, c.id, pick!(c)),
             Change::Zipper(c) => set(&mut p.zippers, c.id, pick!(c)),
+            Change::Detail(c) => set(&mut p.details, c.id, pick!(c)),
             Change::Name { before, after } => {
                 p.name = if forward { after } else { before }.clone();
             }
@@ -130,6 +134,7 @@ impl Change {
             (Change::Guide(a), Change::Guide(b)) if a.id == b.id => a.after = b.after.clone(),
             (Change::Button(a), Change::Button(b)) if a.id == b.id => a.after = b.after.clone(),
             (Change::Zipper(a), Change::Zipper(b)) if a.id == b.id => a.after = b.after.clone(),
+            (Change::Detail(a), Change::Detail(b)) if a.id == b.id => a.after = b.after.clone(),
             (Change::InternalLine(a), Change::InternalLine(b)) if a.id == b.id => {
                 a.after = b.after.clone()
             }
@@ -225,6 +230,7 @@ impl ChangeSet {
                         project.side_panel(&v.b)
                     ])
                 }
+                Change::Detail(c) => each!(c, |v: &Detail| [v.panel(project)]),
                 Change::Garment(_)
                 | Change::Guide(_)
                 | Change::Avatar { .. }
@@ -439,6 +445,17 @@ impl<'a> Transaction<'a> {
         new_zipper_id,
         put_zipper,
         remove_zipper
+    );
+
+    entity_ops!(
+        "detail",
+        DetailId,
+        Detail,
+        details,
+        Detail,
+        new_detail_id,
+        put_detail,
+        remove_detail
     );
 
     /// What changed so far, in order.

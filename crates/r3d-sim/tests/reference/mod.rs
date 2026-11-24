@@ -407,3 +407,42 @@ pub fn grabbed_cloth_follows_the_hand_and_falls_when_released(make: Make) {
     let mean = s.positions().iter().map(|p| p.y).sum::<f32>() / s.positions().len() as f32;
     assert!(mean < 0.07, "cloth did not fall back: mean height {mean} m");
 }
+
+/// The length of the polyline through `ids` at the solver's positions.
+fn path_length(s: &dyn Solver, ids: &[usize]) -> f32 {
+    ids.windows(2)
+        .map(|w| s.positions()[w[0]].distance(s.positions()[w[1]]))
+        .sum()
+}
+
+pub fn an_elastic_gathers_the_edge_it_is_sewn_on(make: Make) {
+    // A 40 × 30 cm sheet hung by its top edge, an elastic along its
+    // bottom edge pulling it to 60 % of its length (a sleeve's hem).
+    let n = 21;
+    let mut scene = sheet(0.4, 0.3, n, Vec2::Y, |r| Vec3::new(r.x, 1.0 + r.y, 0.0));
+    for i in 0..n {
+        scene.particles[(n - 1) * n + i].pinned = true;
+    }
+    let edge: Vec<usize> = (0..n).collect();
+    scene.elastics.push(r3d_sim::ElasticLine {
+        particles: edge.iter().map(|i| *i as u32).collect(),
+        ratio: 0.6,
+        stiffness: 8.0,
+    });
+    let s = run(make, scene, 3.0);
+    let gathered = path_length(&*s, &edge);
+    // Gravity pulls the hem open a little against the elastic.
+    assert!(
+        (gathered - 0.24).abs() < 0.24 * 0.08,
+        "the elastic's edge is {gathered} m long, 0.24 wanted"
+    );
+    // The cloth beside it gathers: the next rows keep most of their
+    // length on the cloth but span much less.
+    let row: Vec<usize> = (2 * n..3 * n).collect();
+    let along = path_length(&*s, &row);
+    let span = s.positions()[row[0]].distance(s.positions()[row[n - 1]]);
+    assert!(
+        along > 1.2 * span,
+        "no gathers: {along} m along, {span} m across"
+    );
+}

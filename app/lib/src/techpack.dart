@@ -33,6 +33,8 @@ Map<String, String> techpackLabels(L l) {
     'placement': l.tpPlacement,
     'button': l.tpButton,
     'zipper': l.tpZipper,
+    'elastic': l.tpElastic,
+    'elastic_by_size': l.tpElasticBySize,
     'measurements': l.tpMeasurements,
     'size_chart': l.tpSizeChart,
     'size': l.tpSize,

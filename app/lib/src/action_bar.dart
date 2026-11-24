@@ -287,6 +287,52 @@ extension _Bar on _ShellState {
     _refresh();
   }
 
+  /// Sew an elastic along an edge, its relaxed length and width asked.
+  Future<void> _addElastic(String edge) async {
+    final l = context.l;
+    final picked = await _askNumbers(
+      context,
+      title: l.elasticTitle,
+      fields: [(l.elasticRatio, '%', 75), (l.elasticWidth, 'mm', 10)],
+    );
+    if (picked == null || !mounted) return;
+    final [ratio, width] = picked.$1;
+    _run({
+      'type': 'elastic.add',
+      'side': {'edge': edge},
+      'ratio': ratio / 100,
+      'width_mm': width,
+    });
+    _refresh();
+  }
+
+  /// Shirr a piece: rows of elastic parallel to an edge.
+  Future<void> _shirr(String panel, String edge) async {
+    final l = context.l;
+    final picked = await _askNumbers(
+      context,
+      title: l.shirringTitle,
+      fields: [
+        (l.shirringRows, '', 5),
+        (l.shirringFirst, l.cm, 1.5),
+        (l.shirringGap, l.cm, 1.5),
+        (l.elasticRatio, '%', 75),
+      ],
+    );
+    if (picked == null || !mounted) return;
+    final [rows, first, gap, ratio] = picked.$1;
+    _run({
+      'type': 'elastic.shirr',
+      'panel': panel,
+      'edge': edge,
+      'rows': rows.round(),
+      'first_mm': first * 10,
+      'gap_mm': gap * 10,
+      'ratio': ratio / 100,
+    });
+    _refresh();
+  }
+
   /// The buttons for the piece selected alone, nothing on it picked:
   /// turn, scale, mirror; join or cut out; delete.
   List<List<_BarAction>> _pieceActions(L l, Map<String, dynamic> panel) {
@@ -527,6 +573,23 @@ extension _Bar on _ShellState {
             l.barVerticalHint,
             () => _constrain({'kind': 'vertical', 'edge': edges[0]}),
           ),
+        ],
+        [
+          act(
+            'elastic',
+            Icons.waves_rounded,
+            l.barElastic,
+            l.barElasticHint,
+            () => _addElastic(edges[0]),
+          ),
+          if (_panel?['id'] case final String panel)
+            act(
+              'shirring',
+              Icons.reorder_rounded,
+              l.barShirring,
+              l.barShirringHint,
+              () => _shirr(panel, edges[0]),
+            ),
         ],
       ],
       (0, 2, 0, 0) => [

@@ -55,6 +55,20 @@ fn on_segment(a: DVec2, b: DVec2, p: DVec2) -> bool {
     p.x >= a.x.min(b.x) && p.x <= a.x.max(b.x) && p.y >= a.y.min(b.y) && p.y <= a.y.max(b.y)
 }
 
+/// Distance from `p` to the closed polyline `pts`.
+pub fn distance_to_loop(pts: &[DVec2], p: DVec2) -> f64 {
+    let n = pts.len();
+    (0..n)
+        .filter_map(|i| {
+            Some(crate::fit::distance_to_segment(
+                p,
+                *pts.get(i)?,
+                *pts.get((i + 1) % n)?,
+            ))
+        })
+        .fold(f64::INFINITY, f64::min)
+}
+
 /// Whether the closed segments `ab` and `cd` intersect (touching counts).
 pub fn segments_intersect(a: DVec2, b: DVec2, c: DVec2, d: DVec2) -> bool {
     let d1 = orient(c, d, a);

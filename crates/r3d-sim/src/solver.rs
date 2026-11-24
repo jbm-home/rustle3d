@@ -50,6 +50,13 @@ pub fn sewing_ramp(time: f32) -> f32 {
     (time / SEWING_TIME).clamp(0.0, 1.0)
 }
 
+/// An elastic segment's target length at `time`: from its length on the
+/// pattern to its relaxed length over the sewing ramp, so the gathers form
+/// while the garment is sewn (docs/physics.md, "Elastic").
+pub fn elastic_target(link: &crate::model::ElasticLink, time: f32) -> f32 {
+    link.full + (link.rest - link.full) * sewing_ramp(time)
+}
+
 /// Seams start soft and tighten while the garment closes; meanwhile
 /// gravity grows from zero, so pieces do not fall before they are sewn
 /// (a skirt would close below the waist and slide off). Gravity and seam

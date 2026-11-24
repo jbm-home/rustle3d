@@ -181,6 +181,17 @@ fn every_command_round_trips() {
     let zipper = zipper.created[0].to_string();
     h.round_trip(json!({"type": "zipper.set_open", "zipper": zipper, "open_mm": 80}));
     h.round_trip(json!({"type": "zipper.remove", "zipper": zipper}));
+    let elastic = h.round_trip(json!({"type": "elastic.add",
+        "side": {"edge": poly.created[7].to_string(), "from_mm": 20, "to_mm": 120},
+        "ratio": 0.6}));
+    let elastic = elastic.created[0].to_string();
+    h.round_trip(
+        json!({"type": "elastic.set", "elastic": elastic, "relaxed_mm": 70,
+        "width_mm": 20}),
+    );
+    h.round_trip(json!({"type": "elastic.remove", "elastic": elastic}));
+    h.round_trip(json!({"type": "elastic.shirr", "panel": poly_panel,
+        "edge": poly.created[5].to_string(), "rows": 3}));
 
     let split = h.round_trip(json!({"type": "edge.split", "edge": edge, "at_mm": 100}));
     let new_point = split.created[0].to_string();

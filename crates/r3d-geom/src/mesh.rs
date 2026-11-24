@@ -48,6 +48,128 @@ impl std::fmt::Display for MeshError {
 
 impl std::error::Error for MeshError {}
 
+/// A band of finer triangles along a polyline (an elastic, so the cloth
+/// gathers in small folds): a triangular lattice of points `spacing`
+/// apart, `rows` rows on each side of the line, added before the
+/// refinement, which grades the triangles back to the panel's spacing
+/// around it (docs/physics.md, "Elastic").
+#[derive(Debug, Clone, PartialEq)]
+pub struct FineZone {
+    /// Its points, about `spacing` apart.
+    pub line: Vec<DVec2>,
+    pub spacing: f64,
+    pub rows: usize,
+}
+
+/// Points already placed, bucketed so a new point too near one is left
+/// out (it would make a sliver).
+struct Taken {
+    cell: f64,
+    grid: std::collections::HashMap<(i64, i64), Vec<DVec2>>,
+}
+
+impl Taken {
+    fn new(cell: f64) -> Self {
+        Self {
+            cell: cell.max(1e-6),
+            grid: std::collections::HashMap::new(),
+        }
+    }
+
+    fn key(&self, p: DVec2) -> (i64, i64) {
+        (
+            (p.x / self.cell).floor() as i64,
+            (p.y / self.cell).floor() as i64,
+        )
+    }
+
+    fn put(&mut self, p: DVec2) {
+        let key = self.key(p);
+        self.grid.entry(key).or_default().push(p);
+    }
+
+    /// Whether a point lies within `r` (at most the cell size) of `p`.
+    fn near(&self, p: DVec2, r: f64) -> bool {
+        let (x, y) = self.key(p);
+        (-1..=1).any(|dx| {
+            (-1..=1).any(|dy| {
+                self.grid
+                    .get(&(x + dx, y + dy))
+                    .is_some_and(|pts| pts.iter().any(|q| q.distance(p) < r))
+            })
+        })
+    }
+}
+
+/// The lattice points of `zones` inside the panel: clear of the outline,
+/// the holes, the given points and each other by half their spacing.
+fn lattice(
+    zones: &[FineZone],
+    boundary: &[DVec2],
+    holes: &[Vec<DVec2>],
+    lines: &[Vec<DVec2>],
+) -> Vec<DVec2> {
+    let finest = zones
+        .iter()
+        .map(|z| z.spacing)
+        .filter(|s| s.is_finite() && *s > 0.0)
+        .fold(f64::INFINITY, f64::min);
+    if !finest.is_finite() {
+        return Vec::new();
+    }
+    let mut taken = Taken::new(finest);
+    for p in boundary
+        .iter()
+        .chain(holes.iter().flatten())
+        .chain(lines.iter().flatten())
+    {
+        taken.put(*p);
+    }
+    let mut out = Vec::new();
+    for zone in zones {
+        let s = zone.spacing;
+        if !(s.is_finite() && s >= finest) {
+            continue;
+        }
+        let row = s * 3f64.sqrt() / 2.0;
+        let n = zone.line.len();
+        for (i, p) in zone.line.iter().enumerate() {
+            let prev = i.checked_sub(1).and_then(|j| zone.line.get(j)).unwrap_or(p);
+            let next = zone.line.get(i + 1).unwrap_or(p);
+            let Some(along) = (*next - *prev).try_normalize() else {
+                continue;
+            };
+            let normal = along.perp();
+            for k in 1..=zone.rows {
+                // Odd rows sit between the line's points: a triangular
+                // lattice, none past the line's last point.
+                let shift = if k % 2 == 1 {
+                    if i + 1 == n {
+                        continue;
+                    }
+                    s / 2.0
+                } else {
+                    0.0
+                };
+                for side in [1.0, -1.0] {
+                    let q = *p + along * shift + normal * (side * row * k as f64);
+                    let inside = crate::polygon::contains(boundary, q)
+                        && crate::polygon::distance_to_loop(boundary, q) > s / 2.0
+                        && holes.iter().all(|h| {
+                            !crate::polygon::contains(h, q)
+                                && crate::polygon::distance_to_loop(h, q) > s / 2.0
+                        });
+                    if inside && !taken.near(q, s / 2.0) {
+                        taken.put(q);
+                        out.push(q);
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
 type Cdt = ConstrainedDelaunayTriangulation<Point2<f64>>;
 
 /// Insert a closed loop of points as constraint edges.
@@ -86,11 +208,13 @@ fn constrain_loop(cdt: &mut Cdt, pts: &[DVec2]) -> Result<Vec<FixedVertexHandle>
 /// Constrained Delaunay triangulation with Ruppert/Chew refinement over
 /// the outline and the holes; the lines are inserted after the refinement
 /// (a constraint that does not enclose anything would confuse the
-/// refinement's inside/outside test).
+/// refinement's inside/outside test). Along each of `fine`'s lines the
+/// triangles are finer.
 pub fn mesh_panel(
     boundary: &[DVec2],
     holes: &[Vec<DVec2>],
     lines: &[Vec<DVec2>],
+    fine: &[FineZone],
     spacing: f64,
 ) -> Result<PanelMesh, MeshError> {
     if spacing.is_nan() || spacing <= 0.0 {
@@ -102,6 +226,10 @@ pub fn mesh_panel(
         .iter()
         .map(|h| constrain_loop(&mut cdt, h))
         .collect::<Result<_, _>>()?;
+    for p in lattice(fine, boundary, holes, lines) {
+        cdt.insert(Point2::new(p.x, p.y))
+            .map_err(|_| MeshError::InvalidBoundary)?;
+    }
     // An equilateral triangle of side `spacing` has this area.
     let target_area = 3f64.sqrt() / 4.0 * spacing * spacing;
     cdt.refine(
@@ -270,7 +398,7 @@ mod tests {
     fn square_mesh_covers_the_panel_and_keeps_the_boundary() {
         let boundary = resample_closed(&square(100.0), 10.0);
         assert_eq!(boundary.len(), 40);
-        let m = mesh_panel(&boundary, &[], &[], 10.0).unwrap();
+        let m = mesh_panel(&boundary, &[], &[], &[], 10.0).unwrap();
         let area: f64 = m
             .triangles
             .iter()
@@ -309,6 +437,7 @@ mod tests {
             &boundary,
             std::slice::from_ref(&hole),
             std::slice::from_ref(&line),
+            &[],
             10.0,
         )
         .unwrap();
@@ -335,25 +464,71 @@ mod tests {
         // A line leaving the panel is refused.
         let out = vec![DVec2::new(50.0, 90.0), DVec2::new(50.0, 130.0)];
         assert_eq!(
-            mesh_panel(&boundary, &[], &[out], 10.0),
+            mesh_panel(&boundary, &[], &[out], &[], 10.0),
             Err(MeshError::LineOutside)
         );
     }
 
     #[test]
+    fn a_fine_zone_makes_smaller_triangles_along_its_line() {
+        let boundary = resample_closed(&square(200.0), 25.0);
+        let line: Vec<DVec2> = (0..=20)
+            .map(|k| DVec2::new(100.0, 20.0 + 8.0 * k as f64))
+            .collect();
+        let zone = FineZone {
+            line: line.clone(),
+            spacing: 8.0,
+            rows: 3,
+        };
+        let lines = std::slice::from_ref(&line);
+        let coarse = mesh_panel(&boundary, &[], lines, &[], 25.0).unwrap();
+        let fine = mesh_panel(&boundary, &[], lines, std::slice::from_ref(&zone), 25.0).unwrap();
+        // The line's segments are triangle edges, the band's triangles small.
+        for w in fine.lines[0].windows(2) {
+            let joined = fine
+                .triangles
+                .iter()
+                .any(|t| t.contains(&w[0]) && t.contains(&w[1]));
+            assert!(joined);
+        }
+        let near = |m: &PanelMesh| -> (usize, f64) {
+            let areas: Vec<f64> = m
+                .triangles
+                .iter()
+                .map(|t| t.map(|i| m.vertices[i as usize]))
+                .filter(|t| ((t[0] + t[1] + t[2]).x / 3.0 - 100.0).abs() < 10.0)
+                .map(|t| signed_area(&t))
+                .collect();
+            let mean = areas.iter().sum::<f64>() / areas.len().max(1) as f64;
+            (areas.len(), mean)
+        };
+        let (n_coarse, a_coarse) = near(&coarse);
+        let (n_fine, a_fine) = near(&fine);
+        assert!(n_fine > 2 * n_coarse, "{n_fine} vs {n_coarse}");
+        assert!(a_fine < a_coarse / 2.0, "{a_fine} vs {a_coarse}");
+        let positive = fine
+            .triangles
+            .iter()
+            .all(|t| signed_area(&t.map(|i| fine.vertices[i as usize])) > 0.0);
+        assert!(positive);
+        // Far from the line, the panel's spacing.
+        assert!(fine.vertices.len() < coarse.vertices.len() + 400);
+    }
+
+    #[test]
     fn invalid_boundaries_are_rejected() {
         assert_eq!(
-            mesh_panel(&square(10.0)[..2], &[], &[], 1.0),
+            mesh_panel(&square(10.0)[..2], &[], &[], &[], 1.0),
             Err(MeshError::InvalidBoundary)
         );
         let mut dup = square(10.0);
         dup.push(DVec2::ZERO);
         assert_eq!(
-            mesh_panel(&dup, &[], &[], 1.0),
+            mesh_panel(&dup, &[], &[], &[], 1.0),
             Err(MeshError::InvalidBoundary)
         );
         assert_eq!(
-            mesh_panel(&square(10.0), &[], &[], 0.0),
+            mesh_panel(&square(10.0), &[], &[], &[], 0.0),
             Err(MeshError::InvalidBoundary)
         );
     }

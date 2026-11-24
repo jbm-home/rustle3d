@@ -5700,6 +5700,102 @@ abstract class L {
   /// In en, this message translates to:
   /// **'The motion library cannot be read or written: {detail}'**
   String errLibraryIo(String detail);
+
+  /// No description provided for @barElastic.
+  ///
+  /// In en, this message translates to:
+  /// **'Elastic'**
+  String get barElastic;
+
+  /// No description provided for @barElasticHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Sew an elastic along this edge: it gathers when draped.'**
+  String get barElasticHint;
+
+  /// No description provided for @barShirring.
+  ///
+  /// In en, this message translates to:
+  /// **'Shirring'**
+  String get barShirring;
+
+  /// No description provided for @barShirringHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Rows of elastic across the piece, parallel to this edge.'**
+  String get barShirringHint;
+
+  /// No description provided for @elasticTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Elastic'**
+  String get elasticTitle;
+
+  /// No description provided for @elasticRatio.
+  ///
+  /// In en, this message translates to:
+  /// **'Relaxed length'**
+  String get elasticRatio;
+
+  /// No description provided for @elasticWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Width'**
+  String get elasticWidth;
+
+  /// No description provided for @shirringTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shirring'**
+  String get shirringTitle;
+
+  /// No description provided for @shirringRows.
+  ///
+  /// In en, this message translates to:
+  /// **'Rows'**
+  String get shirringRows;
+
+  /// No description provided for @shirringFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'First row from the edge'**
+  String get shirringFirst;
+
+  /// No description provided for @shirringGap.
+  ///
+  /// In en, this message translates to:
+  /// **'Between rows'**
+  String get shirringGap;
+
+  /// No description provided for @detailsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Construction details'**
+  String get detailsTitle;
+
+  /// No description provided for @detailElastic.
+  ///
+  /// In en, this message translates to:
+  /// **'Elastic · {cm} cm, {width} mm wide'**
+  String detailElastic(String cm, String width);
+
+  /// No description provided for @tpElastic.
+  ///
+  /// In en, this message translates to:
+  /// **'Elastic'**
+  String get tpElastic;
+
+  /// No description provided for @tpElasticBySize.
+  ///
+  /// In en, this message translates to:
+  /// **'Elastic per garment by size (cm)'**
+  String get tpElasticBySize;
+
+  /// No description provided for @errHasElastic.
+  ///
+  /// In en, this message translates to:
+  /// **'This stretch already has an elastic.'**
+  String get errHasElastic;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

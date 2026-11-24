@@ -3394,4 +3394,56 @@ class LFr extends L {
   String errLibraryIo(String detail) {
     return 'La bibliothèque de mouvements ne peut pas être lue ou écrite : $detail';
   }
+
+  @override
+  String get barElastic => 'Élastique';
+
+  @override
+  String get barElasticHint =>
+      'Coudre un élastique le long de ce bord : il fronce au drapé.';
+
+  @override
+  String get barShirring => 'Smocks';
+
+  @override
+  String get barShirringHint =>
+      'Des rangs d\'élastique à travers la pièce, parallèles à ce bord.';
+
+  @override
+  String get elasticTitle => 'Élastique';
+
+  @override
+  String get elasticRatio => 'Longueur au repos';
+
+  @override
+  String get elasticWidth => 'Largeur';
+
+  @override
+  String get shirringTitle => 'Smocks';
+
+  @override
+  String get shirringRows => 'Rangs';
+
+  @override
+  String get shirringFirst => 'Premier rang depuis le bord';
+
+  @override
+  String get shirringGap => 'Entre les rangs';
+
+  @override
+  String get detailsTitle => 'Détails de montage';
+
+  @override
+  String detailElastic(String cm, String width) {
+    return 'Élastique · $cm cm, $width mm de large';
+  }
+
+  @override
+  String get tpElastic => 'Élastique';
+
+  @override
+  String get tpElasticBySize => 'Élastique par vêtement et par taille (cm)';
+
+  @override
+  String get errHasElastic => 'Ce tronçon a déjà un élastique.';
 }

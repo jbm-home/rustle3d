@@ -10,6 +10,7 @@
 
 pub mod body;
 pub mod constraints;
+pub mod detail;
 pub mod edit;
 pub mod file;
 pub mod formula;
@@ -26,7 +27,9 @@ pub mod seam;
 pub mod trim;
 
 pub use body::{Measure, MeasureGroup, MeasureValue, Measures};
+pub use detail::{Detail, Elastic};
 pub use edit::{ChangeSet, Transaction};
+pub use id::DetailId;
 pub use id::{
     AnyId, ButtonId, ConstraintId, EdgeId, GarmentId, GuideId, InternalLineId, NotchId, PanelId,
     PinId, PointId, SeamId, ZipperId,

@@ -753,6 +753,45 @@ impl QuerySpec for TrimList {
     }
 }
 
+/// Every construction detail of spec 31.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DetailList {}
+
+impl Described for DetailList {
+    const SUMMARY: &'static str = "Every construction detail: elastics (their side, piece, ratio, width, the side's length and the relaxed length in each size of the range, or in the drawn size; mm).";
+}
+
+impl QuerySpec for DetailList {
+    fn run(&self, p: &Project) -> Result<Value, CommandError> {
+        let lengths = crate::commands::elastic_lengths(p);
+        let elastics: Vec<Value> = p
+            .elastics()
+            .map(|(id, e)| {
+                let panel = p.side_panel(&e.side);
+                let sizes: Vec<Value> = lengths
+                    .get(&id)
+                    .into_iter()
+                    .flatten()
+                    .map(|(size, len)| serde_json::json!({ "size": size, "relaxed_mm": r3(*len) }))
+                    .collect();
+                serde_json::json!({
+                    "id": id,
+                    "side": e.side,
+                    "panel": panel,
+                    "panel_name": panel.and_then(|id| p.panel(id)).map(|panel| panel.name.clone()),
+                    "ratio": r3(e.ratio),
+                    "width_mm": r3(e.width_mm),
+                    "side_mm": p.side_length(&e.side).map(r3),
+                    "relaxed_mm": p.elastic_length(e).map(r3),
+                    "sizes": sizes,
+                })
+            })
+            .collect();
+        Ok(serde_json::json!({ "elastics": elastics }))
+    }
+}
+
 /// The starter garments and their default sizes.
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

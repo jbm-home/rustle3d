@@ -51,6 +51,18 @@ pub struct Closure {
     pub overlap: f32,
 }
 
+/// An elastic sewn along a line of particles (in order along it): it
+/// pulls each stretch of the line to `ratio` of its length on the pattern
+/// (docs/physics.md, "Elastic").
+#[derive(Debug, Clone, PartialEq)]
+pub struct ElasticLine {
+    pub particles: Vec<u32>,
+    /// Relaxed length over the line's length on the pattern (0–1].
+    pub ratio: f32,
+    /// Newtons per unit strain.
+    pub stiffness: f32,
+}
+
 /// A complete scene.
 #[derive(Debug, Clone, Default)]
 pub struct SimScene {
@@ -61,6 +73,8 @@ pub struct SimScene {
     pub seams: Vec<[u32; 2]>,
     /// Vertex pairs held by a closure (a button, a closed zipper).
     pub closures: Vec<Closure>,
+    /// Elastics along lines of particles.
+    pub elastics: Vec<ElasticLine>,
     /// The body, if any.
     pub collider: Option<StaticMesh>,
     /// How the body's parts move; `None`: it stands still. Needs a

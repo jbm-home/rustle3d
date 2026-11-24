@@ -17,6 +17,7 @@ use r3d_core::{
     PathSegment, PatternSource, Pin, Placement, Point, Print, PrintPlacement, PrintSource, Project,
     Seam, SeamSide, Size, SourcePiece, Symmetry, TemplateRef, Transaction, UpAxis, Zipper,
 };
+use r3d_core::{Detail, Elastic};
 
 fn golden_dir(version: u32) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("tests/golden/v{version}"))
@@ -389,6 +390,22 @@ fn sample() -> Project {
             b: SeamSide::edge(contour[1], false),
             open_mm: 60.0,
         },
+    );
+    // An elastic on the hem's middle stretch (v22).
+    let elastic = tx.new_detail_id();
+    tx.put_detail(
+        elastic,
+        Detail::Elastic(Elastic {
+            side: SeamSide {
+                edges: vec![contour[0]],
+                line: None,
+                from_mm: Some(100.0),
+                to_mm: Some(300.0),
+                reversed: false,
+            },
+            ratio: 0.6,
+            width_mm: 10.0,
+        }),
     );
     tx.commit();
     p

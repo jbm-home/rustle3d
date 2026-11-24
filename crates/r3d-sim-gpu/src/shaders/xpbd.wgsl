@@ -19,6 +19,8 @@ struct Step {
     params: vec4f,
     // xyz: where the grab pulls its particle.
     grab_target: vec4f,
+    // x: how far the sewing ramp has gone (0–1).
+    sewing: vec4f,
 }
 
 struct Range {
@@ -64,7 +66,7 @@ struct Membrane {
     v: vec4u,
     // cu.xy, cv.xy
     coef: vec4f,
-    // warp, weft, shear compliances (m/N)
+    // warp, weft, shear compliances (m/N); w: 1 along an elastic (buckles)
     alpha: vec4f,
 }
 
@@ -128,6 +130,18 @@ struct Hinge {
 @group(1) @binding(27) var<storage, read_write> layer_delta: array<atomic<i32>>;
 // Where each particle was when the candidates were gathered.
 @group(1) @binding(28) var<storage, read_write> gathered: array<vec4f>;
+// Elastic segments (r3d-sim `ElasticLink`).
+struct Elastic {
+    v: vec2u,
+    // Length on the pattern, relaxed length (m), 1 / stiffness (1/N).
+    full: f32,
+    rest: f32,
+    inv_stiffness: f32,
+    _pad0: f32,
+    _pad1: f32,
+    _pad2: f32,
+}
+@group(1) @binding(29) var<storage, read> elastics: array<Elastic>;
 
 const WG: u32 = 64u;
 
@@ -197,7 +211,9 @@ fn membrane(@builtin(global_invocation_id) id: vec3u) {
         let alpha = select(m.alpha.x, m.alpha.y, k == 1u) * inv_h2;
         let f = (p1 - p0) * coef.x + (p2 - p0) * coef.y;
         let len = length(f);
-        if len > 1e-9 {
+        // Along an elastic the cloth resists stretching only (it gathers).
+        let buckled = m.alpha.w > 0.5 && len < 1.0;
+        if len > 1e-9 && !buckled {
             let n = f / len;
             let g1 = n * coef.x;
             let g2 = n * coef.y;
@@ -318,6 +334,37 @@ fn closure(@builtin(global_invocation_id) id: vec3u) {
     let dl = (len - goal) / denom;
     x[s.x] = vec4f(pa + n * (dl * wa), 0.0);
     x[s.y] = vec4f(pb - n * (dl * wb), 0.0);
+}
+
+// ---------------------------------------------------------------------------
+// Elastics: distances that only pull, their target going from the length
+// on the pattern to the relaxed length over the sewing ramp (r3d-sim
+// `solver::elastic_target`), with the compliance goal / stiffness
+
+@compute @workgroup_size(WG)
+fn elastic(@builtin(global_invocation_id) id: vec3u) {
+    if id.x >= range.count {
+        return;
+    }
+    let e = elastics[range.start + id.x];
+    let pa = x[e.v.x].xyz;
+    let pb = x[e.v.y].xyz;
+    let d = pb - pa;
+    let len = length(d);
+    let goal = e.full + (e.rest - e.full) * step.sewing.x;
+    if len <= goal || len <= 1e-9 {
+        return;
+    }
+    let wa = pdata[e.v.x].x;
+    let wb = pdata[e.v.y].x;
+    let denom = wa + wb + goal * e.inv_stiffness * step.params.z;
+    if denom <= 1e-12 {
+        return;
+    }
+    let n = d / len;
+    let dl = (len - goal) / denom;
+    x[e.v.x] = vec4f(pa + n * (dl * wa), 0.0);
+    x[e.v.y] = vec4f(pb - n * (dl * wb), 0.0);
 }
 
 // ---------------------------------------------------------------------------

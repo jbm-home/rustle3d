@@ -92,6 +92,8 @@ pub enum Invalid {
     NoBody,
     #[error("is missing a measurement our bodies need (height, bust_circ, waist_circ, hip_circ)")]
     MissingMeasurement,
+    #[error("already has an elastic there")]
+    HasElastic,
 }
 
 impl Invalid {
@@ -140,6 +142,7 @@ impl Invalid {
             Invalid::WithMotion => "invalid.with_motion",
             Invalid::NoBody => "invalid.no_body",
             Invalid::MissingMeasurement => "invalid.missing_measurement",
+            Invalid::HasElastic => "invalid.has_elastic",
         }
     }
 }

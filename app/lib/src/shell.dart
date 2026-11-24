@@ -4033,6 +4033,10 @@ class _Inspector extends StatelessWidget {
                 final Map<String, dynamic> t => t,
                 _ => const {},
               },
+              details: switch (query({'type': 'detail.list'})) {
+                final Map<String, dynamic> d => d,
+                _ => const {},
+              },
               figures: [
                 for (final g in indicators)
                   for (final f in g['pieces'] as List)
@@ -4243,6 +4247,7 @@ class _PanelInspector extends StatelessWidget {
   const _PanelInspector({
     required this.panel,
     required this.trims,
+    required this.details,
     required this.garments,
     required this.grading,
     required this.points,
@@ -4261,6 +4266,9 @@ class _PanelInspector extends StatelessWidget {
 
   /// Every button and zipper (`trim.list`).
   final Map<String, dynamic> trims;
+
+  /// Every construction detail (`detail.list`).
+  final Map<String, dynamic> details;
 
   final Map<String, dynamic> panel;
 
@@ -4346,6 +4354,10 @@ class _PanelInspector extends StatelessWidget {
         if (_TrimsCard.on(trims, id)) ...[
           const SizedBox(height: Space.m),
           _TrimsCard(panel: id, trims: trims, run: run),
+        ],
+        if (_DetailsCard.on(details, id)) ...[
+          const SizedBox(height: Space.m),
+          _DetailsCard(panel: id, details: details, run: run),
         ],
         if (points.isNotEmpty) ...[
           const SizedBox(height: Space.m),
@@ -6280,6 +6292,99 @@ class _TrimsCard extends StatelessWidget {
                   'type': 'zipper.set_open',
                   'zipper': z['id'],
                   'open_mm': cm * 10,
+                }),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The piece's construction details (spec 31): each elastic with its
+/// relaxed length, to change or remove.
+class _DetailsCard extends StatelessWidget {
+  const _DetailsCard({
+    required this.panel,
+    required this.details,
+    required this.run,
+  });
+
+  final String panel;
+  final Map<String, dynamic> details;
+  final ValueChanged<Map<String, Object?>> run;
+
+  static List<Map<String, dynamic>> _elastics(
+    Map<String, dynamic> d,
+    String panel,
+  ) => [
+    for (final e in (d['elastics'] as List?) ?? const [])
+      if (e is Map<String, dynamic> && e['panel'] == panel) e,
+  ];
+
+  /// Whether `panel` has any detail.
+  static bool on(Map<String, dynamic> d, String panel) =>
+      _elastics(d, panel).isNotEmpty;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final l = context.l;
+    final label = ts(fontSize: 13, fontWeight: FontWeight.w500, color: p.text);
+    return Container(
+      padding: const EdgeInsets.all(Space.m),
+      decoration: BoxDecoration(
+        border: Border.all(color: p.border),
+        borderRadius: BorderRadius.circular(Tokens.radius(context)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l.detailsTitle,
+            style: ts(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w600,
+              color: p.text,
+            ),
+          ),
+          const SizedBox(height: Space.xs),
+          for (final e in _elastics(details, panel)) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    l.detailElastic(
+                      context.number((e['relaxed_mm'] as num? ?? 0) / 10, 1),
+                      context.number(e['width_mm'] as num, 0),
+                    ),
+                    style: label,
+                  ),
+                ),
+                IconButton(
+                  tooltip: l.trimRemove,
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.close_rounded, size: 16),
+                  onPressed: () =>
+                      run({'type': 'elastic.remove', 'elastic': e['id']}),
+                ),
+              ],
+            ),
+            KeyedSubtree(
+              key: ValueKey('elastic-${e['id']}'),
+              child: _SliderRow(
+                fieldKey: ValueKey('elastic-ratio-${e['id']}'),
+                label: l.elasticRatio,
+                value: (e['ratio'] as num).toDouble() * 100,
+                min: 20,
+                max: 100,
+                unit: '%',
+                enabled: true,
+                onChanged: (pc) => run({
+                  'type': 'elastic.set',
+                  'elastic': e['id'],
+                  'ratio': pc / 100,
                 }),
               ),
             ),

@@ -56,6 +56,8 @@ pub const LABELS: &[(&str, &str)] = &[
     ("placement", "On"),
     ("button", "Button"),
     ("zipper", "Zipper"),
+    ("elastic", "Elastic"),
+    ("elastic_by_size", "Elastic per garment by size (cm)"),
     ("measurements", "Measurements"),
     ("size_chart", "Size chart (body, cm)"),
     ("size", "Size"),
@@ -351,7 +353,8 @@ impl Writer<'_> {
             blocks.push(Block::Table { columns, rows });
         }
         blocks.push(Block::Subheading(self.t("trims")));
-        let trims = self.trims();
+        let mut trims = self.trims();
+        trims.extend(self.elastics());
         if trims.is_empty() {
             blocks.push(Block::Text(self.t("no_trims")));
         } else {
@@ -366,10 +369,95 @@ impl Writer<'_> {
                 rows: trims,
             });
         }
+        let by_size = self.elastics_by_size(&sizes);
+        if !by_size.is_empty() {
+            let mut columns = vec![
+                Column::text(self.t("garment"), 2.0),
+                Column::number(self.t("trim_size"), 1.2),
+            ];
+            columns.extend(sizes.iter().map(|s| Column::number(s.clone(), 1.0)));
+            blocks.push(Block::Subheading(self.t("elastic_by_size")));
+            blocks.push(Block::Table {
+                columns,
+                rows: by_size,
+            });
+        }
         Section {
             title: self.t("materials"),
             blocks,
         }
+    }
+
+    /// The elastic each garment takes, by width: its length (relaxed, each
+    /// elastic rounded up to the centimetre) in the drawn size, and
+    /// where it goes.
+    fn elastics(&self) -> Vec<Vec<String>> {
+        let p = self.project;
+        // (garment, width in 0.1 mm) → pieces, length (cm).
+        let mut rows: std::collections::BTreeMap<(GarmentId, i64), (Vec<String>, f64)> =
+            Default::default();
+        for (_, e) in p.elastics() {
+            let (Some(panel), Some(len)) = (
+                p.side_panel(&e.side).and_then(|id| p.panel(id)),
+                p.elastic_length(e),
+            ) else {
+                continue;
+            };
+            let row = rows
+                .entry((panel.garment, (e.width_mm * 10.0).round() as i64))
+                .or_default();
+            if !row.0.contains(&panel.name) {
+                row.0.push(panel.name.clone());
+            }
+            row.1 += (len / 10.0).ceil();
+        }
+        rows.into_iter()
+            .map(|((g, width), (pieces, cm))| {
+                vec![
+                    self.garment_name(g),
+                    self.t("elastic"),
+                    format!("{} mm", self.num(width as f64 / 10.0, 0)),
+                    format!("{} cm", self.num(cm, 0)),
+                    pieces.join(", "),
+                ]
+            })
+            .collect()
+    }
+
+    /// Per garment and elastic width, the elastic it takes in each of
+    /// `sizes` (cm, each elastic rounded up). Empty without sizes or
+    /// elastics.
+    fn elastics_by_size(&self, sizes: &[String]) -> Vec<Vec<String>> {
+        let p = self.project;
+        if sizes.is_empty() {
+            return Vec::new();
+        }
+        let lengths = crate::commands::elastic_lengths(p);
+        let mut rows: std::collections::BTreeMap<(GarmentId, i64), Vec<f64>> = Default::default();
+        for (id, e) in p.elastics() {
+            let Some(panel) = p.side_panel(&e.side).and_then(|id| p.panel(id)) else {
+                continue;
+            };
+            let row = rows
+                .entry((panel.garment, (e.width_mm * 10.0).round() as i64))
+                .or_insert_with(|| vec![0.0; sizes.len()]);
+            for (size, len) in lengths.get(&id).into_iter().flatten() {
+                let k = sizes.iter().position(|s| Some(s) == size.as_ref());
+                if let Some(slot) = k.and_then(|k| row.get_mut(k)) {
+                    *slot += (len / 10.0).ceil();
+                }
+            }
+        }
+        rows.into_iter()
+            .map(|((g, width), cms)| {
+                let mut row = vec![
+                    self.garment_name(g),
+                    format!("{} mm", self.num(width as f64 / 10.0, 0)),
+                ];
+                row.extend(cms.iter().map(|cm| self.num(*cm, 0)));
+                row
+            })
+            .collect()
     }
 
     /// The trims one garment takes: buttons by diameter (with their
@@ -751,5 +839,31 @@ mod tests {
         unique.sort_unstable();
         unique.dedup();
         assert_eq!(keys.len(), unique.len());
+    }
+
+    #[test]
+    fn elastics_are_in_the_bill_of_materials() {
+        #![allow(clippy::unwrap_used)]
+        let mut s = crate::Session::new(Project::new("t"));
+        let mut run = |v: Value| s.run_step(&crate::Step::from_value(v).unwrap()).unwrap();
+        let r = run(
+            json!({"type": "panel.create_rect", "origin": [0, 0], "width": 400, "height": 300}),
+        );
+        let bottom = r["created"][5].clone();
+        let top = r["created"][7].clone();
+        run(json!({"type": "elastic.add", "side": {"edge": bottom}, "relaxed_mm": 241}));
+        run(json!({"type": "elastic.add", "side": {"edge": top}, "ratio": 0.5}));
+        let labels = BTreeMap::new();
+        let w = Writer {
+            project: s.project(),
+            labels: &labels,
+        };
+        // Both 10 mm wide: 24.1 cm rounded up to 25, and 20.
+        let rows = w.elastics();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0][1], "Elastic");
+        assert_eq!(rows[0][2], "10 mm");
+        assert_eq!(rows[0][3], "45 cm");
+        assert!(w.elastics_by_size(&[]).is_empty());
     }
 }

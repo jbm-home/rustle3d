@@ -81,3 +81,8 @@ fn simulation_is_deterministic() {
     };
     assert_eq!(run(), run());
 }
+
+#[test]
+fn an_elastic_gathers_the_edge_it_is_sewn_on() {
+    on_gpu(reference::an_elastic_gathers_the_edge_it_is_sewn_on);
+}

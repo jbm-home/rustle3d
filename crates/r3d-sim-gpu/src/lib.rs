@@ -36,7 +36,7 @@ use r3d_sim::motion::{BodyMotion, ITERATIONS, ON_SKIN};
 use r3d_sim::selfcollide::MARGIN;
 use r3d_sim::solver::{
     CLOSING_SPEED, CLOSURE_COMPLIANCE, GRAB_COMPLIANCE, NEAR, SEWING_TIME, SKIN, SUBSTEPS,
-    StepError, StepStats, grabbed, sewing,
+    StepError, StepStats, grabbed, sewing, sewing_ramp,
 };
 use r3d_sim::{SimScene, Solver};
 
@@ -79,6 +79,8 @@ struct StepUniform {
     gravity_h: [f32; 4],
     params: [f32; 4],
     grab_target: [f32; 4],
+    /// x: how far the sewing ramp has gone (0–1).
+    sewing: [f32; 4],
 }
 
 #[repr(C)]
@@ -122,6 +124,18 @@ struct GpuMembrane {
     alpha: [f32; 4],
 }
 
+/// An elastic segment (r3d-sim `ElasticLink`).
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct GpuElastic {
+    v: [u32; 2],
+    /// Length on the pattern, relaxed length (m), 1 / stiffness (1/N).
+    full: f32,
+    rest: f32,
+    inv_stiffness: f32,
+    _pad: [f32; 3],
+}
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct GpuHinge {
@@ -160,10 +174,11 @@ mod bind {
     pub const TOUCHES: u32 = 26;
     pub const LAYER_DELTA: u32 = 27;
     pub const GATHERED: u32 = 28;
+    pub const ELASTICS: u32 = 29;
     /// Bindings the kernels only read.
-    pub const READ_ONLY: [u32; 15] = [
+    pub const READ_ONLY: [u32; 16] = [
         PDATA, MEMBRANES, HINGES, SEAMS, EDGE_ROWS, SEWN, EXCLUDED, SDF_SLOTS, SDF_VALUES, GRAB,
-        BODY, CLOSURES, GARMENT, INCIDENT, TRIANGLES,
+        BODY, CLOSURES, GARMENT, INCIDENT, TRIANGLES, ELASTICS,
     ];
 }
 
@@ -197,8 +212,9 @@ mod kernel {
     pub const LAYER_SOLVE: usize = 22;
     pub const LAYER_TURNED: usize = 23;
     pub const LAYER_AVERAGE: usize = 24;
+    pub const ELASTIC: usize = 25;
 
-    pub const ALL: [(&str, &[u32]); 25] = [
+    pub const ALL: [(&str, &[u32]); 26] = [
         ("predict", &[X, PREV, VEL, PDATA]),
         ("membrane", &[X, PDATA, MEMBRANES]),
         ("hinge", &[X, PDATA, HINGES]),
@@ -270,6 +286,7 @@ mod kernel {
             &[X, TRIANGLES, TOUCHES, SDF_SLOTS, SDF_VALUES, BODY],
         ),
         ("layer_average", &[X, LAYER_DELTA, DELTA, SEWN]),
+        ("elastic", &[X, PDATA, ELASTICS]),
     ];
 }
 
@@ -656,7 +673,12 @@ impl GpuSolver {
             .map(|m| GpuMembrane {
                 v: [m.v[0], m.v[1], m.v[2], 0],
                 coef: [m.cu.x, m.cu.y, m.cv.x, m.cv.y],
-                alpha: [m.alpha_u, m.alpha_v, m.alpha_s, 0.0],
+                alpha: [
+                    m.alpha_u,
+                    m.alpha_v,
+                    m.alpha_s,
+                    if m.buckles { 1.0 } else { 0.0 },
+                ],
             })
             .collect();
         let (hinge_order, hinge_ranges) =
@@ -680,6 +702,19 @@ impl GpuSolver {
             .iter()
             .filter_map(|k| model.closures.get(*k))
             .copied()
+            .collect();
+        let (elastic_order, elastic_ranges) =
+            colour(&model.elastics.iter().map(|e| e.v).collect::<Vec<_>>(), n);
+        let elastics: Vec<GpuElastic> = elastic_order
+            .iter()
+            .filter_map(|k| model.elastics.get(*k))
+            .map(|e| GpuElastic {
+                v: e.v,
+                full: e.full,
+                rest: e.rest,
+                inv_stiffness: 1.0 / e.stiffness,
+                _pad: [0.0; 3],
+            })
             .collect();
 
         // Per-particle rows.
@@ -843,6 +878,14 @@ impl GpuSolver {
                     U::empty(),
                 ),
             ),
+            (
+                bind::ELASTICS,
+                storage(
+                    "cloth elastics",
+                    bytemuck::cast_slice(&elastics),
+                    U::empty(),
+                ),
+            ),
             (bind::NEARBY, zeroed("cloth near", 4 * n as u64)),
             (bind::DELTA, zeroed("cloth delta", 16 * n as u64)),
             (
@@ -958,6 +1001,7 @@ impl GpuSolver {
         let hinge_slots = slots(&hinge_ranges);
         let seam_slots = slots(&seam_ranges);
         let closure_slots = slots(&closure_ranges);
+        let elastic_slots = slots(&elastic_ranges);
         let mut range_bytes = vec![0u8; ranges.len() * SLOT as usize];
         for (k, (start, count)) in ranges.iter().enumerate() {
             let r = RangeUniform {
@@ -1074,6 +1118,7 @@ impl GpuSolver {
         substep_passes.extend(coloured(HINGE, &hinge_slots));
         substep_passes.extend(coloured(SEAM, &seam_slots));
         substep_passes.extend(coloured(CLOSURE, &closure_slots));
+        substep_passes.extend(coloured(ELASTIC, &elastic_slots));
         if layered {
             frame_passes.push(all(LAYER_MOVED));
         }
@@ -1249,6 +1294,7 @@ impl Solver for GpuSolver {
                     s as f32,
                 ],
                 grab_target: [target.x, target.y, target.z, 0.0],
+                sewing: [sewing_ramp(self.time + s as f32 * h), 0.0, 0.0, 0.0],
             };
             let at = s * SLOT as usize;
             bytes[at..at + std::mem::size_of::<StepUniform>()]

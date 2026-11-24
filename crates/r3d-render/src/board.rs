@@ -16,6 +16,8 @@ use crate::{MSAA_SAMPLES, Target};
 const NOTCH_MM: f64 = 6.0;
 /// Zippers on the board: a brass tone, readable on both themes.
 const ZIPPER: Rgba = crate::theme::hex(0xB8862B);
+/// Elastic: a muted teal zigzag, apart from seams and trims.
+const ELASTIC: Rgba = crate::theme::hex(0x2F8F83);
 const MINOR_GRID_MM: f64 = 10.0;
 const MAJOR_GRID_MM: f64 = 100.0;
 
@@ -73,6 +75,8 @@ pub struct BoardScene {
     pub prints: Vec<BoardPrint>,
     pub buttons: Vec<BoardButton>,
     pub zippers: Vec<BoardZipper>,
+    /// Where each elastic runs (mm).
+    pub elastics: Vec<Vec<DVec2>>,
 }
 
 /// A button and its buttonhole on the board (mm).
@@ -230,6 +234,10 @@ impl BoardScene {
                 })
             })
             .collect();
+        let elastics = project
+            .elastics()
+            .filter_map(|(_, e)| project.side_polyline(&e.side))
+            .collect();
         Self {
             panels,
             selected: selected.to_vec(),
@@ -241,6 +249,7 @@ impl BoardScene {
             prints: Vec::new(),
             buttons,
             zippers,
+            elastics,
         }
     }
 
@@ -848,6 +857,21 @@ impl BoardRenderer {
                     batch.segment(*a - across, *a + across, 2.5 * px, ZIPPER);
                 }
             }
+        }
+        // Elastics: a zigzag along their side, as a few pixels on screen.
+        for line in &scene.elastics {
+            let total = r3d_core::seam::polyline_length(line);
+            let step = 4.0 * px;
+            let n = (total / step).floor() as usize;
+            let zigzag: Vec<DVec2> = (0..=n)
+                .filter_map(|k| {
+                    let s = (k as f64 * step).min(total);
+                    let (p, dir) = r3d_core::seam::point_along(line, s);
+                    let side = if k % 2 == 0 { 1.0 } else { -1.0 };
+                    Some(p + dir.try_normalize()?.perp() * (3.0 * px * side))
+                })
+                .collect();
+            batch.polyline(&zigzag, false, 1.5 * px, ELASTIC);
         }
         // Buttons at their real size (a ring and the thread's dot), and
         // buttonholes as slits with bar tacks; unbuttoned ones fainter.

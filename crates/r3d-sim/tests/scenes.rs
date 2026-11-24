@@ -85,3 +85,8 @@ fn results_do_not_depend_on_the_thread_count() {
     let many = run(&cpu, make(), 0.5);
     assert_eq!(one.positions(), many.positions());
 }
+
+#[test]
+fn an_elastic_gathers_the_edge_it_is_sewn_on() {
+    reference::an_elastic_gathers_the_edge_it_is_sewn_on(&cpu);
+}

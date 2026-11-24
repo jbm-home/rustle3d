@@ -933,5 +933,21 @@
   "errLibraryName": "« {name} » ne peut pas nommer un mouvement : évitez / \\ : * ? \" < > | et un point au début ou à la fin.",
   "errLibraryExists": "La bibliothèque a déjà un mouvement nommé « {name} ».",
   "errLibraryMissing": "La bibliothèque n'a plus de mouvement nommé « {name} ».",
-  "errLibraryIo": "La bibliothèque de mouvements ne peut pas être lue ou écrite : {detail}"
+  "errLibraryIo": "La bibliothèque de mouvements ne peut pas être lue ou écrite : {detail}",
+  "barElastic": "Élastique",
+  "barElasticHint": "Coudre un élastique le long de ce bord : il fronce au drapé.",
+  "barShirring": "Smocks",
+  "barShirringHint": "Des rangs d'élastique à travers la pièce, parallèles à ce bord.",
+  "elasticTitle": "Élastique",
+  "elasticRatio": "Longueur au repos",
+  "elasticWidth": "Largeur",
+  "shirringTitle": "Smocks",
+  "shirringRows": "Rangs",
+  "shirringFirst": "Premier rang depuis le bord",
+  "shirringGap": "Entre les rangs",
+  "detailsTitle": "Détails de montage",
+  "detailElastic": "Élastique · {cm} cm, {width} mm de large",
+  "tpElastic": "Élastique",
+  "tpElasticBySize": "Élastique par vêtement et par taille (cm)",
+  "errHasElastic": "Ce tronçon a déjà un élastique."
 }
