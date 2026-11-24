@@ -164,6 +164,60 @@ pub fn point_along(pts: &[DVec2], s: f64) -> (DVec2, DVec2) {
     last
 }
 
+/// The points `along` a polyline (distances from its start, in
+/// increasing order), found in one walk along it (thousands of stitches);
+/// past its end, its last point.
+pub fn points_along(line: &[DVec2], along: impl Iterator<Item = f64>) -> Vec<DVec2> {
+    let mut out = Vec::new();
+    let mut segments = line.windows(2).filter_map(|w| match w {
+        [a, b] => Some((*a, *b)),
+        _ => None,
+    });
+    let mut current = segments.next();
+    let mut walked = 0.0;
+    for s in along {
+        loop {
+            let Some((a, b)) = current else {
+                out.extend(line.last());
+                break;
+            };
+            let len = a.distance(b);
+            if walked + len >= s {
+                let t = if len > 0.0 {
+                    ((s - walked) / len).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+                out.push(a.lerp(b, t));
+                break;
+            }
+            walked += len;
+            current = segments.next();
+        }
+    }
+    out
+}
+
+/// Where the thread goes into the cloth between two stitches (mm).
+pub const STITCH_HOLE_MM: f64 = 0.6;
+
+/// The stitches along `row` (mm), one every `stitch_mm`: each one's two
+/// ends, a gap between them where the thread goes in.
+pub fn stitches(row: &[DVec2], stitch_mm: f64) -> Vec<[DVec2; 2]> {
+    let visible = (stitch_mm - STITCH_HOLE_MM).max(0.4 * stitch_mm);
+    let room = polyline_length(row) + 1e-9 - visible;
+    let count = if room >= 0.0 && stitch_mm > 0.0 {
+        (room / stitch_mm).floor() as usize + 1
+    } else {
+        0
+    };
+    let ends = (0..count).flat_map(|k| {
+        let s = k as f64 * stitch_mm;
+        [s, s + visible]
+    });
+    points_along(row, ends).as_chunks::<2>().0.to_vec()
+}
+
 /// The part of a polyline from `from` to `to` mm along it.
 pub fn sub_polyline(pts: &[DVec2], from: f64, to: f64) -> Vec<DVec2> {
     let mut out = vec![point_along(pts, from).0];
@@ -184,6 +238,29 @@ mod tests {
     use super::*;
     use crate::edit::Transaction;
     use crate::model::{Edge, EdgeCurve, InternalLine, Panel, Point};
+
+    #[test]
+    fn points_along_match_one_by_one_and_stop_at_the_end() {
+        let line = [DVec2::ZERO, DVec2::new(30.0, 0.0), DVec2::new(30.0, 40.0)];
+        let along = [0.0, 10.0, 30.0, 45.0, 70.0, 90.0];
+        let found = points_along(&line, along.into_iter());
+        assert_eq!(found.len(), along.len());
+        for (p, s) in found.iter().zip(along) {
+            assert!(p.distance(point_along(&line, s).0) < 1e-9, "{s}");
+        }
+        assert_eq!(found[5], DVec2::new(30.0, 40.0));
+    }
+
+    #[test]
+    fn stitches_every_length_with_a_gap() {
+        let row = [DVec2::ZERO, DVec2::new(10.0, 0.0)];
+        let s = stitches(&row, 3.0);
+        // At 0, 3 and 6 mm, 2.4 mm long; the next would end past 10 mm.
+        assert_eq!(s.len(), 3);
+        assert!(s[2][0].distance(DVec2::new(6.0, 0.0)) < 1e-9);
+        assert!((s[0][0].distance(s[0][1]) - 2.4).abs() < 1e-9);
+        assert!(stitches(&row, 0.0).is_empty());
+    }
 
     #[test]
     fn a_side_runs_along_a_chain_of_edges_or_a_line() {

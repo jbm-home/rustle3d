@@ -25,6 +25,7 @@ pub struct Session {
     project: Project,
     history: History,
     dirty: bool,
+    revision: u64,
 }
 
 impl Session {
@@ -33,6 +34,7 @@ impl Session {
             project,
             history: History::default(),
             dirty: false,
+            revision: 0,
         }
     }
 
@@ -56,6 +58,18 @@ impl Session {
 
     pub fn mark_saved(&mut self) {
         self.dirty = false;
+    }
+
+    /// A number that changes with every change to the document (a
+    /// command, an undo, a redo): what was derived from it at one
+    /// revision holds until the next.
+    pub fn revision(&self) -> u64 {
+        self.revision
+    }
+
+    fn changed(&mut self) {
+        self.dirty = true;
+        self.revision += 1;
     }
 
     /// Execute one command as one undo step.
@@ -149,7 +163,7 @@ impl Session {
             })?;
         let changes = tx.commit();
         if !changes.is_empty() {
-            self.dirty = true;
+            self.changed();
         }
         self.history.push(label, merge_key, changes);
         Ok(outputs)
@@ -161,7 +175,7 @@ impl Session {
             .history
             .undo(&mut self.project)
             .ok_or(CommandError::NothingToUndo)?;
-        self.dirty = true;
+        self.changed();
         Ok(moved)
     }
 
@@ -171,7 +185,7 @@ impl Session {
             .history
             .redo(&mut self.project)
             .ok_or(CommandError::NothingToRedo)?;
-        self.dirty = true;
+        self.changed();
         Ok(moved)
     }
 
@@ -186,7 +200,7 @@ impl Session {
             .go_to(&mut self.project, at)
             .unwrap_or_default();
         if !moved.label.is_empty() {
-            self.dirty = true;
+            self.changed();
         }
         Ok(moved)
     }

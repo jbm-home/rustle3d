@@ -287,14 +287,17 @@ impl Dressed {
             .zip(latest.form.as_ref().map(|f| &f.triangles[..]));
         let values = fit_map.map(|m| (m, m.values(&latest.drape, positions, body)));
         let prints = Prints::default().all(project, Some(ws.dir()));
-        let puffed = latest.drape.puffed(positions);
+        let at = drape::ClothAt::new(&latest.drape, positions);
         let pieces: Vec<DressedPiece> = latest
             .drape
             .pieces
             .iter()
             .filter_map(|p| {
                 let garment = project.garment_of(p.panel);
-                let mut m = mesh(puffed.get(p.particles.clone())?.to_vec(), p.indices.clone());
+                let mut m = mesh(
+                    at.positions.get(p.particles.clone())?.to_vec(),
+                    p.indices.clone(),
+                );
                 if let Some((map, v)) = &values {
                     m.colors = v
                         .get(p.particles.clone())?
@@ -317,16 +320,16 @@ impl Dressed {
                 })
             })
             .collect();
-        let on = drape::LinesOnCloth::new(&latest.drape, positions);
-        let lines = on
-            .internal_lines(project)
+        let marks = drape::ClothMarks::new(&latest.drape, project);
+        let lines = marks
+            .internal_lines(&at)
             .iter()
             .map(|l| Mesh::ribbon(l, LINE_WIDTH_M, LINE_LIFT_M))
             .collect();
         let trims = r3d_render::trims::meshes(
-            &on.buttons(project),
-            &on.zippers(project),
-            &on.stitches(project),
+            &marks.buttons(&at),
+            &marks.zippers(&at),
+            &marks.stitches(&at),
         );
         let fit = values.map(|(map, v)| {
             // The tightest value on the garment, and its piece.

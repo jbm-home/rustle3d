@@ -14,6 +14,8 @@ use crate::theme::{PIECE_COLORS, Rgba, SEAM_COLORS, Theme, WARNING};
 use crate::{MSAA_SAMPLES, Target};
 
 const NOTCH_MM: f64 = 6.0;
+/// Stitches shorter than this on screen (px) are drawn as a line.
+const STITCH_MIN_PX: f64 = 4.0;
 /// Zippers on the board: a brass tone, readable on both themes.
 const ZIPPER: Rgba = crate::theme::hex(0xB8862B);
 /// Elastic: a muted teal zigzag, apart from seams and trims.
@@ -924,16 +926,18 @@ impl BoardRenderer {
             let mut edge = theme.panel_line;
             edge[3] *= 0.45;
             let width = t.width_mm.max(1.5 * px);
-            let visible = (t.stitch_mm - 0.6).max(0.4 * t.stitch_mm);
+            // Stitches too small to tell apart on screen: a line.
+            if t.stitch_mm < STITCH_MIN_PX * px {
+                for row in &t.rows {
+                    batch.polyline(row, false, width + 1.5 * px, edge);
+                    batch.polyline(row, false, width, color);
+                }
+                continue;
+            }
             for row in &t.rows {
-                let total = r3d_core::seam::polyline_length(row);
-                let mut s = 0.0;
-                while s + visible <= total + 1e-9 {
-                    let (a, _) = r3d_core::seam::point_along(row, s);
-                    let (b, _) = r3d_core::seam::point_along(row, s + visible);
+                for [a, b] in r3d_core::seam::stitches(row, t.stitch_mm) {
                     batch.segment(a, b, width + 1.5 * px, edge);
                     batch.segment(a, b, width, color);
-                    s += t.stitch_mm;
                 }
             }
         }

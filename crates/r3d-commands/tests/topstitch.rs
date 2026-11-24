@@ -4,7 +4,7 @@
 
 mod common;
 
-use r3d_commands::drape::{DEFAULT_SPACING_MM, LinesOnCloth, build};
+use r3d_commands::drape::{ClothAt, ClothMarks, DEFAULT_SPACING_MM, build};
 use r3d_commands::{CommandError, Session, Step};
 use r3d_core::{Localizable, Project};
 use serde_json::{Value, json};
@@ -116,8 +116,7 @@ fn stitches_lie_on_the_cloth_and_stiffen_it() {
     // On the cloth where it starts: one strip per stitch, every 3 mm
     // along both rows.
     let start: Vec<_> = drape.scene.particles.iter().map(|p| p.position).collect();
-    let on = LinesOnCloth::new(&drape, &start);
-    let stitches = on.stitches(s.project());
+    let stitches = ClothMarks::new(&drape, s.project()).stitches(&ClothAt::new(&drape, &start));
     // The yoke's and ours.
     assert_eq!(stitches.len(), 2);
     let (dashes, _, width) = stitches

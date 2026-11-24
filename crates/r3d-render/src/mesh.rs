@@ -50,23 +50,30 @@ impl Mesh {
     /// top of it (style lines and selected edges on the garment).
     pub fn ribbon(points: &[(Vec3, Vec3)], width: f32, lift: f32) -> Self {
         let mut mesh = Mesh::default();
+        mesh.add_ribbon(points, width, lift);
+        mesh
+    }
+
+    /// Add a [`Mesh::ribbon`] to this mesh (thousands of stitches drawn
+    /// as one mesh).
+    pub fn add_ribbon(&mut self, points: &[(Vec3, Vec3)], width: f32, lift: f32) {
         let n = points.len();
         if n < 2 {
-            return mesh;
+            return;
         }
+        let first = self.positions.len() as u32;
         for (i, (p, normal)) in points.iter().enumerate() {
             let prev = points[i.saturating_sub(1)].0;
             let next = points[(i + 1).min(n - 1)].0;
             let side = (next - prev).cross(*normal).normalize_or_zero() * (width / 2.0);
             let base = *p + *normal * lift;
-            mesh.positions.extend([base - side, base + side]);
-            mesh.normals.extend([*normal, *normal]);
+            self.positions.extend([base - side, base + side]);
+            self.normals.extend([*normal, *normal]);
         }
         for i in 0..n as u32 - 1 {
-            let k = 2 * i;
-            mesh.indices.extend([k, k + 1, k + 3, k, k + 3, k + 2]);
+            let k = first + 2 * i;
+            self.indices.extend([k, k + 1, k + 3, k, k + 3, k + 2]);
         }
-        mesh
     }
 }
 

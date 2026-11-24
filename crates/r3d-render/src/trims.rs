@@ -52,12 +52,11 @@ pub fn meshes(
     );
     for (dashes, rgb, width) in stitches {
         let mut mesh = Mesh::default();
+        mesh.positions.reserve(4 * dashes.len());
+        mesh.normals.reserve(4 * dashes.len());
+        mesh.indices.reserve(6 * dashes.len());
         for dash in dashes {
-            let one = Mesh::ribbon(dash, *width, STITCH_LIFT_M);
-            let base = mesh.positions.len() as u32;
-            mesh.positions.extend(one.positions);
-            mesh.normals.extend(one.normals);
-            mesh.indices.extend(one.indices.iter().map(|i| base + i));
+            mesh.add_ribbon(dash, *width, STITCH_LIFT_M);
         }
         if !mesh.indices.is_empty() {
             out.push((mesh, flat(hex(*rgb))));

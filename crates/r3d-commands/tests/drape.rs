@@ -217,8 +217,9 @@ fn style_lines_and_edges_follow_the_cloth() {
     let form = Form::of_project(s.project()).unwrap().unwrap();
     let drape = build(s.project(), Some(&form), DEFAULT_SPACING_MM).unwrap();
     let positions: Vec<glam::Vec3> = drape.scene.particles.iter().map(|p| p.position).collect();
-    let on = r3d_commands::drape::LinesOnCloth::new(&drape, &positions);
-    let lines = on.internal_lines(s.project());
+    let cloth = r3d_commands::drape::ClothAt::new(&drape, &positions);
+    let marks = r3d_commands::drape::ClothMarks::new(&drape, s.project());
+    let lines = marks.internal_lines(&cloth);
     assert_eq!(lines.len(), 1);
     // Sampled every 10 mm along the 500 mm line, all on the front piece, at
     // the same height (it is horizontal on the pattern and the start pose
@@ -231,7 +232,7 @@ fn style_lines_and_edges_follow_the_cloth() {
             .all(|(p, n)| (p.y - y0).abs() < 1e-3 && (n.length() - 1.0).abs() < 1e-4)
     );
     let hem: r3d_core::EdgeId = front.edges[0].as_str().unwrap().parse().unwrap();
-    let edge = on.edge(hem).unwrap();
+    let edge = cloth.edge(&drape, hem).unwrap();
     assert!(edge.len() > 10);
 }
 

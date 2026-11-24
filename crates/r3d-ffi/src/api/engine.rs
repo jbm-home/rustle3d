@@ -11,7 +11,7 @@ use std::time::Instant;
 use flutter_rust_bridge::frb;
 
 use r3d_commands::actions::AvatarMotion;
-use r3d_commands::drape::{self, Animation, Drape, Form};
+use r3d_commands::drape::{self, Animation, ClothAt, ClothMarks, Drape, Form};
 use r3d_commands::fit::{self, FitMap, Probe};
 use r3d_commands::prints::{PrintImage, Prints, aspect_of, piece_uvs};
 use r3d_commands::production;
@@ -137,18 +137,15 @@ fn offset_along(polyline: &[r3d_geom::DVec2], at: r3d_geom::DVec2) -> f64 {
     best.1
 }
 
-/// The cloth at `positions` (one per particle of `drape`): one mesh per
-/// piece, with normals; painted with `paint` (one colour per particle, a
-/// fit map) if given.
+/// `cloth` (`drape`'s at one frame): one mesh per piece, with normals;
+/// painted with `paint` (one colour per particle, a fit map) if given.
 fn piece_meshes(
     drape: &Drape,
-    positions: &[glam::Vec3],
+    cloth: &ClothAt,
     paint: Option<&[[f32; 4]]>,
     project: &r3d_core::Project,
     prints: &HashMap<r3d_core::GarmentId, Arc<PrintImage>>,
 ) -> Vec<ClothPiece> {
-    // Quilted cloth with its puffs.
-    let positions = &drape.puffed(positions);
     drape
         .pieces
         .iter()
@@ -157,9 +154,9 @@ fn piece_meshes(
                 .panel(piece.panel)
                 .and_then(|p| prints.get(&p.garment))
                 .cloned();
-            let mut mesh = Mesh {
-                positions: positions.get(piece.particles.clone())?.to_vec(),
-                normals: Vec::new(),
+            let mesh = Mesh {
+                positions: cloth.positions.get(piece.particles.clone())?.to_vec(),
+                normals: cloth.normals.get(piece.particles.clone())?.to_vec(),
                 indices: piece.indices.clone(),
                 colors: paint
                     .and_then(|c| c.get(piece.particles.clone()))
@@ -170,7 +167,6 @@ fn piece_meshes(
                     None => Vec::new(),
                 },
             };
-            mesh.recompute_normals();
             Some(ClothPiece {
                 panel: piece.panel,
                 mesh,
@@ -509,6 +505,10 @@ pub struct Engine {
     sim: Mutex<Option<SimThread>>,
     /// The loaded simulation's scene (pieces, pattern positions).
     cloth: Mutex<Option<Drape>>,
+    /// Where the lines, trims and stitches lie on `cloth`, and the
+    /// document's revision they were found for; cleared when `cloth` is
+    /// rebuilt.
+    marks: Mutex<Option<(u64, Arc<ClothMarks>)>>,
     /// The body the loaded simulation drapes on.
     draped_on: Mutex<Option<FormKey>>,
     /// How the avatar moves while the garment drapes, if it does.
@@ -658,6 +658,7 @@ impl Engine {
             selected_points: Mutex::new(Vec::new()),
             sim: Mutex::new(None),
             cloth: Mutex::new(None),
+            marks: Mutex::new(None),
             draped_on: Mutex::new(None),
             animation: Mutex::new(None),
             show_sizes: AtomicBool::new(true),
@@ -869,6 +870,7 @@ impl Engine {
             }
         }
         *cloth = Some(drape);
+        *self.marks.lock().map_err(|_| poisoned())? = None;
         *draped_on = key;
         Ok(())
     }
@@ -1538,23 +1540,24 @@ impl Engine {
             Some(now) if now.loaded && now.positions.len() == start.len() => now.positions,
             _ => start,
         };
-        let cloth_meshes = piece_meshes(drape, &positions, None, &project, &prints)
+        let at = ClothAt::new(drape, &positions);
+        let cloth_meshes = piece_meshes(drape, &at, None, &project, &prints)
             .into_iter()
             .map(|piece| {
                 let material = piece.material(&project);
                 (piece, material)
             })
             .collect();
-        let on = drape::LinesOnCloth::new(drape, &positions);
-        let lines = on
-            .internal_lines(&project)
+        let marks = ClothMarks::new(drape, &project);
+        let lines = marks
+            .internal_lines(&at)
             .iter()
             .map(|l| Mesh::ribbon(l, LINE_WIDTH_M, LINE_LIFT_M))
             .collect();
         let trims = r3d_render::trims::meshes(
-            &on.buttons(&project),
-            &on.zippers(&project),
-            &on.stitches(&project),
+            &marks.buttons(&at),
+            &marks.zippers(&at),
+            &marks.stitches(&at),
         );
         drop(cloth);
         let animation = self.animation.lock().map_err(|_| poisoned())?.clone();
@@ -1989,7 +1992,8 @@ impl Engine {
                     blit.draw(&g.gpu, target, &image, theme.sky_bottom);
                 } else {
                     drop(photo);
-                    self.render_garment(g, project, ws.dir(), &selected, view)?;
+                    let revision = ws.session().revision();
+                    self.render_garment(g, project, revision, ws.dir(), &selected, view)?;
                 }
             }
         }
@@ -2091,11 +2095,31 @@ impl Engine {
             .all(project, Some(dir)))
     }
 
+    /// Where `project`'s marks lie on `drape` (the loaded cloth), found
+    /// again only when the document or the drape changed.
+    fn marks_of(
+        &self,
+        drape: &Drape,
+        project: &r3d_core::Project,
+        revision: u64,
+    ) -> Result<Arc<ClothMarks>, ApiError> {
+        let mut slot = self.marks.lock().map_err(|_| poisoned())?;
+        if let Some((at, marks)) = slot.as_ref()
+            && *at == revision
+        {
+            return Ok(marks.clone());
+        }
+        let marks = Arc::new(ClothMarks::new(drape, project));
+        *slot = Some((revision, marks.clone()));
+        Ok(marks)
+    }
+
     /// Draw the live garment on the avatar into `view`.
     fn render_garment(
         &self,
         g: &mut Graphics,
         project: &r3d_core::Project,
+        revision: u64,
         dir: &Path,
         selected: &[PanelId],
         view: u32,
@@ -2126,26 +2150,31 @@ impl Engine {
             .map_err(|_| poisoned())?
             .first()
             .copied();
-        let (lines, edge_line, trims) = cloth
+        // The cloth as drawn (quilted parts puffed), for the pieces and
+        // the marks on them.
+        let at = cloth
             .as_ref()
-            .map(|d| {
-                let on = drape::LinesOnCloth::new(d, &published.positions);
-                let lines: Vec<Mesh> = on
-                    .internal_lines(project)
+            .map(|d| ClothAt::new(d, &published.positions));
+        let (lines, edge_line, trims) = match (cloth.as_ref(), at.as_ref()) {
+            (Some(d), Some(at)) => {
+                let marks = self.marks_of(d, project, revision)?;
+                let lines: Vec<Mesh> = marks
+                    .internal_lines(at)
                     .iter()
                     .map(|l| Mesh::ribbon(l, LINE_WIDTH_M, LINE_LIFT_M))
                     .collect();
                 let edge = edge
-                    .and_then(|e| on.edge(e))
+                    .and_then(|e| at.edge(d, e))
                     .map(|l| Mesh::ribbon(&l, EDGE_WIDTH_M, LINE_LIFT_M));
                 let trims = r3d_render::trims::meshes(
-                    &on.buttons(project),
-                    &on.zippers(project),
-                    &on.stitches(project),
+                    &marks.buttons(at),
+                    &marks.zippers(at),
+                    &marks.stitches(at),
                 );
                 (lines, edge, trims)
-            })
-            .unwrap_or_default();
+            }
+            _ => Default::default(),
+        };
         let fit_map = *self.fit_map.lock().map_err(|_| poisoned())?;
         let paint = match (fit_map, cloth.as_ref()) {
             (Some(map), Some(d)) => {
@@ -2164,10 +2193,10 @@ impl Engine {
             }
             _ => None,
         };
-        let pieces = cloth
-            .as_ref()
-            .map(|d| piece_meshes(d, &published.positions, paint.as_deref(), project, &prints))
-            .unwrap_or_default();
+        let pieces = match (cloth.as_ref(), at.as_ref()) {
+            (Some(d), Some(at)) => piece_meshes(d, at, paint.as_deref(), project, &prints),
+            _ => Vec::new(),
+        };
         drop(cloth);
         let tape = self
             .tape
@@ -2518,16 +2547,14 @@ impl Engine {
             .map_err(|_| poisoned())?
             .as_ref()
             .map(|d| {
-                let on = drape::LinesOnCloth::new(d, &published.positions);
+                let at = ClothAt::new(d, &published.positions);
+                let marks = ClothMarks::new(d, project);
                 let trims = r3d_render::trims::meshes(
-                    &on.buttons(project),
-                    &on.zippers(project),
-                    &on.stitches(project),
+                    &marks.buttons(&at),
+                    &marks.zippers(&at),
+                    &marks.stitches(&at),
                 );
-                (
-                    piece_meshes(d, &published.positions, None, project, &prints),
-                    trims,
-                )
+                (piece_meshes(d, &at, None, project, &prints), trims)
             })
             .unwrap_or_default();
         let body = match self.moving_avatar(project, published.time)? {

@@ -2325,42 +2325,76 @@ pub type ClothLine = Vec<(Vec3, Vec3)>;
 /// cloth's normal), the thread's colour (`0xRRGGBB`) and width (m).
 pub type ClothStitches = (Vec<[(Vec3, Vec3); 2]>, u32, f32);
 
-/// Where the thread goes into the cloth between two stitches (mm).
-const STITCH_HOLE_MM: f64 = 0.6;
-
-/// Pattern lines where they are on a drape (style lines, the selected
-/// edge), for drawing them on the garment.
+/// The cloth as drawn at one frame: quilted parts puffed, with the
+/// cloth's normal at each particle.
 #[derive(Debug)]
-pub struct LinesOnCloth<'a> {
-    drape: &'a Drape,
-    locator: Locator<'a>,
-    /// The cloth as drawn: quilted parts puffed.
-    positions: Vec<Vec3>,
-    /// Cloth normal per particle.
-    normals: Vec<Vec3>,
+pub struct ClothAt {
+    pub positions: Vec<Vec3>,
+    pub normals: Vec<Vec3>,
 }
 
-impl<'a> LinesOnCloth<'a> {
-    /// For `drape` with its particles at `positions`.
-    pub fn new(drape: &'a Drape, positions: &[Vec3]) -> Self {
+impl ClothAt {
+    /// `drape`'s cloth with its particles at `positions`.
+    pub fn new(drape: &Drape, positions: &[Vec3]) -> Self {
         let positions = drape.puffed(positions);
         let normals = vertex_normals(drape, &positions);
-        Self {
-            drape,
-            locator: Locator::new(drape),
-            positions,
-            normals,
-        }
+        Self { positions, normals }
     }
 
     fn normal(&self, i: usize) -> Vec3 {
         self.normals.get(i).copied().unwrap_or(Vec3::Y)
     }
 
-    /// Every internal line of the simulated panels.
-    pub fn internal_lines(&self, project: &Project) -> Vec<ClothLine> {
+    /// The point at `anchor`, with the cloth's normal there.
+    fn at(&self, (t, w): &Anchor) -> Option<(Vec3, Vec3)> {
+        let [a, b, c] = t.map(|k| self.positions.get(k).copied());
+        let at = a? * w.x + b? * w.y + c? * w.z;
+        let [na, nb, nc] = t.map(|k| self.normal(k));
+        Some((at, (na * w.x + nb * w.y + nc * w.z).normalize_or(Vec3::Y)))
+    }
+
+    fn line(&self, anchors: &[Anchor]) -> ClothLine {
+        anchors.iter().filter_map(|a| self.at(a)).collect()
+    }
+
+    /// A contour edge of a simulated panel of `drape`.
+    pub fn edge(&self, drape: &Drape, edge: EdgeId) -> Option<ClothLine> {
+        let particles = drape.edges.get(&edge)?;
+        Some(
+            particles
+                .iter()
+                .filter_map(|i| Some((*self.positions.get(*i)?, self.normal(*i))))
+                .collect(),
+        )
+    }
+}
+
+/// A pattern point on a drape: the triangle holding it (particles) and
+/// its weights there.
+type Anchor = ([usize; 3], Vec3);
+
+/// The pattern's style lines, buttons, zippers and stitches where they lie
+/// on a drape's cloth, found once for a drape and a document and then
+/// placed on the cloth at every frame ([`ClothAt`]): the thousands of
+/// stitches of a quilted piece are not looked up again each frame.
+#[derive(Debug, Default)]
+pub struct ClothMarks {
+    lines: Vec<Vec<Anchor>>,
+    /// Each button and its radius (m).
+    buttons: Vec<(Anchor, f32)>,
+    zippers: Vec<Vec<Anchor>>,
+    /// Each topstitch's or quilting's stitches, its thread's colour
+    /// (`0xRRGGBB`) and width (m).
+    stitches: Vec<(Vec<[Anchor; 2]>, u32, f32)>,
+}
+
+impl ClothMarks {
+    /// The marks of `project` on `drape`.
+    pub fn new(drape: &Drape, project: &Project) -> Self {
         let project = project.as_shown();
-        project
+        let locator = Locator::new(drape);
+        let anchor = |panel: PanelId, p: DVec2| locator.locate(panel, (p / 1000.0).as_vec2());
+        let lines = project
             .internal_lines()
             .iter()
             .filter_map(|(id, line)| {
@@ -2371,51 +2405,23 @@ impl<'a> LinesOnCloth<'a> {
                     points.extend((0..steps).map(|k| a.lerp(*b, k as f64 / steps as f64)));
                 }
                 points.extend(polyline.last());
-                let on: ClothLine = points
+                let on: Vec<Anchor> = points
                     .iter()
-                    .filter_map(|p| {
-                        let (t, w) = self.locator.locate(line.panel, (*p / 1000.0).as_vec2())?;
-                        let [a, b, c] = t.map(|k| self.positions.get(k).copied());
-                        let at = a? * w.x + b? * w.y + c? * w.z;
-                        let [na, nb, nc] = t.map(|k| self.normal(k));
-                        Some((at, (na * w.x + nb * w.y + nc * w.z).normalize_or(Vec3::Y)))
-                    })
+                    .filter_map(|p| anchor(line.panel, *p))
                     .collect();
                 (on.len() > 1).then_some(on)
             })
-            .collect()
-    }
-
-    /// Where a pattern point of `panel` (mm) is on the cloth, with the
-    /// cloth's normal there.
-    fn on_cloth(&self, panel: PanelId, p: DVec2) -> Option<(Vec3, Vec3)> {
-        let (t, w) = self.locator.locate(panel, (p / 1000.0).as_vec2())?;
-        let [a, b, c] = t.map(|k| self.positions.get(k).copied());
-        let at = a? * w.x + b? * w.y + c? * w.z;
-        let [na, nb, nc] = t.map(|k| self.normal(k));
-        Some((at, (na * w.x + nb * w.y + nc * w.z).normalize_or(Vec3::Y)))
-    }
-
-    /// The buttons on the cloth: centre, the cloth's normal and radius
-    /// (m). A buttoned one sits where the button is sewn; so does an
-    /// unbuttoned one (its buttonhole is not drawn in 3D).
-    pub fn buttons(&self, project: &Project) -> Vec<(Vec3, Vec3, f32)> {
-        let project = project.as_shown();
-        project
+            .collect();
+        // A buttoned button sits where it is sewn; so does an unbuttoned
+        // one (its buttonhole is not drawn in 3D).
+        let buttons = project
             .buttons()
             .values()
-            .filter_map(|b| {
-                let (at, n) = self.on_cloth(b.panel, b.at)?;
-                Some((at, n, (b.diameter_mm / 2000.0) as f32))
-            })
-            .collect()
-    }
-
-    /// The zippers' closed stretches on the cloth, along their first side
-    /// (both sides meet there).
-    pub fn zippers(&self, project: &Project) -> Vec<ClothLine> {
-        let project = project.as_shown();
-        project
+            .filter_map(|b| Some((anchor(b.panel, b.at)?, (b.diameter_mm / 2000.0) as f32)))
+            .collect();
+        // A zipper's closed stretch, along its first side (both sides
+        // meet there).
+        let zippers = project
             .zippers()
             .values()
             .filter_map(|z| {
@@ -2424,70 +2430,75 @@ impl<'a> LinesOnCloth<'a> {
                 let total = r3d_core::seam::polyline_length(&side);
                 let closed = total * project.zipper_closed(z);
                 let steps = ((closed / LINE_STEP_MM).ceil() as usize).max(1);
-                let line: ClothLine = (0..=steps)
-                    .filter_map(|k| {
-                        let (p, _) =
-                            r3d_core::seam::point_along(&side, closed * k as f64 / steps as f64);
-                        self.on_cloth(panel, p)
-                    })
+                let along = (0..=steps).map(|k| closed * k as f64 / steps as f64);
+                let line: Vec<Anchor> = r3d_core::seam::points_along(&side, along)
+                    .into_iter()
+                    .filter_map(|p| anchor(panel, p))
                     .collect();
                 (closed > 0.0 && line.len() > 1).then_some(line)
             })
-            .collect()
-    }
-
-    /// Every topstitch and quilting on the cloth, stitch by stitch.
-    pub fn stitches(&self, project: &Project) -> Vec<ClothStitches> {
-        let project = project.as_shown();
+            .collect();
+        let stitched = |panel: PanelId, rows: &[Vec<DVec2>], stitch_mm: f64, rgb: u32, width| {
+            let dashes: Vec<[Anchor; 2]> = rows
+                .iter()
+                .flat_map(|row| r3d_core::seam::stitches(row, stitch_mm))
+                .filter_map(|[a, b]| Some([anchor(panel, a)?, anchor(panel, b)?]))
+                .collect();
+            (!dashes.is_empty()).then_some((dashes, rgb, width))
+        };
         let topstitches = project.topstitches().filter_map(|(_, t)| {
             let panel = project.side_panel(&t.side)?;
             let rows = project.topstitch_rows(t);
             let width = (t.thread.width_mm() / 1000.0) as f32;
-            self.stitched(panel, &rows, t.stitch_mm, project.thread_rgb(t), width)
+            stitched(panel, &rows, t.stitch_mm, project.thread_rgb(t), width)
         });
         let quiltings = project.quiltings().filter_map(|(_, q)| {
             let rows = project.quilting_lines(q);
             let width = (r3d_core::Thread::Normal.width_mm() / 1000.0) as f32;
-            self.stitched(q.panel, &rows, q.stitch_mm, project.quilting_rgb(q), width)
+            stitched(q.panel, &rows, q.stitch_mm, project.quilting_rgb(q), width)
         });
-        topstitches.chain(quiltings).collect()
-    }
-
-    /// `rows` of `panel` on the cloth, stitch by stitch.
-    fn stitched(
-        &self,
-        panel: PanelId,
-        rows: &[Vec<DVec2>],
-        stitch_mm: f64,
-        rgb: u32,
-        width: f32,
-    ) -> Option<ClothStitches> {
-        let visible = (stitch_mm - STITCH_HOLE_MM).max(0.4 * stitch_mm);
-        let mut dashes = Vec::new();
-        for row in rows {
-            let total = r3d_core::seam::polyline_length(row);
-            let mut s = 0.0;
-            while s + visible <= total + 1e-9 {
-                let (a, _) = r3d_core::seam::point_along(row, s);
-                let (b, _) = r3d_core::seam::point_along(row, s + visible);
-                if let (Some(a), Some(b)) = (self.on_cloth(panel, a), self.on_cloth(panel, b)) {
-                    dashes.push([a, b]);
-                }
-                s += stitch_mm;
-            }
+        let stitches = topstitches.chain(quiltings).collect();
+        Self {
+            lines,
+            buttons,
+            zippers,
+            stitches,
         }
-        (!dashes.is_empty()).then_some((dashes, rgb, width))
     }
 
-    /// A contour edge of a simulated panel.
-    pub fn edge(&self, edge: EdgeId) -> Option<ClothLine> {
-        let particles = self.drape.edges.get(&edge)?;
-        Some(
-            particles
-                .iter()
-                .filter_map(|i| Some((*self.positions.get(*i)?, self.normal(*i))))
-                .collect(),
-        )
+    /// Every internal line of the simulated panels on `cloth`.
+    pub fn internal_lines(&self, cloth: &ClothAt) -> Vec<ClothLine> {
+        self.lines.iter().map(|l| cloth.line(l)).collect()
+    }
+
+    /// The buttons on `cloth`: centre, the cloth's normal and radius (m).
+    pub fn buttons(&self, cloth: &ClothAt) -> Vec<(Vec3, Vec3, f32)> {
+        self.buttons
+            .iter()
+            .filter_map(|(a, r)| {
+                let (at, n) = cloth.at(a)?;
+                Some((at, n, *r))
+            })
+            .collect()
+    }
+
+    /// The zippers' closed stretches on `cloth`.
+    pub fn zippers(&self, cloth: &ClothAt) -> Vec<ClothLine> {
+        self.zippers.iter().map(|z| cloth.line(z)).collect()
+    }
+
+    /// Every topstitch and quilting on `cloth`, stitch by stitch.
+    pub fn stitches(&self, cloth: &ClothAt) -> Vec<ClothStitches> {
+        self.stitches
+            .iter()
+            .map(|(dashes, rgb, width)| {
+                let on = dashes
+                    .iter()
+                    .filter_map(|[a, b]| Some([cloth.at(a)?, cloth.at(b)?]))
+                    .collect();
+                (on, *rgb, *width)
+            })
+            .collect()
     }
 }
 
@@ -2543,7 +2554,7 @@ fn moved_by(old: &BTreeMap<PointId, Vec2>, new: &BTreeMap<PointId, Vec2>) -> Opt
 }
 
 /// Bin size of the carry-over grid on the pattern (m).
-const CARRY_CELL_M: f32 = 0.05;
+const CARRY_CELL_M: f32 = 0.02;
 
 /// Barycentric weights of `p` in triangle `abc` (2D); `None` if it is flat.
 fn barycentric(p: Vec2, a: Vec2, b: Vec2, c: Vec2) -> Option<Vec3> {
