@@ -2924,7 +2924,6 @@ class _ShellState extends State<Shell> {
                           onShowSizes: (show) => setState(
                             () => widget.engine.setShowSizes(show_: show),
                           ),
-                          onDelete: _deleteSelected,
                         ),
                       ),
                     ],
@@ -3965,7 +3964,6 @@ class _Inspector extends StatelessWidget {
     required this.query,
     required this.showSizes,
     required this.onShowSizes,
-    required this.onDelete,
   });
 
   /// For the prints' previews and images.
@@ -3994,7 +3992,6 @@ class _Inspector extends StatelessWidget {
   /// Whether the board shows the other sizes' outlines.
   final bool showSizes;
   final ValueChanged<bool> onShowSizes;
-  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -4051,12 +4048,6 @@ class _Inspector extends StatelessWidget {
               edge: edge,
               seams: seams,
               run: run,
-              onDelete: onDelete,
-              // The other pieces, to join or cut this one with.
-              others: [
-                for (final p in (summary['panels'] as List? ?? const []))
-                  if (p is Map<String, dynamic> && p['id'] != panel!['id']) p,
-              ],
             ),
             _ => _MultiInspector(count: selection.length),
           },
@@ -4262,8 +4253,6 @@ class _PanelInspector extends StatelessWidget {
     required this.edge,
     required this.seams,
     required this.run,
-    required this.onDelete,
-    required this.others,
     required this.figures,
   });
 
@@ -4272,9 +4261,6 @@ class _PanelInspector extends StatelessWidget {
 
   /// Every button and zipper (`trim.list`).
   final Map<String, dynamic> trims;
-
-  /// The other pieces, as the project summary lists them.
-  final List<Map<String, dynamic>> others;
 
   final Map<String, dynamic> panel;
 
@@ -4291,7 +4277,6 @@ class _PanelInspector extends StatelessWidget {
   final String? edge;
   final List<dynamic> seams;
   final ValueChanged<Map<String, Object?>> run;
-  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -4370,10 +4355,6 @@ class _PanelInspector extends StatelessWidget {
             grading: linked ? null : grading,
             panel: panel,
           ),
-        ],
-        if (!linked && others.isNotEmpty) ...[
-          const SizedBox(height: Space.l),
-          _CombineCard(panel: id, others: others, run: run),
         ],
         if (!linked) ...[
           const SizedBox(height: Space.l),
@@ -4490,88 +4471,6 @@ class _PanelInspector extends StatelessWidget {
         _PlacementCard(
           placement: panel['placement'] as Map<String, dynamic>?,
           place: (place) => run({'type': 'panel.place', 'panel': id, ...place}),
-        ),
-        const SizedBox(height: Space.xl),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: linked
-                    ? null
-                    : () async {
-                        final picked = await _askNumbers(
-                          context,
-                          title: l.rotatePiece,
-                          fields: [(l.rotateAngle, '°', 90)],
-                          hint: l.rotatePieceHint,
-                        );
-                        final angle = picked?.$1.first ?? 0;
-                        if (angle == 0) return;
-                        run({
-                          'type': 'panel.rotate',
-                          'panel': id,
-                          'angle_deg': angle,
-                        });
-                      },
-                icon: const Icon(Icons.rotate_left_rounded, size: 16),
-                label: Text(l.rotatePiece),
-              ),
-            ),
-            const SizedBox(width: Space.s),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: linked
-                    ? null
-                    : () async {
-                        final picked = await _askNumbers(
-                          context,
-                          title: l.scalePiece,
-                          fields: [
-                            (l.scaleAcross, '%', 100),
-                            (l.scaleUpDown, '%', 100),
-                          ],
-                        );
-                        if (picked == null) return;
-                        final [x, y] = picked.$1;
-                        if (x <= 0 || y <= 0) return;
-                        run({
-                          'type': 'panel.scale',
-                          'panel': id,
-                          'factor': [x / 100, y / 100],
-                        });
-                      },
-                icon: const Icon(Icons.open_in_full_rounded, size: 16),
-                label: Text(l.scalePiece),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: Space.s),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: linked
-                    ? null
-                    : () => run({
-                        'type': 'panel.mirror',
-                        'panel': id,
-                        'name': l.pieceMirror(panel['name'] as String),
-                      }),
-                icon: const Icon(Icons.flip_rounded, size: 16),
-                label: Text(l.mirror),
-              ),
-            ),
-            const SizedBox(width: Space.s),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: onDelete,
-                style: OutlinedButton.styleFrom(foregroundColor: p.danger),
-                icon: const Icon(Icons.delete_outline_rounded, size: 16),
-                label: Text(l.delete),
-              ),
-            ),
-          ],
         ),
       ],
     );

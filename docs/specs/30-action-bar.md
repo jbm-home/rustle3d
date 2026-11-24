@@ -7,7 +7,9 @@ layout, icons and terms) and decisions on the plan (2026-11-24: no
 separate sketch mode, the board already is one and every piece can be
 sketched; the context buttons are a horizontal bar like the tool rail,
 on the row above the 2D and 3D views where the guided flow's banner was;
-dimensions can be named and used in formulas); a walk-through of the app
+dimensions can be named and used in formulas; 2026-11-24, later: the
+piece's own actions, turn, scale, mirror, join and cut out, move from the
+inspector to the bar, groups set apart by a line); a walk-through of the app
 drafting a half bodice and its sleeve (what got in the way: constraints
 only in the inspector, labels piled up and dragging one reshaped the
 piece, no dimension on a notch or a construction line, picking stopped
@@ -53,7 +55,14 @@ name it `armhole`; on the sleeve I give the cap the formula
   | a notch | From the start, From the end | Remove notch |
   | a corner and a construction line | Distance to the line | On the line |
   | a construction line | — | Level, Upright, Remove line |
+  | a piece alone | — | Rotate, Scale, Mirror; Join, Cut out; Delete |
 
+  A piece selected with nothing on it picked shows its name and its
+  own actions: Rotate and Scale ask for an angle or percentages,
+  Mirror adds a linked mirrored copy, Join and Cut out open a list of
+  the other pieces under the button (`panel.boolean`), Delete. A linked
+  mirror copy only offers Delete. The inspector no longer has these
+  buttons. Selecting another piece clears what was picked on the last.
   A dimension is added with the value the drawing has, and its value
   field opens at once on the board where its label is, the value
   selected: type a number (cm, or ° for an angle) or a formula, Enter;

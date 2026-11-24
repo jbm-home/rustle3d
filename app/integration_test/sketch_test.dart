@@ -263,5 +263,19 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Create'));
     await frames();
     expect(panels().length, 2);
+
+    // The new piece is selected: the bar offers the piece's actions.
+    // Join lists the other pieces under the button.
+    await tester.tap(find.byKey(const ValueKey('bar_join')));
+    await frames();
+    expect(
+      find.widgetWithText(PopupMenuItem<String>, piece['name'] as String),
+      findsOneWidget,
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await frames();
+    await tester.tap(find.byKey(const ValueKey('bar_mirror')));
+    await frames();
+    expect(panels().length, 3);
   });
 }

@@ -2212,6 +2212,29 @@ class LFr extends L {
       'Supprimer la ligne de construction (et ses contraintes).';
 
   @override
+  String get barRotateHint =>
+      'Tourner la pièce d’un angle saisi. La poignée ronde de son cadre la tourne à la main.';
+
+  @override
+  String get barScaleHint =>
+      'Élargir ou allonger la pièce d’un pourcentage. Les coins de son cadre la redimensionnent à la main.';
+
+  @override
+  String get barMirrorHint =>
+      'Ajouter une copie symétrique qui suit cette pièce.';
+
+  @override
+  String get barJoinHint =>
+      'Fusionner une autre pièce avec celle-ci : choisissez-la dans la liste.';
+
+  @override
+  String get barCutOutHint =>
+      'Retirer la forme d’une autre pièce de celle-ci : choisissez-la dans la liste.';
+
+  @override
+  String get barDeleteHint => 'Supprimer la pièce.';
+
+  @override
   String get dimensionRename =>
       'Nom : les formules peuvent utiliser cette cote';
 
@@ -2410,12 +2433,6 @@ class LFr extends L {
 
   @override
   String get pleatBox => 'Creux';
-
-  @override
-  String get combine => 'Joindre ou découper';
-
-  @override
-  String get combineWith => 'Avec la pièce';
 
   @override
   String get join => 'Joindre';

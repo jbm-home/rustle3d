@@ -365,8 +365,8 @@ abstract class Engine implements RustOpaqueInterface {
   /// user chose).
   Future<void> savePhoto({required String path});
 
-  /// Replace the shared selection with these panel ids; unknown ids are
-  /// ignored. Returns the resulting selection.
+  /// Replace the shared selection with these panel ids (nothing on them
+  /// picked); unknown ids are ignored. Returns the resulting selection.
   List<String> select({required List<String> panels});
 
   /// The edge picked within the selection (by a click near a border, in

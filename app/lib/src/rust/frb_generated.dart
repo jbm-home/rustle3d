@@ -6374,8 +6374,8 @@ class EngineImpl extends RustOpaque implements Engine {
   Future<void> savePhoto({required String path}) => RustLib.instance.api
       .crateApiEngineEngineSavePhoto(that: this, path: path);
 
-  /// Replace the shared selection with these panel ids; unknown ids are
-  /// ignored. Returns the resulting selection.
+  /// Replace the shared selection with these panel ids (nothing on them
+  /// picked); unknown ids are ignored. Returns the resulting selection.
   List<String> select({required List<String> panels}) => RustLib.instance.api
       .crateApiEngineEngineSelect(that: this, panels: panels);
 

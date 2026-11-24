@@ -2191,6 +2191,28 @@ class LEn extends L {
       'Remove the construction line (and its constraints).';
 
   @override
+  String get barRotateHint =>
+      'Turn the piece by an angle you type. Its frame\'s round handle turns it by hand.';
+
+  @override
+  String get barScaleHint =>
+      'Make the piece wider or taller by a percentage. Its frame\'s corners scale it by hand.';
+
+  @override
+  String get barMirrorHint => 'Add a mirrored copy that follows this piece.';
+
+  @override
+  String get barJoinHint =>
+      'Merge another piece into this one: pick it in the list.';
+
+  @override
+  String get barCutOutHint =>
+      'Cut another piece\'s shape out of this one: pick it in the list.';
+
+  @override
+  String get barDeleteHint => 'Delete the piece.';
+
+  @override
   String get dimensionRename => 'Name: formulas can use this dimension';
 
   @override
@@ -2386,12 +2408,6 @@ class LEn extends L {
 
   @override
   String get pleatBox => 'Box';
-
-  @override
-  String get combine => 'Join or cut';
-
-  @override
-  String get combineWith => 'With the piece';
 
   @override
   String get join => 'Join';

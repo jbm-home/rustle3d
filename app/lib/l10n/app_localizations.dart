@@ -3625,6 +3625,42 @@ abstract class L {
   /// **'Remove the construction line (and its constraints).'**
   String get barRemoveLineHint;
 
+  /// No description provided for @barRotateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn the piece by an angle you type. Its frame\'s round handle turns it by hand.'**
+  String get barRotateHint;
+
+  /// No description provided for @barScaleHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Make the piece wider or taller by a percentage. Its frame\'s corners scale it by hand.'**
+  String get barScaleHint;
+
+  /// No description provided for @barMirrorHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a mirrored copy that follows this piece.'**
+  String get barMirrorHint;
+
+  /// No description provided for @barJoinHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Merge another piece into this one: pick it in the list.'**
+  String get barJoinHint;
+
+  /// No description provided for @barCutOutHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Cut another piece\'s shape out of this one: pick it in the list.'**
+  String get barCutOutHint;
+
+  /// No description provided for @barDeleteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the piece.'**
+  String get barDeleteHint;
+
   /// No description provided for @dimensionRename.
   ///
   /// In en, this message translates to:
@@ -3942,18 +3978,6 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Box'**
   String get pleatBox;
-
-  /// No description provided for @combine.
-  ///
-  /// In en, this message translates to:
-  /// **'Join or cut'**
-  String get combine;
-
-  /// No description provided for @combineWith.
-  ///
-  /// In en, this message translates to:
-  /// **'With the piece'**
-  String get combineWith;
 
   /// No description provided for @join.
   ///

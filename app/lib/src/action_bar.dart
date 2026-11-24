@@ -9,7 +9,8 @@ typedef _BarAction = ({
   IconData icon,
   String name,
   String hint,
-  VoidCallback onTap,
+  // Given the button's context, to open a menu under it.
+  void Function(BuildContext) onTap,
 });
 
 class _ActionBar extends StatelessWidget {
@@ -37,13 +38,15 @@ class _ActionBar extends StatelessWidget {
             TextSpan(text: a.hint),
           ],
         ),
-        child: _RailButton(
-          key: ValueKey('bar_${a.id}'),
-          icon: a.icon,
-          label: a.name,
-          active: false,
-          grouped: false,
-          onTap: a.onTap,
+        child: Builder(
+          builder: (at) => _RailButton(
+            key: ValueKey('bar_${a.id}'),
+            icon: a.icon,
+            label: a.name,
+            active: false,
+            grouped: false,
+            onTap: () => a.onTap(at),
+          ),
         ),
       ),
     );
@@ -115,13 +118,21 @@ class _ActionBar extends StatelessWidget {
 }
 
 extension _Bar on _ShellState {
-  /// What is picked, in words ("2 corners · 1 edge"); empty: nothing.
-  String _pickedText(L l) => [
-    if (_points.isNotEmpty) l.barCorners(_points.length),
-    if (_edges.isNotEmpty) l.barEdges(_edges.length),
-    if (_notches.isNotEmpty) l.barNotches(_notches.length),
-    if (_guides.isNotEmpty) l.barLines(_guides.length),
-  ].join(' · ');
+  /// What is picked, in words ("2 corners · 1 edge", or the piece's
+  /// name); empty: nothing.
+  String _pickedText(L l) {
+    final parts = [
+      if (_points.isNotEmpty) l.barCorners(_points.length),
+      if (_edges.isNotEmpty) l.barEdges(_edges.length),
+      if (_notches.isNotEmpty) l.barNotches(_notches.length),
+      if (_guides.isNotEmpty) l.barLines(_guides.length),
+    ];
+    if (parts.isEmpty && _selection.length > 1) {
+      return l.piecesSelected(_selection.length);
+    }
+    if (parts.isEmpty) return _panel?['name'] as String? ?? '';
+    return parts.join(' · ');
+  }
 
   /// Add a constraint (one undo step).
   void _constrain(Map<String, Object?> c) {
@@ -177,6 +188,131 @@ extension _Bar on _ShellState {
     _refresh();
   }
 
+  /// Join the piece with another, or cut that one out of it
+  /// (`panel.boolean`), the other picked in a menu under the button.
+  Future<void> _combine(BuildContext at, String piece, String op) async {
+    final box = at.findRenderObject();
+    final overlay = Overlay.of(at).context.findRenderObject();
+    if (box is! RenderBox || overlay is! RenderBox) return;
+    final corner = box.localToGlobal(
+      Offset(0, box.size.height),
+      ancestor: overlay,
+    );
+    final other = await showMenu<String>(
+      context: at,
+      position: RelativeRect.fromLTRB(
+        corner.dx,
+        corner.dy,
+        overlay.size.width - corner.dx,
+        0,
+      ),
+      items: [
+        for (final o in (_summary['panels'] as List? ?? const []))
+          if (o is Map<String, dynamic> && o['id'] != piece)
+            PopupMenuItem(
+              value: o['id'] as String,
+              child: Text(o['name'] as String),
+            ),
+      ],
+    );
+    if (other == null || !mounted) return;
+    _run({'type': 'panel.boolean', 'panel': piece, 'with': other, 'op': op});
+    _refresh();
+  }
+
+  /// The buttons for the piece selected alone, nothing on it picked:
+  /// turn, scale, mirror; join or cut out; delete.
+  List<List<_BarAction>> _pieceActions(L l, Map<String, dynamic> panel) {
+    final id = panel['id'] as String;
+    final linked = panel['mirror_of'] != null;
+    final others = (_summary['panels'] as List? ?? const []).length > 1;
+    return [
+      if (!linked)
+        [
+          (
+            id: 'rotate',
+            icon: Icons.rotate_left_rounded,
+            name: l.rotatePiece,
+            hint: l.barRotateHint,
+            onTap: (_) async {
+              final picked = await _askNumbers(
+                context,
+                title: l.rotatePiece,
+                fields: [(l.rotateAngle, '°', 90)],
+                hint: l.rotatePieceHint,
+              );
+              final angle = picked?.$1.first ?? 0;
+              if (angle == 0) return;
+              _run({'type': 'panel.rotate', 'panel': id, 'angle_deg': angle});
+              _refresh();
+            },
+          ),
+          (
+            id: 'scale',
+            icon: Icons.open_in_full_rounded,
+            name: l.scalePiece,
+            hint: l.barScaleHint,
+            onTap: (_) async {
+              final picked = await _askNumbers(
+                context,
+                title: l.scalePiece,
+                fields: [(l.scaleAcross, '%', 100), (l.scaleUpDown, '%', 100)],
+              );
+              if (picked == null) return;
+              final [x, y] = picked.$1;
+              if (x <= 0 || y <= 0) return;
+              _run({
+                'type': 'panel.scale',
+                'panel': id,
+                'factor': [x / 100, y / 100],
+              });
+              _refresh();
+            },
+          ),
+          (
+            id: 'mirror',
+            icon: Icons.flip_rounded,
+            name: l.mirror,
+            hint: l.barMirrorHint,
+            onTap: (_) {
+              _run({
+                'type': 'panel.mirror',
+                'panel': id,
+                'name': l.pieceMirror(panel['name'] as String),
+              });
+              _refresh();
+            },
+          ),
+        ],
+      if (!linked && others)
+        [
+          (
+            id: 'join',
+            icon: Icons.join_full_rounded,
+            name: l.join,
+            hint: l.barJoinHint,
+            onTap: (at) => _combine(at, id, 'union'),
+          ),
+          (
+            id: 'cut_out',
+            icon: Icons.join_left_rounded,
+            name: l.cutOut,
+            hint: l.barCutOutHint,
+            onTap: (at) => _combine(at, id, 'difference'),
+          ),
+        ],
+      [
+        (
+          id: 'delete',
+          icon: Icons.delete_outline_rounded,
+          name: l.delete,
+          hint: l.barDeleteHint,
+          onTap: (_) => _deleteSelected(),
+        ),
+      ],
+    ];
+  }
+
   /// The bar's buttons for what is picked.
   List<List<_BarAction>> _barActions(L l) {
     final pts = [for (final q in _points) q.id];
@@ -189,9 +325,13 @@ extension _Bar on _ShellState {
       String name,
       String hint,
       VoidCallback onTap,
-    ) => (id: id, icon: icon, name: name, hint: hint, onTap: onTap);
+    ) => (id: id, icon: icon, name: name, hint: hint, onTap: (_) => onTap());
     String kind(String k) => l.constraintKind(k);
     return switch ((pts.length, edges.length, notches.length, guides.length)) {
+      (0, 0, 0, 0) => switch (_panel) {
+        final panel? when _selection.length == 1 => _pieceActions(l, panel),
+        _ => const [],
+      },
       (1, 0, 0, 0) => () {
         final smooth = _constraints.any(
           (c) => c['kind'] == 'tangent' && c['point'] == pts[0],

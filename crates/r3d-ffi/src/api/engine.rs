@@ -3857,13 +3857,14 @@ impl Engine {
         Ok(())
     }
 
-    /// Replace the shared selection with these panel ids; unknown ids are
-    /// ignored. Returns the resulting selection.
+    /// Replace the shared selection with these panel ids (nothing on them
+    /// picked); unknown ids are ignored. Returns the resulting selection.
     #[frb(sync)]
     pub fn select(&self, panels: Vec<String>) -> Result<Vec<String>, ApiError> {
         let ws = self.workspace()?;
         let project = ws.session().project();
         self.selected_edges.lock().map_err(|_| poisoned())?.clear();
+        self.selected_points.lock().map_err(|_| poisoned())?.clear();
         self.selected_guides.lock().map_err(|_| poisoned())?.clear();
         self.selected_notches
             .lock()
