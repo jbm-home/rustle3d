@@ -4,7 +4,7 @@ use r3d_core::detail::{ELASTIC_RATIO, ELASTIC_WIDTH_MM};
 use r3d_core::seam::Span;
 use r3d_core::{
     Detail, DetailId, EdgeId, Elastic, InternalLine, PanelId, PathSegment, Project, SeamSide,
-    Transaction,
+    Topstitch, Transaction,
 };
 use r3d_geom::DVec2;
 use schemars::JsonSchema;
@@ -77,6 +77,7 @@ fn ratio_of(
 pub(crate) fn get_elastic(p: &Project, id: DetailId) -> Result<Elastic, CommandError> {
     match p.details().get(&id) {
         Some(Detail::Elastic(e)) => Ok(e.clone()),
+        Some(_) => Err(CommandError::invalid("elastic", Invalid::OtherKind)),
         None => Err(CommandError::not_found(id)),
     }
 }
@@ -370,7 +371,9 @@ pub(crate) fn settle_details(tx: &mut Transaction<'_>) {
         .details()
         .iter()
         .filter(|(_, d)| match d {
-            Detail::Elastic(e) => !p.side_length(&e.side).is_some_and(|len| len > 0.0),
+            Detail::Elastic(Elastic { side, .. }) | Detail::Topstitch(Topstitch { side, .. }) => {
+                !p.side_length(side).is_some_and(|len| len > 0.0)
+            }
         })
         .map(|(id, _)| *id)
         .collect();

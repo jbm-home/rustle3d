@@ -28,6 +28,7 @@ mod source;
 mod symmetry;
 mod take_in;
 mod template;
+mod topstitch;
 mod transform;
 mod trim;
 
@@ -59,6 +60,7 @@ pub use source::*;
 pub use symmetry::*;
 pub use take_in::*;
 pub use template::*;
+pub use topstitch::*;
 pub use transform::*;
 pub use trim::*;
 

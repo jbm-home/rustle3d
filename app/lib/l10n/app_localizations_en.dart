@@ -3416,4 +3416,85 @@ class LEn extends L {
 
   @override
   String get errHasElastic => 'This stretch already has an elastic.';
+
+  @override
+  String get barTopstitch => 'Topstitch';
+
+  @override
+  String get barTopstitchHint =>
+      'Rows of stitches along this edge, seen on the right side.';
+
+  @override
+  String get topstitchTitle => 'Topstitch';
+
+  @override
+  String get topstitchRows => 'Rows';
+
+  @override
+  String get topstitchDistance => 'From the edge';
+
+  @override
+  String get topstitchGap => 'Between rows';
+
+  @override
+  String get topstitchStitch => 'Stitch length';
+
+  @override
+  String get threadNormal => 'Sewing thread';
+
+  @override
+  String get threadHeavy => 'Topstitching thread';
+
+  @override
+  String detailTopstitch(int rows, String mm, String stitch) {
+    String _temp0 = intl.Intl.pluralLogic(
+      rows,
+      locale: localeName,
+      other: '$rows rows',
+      one: '1 row',
+    );
+    return '$_temp0 · $mm mm from the edge, $stitch mm stitches';
+  }
+
+  @override
+  String get errOtherKind => 'That is another kind of detail.';
+
+  @override
+  String get tpTopstitching => 'Topstitching';
+
+  @override
+  String get tpRows => 'Rows';
+
+  @override
+  String get tpRowDistance => 'From the edge (mm)';
+
+  @override
+  String get tpRowGap => 'Between rows (mm)';
+
+  @override
+  String get tpStitch => 'Stitch (mm)';
+
+  @override
+  String get tpSpi => 'Stitches per inch';
+
+  @override
+  String get tpThread => 'Thread';
+
+  @override
+  String get tpThreadNormal => 'normal';
+
+  @override
+  String get tpThreadHeavy => 'heavy';
+
+  @override
+  String get tpElastics => 'Elastics';
+
+  @override
+  String get tpRatio => 'Relaxed length (%)';
+
+  @override
+  String get tpElasticWidth => 'Width (mm)';
+
+  @override
+  String get tpRelaxed => 'Relaxed (cm)';
 }

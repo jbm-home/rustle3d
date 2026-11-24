@@ -23,6 +23,20 @@ pub struct FabricParams {
     pub damping: f32,
 }
 
+/// Topstitched cloth bends this much harder: the thread and the seam
+/// allowance under it (docs/physics.md, "Composite cloth").
+pub const TOPSTITCH_BENDING: f32 = 1.5;
+
+impl FabricParams {
+    /// The cloth under topstitching.
+    pub fn topstitched(self) -> Self {
+        Self {
+            bending: self.bending * TOPSTITCH_BENDING,
+            ..self
+        }
+    }
+}
+
 /// The built-in fabrics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]

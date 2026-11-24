@@ -1740,5 +1740,42 @@
   },
   "tpElastic": "Elastic",
   "tpElasticBySize": "Elastic per garment by size (cm)",
-  "errHasElastic": "This stretch already has an elastic."
+  "errHasElastic": "This stretch already has an elastic.",
+  "barTopstitch": "Topstitch",
+  "barTopstitchHint": "Rows of stitches along this edge, seen on the right side.",
+  "topstitchTitle": "Topstitch",
+  "topstitchRows": "Rows",
+  "topstitchDistance": "From the edge",
+  "topstitchGap": "Between rows",
+  "topstitchStitch": "Stitch length",
+  "threadNormal": "Sewing thread",
+  "threadHeavy": "Topstitching thread",
+  "detailTopstitch": "{rows, plural, =1{1 row} other{{rows} rows}} · {mm} mm from the edge, {stitch} mm stitches",
+  "@detailTopstitch": {
+    "placeholders": {
+      "rows": {
+        "type": "int"
+      },
+      "mm": {
+        "type": "String"
+      },
+      "stitch": {
+        "type": "String"
+      }
+    }
+  },
+  "errOtherKind": "That is another kind of detail.",
+  "tpTopstitching": "Topstitching",
+  "tpRows": "Rows",
+  "tpRowDistance": "From the edge (mm)",
+  "tpRowGap": "Between rows (mm)",
+  "tpStitch": "Stitch (mm)",
+  "tpSpi": "Stitches per inch",
+  "tpThread": "Thread",
+  "tpThreadNormal": "normal",
+  "tpThreadHeavy": "heavy",
+  "tpElastics": "Elastics",
+  "tpRatio": "Relaxed length (%)",
+  "tpElasticWidth": "Width (mm)",
+  "tpRelaxed": "Relaxed (cm)"
 }

@@ -1298,6 +1298,63 @@ fn subtract(from: f64, to: f64, taken: &[(f64, f64)]) -> Vec<(f64, f64)> {
     out
 }
 
+/// The cloth under topstitching reaches this far past its last row (mm).
+const TOPSTITCH_BAND_EXTRA_MM: f64 = 2.0;
+
+/// What changes the cloth of a triangle (spec 31): the details covering
+/// it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
+struct Covers {
+    topstitched: bool,
+}
+
+impl Covers {
+    /// `base` changed by what covers it (docs/physics.md, "Composite
+    /// cloth").
+    fn fabric(self, base: r3d_sim::FabricParams) -> r3d_sim::FabricParams {
+        if self.topstitched {
+            base.topstitched()
+        } else {
+            base
+        }
+    }
+}
+
+/// Where the details of `panel` change its cloth, on the pattern (mm).
+struct PieceCovers {
+    /// Each topstitch's side and how far from it its band reaches.
+    stitched: Vec<(Vec<DVec2>, f64)>,
+}
+
+impl PieceCovers {
+    fn of(project: &Project, panel: PanelId) -> Self {
+        let stitched = project
+            .topstitches()
+            .filter(|(_, t)| project.side_panel(&t.side) == Some(panel))
+            .filter_map(|(_, t)| {
+                let line = project.side_polyline(&t.side)?;
+                Some((line, t.reach_mm().abs() + TOPSTITCH_BAND_EXTRA_MM))
+            })
+            .collect();
+        Self { stitched }
+    }
+
+    /// What covers the triangle with corners `corners` (mm).
+    fn covers(&self, corners: [DVec2; 3]) -> Covers {
+        let near = |line: &[DVec2], reach: f64| {
+            corners.iter().any(|p| {
+                line.windows(2).any(|w| match w {
+                    [a, b] => r3d_geom::fit::distance_to_segment(*p, *a, *b) <= reach,
+                    _ => false,
+                })
+            })
+        };
+        Covers {
+            topstitched: self.stitched.iter().any(|(line, reach)| near(line, *reach)),
+        }
+    }
+}
+
 /// A seam side's stretches with some length.
 fn spans(project: &Project, side: &SeamSide) -> Option<Vec<Span>> {
     let spans: Vec<Span> = project
@@ -1700,6 +1757,8 @@ pub fn build(
         }
     }
 
+    // Fabrics of the cloth under details, after the garments' own.
+    let mut composite: BTreeMap<(u16, Covers), u16> = BTreeMap::new();
     for (l, start) in laid.iter().zip(starts) {
         let Some(panel) = project.panel(l.panel) else {
             continue;
@@ -1746,19 +1805,39 @@ pub fn build(
         });
         let grain = (panel.grain_angle_deg as f32).to_radians();
         let warp = Vec2::new(grain.cos(), grain.sin());
-        let fabric = garments
+        let garment = garments
             .iter()
             .position(|g| *g == panel.garment)
             .and_then(|k| u16::try_from(k).ok())
             .unwrap_or(0);
-        scene
-            .triangles
-            .extend(mesh.triangles.iter().map(|t| Triangle {
+        let covers = PieceCovers::of(project, l.panel);
+        for t in &mesh.triangles {
+            let corners = t.map(|i| mesh.vertices.get(i as usize).copied().unwrap_or_default());
+            let cover = covers.covers(corners);
+            let fabric = if cover == Covers::default() {
+                garment
+            } else {
+                // A fabric of its own per garment and covers.
+                match composite.get(&(garment, cover)) {
+                    Some(k) => *k,
+                    None => {
+                        let base = scene.fabrics.get(usize::from(garment)).copied();
+                        let k = u16::try_from(scene.fabrics.len()).unwrap_or(garment);
+                        if let Some(base) = base {
+                            scene.fabrics.push(cover.fabric(base));
+                            composite.insert((garment, cover), k);
+                        }
+                        k
+                    }
+                }
+            };
+            scene.triangles.push(Triangle {
                 vertices: t.map(|i| offset + i),
                 fabric,
-                garment: fabric,
+                garment,
                 warp,
-            }));
+            });
+        }
     }
 
     // A seam side's particles, in the order it is walked: its stretches'
@@ -2025,6 +2104,13 @@ const LINE_STEP_MM: f64 = 10.0;
 /// A line on the draped cloth: points with the cloth's normal there.
 pub type ClothLine = Vec<(Vec3, Vec3)>;
 
+/// A topstitch on the draped cloth: each stitch's two ends (with the
+/// cloth's normal), the thread's colour (`0xRRGGBB`) and width (m).
+pub type ClothStitches = (Vec<[(Vec3, Vec3); 2]>, u32, f32);
+
+/// Where the thread goes into the cloth between two stitches (mm).
+const STITCH_HOLE_MM: f64 = 0.6;
+
 /// Pattern lines where they are on a drape (style lines, the selected
 /// edge), for drawing them on the garment.
 #[derive(Debug)]
@@ -2145,6 +2231,35 @@ impl<'a> LinesOnCloth<'a> {
                     })
                     .collect();
                 (closed > 0.0 && line.len() > 1).then_some(line)
+            })
+            .collect()
+    }
+
+    /// Every topstitch on the cloth, stitch by stitch.
+    pub fn stitches(&self, project: &Project) -> Vec<ClothStitches> {
+        let project = project.as_shown();
+        project
+            .topstitches()
+            .filter_map(|(_, t)| {
+                let panel = project.side_panel(&t.side)?;
+                let visible = (t.stitch_mm - STITCH_HOLE_MM).max(0.4 * t.stitch_mm);
+                let mut dashes = Vec::new();
+                for row in project.topstitch_rows(t) {
+                    let total = r3d_core::seam::polyline_length(&row);
+                    let mut s = 0.0;
+                    while s + visible <= total + 1e-9 {
+                        let (a, _) = r3d_core::seam::point_along(&row, s);
+                        let (b, _) = r3d_core::seam::point_along(&row, s + visible);
+                        if let (Some(a), Some(b)) =
+                            (self.on_cloth(panel, a), self.on_cloth(panel, b))
+                        {
+                            dashes.push([a, b]);
+                        }
+                        s += t.stitch_mm;
+                    }
+                }
+                let width = (t.thread.width_mm() / 1000.0) as f32;
+                (!dashes.is_empty()).then(|| (dashes, project.thread_rgb(t), width))
             })
             .collect()
     }

@@ -3446,4 +3446,85 @@ class LFr extends L {
 
   @override
   String get errHasElastic => 'Ce tronçon a déjà un élastique.';
+
+  @override
+  String get barTopstitch => 'Surpiqûre';
+
+  @override
+  String get barTopstitchHint =>
+      'Des rangs de points le long de ce bord, visibles à l\'endroit.';
+
+  @override
+  String get topstitchTitle => 'Surpiqûre';
+
+  @override
+  String get topstitchRows => 'Rangs';
+
+  @override
+  String get topstitchDistance => 'Depuis le bord';
+
+  @override
+  String get topstitchGap => 'Entre les rangs';
+
+  @override
+  String get topstitchStitch => 'Longueur de point';
+
+  @override
+  String get threadNormal => 'Fil à coudre';
+
+  @override
+  String get threadHeavy => 'Fil à surpiquer';
+
+  @override
+  String detailTopstitch(int rows, String mm, String stitch) {
+    String _temp0 = intl.Intl.pluralLogic(
+      rows,
+      locale: localeName,
+      other: '$rows rangs',
+      one: '1 rang',
+    );
+    return '$_temp0 · à $mm mm du bord, points de $stitch mm';
+  }
+
+  @override
+  String get errOtherKind => 'C\'est une autre sorte de détail.';
+
+  @override
+  String get tpTopstitching => 'Surpiqûres';
+
+  @override
+  String get tpRows => 'Rangs';
+
+  @override
+  String get tpRowDistance => 'Depuis le bord (mm)';
+
+  @override
+  String get tpRowGap => 'Entre les rangs (mm)';
+
+  @override
+  String get tpStitch => 'Point (mm)';
+
+  @override
+  String get tpSpi => 'Points par pouce';
+
+  @override
+  String get tpThread => 'Fil';
+
+  @override
+  String get tpThreadNormal => 'normal';
+
+  @override
+  String get tpThreadHeavy => 'épais';
+
+  @override
+  String get tpElastics => 'Élastiques';
+
+  @override
+  String get tpRatio => 'Longueur au repos (%)';
+
+  @override
+  String get tpElasticWidth => 'Largeur (mm)';
+
+  @override
+  String get tpRelaxed => 'Au repos (cm)';
 }

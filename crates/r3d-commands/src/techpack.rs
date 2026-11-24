@@ -78,6 +78,19 @@ pub const LABELS: &[(&str, &str)] = &[
     ("pattern", "Pattern"),
     ("sewing", "Sewing notes"),
     ("seams", "Seams"),
+    ("topstitching", "Topstitching"),
+    ("rows", "Rows"),
+    ("row_distance", "From the edge (mm)"),
+    ("row_gap", "Between rows (mm)"),
+    ("stitch", "Stitch (mm)"),
+    ("spi", "Stitches per inch"),
+    ("thread", "Thread"),
+    ("thread_normal", "normal"),
+    ("thread_heavy", "heavy"),
+    ("elastics", "Elastics"),
+    ("ratio", "Relaxed length (%)"),
+    ("elastic_width", "Width (mm)"),
+    ("relaxed", "Relaxed (cm)"),
     ("side_a", "Side A"),
     ("side_b", "Side B"),
     ("length_a", "Length A (mm)"),
@@ -386,6 +399,86 @@ impl Writer<'_> {
             title: self.t("materials"),
             blocks,
         }
+    }
+
+    /// The construction details to sew: topstitching and elastics, each a
+    /// table when there are any.
+    fn details(&self) -> Vec<Block> {
+        let p = self.project;
+        let piece = |s: &r3d_core::SeamSide| {
+            p.side_panel(s)
+                .map(|id| self.piece_name(p, id))
+                .unwrap_or_default()
+        };
+        let length =
+            |s: &r3d_core::SeamSide| self.num(p.side_length(s).unwrap_or_default() / 10.0, 1);
+        let mut blocks = Vec::new();
+        let stitched: Vec<Vec<String>> = p
+            .topstitches()
+            .map(|(_, t)| {
+                vec![
+                    piece(&t.side),
+                    length(&t.side),
+                    t.rows.to_string(),
+                    self.num(t.offset_mm.abs(), 1),
+                    if t.rows > 1 {
+                        self.num(t.gap_mm, 1)
+                    } else {
+                        String::new()
+                    },
+                    self.num(t.stitch_mm, 1),
+                    self.num(25.4 / t.stitch_mm, 1),
+                    self.t(match t.thread {
+                        r3d_core::Thread::Normal => "thread_normal",
+                        r3d_core::Thread::Heavy => "thread_heavy",
+                    }),
+                    format!("#{:06X}", p.thread_rgb(t)),
+                ]
+            })
+            .collect();
+        if !stitched.is_empty() {
+            blocks.push(Block::Subheading(self.t("topstitching")));
+            blocks.push(Block::Table {
+                columns: vec![
+                    Column::text(self.t("piece"), 2.0),
+                    Column::number(self.t("length"), 1.1),
+                    Column::number(self.t("rows"), 0.7),
+                    Column::number(self.t("row_distance"), 1.2),
+                    Column::number(self.t("row_gap"), 1.2),
+                    Column::number(self.t("stitch"), 1.0),
+                    Column::number(self.t("spi"), 1.0),
+                    Column::text(self.t("thread"), 1.0),
+                    Column::text(self.t("colour"), 1.1),
+                ],
+                rows: stitched,
+            });
+        }
+        let elastics: Vec<Vec<String>> = p
+            .elastics()
+            .map(|(_, e)| {
+                vec![
+                    piece(&e.side),
+                    length(&e.side),
+                    self.num(e.ratio * 100.0, 0),
+                    self.num(e.width_mm, 0),
+                    self.num(p.elastic_length(e).unwrap_or_default() / 10.0, 1),
+                ]
+            })
+            .collect();
+        if !elastics.is_empty() {
+            blocks.push(Block::Subheading(self.t("elastics")));
+            blocks.push(Block::Table {
+                columns: vec![
+                    Column::text(self.t("piece"), 2.0),
+                    Column::number(self.t("length"), 1.1),
+                    Column::number(self.t("ratio"), 1.3),
+                    Column::number(self.t("elastic_width"), 1.1),
+                    Column::number(self.t("relaxed"), 1.1),
+                ],
+                rows: elastics,
+            });
+        }
+        blocks
     }
 
     /// The elastic each garment takes, by width: its length (relaxed, each
@@ -723,6 +816,7 @@ impl Writer<'_> {
                 rows,
             });
         }
+        blocks.extend(self.details());
         for id in self.garments() {
             if let Some(g) = p.garments().get(&id)
                 && !g.notes.trim().is_empty()
@@ -865,5 +959,7 @@ mod tests {
         assert_eq!(rows[0][2], "10 mm");
         assert_eq!(rows[0][3], "45 cm");
         assert!(w.elastics_by_size(&[]).is_empty());
+        // Both listed to sew, each its own row.
+        assert_eq!(w.details().len(), 2);
     }
 }

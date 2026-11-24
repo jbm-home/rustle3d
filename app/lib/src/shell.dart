@@ -6315,17 +6315,23 @@ class _DetailsCard extends StatelessWidget {
   final Map<String, dynamic> details;
   final ValueChanged<Map<String, Object?>> run;
 
-  static List<Map<String, dynamic>> _elastics(
+  static List<Map<String, dynamic>> _of(
     Map<String, dynamic> d,
+    String kind,
     String panel,
   ) => [
-    for (final e in (d['elastics'] as List?) ?? const [])
+    for (final e in (d[kind] as List?) ?? const [])
       if (e is Map<String, dynamic> && e['panel'] == panel) e,
   ];
 
+  static List<Map<String, dynamic>> _elastics(
+    Map<String, dynamic> d,
+    String panel,
+  ) => _of(d, 'elastics', panel);
+
   /// Whether `panel` has any detail.
   static bool on(Map<String, dynamic> d, String panel) =>
-      _elastics(d, panel).isNotEmpty;
+      _elastics(d, panel).isNotEmpty || _of(d, 'topstitches', panel).isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -6389,6 +6395,44 @@ class _DetailsCard extends StatelessWidget {
               ),
             ),
           ],
+          for (final t in _of(details, 'topstitches', panel))
+            Row(
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  margin: const EdgeInsets.only(right: Space.s),
+                  decoration: BoxDecoration(
+                    color: Color(
+                      0xFF000000 |
+                          int.parse(
+                            (t['color'] as String).substring(1),
+                            radix: 16,
+                          ),
+                    ),
+                    border: Border.all(color: p.border),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    l.detailTopstitch(
+                      t['rows'] as int,
+                      context.number(t['offset_mm'] as num, 1),
+                      context.number(t['stitch_mm'] as num, 1),
+                    ),
+                    style: label,
+                  ),
+                ),
+                IconButton(
+                  tooltip: l.trimRemove,
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.close_rounded, size: 16),
+                  onPressed: () =>
+                      run({'type': 'topstitch.remove', 'topstitch': t['id']}),
+                ),
+              ],
+            ),
         ],
       ),
     );

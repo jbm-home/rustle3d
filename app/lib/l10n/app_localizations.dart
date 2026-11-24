@@ -5796,6 +5796,150 @@ abstract class L {
   /// In en, this message translates to:
   /// **'This stretch already has an elastic.'**
   String get errHasElastic;
+
+  /// No description provided for @barTopstitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Topstitch'**
+  String get barTopstitch;
+
+  /// No description provided for @barTopstitchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Rows of stitches along this edge, seen on the right side.'**
+  String get barTopstitchHint;
+
+  /// No description provided for @topstitchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Topstitch'**
+  String get topstitchTitle;
+
+  /// No description provided for @topstitchRows.
+  ///
+  /// In en, this message translates to:
+  /// **'Rows'**
+  String get topstitchRows;
+
+  /// No description provided for @topstitchDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'From the edge'**
+  String get topstitchDistance;
+
+  /// No description provided for @topstitchGap.
+  ///
+  /// In en, this message translates to:
+  /// **'Between rows'**
+  String get topstitchGap;
+
+  /// No description provided for @topstitchStitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Stitch length'**
+  String get topstitchStitch;
+
+  /// No description provided for @threadNormal.
+  ///
+  /// In en, this message translates to:
+  /// **'Sewing thread'**
+  String get threadNormal;
+
+  /// No description provided for @threadHeavy.
+  ///
+  /// In en, this message translates to:
+  /// **'Topstitching thread'**
+  String get threadHeavy;
+
+  /// No description provided for @detailTopstitch.
+  ///
+  /// In en, this message translates to:
+  /// **'{rows, plural, =1{1 row} other{{rows} rows}} · {mm} mm from the edge, {stitch} mm stitches'**
+  String detailTopstitch(int rows, String mm, String stitch);
+
+  /// No description provided for @errOtherKind.
+  ///
+  /// In en, this message translates to:
+  /// **'That is another kind of detail.'**
+  String get errOtherKind;
+
+  /// No description provided for @tpTopstitching.
+  ///
+  /// In en, this message translates to:
+  /// **'Topstitching'**
+  String get tpTopstitching;
+
+  /// No description provided for @tpRows.
+  ///
+  /// In en, this message translates to:
+  /// **'Rows'**
+  String get tpRows;
+
+  /// No description provided for @tpRowDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'From the edge (mm)'**
+  String get tpRowDistance;
+
+  /// No description provided for @tpRowGap.
+  ///
+  /// In en, this message translates to:
+  /// **'Between rows (mm)'**
+  String get tpRowGap;
+
+  /// No description provided for @tpStitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Stitch (mm)'**
+  String get tpStitch;
+
+  /// No description provided for @tpSpi.
+  ///
+  /// In en, this message translates to:
+  /// **'Stitches per inch'**
+  String get tpSpi;
+
+  /// No description provided for @tpThread.
+  ///
+  /// In en, this message translates to:
+  /// **'Thread'**
+  String get tpThread;
+
+  /// No description provided for @tpThreadNormal.
+  ///
+  /// In en, this message translates to:
+  /// **'normal'**
+  String get tpThreadNormal;
+
+  /// No description provided for @tpThreadHeavy.
+  ///
+  /// In en, this message translates to:
+  /// **'heavy'**
+  String get tpThreadHeavy;
+
+  /// No description provided for @tpElastics.
+  ///
+  /// In en, this message translates to:
+  /// **'Elastics'**
+  String get tpElastics;
+
+  /// No description provided for @tpRatio.
+  ///
+  /// In en, this message translates to:
+  /// **'Relaxed length (%)'**
+  String get tpRatio;
+
+  /// No description provided for @tpElasticWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Width (mm)'**
+  String get tpElasticWidth;
+
+  /// No description provided for @tpRelaxed.
+  ///
+  /// In en, this message translates to:
+  /// **'Relaxed (cm)'**
+  String get tpRelaxed;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

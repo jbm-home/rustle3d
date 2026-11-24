@@ -77,6 +77,17 @@ pub struct BoardScene {
     pub zippers: Vec<BoardZipper>,
     /// Where each elastic runs (mm).
     pub elastics: Vec<Vec<DVec2>>,
+    pub topstitches: Vec<BoardTopstitch>,
+}
+
+/// A topstitch on the board: its rows (mm), its stitch length (mm), its
+/// thread's colour (`0xRRGGBB`) and width (mm).
+#[derive(Debug, Clone, PartialEq)]
+pub struct BoardTopstitch {
+    pub rows: Vec<Vec<DVec2>>,
+    pub stitch_mm: f64,
+    pub rgb: u32,
+    pub width_mm: f64,
 }
 
 /// A button and its buttonhole on the board (mm).
@@ -238,6 +249,15 @@ impl BoardScene {
             .elastics()
             .filter_map(|(_, e)| project.side_polyline(&e.side))
             .collect();
+        let topstitches = project
+            .topstitches()
+            .map(|(_, t)| BoardTopstitch {
+                rows: project.topstitch_rows(t),
+                stitch_mm: t.stitch_mm,
+                rgb: project.thread_rgb(t),
+                width_mm: t.thread.width_mm(),
+            })
+            .collect();
         Self {
             panels,
             selected: selected.to_vec(),
@@ -250,6 +270,7 @@ impl BoardScene {
             buttons,
             zippers,
             elastics,
+            topstitches,
         }
     }
 
@@ -872,6 +893,27 @@ impl BoardRenderer {
                 })
                 .collect();
             batch.polyline(&zigzag, false, 1.5 * px, ELASTIC);
+        }
+        // Topstitches: their stitches at their real length, a gap where
+        // the thread goes in, in the thread's colour over a faint dark
+        // edge (a white thread shows on a white piece).
+        for t in &scene.topstitches {
+            let color = crate::theme::hex(t.rgb);
+            let mut edge = theme.panel_line;
+            edge[3] *= 0.45;
+            let width = t.width_mm.max(1.5 * px);
+            let visible = (t.stitch_mm - 0.6).max(0.4 * t.stitch_mm);
+            for row in &t.rows {
+                let total = r3d_core::seam::polyline_length(row);
+                let mut s = 0.0;
+                while s + visible <= total + 1e-9 {
+                    let (a, _) = r3d_core::seam::point_along(row, s);
+                    let (b, _) = r3d_core::seam::point_along(row, s + visible);
+                    batch.segment(a, b, width + 1.5 * px, edge);
+                    batch.segment(a, b, width, color);
+                    s += t.stitch_mm;
+                }
+            }
         }
         // Buttons at their real size (a ring and the thread's dot), and
         // buttonholes as slits with bar tacks; unbuttoned ones fainter.

@@ -10,7 +10,12 @@ Built in four steps, each one commit; then the shirt template.
   `detail:N`), `elastic.add`, `elastic.set`, `elastic.remove`,
   `elastic.shirr`, `detail.list`; the drape on both solvers; the board,
   the tech pack, the action bar and the inspector.
-- Topstitching, interfacing, quilting: planned.
+- Topstitching (2026-11-24): the document (schema v23),
+  `topstitch.add`, `topstitch.set`, `topstitch.remove`, `detail.list`;
+  the stiffer cloth under it on both solvers; the board, the 3D view
+  and its renders, photos (which show buttons and zippers too since),
+  the tech pack's sewing section; Topstitch in the action bar.
+- Interfacing, quilting: planned.
 
 ## User story
 As a designer, I gather a sleeve's cuff with an elastic two thirds its
@@ -64,8 +69,9 @@ and the topstitching.
   thick).
 - To topstitch beside a seam (a yoke), topstitch the edge of the piece
   the stitches show on.
-- The cloth under the rows (the band from the side to the last row,
-  plus 2 mm) bends 1.5 times harder: a topstitched edge stays flatter.
+- The cloth under the rows (each triangle with a corner within the
+  band from the side to the last row, plus 2 mm) bends 1.5 times
+  harder: a topstitched edge stays flatter.
 - Rows are clipped to the piece; removing the side removes the
   topstitch.
 
@@ -120,15 +126,16 @@ and the topstitching.
 - Elastic: a green zigzag along its side (its ratio is in the
   inspector). Shirring: each row likewise.
 - Topstitching: its rows dashed at the stitch length, in the thread's
-  colour.
+  colour over a faint dark edge (a white thread on a white piece).
 - Interfacing: its area hatched.
 - Quilting: its stitched lines dashed, its area outlined.
 
 ### 3D view and photos
-- Topstitches and quilting stitches as short raised dashes of thread on
-  the cloth, at their real size (in the 3D view no thinner than a
-  pixel), in the thread's colour. In the app's 3D view, the headless
-  renders, the tech pack's pictures and the photos.
+- Topstitches and quilting stitches as short strips of thread on the
+  cloth, 1 mm above it, at their length and the thread's width (0.4 mm,
+  0.8 mm heavy), in the thread's colour, a 0.6 mm gap where the thread
+  goes in. In the app's 3D view, the headless renders, the tech pack's
+  pictures and the photos (with buttons and zippers).
 - Quilting puffs, as above.
 
 ### Tech pack
@@ -136,10 +143,10 @@ and the topstitching.
   size (relaxed, rounded up to the centimetre) and the total; interfacing
   by kind and weight, with its area (m²); padding by loft and weight,
   with its area.
-- Construction details: each topstitch (piece, edge, rows, distance,
-  gap, stitch length and stitches per inch, thread and colour), each
-  elastic (piece, edge or line, ratio, width), each quilting (piece,
-  pattern, spacing, loft).
+- Sewing section: a Topstitching table (piece, length, rows, distance,
+  gap, stitch length and stitches per inch, thread and colour), an
+  Elastics table (piece, length, relaxed length in % and cm, width),
+  and the quiltings (piece, pattern, spacing, loft).
 
 ## Commands and queries
 - `elastic.add` (side, ratio? | relaxed_mm?, width_mm?), `elastic.set`

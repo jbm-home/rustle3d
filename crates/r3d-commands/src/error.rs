@@ -94,6 +94,8 @@ pub enum Invalid {
     MissingMeasurement,
     #[error("already has an elastic there")]
     HasElastic,
+    #[error("is another kind of detail")]
+    OtherKind,
 }
 
 impl Invalid {
@@ -143,6 +145,7 @@ impl Invalid {
             Invalid::NoBody => "invalid.no_body",
             Invalid::MissingMeasurement => "invalid.missing_measurement",
             Invalid::HasElastic => "invalid.has_elastic",
+            Invalid::OtherKind => "invalid.other_kind",
         }
     }
 }

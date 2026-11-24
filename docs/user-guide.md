@@ -7,7 +7,7 @@ words. Keep it in step with the app: every user-visible change (a tool, a
 shortcut, a menu, a format, a limit) updates this file in the same
 commit (CLAUDE.md §5). Shortcuts are written with the macOS keys; on
 Windows and Linux ⌘ is Ctrl and ⌥ is Alt.
-Last updated: 2026-11-24 (elastic: pick an edge, then Elastic in the action bar, and it gathers when draped; Shirring adds rows of elastic across a piece; the tech pack lists the elastic per size; moving a piece on the pattern no longer moves it on the avatar; the action bar's buttons are larger, with a short name under each, and it says Nothing picked when nothing is; a piece selected alone, the action bar offers Rotate, Scale, Mirror, Join, Cut out and Delete, no longer in the inspector; the action bar above the pattern and the garment: pick corners, edges, notches or construction lines, as many as you like, and it offers the constraints and dimensions that fit; a dimension added from it opens its value field on the board; drag a dimension's label to move it, click it to type a new value; dimensions can be named and used in formulas; a notch keeps its distance from the start or the end of its edge; corners on a construction line or at a distance from it follow the line; drawing snaps to where two lines cross; every piece's dimensions are shown; more body measurements: neck, shoulders, arm length, upper arm, wrist, back and front waist lengths, waist and hip heights, crotch depth, inside leg, thigh, knee and ankle, estimated until you type your own, in the Body panel under More measurements; the avatar follows the neck, shoulders, arms, back length, hip height, inside leg and thigh; formulas can use them; the shirt's sleeve comes from the arm length and the T-shirt's and shirt's neckline from the neck; with Select, drag a piece to move it, the corners of its frame to scale it and the round handle above it to turn it; Rotate and Scale in the inspector for an exact angle or percentage; the Draw tool also draws on a piece of the pattern, not only on the 3D garment; a shape added from the Shapes menu comes in selected, with the Select tool on; in French, the circle skirt is now called « jupe soleil »; patterns and measurement files from Seamly2D and Valentina come in drafted for their measurements, graded in every size, and can be drafted again for the avatar; the tape measure goes round a slanting sleeve square to it, and measures a length between two points of the garment; the start screen tells you when a new version is out, and the check can be turned off; Installing: a disk image for macOS, one for Intel and Apple silicon, an installer for Windows, and the first launch on recent macOS, through Privacy & Security; the shirt, T-shirt and dress take their shoulders, neckline and armholes from the avatar's body, and their hem fits over the hips: large sizes no longer have drooping shoulders; the avatar now takes the measurements given in every size of the charts, up to the women's 54: large sizes came out too slim and trousers fell off them; changing the size or the body while draping starts the drape again around the new body; trousers end just above the floor whatever the body; garments worn in layers lie close together: a shirt worn under trousers is tucked into them, and nothing shows through a garment worn over another; the trousers template is a little shorter; a selected piece's panel shows its garment's fabric; the Construction line and Tape measure tools have new icons; the tool rail in four sections, drawing, measuring, sewing and trims, with Dart and Pleat under Darts and pleats and Hole a tool of its own; the guided flow's step bar and banner removed; a more natural walk and a new motion, Stand at ease; captured motions whose rest pose lies flat play upright; pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
+Last updated: 2026-11-24 (topstitching: pick an edge, then Topstitch in the action bar: one to three rows of stitches, seen on the pattern, on the 3D garment, in photos and in the tech pack; photos now show buttons and zippers; elastic: pick an edge, then Elastic in the action bar, and it gathers when draped; Shirring adds rows of elastic across a piece; the tech pack lists the elastic per size; moving a piece on the pattern no longer moves it on the avatar; the action bar's buttons are larger, with a short name under each, and it says Nothing picked when nothing is; a piece selected alone, the action bar offers Rotate, Scale, Mirror, Join, Cut out and Delete, no longer in the inspector; the action bar above the pattern and the garment: pick corners, edges, notches or construction lines, as many as you like, and it offers the constraints and dimensions that fit; a dimension added from it opens its value field on the board; drag a dimension's label to move it, click it to type a new value; dimensions can be named and used in formulas; a notch keeps its distance from the start or the end of its edge; corners on a construction line or at a distance from it follow the line; drawing snaps to where two lines cross; every piece's dimensions are shown; more body measurements: neck, shoulders, arm length, upper arm, wrist, back and front waist lengths, waist and hip heights, crotch depth, inside leg, thigh, knee and ankle, estimated until you type your own, in the Body panel under More measurements; the avatar follows the neck, shoulders, arms, back length, hip height, inside leg and thigh; formulas can use them; the shirt's sleeve comes from the arm length and the T-shirt's and shirt's neckline from the neck; with Select, drag a piece to move it, the corners of its frame to scale it and the round handle above it to turn it; Rotate and Scale in the inspector for an exact angle or percentage; the Draw tool also draws on a piece of the pattern, not only on the 3D garment; a shape added from the Shapes menu comes in selected, with the Select tool on; in French, the circle skirt is now called « jupe soleil »; patterns and measurement files from Seamly2D and Valentina come in drafted for their measurements, graded in every size, and can be drafted again for the avatar; the tape measure goes round a slanting sleeve square to it, and measures a length between two points of the garment; the start screen tells you when a new version is out, and the check can be turned off; Installing: a disk image for macOS, one for Intel and Apple silicon, an installer for Windows, and the first launch on recent macOS, through Privacy & Security; the shirt, T-shirt and dress take their shoulders, neckline and armholes from the avatar's body, and their hem fits over the hips: large sizes no longer have drooping shoulders; the avatar now takes the measurements given in every size of the charts, up to the women's 54: large sizes came out too slim and trousers fell off them; changing the size or the body while draping starts the drape again around the new body; trousers end just above the floor whatever the body; garments worn in layers lie close together: a shirt worn under trousers is tucked into them, and nothing shows through a garment worn over another; the trousers template is a little shorter; a selected piece's panel shows its garment's fabric; the Construction line and Tape measure tools have new icons; the tool rail in four sections, drawing, measuring, sewing and trims, with Dart and Pleat under Darts and pleats and Hole a tool of its own; the guided flow's step bar and banner removed; a more natural walk and a new motion, Stand at ease; captured motions whose rest pose lies flat play upright; pieces can be renamed from the inspector; a moving avatar keeps its hands clear of its
 hips, so trousers no longer slide with each step; a garment worn over
 trousers starts outside them; captured motions: Motion › Import a captured
 motion… plays a BVH motion capture on the avatar, Motion › Motion
@@ -468,7 +468,7 @@ linked mirror copy must be unlinked first.
   closes like a seam up to its slider. Button, unbutton or open a zipper
   while the garment drapes: it opens or closes in a fraction of a
   second, without starting over. Buttons show as small dark discs on the
-  cloth, a zipper as a brass band.
+  cloth, a zipper as a brass band, in the 3D view and in photos.
 - The shirt template comes buttoned: buttons down one front, buttonholes
   on the other (left over right on a men's body, right over left
   otherwise), one on each cuff. The trousers have an 18 cm fly zipper,
@@ -494,6 +494,26 @@ linked mirror copy must be unlinked first.
 - The elastic keeps its share of the edge when the edge changes or in
   another size; the tech pack lists the elastic each garment takes, by
   width, and by size when the pattern is graded.
+
+## Topstitching
+- Pick an edge of a piece, then **Topstitch** in the action bar: how
+  many rows (1 to 3), how far the first is from the edge, the gap
+  between rows, the stitch length, and the thread (sewing thread, or
+  the thicker topstitching thread). The rows run inside the piece and
+  stop at its outline.
+- To topstitch beside a seam (a yoke, a shoulder), pick the edge of the
+  piece the stitches show on.
+- The thread is a darker shade of the fabric unless you choose its
+  colour (agents can set any colour). The pattern shows the stitches at
+  their length in the thread's colour; the 3D garment, its pictures and
+  photos show them on the cloth.
+- The **Construction details** card lists a piece's topstitches with
+  their thread colour; remove one with its ×.
+- The cloth under the stitches folds a little less, as a real
+  topstitched edge stays flatter.
+- The tech pack lists each topstitch to sew: piece, length, rows,
+  distance from the edge, gap, stitch length and stitches per inch,
+  thread and colour; and each elastic with its relaxed length.
 
 ## Fabric and garments
 With nothing selected, the panel on the right lists the project's
@@ -938,8 +958,7 @@ the tech pack as PDF: open formats only.
   T pose, move the shoulder, elbow and wrist points. Compressed glTF
   (Draco, meshopt) cannot be read; files over 2 million triangles are
   refused, and above 300 000 the views and the drape slow down.
-- Not yet in the simulation: visible topstitching, interfacing,
-  quilting and padding. Holes are cut on their line (no seam
+- Not yet in the simulation: interfacing, quilting and padding. Holes are cut on their line (no seam
   allowance inside them), and a mirrored or symmetric piece cannot have
   holes.
 - Fit maps show the stretch of the cloth, not the force in it (a stiff
@@ -959,8 +978,8 @@ the tech pack as PDF: open formats only.
   parts a little at the front below its last button, over the belly.
   A template's pieces graded after they were laid out keep their place
   on the board: the largest sizes of neighbouring pieces can touch.
-- Buttons and zippers: photos do not show them yet. A copied piece is
-  pasted without its buttons. The two pieces a button holds may pass
+- Buttons and zippers: a copied piece is pasted without its buttons
+  (and its elastics and topstitches). The two pieces a button holds may pass
   through each other near the button (they are allowed to lie on each
   other there). Agents can place a zipper on part of an edge; in the app
   the Zipper tool takes whole edges.

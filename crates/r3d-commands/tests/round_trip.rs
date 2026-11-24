@@ -190,6 +190,12 @@ fn every_command_round_trips() {
         "width_mm": 20}),
     );
     h.round_trip(json!({"type": "elastic.remove", "elastic": elastic}));
+    let topstitch = h.round_trip(json!({"type": "topstitch.add",
+        "side": {"edge": poly.created[7].to_string()}, "rows": 2}));
+    let topstitch = topstitch.created[0].to_string();
+    h.round_trip(json!({"type": "topstitch.set", "topstitch": topstitch,
+        "color": "#203040", "stitch_mm": 4}));
+    h.round_trip(json!({"type": "topstitch.remove", "topstitch": topstitch}));
     h.round_trip(json!({"type": "elastic.shirr", "panel": poly_panel,
         "edge": poly.created[5].to_string(), "rows": 3}));
 

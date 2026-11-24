@@ -45,6 +45,8 @@ pub(crate) struct Subject {
         Surface,
         Option<std::sync::Arc<r3d_commands::prints::PrintImage>>,
     )>,
+    /// Trims and stitches, each a mesh in a plain colour.
+    pub trims: Vec<(Mesh, Surface)>,
     pub body: Option<Mesh>,
     pub camera: OrbitCamera,
 }
@@ -144,7 +146,8 @@ fn run(
             }),
         })
         .collect();
-    let scene = PhotoScene::new(&cloth, subject.body.as_ref());
+    let extras: Vec<(&Mesh, Surface)> = subject.trims.iter().map(|(m, s)| (m, *s)).collect();
+    let scene = PhotoScene::new(&cloth, &extras, subject.body.as_ref());
     let mut photo = PhotoRenderer::new(gpu, &scene, &subject.camera, settings, width, height)
         .map_err(|e| e.to_string())?;
     *shared.image.lock().map_err(|e| e.to_string())? = Some(photo.image().clone());

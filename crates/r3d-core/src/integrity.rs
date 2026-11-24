@@ -206,6 +206,7 @@ impl Project {
         for (id, d) in &self.details {
             let ok = match d {
                 crate::detail::Detail::Elastic(e) => self.side_ok(&e.side) && e.valid(),
+                crate::detail::Detail::Topstitch(t) => self.side_ok(&t.side) && t.valid(),
             };
             if !ok {
                 return Err(E::BadValue {

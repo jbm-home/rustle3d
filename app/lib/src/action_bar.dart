@@ -306,6 +306,35 @@ extension _Bar on _ShellState {
     _refresh();
   }
 
+  /// Topstitch along an edge: rows, distance, stitch length and thread
+  /// asked.
+  Future<void> _addTopstitch(String edge) async {
+    final l = context.l;
+    final picked = await _askNumbers(
+      context,
+      title: l.topstitchTitle,
+      fields: [
+        (l.topstitchRows, '', 1),
+        (l.topstitchDistance, 'mm', 6),
+        (l.topstitchGap, 'mm', 6),
+        (l.topstitchStitch, 'mm', 3),
+      ],
+      choices: [l.threadNormal, l.threadHeavy],
+    );
+    if (picked == null || !mounted) return;
+    final [rows, distance, gap, stitch] = picked.$1;
+    _run({
+      'type': 'topstitch.add',
+      'side': {'edge': edge},
+      'rows': rows.round(),
+      'offset_mm': distance,
+      'gap_mm': gap,
+      'stitch_mm': stitch,
+      'thread': picked.$2 == 1 ? 'heavy' : 'normal',
+    });
+    _refresh();
+  }
+
   /// Shirr a piece: rows of elastic parallel to an edge.
   Future<void> _shirr(String panel, String edge) async {
     final l = context.l;
@@ -581,6 +610,13 @@ extension _Bar on _ShellState {
             l.barElastic,
             l.barElasticHint,
             () => _addElastic(edges[0]),
+          ),
+          act(
+            'topstitch',
+            Icons.more_horiz_rounded,
+            l.barTopstitch,
+            l.barTopstitchHint,
+            () => _addTopstitch(edges[0]),
           ),
           if (_panel?['id'] case final String panel)
             act(

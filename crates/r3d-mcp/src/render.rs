@@ -325,7 +325,11 @@ impl Dressed {
             .iter()
             .map(|l| Mesh::ribbon(l, LINE_WIDTH_M, LINE_LIFT_M))
             .collect();
-        let trims = r3d_render::trims::meshes(&on.buttons(project), &on.zippers(project));
+        let trims = r3d_render::trims::meshes(
+            &on.buttons(project),
+            &on.zippers(project),
+            &on.stitches(project),
+        );
         let fit = values.map(|(map, v)| {
             // The tightest value on the garment, and its piece.
             let (loose, tight) = map.range();
@@ -580,7 +584,12 @@ pub fn render(
                     print: p.printed(),
                 })
                 .collect();
-            let scene = PhotoScene::new(&cloth, dressed.avatar.as_ref());
+            let extras: Vec<(&Mesh, Surface)> = dressed
+                .trims
+                .iter()
+                .map(|(mesh, material)| (mesh, Surface::plain(material.base)))
+                .collect();
+            let scene = PhotoScene::new(&cloth, &extras, dressed.avatar.as_ref());
             let camera = if options.close_up {
                 garment_camera(&dressed, options.angle)
             } else {

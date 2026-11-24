@@ -111,7 +111,7 @@ fn skirt_scene_printed(fabric: Fabric, print: Option<&Texture>) -> PhotoScene {
             print: print.map(|texture| Printed { key: 1, texture }),
         })
         .collect();
-    PhotoScene::new(&cloth, Some(&avatar))
+    PhotoScene::new(&cloth, &[], Some(&avatar))
 }
 
 #[test]

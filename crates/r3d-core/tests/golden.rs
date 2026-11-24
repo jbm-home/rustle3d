@@ -17,7 +17,7 @@ use r3d_core::{
     PathSegment, PatternSource, Pin, Placement, Point, Print, PrintPlacement, PrintSource, Project,
     Seam, SeamSide, Size, SourcePiece, Symmetry, TemplateRef, Transaction, UpAxis, Zipper,
 };
-use r3d_core::{Detail, Elastic};
+use r3d_core::{Detail, Elastic, Thread, Topstitch};
 
 fn golden_dir(version: u32) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("tests/golden/v{version}"))
@@ -405,6 +405,20 @@ fn sample() -> Project {
             },
             ratio: 0.6,
             width_mm: 10.0,
+        }),
+    );
+    // Two rows of heavy white topstitching along the top (v23).
+    let topstitch = tx.new_detail_id();
+    tx.put_detail(
+        topstitch,
+        Detail::Topstitch(Topstitch {
+            side: SeamSide::edge(contour[2], false),
+            rows: 2,
+            offset_mm: 1.5,
+            gap_mm: 5.0,
+            stitch_mm: 3.0,
+            color: Some("#FFFFFF".into()),
+            thread: Thread::Heavy,
         }),
     );
     tx.commit();

@@ -185,8 +185,11 @@ own, the garment's combined with the detail; hinges between two
 fabrics average their bending (as between garments' fabrics). The
 area's boundary is a mesh line, so the change follows it.
 
-- **Topstitching**: the band from the side to the last row (plus 2 mm)
-  bends 1.5 times harder (the thread and the seam allowance under it).
+- **Topstitching**: the triangles with a corner in the band from the
+  side to the last row (plus 2 mm) bend 1.5 times harder (the thread and
+  the seam allowance under it; `FabricParams::topstitched`). The band is
+  thinner than a triangle, so no mesh line marks it: the triangles along
+  the edge take it.
 - **Interfacing** (fused): weights and thicknesses add, stretch and
   shear stiffnesses add, and bending is `3 × (B_cloth + B_interfacing)`.
   Bonded layers bend about a shared neutral axis, so their rigidity

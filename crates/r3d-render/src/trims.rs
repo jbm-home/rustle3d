@@ -1,5 +1,6 @@
 //! Trims on the draped garment in the 3D view (spec 26): buttons as small
-//! discs on the cloth, zippers as a band along their closed stretch.
+//! discs on the cloth, zippers as a band along their closed stretch; and
+//! topstitches (spec 31), each stitch a short strip of thread.
 
 use glam::Vec3;
 
@@ -15,6 +16,9 @@ const ZIPPER: Rgba = hex(0xB8862B);
 const LIFT_M: f32 = 0.002;
 /// A zipper's band is this wide (m): both rows of teeth.
 const ZIPPER_WIDTH_M: f32 = 0.008;
+/// Stitches sit this far off the cloth (m): above the curved surface the
+/// photos draw between the cloth's points.
+const STITCH_LIFT_M: f32 = 0.001;
 
 fn flat(base: Rgba) -> Material {
     Material {
@@ -24,12 +28,17 @@ fn flat(base: Rgba) -> Material {
     }
 }
 
+/// A topstitch on the cloth: each stitch's two ends with the cloth's
+/// normal, the thread's colour (`0xRRGGBB`) and width (m).
+pub type Stitches = (Vec<[(Vec3, Vec3); 2]>, u32, f32);
+
 /// Meshes and materials for `buttons` (centre on the cloth, the cloth's
-/// normal there, radius; m) and the closed stretches of `zippers` (points
-/// on the cloth with its normal).
+/// normal there, radius; m), the closed stretches of `zippers` (points
+/// on the cloth with its normal) and `stitches`, one mesh per topstitch.
 pub fn meshes(
     buttons: &[(Vec3, Vec3, f32)],
     zippers: &[Vec<(Vec3, Vec3)>],
+    stitches: &[Stitches],
 ) -> Vec<(Mesh, Material)> {
     let mut out: Vec<(Mesh, Material)> = buttons
         .iter()
@@ -41,6 +50,19 @@ pub fn meshes(
             .filter(|z| z.len() > 1)
             .map(|z| (Mesh::ribbon(z, ZIPPER_WIDTH_M, LIFT_M), flat(ZIPPER))),
     );
+    for (dashes, rgb, width) in stitches {
+        let mut mesh = Mesh::default();
+        for dash in dashes {
+            let one = Mesh::ribbon(dash, *width, STITCH_LIFT_M);
+            let base = mesh.positions.len() as u32;
+            mesh.positions.extend(one.positions);
+            mesh.normals.extend(one.normals);
+            mesh.indices.extend(one.indices.iter().map(|i| base + i));
+        }
+        if !mesh.indices.is_empty() {
+            out.push((mesh, flat(hex(*rgb))));
+        }
+    }
     out
 }
 

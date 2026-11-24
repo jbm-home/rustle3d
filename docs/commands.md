@@ -3548,6 +3548,299 @@ Shirr a piece: `rows` parallel rows of elastic across it, along `edge`'s chord, 
 
 </details>
 
+### `topstitch.add`
+
+Topstitch along a side (given as a seam's: a whole `edge`, consecutive outline `edges` or an internal `line`, maybe only `from_mm`/`to_mm` along it): `rows` (1–3, default 1), the first `offset_mm` from the side (default 6; inside the piece on outline edges, on the line's left when positive), the next `gap_mm` further (default 6), `stitch_mm` stitches (default 3), a `color` (#RRGGBB, default a darker shade of the garment's) and a `thread` (normal or heavy). Beside a seam, topstitch the edge of the piece the stitches show on. Rows are cut where they leave the piece. The cloth under them bends a little harder. Returns the topstitch (a detail).
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "EdgeId": {
+      "description": "Identifier of a edge, e.g. `edge:1`.",
+      "pattern": "^edge:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "InternalLineId": {
+      "description": "Identifier of a line, e.g. `line:1`.",
+      "pattern": "^line:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "SeamSideSpec": {
+      "additionalProperties": false,
+      "description": "One side of a new seam: a whole edge, a run of edges, or an internal\nline; all of it or part of it.",
+      "properties": {
+        "edge": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EdgeId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "One edge."
+        },
+        "edges": {
+          "description": "Or consecutive outline edges of one piece, in their order around it\n(e.g. a pocket's sides and bottom).",
+          "items": {
+            "$ref": "#/$defs/EdgeId"
+          },
+          "type": "array"
+        },
+        "from_mm": {
+          "description": "Only from here along the path (mm from its start). Omitted: its\nstart.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "line": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InternalLineId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Or an internal line (a pocket's placement line, a tuck's line)."
+        },
+        "reversed": {
+          "description": "Walk the side from its end instead of its start. Omitted: `false`\nfor side `a`; for side `b`, an edge sewn to its linked mirror image\nmeets it mirrored point to mirrored point (a centre seam), other\nsides are walked both the same way on the pattern (what sewing two\npanels laid side by side needs).",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "to_mm": {
+          "description": "Only to here (mm from the path's start). Omitted: its end.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "Thread": {
+      "description": "The thread a topstitch is sewn with.",
+      "oneOf": [
+        {
+          "const": "normal",
+          "description": "The garment's sewing thread.",
+          "type": "string"
+        },
+        {
+          "const": "heavy",
+          "description": "Topstitching thread, about twice as thick.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Add topstitching along a side.",
+  "properties": {
+    "color": {
+      "description": "The thread's colour, `#RRGGBB`. Omitted: a darker shade of the\ngarment's.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "gap_mm": {
+      "description": "The distance between rows (1–30 mm). Omitted: 6.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "offset_mm": {
+      "description": "The first row's distance from the side (mm). On outline edges\n1–50, inside the piece; on an internal line −50–50, on its left\n(from its start) when positive. Omitted: 6.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "rows": {
+      "description": "How many rows (1–3). Omitted: 1.",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "side": {
+      "$ref": "#/$defs/SeamSideSpec",
+      "description": "Where it runs, as a seam's side (the edge of the piece the\nstitches show on)."
+    },
+    "stitch_mm": {
+      "description": "The stitch length (1–8 mm). Omitted: 3.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "thread": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Thread"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "`normal` or `heavy` (topstitching thread). Omitted: normal."
+    }
+  },
+  "required": [
+    "side"
+  ],
+  "title": "TopstitchAdd",
+  "type": "object"
+}
+```
+
+</details>
+
+### `topstitch.set`
+
+Change a topstitch: its `rows`, `offset_mm`, `gap_mm`, `stitch_mm`, `color` ("" for a darker shade of the garment's) or `thread`; what is omitted stays.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "DetailId": {
+      "description": "Identifier of a detail, e.g. `detail:1`.",
+      "pattern": "^detail:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "Thread": {
+      "description": "The thread a topstitch is sewn with.",
+      "oneOf": [
+        {
+          "const": "normal",
+          "description": "The garment's sewing thread.",
+          "type": "string"
+        },
+        {
+          "const": "heavy",
+          "description": "Topstitching thread, about twice as thick.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Change a topstitch.",
+  "properties": {
+    "color": {
+      "description": "`#RRGGBB`, or `\"\"` for the garment's shade.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "gap_mm": {
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "offset_mm": {
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "rows": {
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "stitch_mm": {
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "thread": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Thread"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "topstitch": {
+      "$ref": "#/$defs/DetailId"
+    }
+  },
+  "required": [
+    "topstitch"
+  ],
+  "title": "TopstitchSet",
+  "type": "object"
+}
+```
+
+</details>
+
+### `topstitch.remove`
+
+Remove a topstitch.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "DetailId": {
+      "description": "Identifier of a detail, e.g. `detail:1`.",
+      "pattern": "^detail:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Remove a topstitch.",
+  "properties": {
+    "topstitch": {
+      "$ref": "#/$defs/DetailId"
+    }
+  },
+  "required": [
+    "topstitch"
+  ],
+  "title": "TopstitchRemove",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `garment.set_fabric`
 
 Choose what the garment is made of: cotton, denim, jersey, silk or wool. Sets how it drapes and how it looks.
@@ -6425,7 +6718,7 @@ Every trim: buttons (the piece and point they are sewn at, diameter, the buttonh
 
 ### `detail.list`
 
-Every construction detail: elastics (their side, piece, ratio, width, the side's length and the relaxed length in each size of the range, or in the drawn size; mm).
+Every construction detail: elastics (their side, piece, ratio, width, the side's length and the relaxed length in each size of the range, or in the drawn size) and topstitches (their side, piece, rows, distance, gap, stitch length, thread and its colour, the length of each row on the piece); mm.
 
 <details><summary>Parameters (JSON schema)</summary>
 

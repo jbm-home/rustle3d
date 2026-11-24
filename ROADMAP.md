@@ -173,8 +173,8 @@ As noted when each milestone closed; recheck before taking one up.
   particle diameter apart); on the GPU a shirt and trousers step in
   13.9 ms (6.2 ms without contacts between garments), a hash of its own
   for self-collision is the lever.
-- **Trims (M20)**: trims in photos (the path tracer) and in glTF/OBJ
-  exports; buttons kept when pieces are copied and pasted, or mirrored;
+- **Trims (M20)**: trims in glTF/OBJ exports (photos show them since
+  M34); buttons kept when pieces are copied and pasted, or mirrored;
   the Zipper tool on part of an edge (agents can); a button's own colour
   and shape; vertical buttonholes drawn along the band; a waistband with
   a button on the trousers; snaps, hooks and elastic; the overlapping

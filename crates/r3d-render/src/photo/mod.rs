@@ -194,6 +194,19 @@ impl Surface {
         }
     }
 
+    /// A trim or a thread: a plain matte surface of `base` (sRGB, as the
+    /// 3D view's materials).
+    pub fn plain(base: crate::theme::Rgba) -> Self {
+        Self {
+            albedo: [base[0], base[1], base[2]].map(linear),
+            sheen: [0.0; 3],
+            sheen_roughness: 0.5,
+            roughness: 0.6,
+            specular: 0.3,
+            translucency: 0.0,
+        }
+    }
+
     /// The avatar: a dress form with a satin finish.
     pub fn mannequin() -> Self {
         Self {
@@ -248,15 +261,16 @@ pub struct PhotoScene {
 impl Default for PhotoScene {
     /// An empty studio.
     fn default() -> Self {
-        Self::new(&[], None)
+        Self::new(&[], &[], None)
     }
 }
 
 impl PhotoScene {
-    /// The garment's pieces with their surfaces, on the avatar's `body`.
-    /// The coarse simulation meshes are cut into curved triangles; meshes
-    /// without normals get them computed.
-    pub fn new(cloth: &[Cloth<'_>], body: Option<&Mesh>) -> Self {
+    /// The garment's pieces with their surfaces, its trims and stitches
+    /// (`extras`, drawn as they are), on the avatar's `body`. The coarse
+    /// simulation meshes are cut into curved triangles; meshes without
+    /// normals get them computed.
+    pub fn new(cloth: &[Cloth<'_>], extras: &[(&Mesh, Surface)], body: Option<&Mesh>) -> Self {
         let mut scene = Self {
             triangles: Vec::new(),
             surface_of: Vec::new(),
@@ -283,6 +297,9 @@ impl PhotoScene {
                 scene.print_of.push((scene.surfaces.len() as u32, at));
             }
             scene.add(c.mesh, c.surface, CLOTH_LEVEL);
+        }
+        for (mesh, surface) in extras {
+            scene.add(mesh, *surface, 0);
         }
         scene
     }

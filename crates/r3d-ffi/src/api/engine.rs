@@ -1549,7 +1549,11 @@ impl Engine {
             .iter()
             .map(|l| Mesh::ribbon(l, LINE_WIDTH_M, LINE_LIFT_M))
             .collect();
-        let trims = r3d_render::trims::meshes(&on.buttons(&project), &on.zippers(&project));
+        let trims = r3d_render::trims::meshes(
+            &on.buttons(&project),
+            &on.zippers(&project),
+            &on.stitches(&project),
+        );
         drop(cloth);
         let animation = self.animation.lock().map_err(|_| poisoned())?.clone();
         let body = form.as_deref().map(|f| {
@@ -2132,7 +2136,11 @@ impl Engine {
                 let edge = edge
                     .and_then(|e| on.edge(e))
                     .map(|l| Mesh::ribbon(&l, EDGE_WIDTH_M, LINE_LIFT_M));
-                let trims = r3d_render::trims::meshes(&on.buttons(project), &on.zippers(project));
+                let trims = r3d_render::trims::meshes(
+                    &on.buttons(project),
+                    &on.zippers(project),
+                    &on.stitches(project),
+                );
                 (lines, edge, trims)
             })
             .unwrap_or_default();
@@ -2502,18 +2510,33 @@ impl Engine {
             .as_ref()
             .map(SimThread::latest)
             .unwrap_or_default();
-        let cloth = self
+        let (cloth, trims) = self
             .cloth
             .lock()
             .map_err(|_| poisoned())?
             .as_ref()
-            .map(|d| piece_meshes(d, &published.positions, None, project, &prints))
+            .map(|d| {
+                let on = drape::LinesOnCloth::new(d, &published.positions);
+                let trims = r3d_render::trims::meshes(
+                    &on.buttons(project),
+                    &on.zippers(project),
+                    &on.stitches(project),
+                );
+                (
+                    piece_meshes(d, &published.positions, None, project, &prints),
+                    trims,
+                )
+            })
             .unwrap_or_default();
         let body = match self.moving_avatar(project, published.time)? {
             Some(moving) => Some(moving),
             None => g.avatar.as_ref().map(|(_, m)| m.clone()),
         };
         let subject = Subject {
+            trims: trims
+                .into_iter()
+                .map(|(mesh, material)| (mesh, r3d_render::photo::Surface::plain(material.base)))
+                .collect(),
             cloth: cloth
                 .into_iter()
                 .map(|p| {

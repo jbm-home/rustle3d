@@ -759,7 +759,7 @@ impl QuerySpec for TrimList {
 pub struct DetailList {}
 
 impl Described for DetailList {
-    const SUMMARY: &'static str = "Every construction detail: elastics (their side, piece, ratio, width, the side's length and the relaxed length in each size of the range, or in the drawn size; mm).";
+    const SUMMARY: &'static str = "Every construction detail: elastics (their side, piece, ratio, width, the side's length and the relaxed length in each size of the range, or in the drawn size) and topstitches (their side, piece, rows, distance, gap, stitch length, thread and its colour, the length of each row on the piece); mm.";
 }
 
 impl QuerySpec for DetailList {
@@ -788,7 +788,32 @@ impl QuerySpec for DetailList {
                 })
             })
             .collect();
-        Ok(serde_json::json!({ "elastics": elastics }))
+        let topstitches: Vec<Value> = p
+            .topstitches()
+            .map(|(id, t)| {
+                let panel = p.side_panel(&t.side);
+                let rows: Vec<f64> = p
+                    .topstitch_rows(t)
+                    .iter()
+                    .map(|r| r3(r3d_core::seam::polyline_length(r)))
+                    .collect();
+                serde_json::json!({
+                    "id": id,
+                    "side": t.side,
+                    "panel": panel,
+                    "panel_name": panel.and_then(|id| p.panel(id)).map(|panel| panel.name.clone()),
+                    "rows": t.rows,
+                    "offset_mm": r3(t.offset_mm),
+                    "gap_mm": r3(t.gap_mm),
+                    "stitch_mm": r3(t.stitch_mm),
+                    "color": format!("#{:06X}", p.thread_rgb(t)),
+                    "own_color": t.color.is_some(),
+                    "thread": t.thread,
+                    "rows_mm": rows,
+                })
+            })
+            .collect();
+        Ok(serde_json::json!({ "elastics": elastics, "topstitches": topstitches }))
     }
 }
 
