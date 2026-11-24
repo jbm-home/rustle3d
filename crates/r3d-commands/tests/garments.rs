@@ -40,7 +40,9 @@ fn garment(s: &Session, name: &str) -> GarmentId {
 fn a_second_template_is_a_garment_of_its_own_worn_over_the_first() {
     let s = outfit();
     let p = s.project();
-    assert_eq!(p.name(), "Trousers");
+    // The project keeps the name it was given; the garments take the
+    // templates'.
+    assert_eq!(p.name(), "Untitled");
     let (trousers, shirt) = (garment(&s, "Trousers"), garment(&s, "Shirt"));
     assert_eq!(p.garments()[&trousers].fabric, Fabric::Denim);
     assert_eq!(p.garments()[&shirt].fabric, Fabric::Cotton);
@@ -297,4 +299,20 @@ fn trousers_do_not_show_through_a_t_shirt_over_them() {
         seen.is_empty(),
         "trousers showing through the T-shirt above {hem}: {seen:?}"
     );
+}
+
+#[test]
+fn a_drawn_piece_joins_the_newest_garment_with_an_allowance() {
+    // Trousers, then a hoodie: a hood drawn next belongs to the hoodie.
+    let mut s = outfit();
+    let newest = *s.project().garments().keys().next_back().unwrap();
+    let out = run(
+        &mut s,
+        json!({"type": "panel.create_rect", "width": 300, "height": 400}),
+    )
+    .unwrap();
+    let id: r3d_core::PanelId = out["created"][0].as_str().unwrap().parse().unwrap();
+    let panel = s.project().panel(id).unwrap();
+    assert_eq!(panel.garment, newest);
+    assert_eq!(panel.seam_allowance_mm, 10.0);
 }

@@ -191,3 +191,26 @@ fn arrange_places_panels_around_in_seam_order() {
     assert_eq!(names.map(|n| place(&s, n).angle_deg), [0.0, 135.0, 225.0]);
     assert!((place(&s, "Front").top_cm - 110.0).abs() < 1e-9);
 }
+
+#[test]
+fn a_range_ending_at_the_length_as_shown_reaches_the_end() {
+    // A curve's length is measured, so after edge.set_length 222 it may be
+    // 221.9996: `to_mm` 222, the length as shown, was refused.
+    let (mut s, a, b) = two_panels();
+    run(
+        &mut s,
+        json!({"type": "seam.add", "a": {"edge": a[1], "to_mm": 200.03},
+            "b": {"edge": b[3], "reversed": true}}),
+    )
+    .unwrap();
+    let list = run(&mut s, json!({"type": "seam.list"})).unwrap();
+    assert_eq!(list[0]["a"]["length_mm"], 200.0);
+    // Clearly past the end is still refused.
+    let err = run(
+        &mut s,
+        json!({"type": "seam.add", "a": {"edge": a[0], "to_mm": 100.2},
+            "b": {"edge": b[0], "reversed": true}}),
+    )
+    .unwrap_err();
+    assert_eq!(err.message().code, "invalid.range");
+}

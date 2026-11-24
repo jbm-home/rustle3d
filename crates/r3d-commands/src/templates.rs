@@ -23,8 +23,8 @@ use serde::{Deserialize, Serialize};
 use crate::commands::{
     ButtonAdd, CurveSpec, EdgeSetCurve, EdgeSplit, GarmentAdd, GarmentRename, GarmentSetFabric,
     InterfacingAdd, NotchAdd, PanelCreatePolygon, PanelMirror, PanelPlace, PanelSetGarment,
-    PanelSetSeamAllowance, PinAdd, ProjectRename, SeamAdd, SeamSideSpec, TopstitchAdd, ZipperAdd,
-    mirrored_source, waist_height_cm,
+    PanelSetSeamAllowance, PinAdd, SeamAdd, SeamSideSpec, TopstitchAdd, ZipperAdd, mirrored_source,
+    waist_height_cm,
 };
 use crate::drape::arm_drop;
 use crate::error::{CommandError, positive};
@@ -171,7 +171,6 @@ const CROTCH_HEIGHT: f64 = 0.455;
 
 /// Gap between pieces on the pattern board (mm).
 const BOARD_GAP: f64 = 80.0;
-const SEAM_ALLOWANCE_MM: f64 = 10.0;
 /// What a shirt-like pattern takes from the upper body (mm), measured on
 /// the avatar (or the standard body without one): proportions of the
 /// chest made a size 52's shoulders 26 cm wide each side for 19 on the
@@ -416,7 +415,7 @@ impl Draft<'_, '_> {
         }
         PanelSetSeamAllowance {
             panel: id,
-            mm: SEAM_ALLOWANCE_MM,
+            mm: crate::commands::DEFAULT_SEAM_ALLOWANCE_MM,
         }
         .apply(self.tx)?;
         self.origins.insert(id, shift.x);
@@ -1000,11 +999,10 @@ fn draft_in(
         if let Some(garment) = garment {
             GarmentRename {
                 garment,
-                name: title.clone(),
+                name: title,
             }
             .apply(d.tx)?;
         }
-        ProjectRename { name: title }.apply(d.tx)?;
     } else {
         // A garment of its own, worn over the others.
         let out = GarmentAdd {

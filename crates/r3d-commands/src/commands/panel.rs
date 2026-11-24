@@ -14,6 +14,8 @@ use crate::spec::{CommandOutput, CommandSpec, Described};
 
 /// Default grainline: vertical on the board, the usual layout for garments.
 pub const DEFAULT_GRAIN_ANGLE_DEG: f64 = 90.0;
+/// Seam allowance of a new piece (mm), drawn or from a template.
+pub const DEFAULT_SEAM_ALLOWANCE_MM: f64 = 10.0;
 
 pub(crate) fn default_grain() -> f64 {
     DEFAULT_GRAIN_ANGLE_DEG
@@ -92,7 +94,7 @@ pub(crate) fn create_panel(
     }
     let garment = tx
         .project()
-        .default_garment()
+        .newest_garment()
         .ok_or_else(|| CommandError::Internal {
             detail: "project has no garment".into(),
         })?;
@@ -134,7 +136,7 @@ pub(crate) fn create_panel(
             garment,
             contour: edge_ids.clone(),
             grain_angle_deg,
-            seam_allowance_mm: 0.0,
+            seam_allowance_mm: DEFAULT_SEAM_ALLOWANCE_MM,
             mirror_of: None,
             placement: None,
             symmetry: None,
@@ -412,16 +414,20 @@ pub struct PanelSetSeamAllowance {
 }
 
 impl Described for PanelSetSeamAllowance {
-    const SUMMARY: &'static str =
-        "Set the seam allowance (mm, 0 = none) drawn around a panel when exporting.";
+    const SUMMARY: &'static str = "Set the seam allowance (mm, 0 = none) drawn around a panel when exporting. On a linked mirror copy it is set on its piece, which the copy follows.";
 }
 
 impl CommandSpec for PanelSetSeamAllowance {
     fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
         non_negative("mm", self.mm)?;
-        let mut p = editable_panel(tx, self.panel)?;
+        // A linked copy takes its piece's allowance.
+        let id = match get_panel(tx.project(), self.panel)?.mirror_of {
+            Some(link) => link.source,
+            None => self.panel,
+        };
+        let mut p = editable_panel(tx, id)?;
         p.seam_allowance_mm = self.mm;
-        tx.put_panel(self.panel, p);
+        tx.put_panel(id, p);
         Ok(CommandOutput::default())
     }
 

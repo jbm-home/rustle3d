@@ -97,7 +97,8 @@ fn the_list_fills_sizes_from_the_avatar() {
 fn a_t_shirt_hangs_from_the_shoulders() {
     let s = draft("t_shirt");
     let p = s.project();
-    assert_eq!(p.name(), "T-shirt");
+    // The garment takes the template's name; the project keeps its own.
+    assert_eq!(p.garments().values().next().unwrap().name, "T-shirt");
     assert_eq!(p.panels().len(), 4);
     assert_eq!(p.seams().len(), 10);
     let on_arms = p
@@ -160,7 +161,8 @@ fn long_sleeves_follow_the_forearms() {
 fn a_shirt_has_a_collar_and_cuffs() {
     let s = draft("shirt");
     let p = s.project();
-    assert_eq!(p.name(), "Shirt");
+    // The garment takes the template's name; the project keeps its own.
+    assert_eq!(p.garments().values().next().unwrap().name, "Shirt");
     // Two fronts, a yoke and a back, two sleeves, two cuffs, a collar;
     // the fronts and the cuffs buttoned. Each sleeve's back cap is sewn
     // to the back and to the yoke.
@@ -185,7 +187,8 @@ fn trousers_hang_from_the_waist_one_leg_in_each_leg() {
     // trousers starts and stays on its own side.
     let s = draft("trousers");
     let p = s.project();
-    assert_eq!(p.name(), "Trousers");
+    // The garment takes the template's name; the project keeps its own.
+    assert_eq!(p.garments().values().next().unwrap().name, "Trousers");
     assert_eq!(p.panels().len(), 4);
     assert_eq!(p.seams().len(), 6);
     // A fly zipper, closed, above the crotch seam.

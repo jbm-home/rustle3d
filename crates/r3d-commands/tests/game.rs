@@ -212,9 +212,9 @@ fn a_shell_unreal_export_without_skin() {
         json!({"type": "export.game", "preset": "unreal", "sides": "shell",
             "thickness_mm": 2, "skin": false, "normal_map": 0, "avatar": true}),
     );
-    assert_eq!(out["path"], "exports/T-shirt-unreal.glb");
+    assert_eq!(out["path"], "exports/Tee-unreal.glb");
     assert_eq!(out["lods"].as_array().unwrap().len(), 4);
-    let (doc, _) = chunks(&std::fs::read(ws.dir().join("exports/T-shirt-unreal.glb")).unwrap());
+    let (doc, _) = chunks(&std::fs::read(ws.dir().join("exports/Tee-unreal.glb")).unwrap());
     assert!(doc["skins"].is_null() && doc["animations"].is_null());
     assert!(doc["images"].is_null());
     assert_eq!(doc["meshes"][0]["name"], "SK_T-shirt_LOD0");

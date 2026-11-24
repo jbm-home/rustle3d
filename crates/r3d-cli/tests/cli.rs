@@ -328,8 +328,8 @@ fn marker_lays_out_and_writes() {
         )
         .assert()
         .success();
-    // Figures only: two 40 x 60 cm pieces, grain along the length, side
-    // by side across a 140 cm fabric.
+    // Figures only: two 40 x 60 cm pieces with their 1 cm allowance,
+    // grain along the length, side by side across a 140 cm fabric.
     let out = r3d()
         .arg("marker")
         .arg(&dir)
@@ -340,8 +340,8 @@ fn marker_lays_out_and_writes() {
         .stdout
         .clone();
     let v = json_of(&out);
-    assert_eq!(v["length_mm"], 600.0);
-    assert_eq!(v["cost"], 6.0);
+    assert_eq!(v["length_mm"], 620.0);
+    assert_eq!(v["cost"], 6.2);
     assert!(!dir.join("exports").join("Bag-marker.svg").exists());
     let out = r3d()
         .arg("marker")
@@ -390,7 +390,7 @@ fn techpack_writes_a_pdf() {
         .clone();
     let v = json_of(&out);
     assert_eq!(v["path"], "exports/Bag-techpack.pdf");
-    assert_eq!(v["fabric"][0]["cost"], 6.0);
+    assert_eq!(v["fabric"][0]["cost"], 6.2);
     let pdf = std::fs::read(dir.join("exports/Bag-techpack.pdf")).unwrap();
     assert!(String::from_utf8_lossy(&pdf).contains("Double-stitch the handles."));
 }

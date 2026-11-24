@@ -951,7 +951,7 @@ Set a panel's grainline (warp direction), in degrees from +X.
 
 ### `panel.set_seam_allowance`
 
-Set the seam allowance (mm, 0 = none) drawn around a panel when exporting.
+Set the seam allowance (mm, 0 = none) drawn around a panel when exporting. On a linked mirror copy it is set on its piece, which the copy follows.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -5290,7 +5290,7 @@ Set how a contour point moves from size to size (its grade rule): either `step`,
 
 ### `template.apply`
 
-Draft a starter garment (t_shirt, shirt, trousers, dress, straight_skirt, a_line_skirt, tote_bag) from sizes in cm, the avatar's measurements filling in any left out: its pieces are drawn, sewn, placed around the body and given a fabric, ready to simulate and edit. A project without panels takes the template's name, and so does its garment; in a project with pieces the template becomes a garment of its own, worn over the others (see garment.set_layer). Returns the garment if one was added, then the panels, seams and notches.
+Draft a starter garment (t_shirt, shirt, trousers, dress, straight_skirt, a_line_skirt, tote_bag) from sizes in cm, the avatar's measurements filling in any left out: its pieces are drawn, sewn, placed around the body and given a fabric, ready to simulate and edit. In a project without panels its garment takes the template's name (the project keeps its own); in a project with pieces the template becomes a garment of its own, worn over the others (see garment.set_layer). Returns the garment if one was added, then the panels, seams and notches.
 
 <details><summary>Parameters (JSON schema)</summary>
 

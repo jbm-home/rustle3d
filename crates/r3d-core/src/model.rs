@@ -1232,9 +1232,14 @@ impl Project {
         self.edges.get(&id)
     }
 
-    /// The garment new panels go to: the first one.
+    /// The garment commands act on when none is given: the first one.
     pub fn default_garment(&self) -> Option<GarmentId> {
         self.garments.keys().next().copied()
+    }
+
+    /// The garment added last, which new pieces join.
+    pub fn newest_garment(&self) -> Option<GarmentId> {
+        self.garments.keys().next_back().copied()
     }
 
     /// The garment a panel belongs to.

@@ -68,18 +68,10 @@ used the app.
   - Still open: about 8 mm open at the seams beside an elastic waist (the
     elastic, solved after the seams, pulls their ends apart each
     substep).
-- **Annoyances**:
-  - `template.apply` renames a project the user named, even when it
-    has no pieces.
-  - `to_mm` equal to the edge's length (222 after `edge.set_length`
-    222) is refused as out of range: a rounding problem.
-  - `panel.create_path` puts the new piece in the first garment, not
-    in the last one created.
-  - `panel.create_path` gives a seam allowance of 0, where the
-    templates give 10 mm.
-  - `panel.set_seam_allowance` on a linked mirror copy fails, and the
-    whole batch is cancelled; it could be skipped instead, since the copy
-    follows its piece.
+- **Annoyances** (all done): templates no longer rename the project; a
+  range's end within 0.05 mm of the path's length is its end; a new
+  piece joins the newest garment with a 10 mm allowance; an allowance set
+  on a linked copy goes to its piece.
 - **Missing**:
   - Hoodie and jogger templates.
   - A way to take one garment out of the drape.

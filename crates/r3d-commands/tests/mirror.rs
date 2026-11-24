@@ -74,6 +74,14 @@ fn copy_follows_source_edits_and_topology_changes() {
         json!({"type": "panel.set_seam_allowance", "panel": panel, "mm": 12}),
     );
     assert_eq!(get(&mut s, &copy)["seam_allowance_mm"], 12.0);
+    // Set on the copy, it goes to its piece (a script setting every
+    // piece's allowance runs through).
+    ok(
+        &mut s,
+        json!({"type": "panel.set_seam_allowance", "panel": copy, "mm": 8}),
+    );
+    assert_eq!(get(&mut s, &panel)["seam_allowance_mm"], 8.0);
+    assert_eq!(get(&mut s, &copy)["seam_allowance_mm"], 8.0);
     s.project().check_integrity().unwrap();
 }
 

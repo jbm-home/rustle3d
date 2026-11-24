@@ -56,7 +56,7 @@ impl SeamSideSpec {
                 .ok_or_else(|| CommandError::not_found(l))?;
         }
         finite(field, &[self.from_mm, self.to_mm].map(|v| v.unwrap_or(0.0)))?;
-        let side = SeamSide {
+        let mut side = SeamSide {
             edges,
             line: self.line,
             from_mm: self.from_mm,
@@ -86,8 +86,14 @@ impl SeamSideSpec {
                 .sum(),
         };
         let from = self.from_mm.unwrap_or(0.0);
-        let to = self.to_mm.unwrap_or(total);
-        if !(from >= 0.0 && from < to && to <= total + 1e-6) {
+        let mut to = self.to_mm.unwrap_or(total);
+        // A length typed as shown (a curve's measured length rounds to
+        // it) is the path's end.
+        if (to - total).abs() <= END_TOLERANCE_MM {
+            to = total;
+            side.to_mm = None;
+        }
+        if !(from >= 0.0 && from < to && to <= total) {
             return Err(CommandError::invalid(
                 field,
                 Invalid::Range(0.0, (total * 1000.0).round() / 1000.0),
@@ -99,6 +105,10 @@ impl SeamSideSpec {
         Ok(side)
     }
 }
+
+/// How far past a path's length a range's end may be given and still mean
+/// its end (mm).
+const END_TOLERANCE_MM: f64 = 0.05;
 
 /// Whether two stretches of the same track overlap (more than touching).
 pub(crate) fn overlap(a: &Span, b: &Span) -> bool {
