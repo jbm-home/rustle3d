@@ -161,10 +161,14 @@ fn a_shirt_has_a_collar_and_cuffs() {
     let s = draft("shirt");
     let p = s.project();
     assert_eq!(p.name(), "Shirt");
-    // Two fronts, a back, two sleeves, two cuffs, a collar; the fronts
-    // and the cuffs buttoned.
-    assert_eq!(p.panels().len(), 8);
-    assert_eq!(p.seams().len(), 15);
+    // Two fronts, a yoke and a back, two sleeves, two cuffs, a collar;
+    // the fronts and the cuffs buttoned. Each sleeve's back cap is sewn
+    // to the back and to the yoke.
+    assert_eq!(p.panels().len(), 9);
+    assert_eq!(p.seams().len(), 18);
+    // The collar and the cuffs interfaced, the yoke topstitched.
+    assert_eq!(p.interfacings().count(), 3);
+    assert_eq!(p.topstitches().count(), 1);
     assert_eq!(p.buttons().len(), 9);
     assert!(p.buttons().values().all(|b| b.closed));
     let (low, high) = drape(&s, 180);

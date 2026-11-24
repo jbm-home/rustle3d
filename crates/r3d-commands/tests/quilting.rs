@@ -74,7 +74,14 @@ fn quilted_cloth_is_padded_folds_on_its_lines_and_puffs() {
     .unwrap();
     let drape = build(s.project(), None, DEFAULT_SPACING_MM).unwrap();
     let base = drape.scene.fabrics[0];
-    let quilted = drape.scene.fabrics.last().unwrap();
+    // The heaviest: the shirt's own details (interfacing, topstitching)
+    // add lighter ones.
+    let quilted = drape
+        .scene
+        .fabrics
+        .iter()
+        .max_by(|a, b| a.density.total_cmp(&b.density))
+        .unwrap();
     // Shell and lining with the padding between.
     assert!((quilted.density - (2.0 * base.density + 0.15)).abs() < 1e-6);
     assert!((quilted.thickness - (base.thickness + 0.01)).abs() < 1e-6);

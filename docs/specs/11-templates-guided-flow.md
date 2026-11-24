@@ -16,9 +16,11 @@ a first-launch tour. The shirt (M18) has two fronts with a 15 mm band
 past the centre front, buttoned down the centre front (M20: buttons on
 the under front, buttonholes on the one lapped over it, left over right
 on a men's body and right over left otherwise, from below the collar to
-a tenth of the length above the hem, about 9 cm apart), a back, long
-sleeves with cuffs (each with a 2 cm lap and one button) and a stand
-collar; the trousers a front and a back per leg, placed on the legs
+a tenth of the length above the hem, about 9 cm apart), a back and a
+yoke (M34: cut 7 cm below the shoulders, its seam topstitched in two
+rows; each sleeve's back cap sewn to both), long sleeves with cuffs
+(each with a 2 cm lap and one button) and a stand collar, the collar
+and the cuffs interfaced (medium, woven); the trousers a front and a back per leg, placed on the legs
 (`left_leg`, `right_leg`), a straight-leg block without darts whose back
 crotch point is lowered until both inseams match, with an 18 cm fly
 zipper (at most 60 % of the centre front) above the crotch seam (M20). Not yet: sizes on a body silhouette (plain fields for

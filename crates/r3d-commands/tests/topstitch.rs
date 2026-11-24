@@ -87,49 +87,52 @@ fn stitches_lie_on_the_cloth_and_stiffen_it() {
     .unwrap();
     let before = build(s.project(), None, DEFAULT_SPACING_MM).unwrap();
     let back = common::piece(&s, "Back");
-    // Two rows along the back's right shoulder seam, in white.
+    // Two rows along the back's hem, in white (the template topstitches
+    // its yoke already).
     run(
         &mut s,
-        json!({"type": "topstitch.add", "side": {"edge": back.edges[3]}, "rows": 2,
+        json!({"type": "topstitch.add", "side": {"edge": back.edges[0]}, "rows": 2,
             "offset_mm": 1.5, "gap_mm": 5, "color": "#FFFFFF", "thread": "heavy"}),
     )
     .unwrap();
     let drape = build(s.project(), None, DEFAULT_SPACING_MM).unwrap();
-    // The cloth under them takes a stiffer fabric of its own.
-    assert_eq!(drape.scene.fabrics.len(), before.scene.fabrics.len() + 1);
-    let stiff = drape.scene.fabrics.len() - 1;
-    let under = drape
-        .scene
-        .triangles
-        .iter()
-        .filter(|t| usize::from(t.fabric) == stiff)
-        .count();
+    // The cloth under them takes the stiffer topstitched fabric.
+    let base = drape.scene.fabrics[0];
+    let stiff = |t: &&r3d_sim::scene::Triangle| {
+        drape.scene.fabrics[usize::from(t.fabric)].bending > base.bending
+    };
+    let count = |d: &r3d_commands::drape::Drape| d.scene.triangles.iter().filter(stiff).count();
+    let more = count(&drape) as i64
+        - before
+            .scene
+            .triangles
+            .iter()
+            .filter(|t| before.scene.fabrics[usize::from(t.fabric)].bending > base.bending)
+            .count() as i64;
     assert!(
-        under > 0 && under < drape.scene.triangles.len() / 20,
-        "{under}"
-    );
-    assert!(
-        drape.scene.fabrics[stiff].bending > drape.scene.fabrics[0].bending,
-        "{:?}",
-        drape.scene.fabrics
+        more > 0 && more < drape.scene.triangles.len() as i64 / 20,
+        "{more}"
     );
     // On the cloth where it starts: one strip per stitch, every 3 mm
     // along both rows.
     let start: Vec<_> = drape.scene.particles.iter().map(|p| p.position).collect();
     let on = LinesOnCloth::new(&drape, &start);
     let stitches = on.stitches(s.project());
-    assert_eq!(stitches.len(), 1);
-    let (dashes, rgb, width) = &stitches[0];
-    assert_eq!(*rgb, 0xFFFFFF);
-    assert!((width - 0.0008).abs() < 1e-6);
-    let shoulder = s
-        .project()
-        .edge_length(back.edges[3].as_str().unwrap().parse().unwrap())
+    // The yoke's and ours.
+    assert_eq!(stitches.len(), 2);
+    let (dashes, _, width) = stitches
+        .iter()
+        .find(|(_, rgb, _)| *rgb == 0xFFFFFF)
         .unwrap();
-    let want = 2.0 * shoulder / 3.0;
+    assert!((width - 0.0008).abs() < 1e-6);
+    let hem = s
+        .project()
+        .edge_length(back.edges[0].as_str().unwrap().parse().unwrap())
+        .unwrap();
+    let want = 2.0 * hem / 3.0;
     assert!(
         (dashes.len() as f64 - want).abs() < 0.1 * want,
-        "{} stitches for {shoulder} mm",
+        "{} stitches for {hem} mm",
         dashes.len()
     );
     for [(a, _), (b, _)] in dashes {

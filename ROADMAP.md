@@ -43,37 +43,13 @@ maintainer's briefs that specs cite as "ROADMAP Mxx" in their
 | M31 | Imported avatars ✅ (2026-11-19) | A body scan in OBJ/glTF is checked, the pieces placed around it and draped |
 | M15 | Game-ready export ✅ (2026-11-19) | LODs + baked wrinkle normal maps + skinning, imported in Godot/Unity/Unreal |
 | M33 | Body measurements ✅ (2026-11-23) | A project made with four measurements; later its arm length and neck are set, the avatar and a sleeve drafted from `arm_length` follow |
-| M34 | Construction details 2 | A cuff gathered by elastic, a topstitched yoke, a collar that stands thanks to its interfacing, a quilted panel |
+| M34 | Construction details 2 ✅ (2026-11-24) | A cuff gathered by elastic, a topstitched yoke, a collar that stands thanks to its interfacing, a quilted panel |
 | M35 | Sketching on the board: the action bar ✅ (2026-11-24) | A half bodice drawn and constrained without the inspector: what fits the selection is offered above the board, one click applies it |
 | M36 | Natural motions | The walk looks human: no hop, a supple trunk, relaxed arms |
 | M37 | Imported avatars in motion, game export checked | A scanned body walks in its garment; the garment and its motion open in a game engine as exported |
 
-Order of the next ones, as set by the maintainer on 2026-11-23: M34,
-M36, M37 (M16's Linux part when the work moves to Linux).
-
-## M34 — Construction details 2
-
-Maintainer's brief (2026-11-23): the details left open by M29.
-
-- Elastic (an edge or a line gathered by an elastic of a given relaxed
-  length) and shirring (several parallel elastic lines).
-- Topstitching (one or more rows at a distance from an edge or a seam,
-  thread colour and stitch length), seen on the board, in 3D, in photos
-  and in the tech pack.
-- Interfacing on a piece or part of it (stiffer to bend and stretch),
-  in the bill of materials.
-- Quilting and padding (thickness between stitched lines).
-- Needs solver work: docs/physics.md first.
-
-Plan (agreed 2026-11-24; spec 31, physics.md "Elastic" and "Composite
-cloth"): four steps, one commit each: elastic and shirring (tension-only
-ties, the cloth along them buckling, a finer mesh along them),
-topstitching (drawn on the cloth as dashes of thread, the band under it
-slightly stiffer), interfacing (composite fabric on the whole piece, a
-band or a closed line's inside), quilting (one layer, puffs drawn by the
-views); then the shirt template uses them (interfaced collar stand,
-topstitched yoke, elastic cuffs offered). Done: the four details
-(2026-11-24); open: the shirt template.
+Order of the next ones, as set by the maintainer on 2026-11-23: M36,
+M37 (M16's Linux part when the work moves to Linux).
 
 ## M36 — Natural motions
 
@@ -123,6 +99,14 @@ back through the CPU every frame.
 ## Open points of closed milestones
 
 As noted when each milestone closed; recheck before taking one up.
+
+- **Construction details 2 (M34)**: elastics, topstitches and the like
+  copied with a pasted or mirrored piece; bending across seams (a collar
+  turns freely at its neckline seam, the shirt's stands by its ring
+  shape); quilting with two simulated layers and a padding volume; the
+  game export's baked textures do not draw stitches (the meshes carry
+  the puffs); an elastic-cuff variant of the shirt; gathers finer than
+  about 8 mm (the mesh along an elastic).
 
 - **Sketching (M35)**: constraints on internal lines (their points
   need an identity first: a schema change); a notch as the end of a

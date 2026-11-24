@@ -21,9 +21,10 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::commands::{
-    ButtonAdd, CurveSpec, EdgeSetCurve, GarmentAdd, GarmentRename, GarmentSetFabric, NotchAdd,
-    PanelCreatePolygon, PanelMirror, PanelPlace, PanelSetGarment, PanelSetSeamAllowance, PinAdd,
-    ProjectRename, SeamAdd, SeamSideSpec, ZipperAdd, mirrored_source, waist_height_cm,
+    ButtonAdd, CurveSpec, EdgeSetCurve, EdgeSplit, GarmentAdd, GarmentRename, GarmentSetFabric,
+    InterfacingAdd, NotchAdd, PanelCreatePolygon, PanelMirror, PanelPlace, PanelSetGarment,
+    PanelSetSeamAllowance, PinAdd, ProjectRename, SeamAdd, SeamSideSpec, TopstitchAdd, ZipperAdd,
+    mirrored_source, waist_height_cm,
 };
 use crate::drape::arm_drop;
 use crate::error::{CommandError, positive};
@@ -588,6 +589,39 @@ impl Draft<'_, '_> {
             centre_x_mm,
         }
         .apply(self.tx)?;
+        Ok(())
+    }
+
+    /// A medium woven interfacing on the whole of `piece`.
+    fn interface(&mut self, piece: PanelId) -> Result<(), CommandError> {
+        let out = InterfacingAdd {
+            panel: piece,
+            area: None,
+            fabric: None,
+            weight: None,
+        }
+        .apply(self.tx)?;
+        self.created.extend(out.created);
+        Ok(())
+    }
+
+    /// `rows` rows of topstitching inside `edge`, the first `offset_mm`
+    /// from it, 5 mm apart.
+    fn topstitch(&mut self, edge: EdgeId, rows: u8, offset_mm: f64) -> Result<(), CommandError> {
+        let out = TopstitchAdd {
+            side: SeamSideSpec {
+                edge: Some(edge),
+                ..SeamSideSpec::default()
+            },
+            rows: Some(rows),
+            offset_mm: Some(offset_mm),
+            gap_mm: Some(5.0),
+            stitch_mm: None,
+            color: None,
+            thread: None,
+        }
+        .apply(self.tx)?;
+        self.created.extend(out.created);
         Ok(())
     }
 
@@ -1163,6 +1197,21 @@ fn t_shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
 }
 
 /// The longer armhole of a front and a back (their edge 2).
+/// Where along `curve`, rising from its start, it reaches the height `y`
+/// (bisection; its end when it never does).
+fn rising_to(curve: &r3d_geom::CubicBez, y: f64) -> f64 {
+    let (mut lo, mut hi) = (0.0, 1.0);
+    for _ in 0..50 {
+        let mid = (lo + hi) / 2.0;
+        if curve.eval(mid).y < y {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    (lo + hi) / 2.0
+}
+
 fn armhole_length(d: &Draft, front: &Piece, back: &Piece) -> Result<f64, CommandError> {
     let len = |piece: &Piece| -> Result<f64, CommandError> {
         Ok(d.tx
@@ -1238,6 +1287,8 @@ const BUTTON_MM: f64 = 11.0;
 /// A trouser fly's zipper (mm), at most 60 % of the centre front.
 const FLY_MM: f64 = 180.0;
 const CUFF_MM: f64 = 60.0;
+/// A shirt's yoke reaches this far below the shoulders' tops (mm).
+const YOKE_MM: f64 = 70.0;
 
 /// A shirt: two fronts buttoned at the centre front, a whole back, long
 /// sleeves ending in buttoned cuffs, and a stand collar around the
@@ -1284,26 +1335,73 @@ fn shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
         ],
     )?;
     let front_right = d.mirror(&front, "Front right")?;
-    // The back, whole: edges as the T-shirt's (0 hem, 1–3 its right side,
-    // armhole and shoulder, 4 neckline, 5–7 its left).
-    let k = 4.0 / 3.0 * 20.0;
+    // The back in two: a yoke across the shoulders, sewn YOKE_MM below
+    // them, and the back below it. Each armhole is cut where the yoke's
+    // seam meets it (de Casteljau).
+    let y_k = y_s - YOKE_MM;
+    let [c1, c2] = hole(1.0);
+    let armhole = r3d_geom::CubicBez::new(p(w, y_a), c1, c2, p(shoulder, y_s));
+    let (below, above) = armhole.split(rising_to(&armhole, y_k));
+    let x_k = below.p3.x;
+    let mirror = |q: DVec2| p(-q.x, q.y);
+    // The back: 0 hem, 1 right side, 2 right armhole, 3 the yoke seam,
+    // 4 left armhole, 5 left side.
     let back = d.panel(
         "Back",
         &[
             (p(-hem, 0.0), None),
             (p(hem, 0.0), None),
-            (p(w, y_a), Some(hole(1.0))),
-            (p(shoulder, y_s), None),
-            (p(neck, len), Some([p(neck, len - k), p(-neck, len - k)])),
-            (p(-neck, len), None),
-            (p(-shoulder, y_s), Some(reverse(hole(-1.0)))),
+            (p(w, y_a), Some([below.p1, below.p2])),
+            (p(x_k, y_k), None),
+            (p(-x_k, y_k), Some([mirror(below.p2), mirror(below.p1)])),
             (p(-w, y_a), None),
         ],
     )?;
-    let hole_len = armhole_length(d, &front, &back)?;
+    // The yoke: 0 its seam to the back, 1 right armhole, 2 right
+    // shoulder, 3 neckline, 4 left shoulder, 5 left armhole.
+    let k = 4.0 / 3.0 * 20.0;
+    let yoke = d.panel(
+        "Yoke",
+        &[
+            (p(-x_k, y_k), None),
+            (p(x_k, y_k), Some([above.p1, above.p2])),
+            (p(shoulder, y_s), None),
+            (p(neck, len), Some([p(neck, len - k), p(-neck, len - k)])),
+            (p(-neck, len), None),
+            (
+                p(-shoulder, y_s),
+                Some([mirror(above.p2), mirror(above.p1)]),
+            ),
+        ],
+    )?;
+    let edge_len = |e: EdgeId| d.tx.project().edge_length(e).unwrap_or_default();
+    // The back's armhole, below the yoke then on it.
+    let (hole_low, hole_high) = (edge_len(back.edge(2)?), edge_len(yoke.edge(1)?));
+    let hole_len = edge_len(front.edge(2)?).max(hole_low + hole_high);
     let cuff = 0.12 * chest + 150.0;
     let half = (0.33 * chest + 70.0) / 2.0;
-    let left = sleeve_piece(d, "Sleeve left", hole_len, half, cuff / 2.0, sleeve)?;
+    let mut left = sleeve_piece(d, "Sleeve left", hole_len, half, cuff / 2.0, sleeve)?;
+    // Its back cap in two, where the yoke meets the armhole: edges 0 hem,
+    // 1 right underarm seam, 2 back cap below the yoke, 3 on it, 4 front
+    // cap, 5 left underarm seam.
+    let cap =
+        d.tx.project()
+            .edge_length(left.edge(2)?)
+            .unwrap_or_default();
+    let out = EdgeSplit {
+        edge: left.edge(2)?,
+        at_mm: cap * hole_low / (hole_low + hole_high),
+    }
+    .apply(d.tx)?;
+    let upper = out
+        .created
+        .iter()
+        .find_map(|id| match id {
+            AnyId::Edge(e) => Some(*e),
+            _ => None,
+        })
+        .ok_or_else(|| internal("the sleeve cap was not split".into()))?;
+    left.edges.insert(3, upper);
     let right = d.mirror(&left, "Sleeve right")?;
     // Cuffs, with a lap to button: edges 0 wrist, 1 right end, 2 top
     // (sewn to the sleeve but for the lap), 3 left end.
@@ -1322,7 +1420,7 @@ fn shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
     // neck edge (left front, back, right front), 3 right end, 4 top, 5
     // left end.
     let edge_len = |e: EdgeId| d.tx.project().edge_length(e).unwrap_or_default();
-    let (f, b) = (edge_len(front.edge(4)?), edge_len(back.edge(4)?));
+    let (f, b) = (edge_len(front.edge(4)?), edge_len(yoke.edge(3)?));
     let collar = d.panel(
         "Collar",
         &[
@@ -1334,16 +1432,20 @@ fn shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
             (p(0.0, COLLAR_MM), None),
         ],
     )?;
-    d.sew(front.edge(1)?, back.edge(7)?)?;
+    d.sew(front.edge(1)?, back.edge(5)?)?;
     d.sew(front_right.edge(1)?, back.edge(1)?)?;
-    d.sew(front.edge(3)?, back.edge(5)?)?;
-    d.sew(front_right.edge(3)?, back.edge(3)?)?;
-    d.sew(left.edge(3)?, front.edge(2)?)?;
-    d.sew(left.edge(2)?, back.edge(6)?)?;
-    d.sew(right.edge(3)?, front_right.edge(2)?)?;
+    d.sew(front.edge(3)?, yoke.edge(4)?)?;
+    d.sew(front_right.edge(3)?, yoke.edge(2)?)?;
+    d.sew(back.edge(3)?, yoke.edge(0)?)?;
+    d.sew(left.edge(4)?, front.edge(2)?)?;
+    d.sew(right.edge(4)?, front_right.edge(2)?)?;
+    // Each sleeve's back cap: below the yoke to the back, then to the yoke.
+    d.sew(left.edge(2)?, back.edge(4)?)?;
+    d.sew(left.edge(3)?, yoke.edge(5)?)?;
     d.sew(right.edge(2)?, back.edge(2)?)?;
-    d.sew(left.edge(1)?, left.edge(4)?)?;
-    d.sew(right.edge(1)?, right.edge(4)?)?;
+    d.sew(right.edge(3)?, yoke.edge(1)?)?;
+    d.sew(left.edge(1)?, left.edge(5)?)?;
+    d.sew(right.edge(1)?, right.edge(5)?)?;
     // Each cuff's top, but the lap, to its sleeve's wrist; one button
     // closes the cuff around the wrist, the lap over its other end.
     for (c, s) in [(&cuff_left, &left), (&cuff_right, &right)] {
@@ -1374,7 +1476,7 @@ fn shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
         d.button(under, p(0.0, y), over, p(0.0, y))?;
     }
     d.sew(collar.edge(0)?, front.edge(4)?)?;
-    d.sew(collar.edge(1)?, back.edge(4)?)?;
+    d.sew(collar.edge(1)?, yoke.edge(3)?)?;
     d.sew(collar.edge(2)?, front_right.edge(4)?)?;
     let h = body.height_cm;
     let top = NECK_HEIGHT * h + TOP_LIFT_CM;
@@ -1383,7 +1485,8 @@ fn shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
         let offset = if f.id == over.id { 38.0 } else { 30.0 };
         d.place_at(f, Around::Body, 0.0, top, offset, Some(f.origin_x))?;
     }
-    d.place(&back, Around::Body, 180.0, top)?;
+    d.place(&yoke, Around::Body, 180.0, top)?;
+    d.place(&back, Around::Body, 180.0, top - (len - y_k) / 10.0)?;
     // The collar's lower edge at the back neck, 2 cm below the shoulders'
     // tops.
     d.place(&collar, Around::Body, 180.0, top - 2.0 + COLLAR_MM / 10.0)?;
@@ -1393,6 +1496,13 @@ fn shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
     let wrist = shoulder_top - arm_drop(d.tx.project())? * sleeve / 10.0;
     d.place(&cuff_left, Around::LeftArm, 0.0, wrist)?;
     d.place(&cuff_right, Around::RightArm, 0.0, wrist)?;
+    // Construction details (spec 31): the collar and the cuffs
+    // interfaced; a yoke cut off the back below the shoulders and
+    // topstitched along its seam.
+    for piece in [&collar, &cuff_left, &cuff_right] {
+        d.interface(piece.id)?;
+    }
+    d.topstitch(yoke.edge(0)?, 2, 1.5)?;
     Ok(())
 }
 

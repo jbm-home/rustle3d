@@ -46,7 +46,8 @@ fn a_second_template_is_a_garment_of_its_own_worn_over_the_first() {
     assert_eq!(p.garments()[&shirt].fabric, Fabric::Cotton);
     assert_eq!(p.garments_by_layer(), vec![trousers, shirt]);
     let in_shirt = p.panels().values().filter(|pn| pn.garment == shirt).count();
-    assert_eq!(in_shirt, 8);
+    // Two fronts, a yoke and a back, two sleeves, two cuffs, a collar.
+    assert_eq!(in_shirt, 9);
     let summary = s
         .query(&serde_json::from_value(json!({"type": "project.summary"})).unwrap())
         .unwrap();
@@ -119,20 +120,23 @@ fn each_garment_drapes_in_its_own_fabric_and_starts_over_the_one_under_it() {
     let p = s.project();
     let form = Form::of_project(p).unwrap().unwrap();
     let drape = build(p, Some(&form), DEFAULT_SPACING_MM).unwrap();
-    assert_eq!(drape.scene.fabrics.len(), 2);
+    // The two garments' fabrics first (denim, cotton), then the shirt's
+    // interfaced and topstitched cloth.
+    assert!(drape.scene.fabrics.len() > 2);
+    assert!(drape.scene.fabrics[0].density > drape.scene.fabrics[1].density);
     let shirt = garment(&s, "Shirt");
-    let fabric_of = |piece: &r3d_commands::drape::Piece| {
+    let garment_of = |piece: &r3d_commands::drape::Piece| {
         let first = piece.indices[0] as usize + piece.particles.start;
         drape
             .scene
             .triangles
             .iter()
             .find(|t| t.vertices[0] as usize == first)
-            .map(|t| t.fabric)
+            .map(|t| t.garment)
     };
     for piece in &drape.pieces {
         let expected = u16::from(p.panel(piece.panel).unwrap().garment == shirt);
-        assert_eq!(fabric_of(piece), Some(expected));
+        assert_eq!(garment_of(piece), Some(expected));
     }
     // At the hips the shirt starts outside the trousers, all around.
     let radius = |garment: GarmentId, inner: bool| {

@@ -4,7 +4,8 @@ Provenance: maintainer's functional brief (ROADMAP M34, 2026-11-23: elastic on a
 
 ## Status
 
-Built in four steps, each one commit; then the shirt template.
+Done (M34, 2026-11-24): built in four steps, each one commit, then the
+shirt template.
 
 - Elastic and shirring (2026-11-24): the document (schema v22, details
   `detail:N`), `elastic.add`, `elastic.set`, `elastic.remove`,
@@ -28,7 +29,12 @@ Built in four steps, each one commit; then the shirt template.
   stitches on the board, in 3D and photos; padding in the bill of
   materials and a Quilting table in the sewing section; Quilting in the
   action bar.
-- The shirt template: planned.
+- The shirt template (2026-11-24): a yoke across the back, drafted as a
+  piece of its own (the armholes cut at its seam, each sleeve's back cap
+  split there so both seams grade), its seam topstitched in two rows;
+  the collar and the cuffs interfaced. An elastic-cuff variant was not
+  added: the shirt keeps its buttoned cuffs (an elastic is one action
+  away on any hem).
 
 ## User story
 As a designer, I gather a sleeve's cuff with an elastic two thirds its

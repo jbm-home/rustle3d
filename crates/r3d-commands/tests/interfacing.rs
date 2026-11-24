@@ -113,10 +113,19 @@ fn interfaced_cloth_is_heavier_and_stiffer_in_the_drape() {
     )
     .unwrap();
     let before = build(s.project(), None, DEFAULT_SPACING_MM).unwrap();
+    // The shirt's collar comes interfaced (medium): make it heavy.
     let collar = common::piece(&s, "Collar");
+    let list = run(&mut s, json!({"type": "detail.list"})).unwrap();
+    let on_collar = list["interfacings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["panel"] == collar.panel)
+        .unwrap()["id"]
+        .clone();
     run(
         &mut s,
-        json!({"type": "interfacing.add", "panel": collar.panel, "weight": "heavy"}),
+        json!({"type": "interfacing.set", "interfacing": on_collar, "weight": "heavy"}),
     )
     .unwrap();
     // A band inside the back's hem: its edge is a line of the mesh.
