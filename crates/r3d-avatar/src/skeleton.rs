@@ -3,10 +3,9 @@
 //! A pose turns each bone about its head joint; rotations are written in
 //! the rest pose's axes (X to the body's left, Y up, Z forward) and carried
 //! by the parent bones' motion (forward kinematics). The skin follows by
-//! linear blend skinning (Magnenat-Thalmann, Laperrière, Thalmann, "Joint-
-//! dependent local deformations for hand animation and object grasping",
-//! Graphics Interface 1988): each vertex moves with the weighted average of
-//! its bones' motions.
+//! dual quaternion skinning (Kavan et al. 2008, [`Rigid::blend`]): each
+//! vertex moves with the blend of its bones' motions, a rigid motion, so
+//! a bent joint keeps its volume.
 
 use glam::{Quat, Vec3};
 use r3d_geom::Rigid;
@@ -144,26 +143,25 @@ impl Skeleton {
     }
 }
 
-/// The skin moved by its bones: each vertex by the weighted average of
-/// its bones' motions (linear blend skinning).
+/// The skin moved by its bones: each vertex by the blend of its bones'
+/// motions ([`Rigid::blend`], dual quaternion skinning).
 pub fn skin(positions: &[Vec3], weights: &[Influences], transforms: &[Rigid]) -> Vec<Vec3> {
     positions
         .iter()
         .zip(weights)
-        .map(|(p, w)| {
-            let mut sum = Vec3::ZERO;
-            let mut total = 0.0;
-            for (b, x) in w.bones.iter().zip(w.weights) {
-                if x > 0.0
-                    && let Some(t) = transforms.get(usize::from(*b))
-                {
-                    sum += t.apply(*p) * x;
-                    total += x;
-                }
-            }
-            if total > 0.0 { sum / total } else { *p }
-        })
+        .map(|(p, w)| blended(w, transforms).map_or(*p, |g| g.apply(*p)))
         .collect()
+}
+
+/// The motion of a vertex with weights `w`: the blend of its bones'.
+fn blended(w: &Influences, transforms: &[Rigid]) -> Option<Rigid> {
+    let mut parts = [(Rigid::IDENTITY, 0.0); 4];
+    for (slot, (b, x)) in parts.iter_mut().zip(w.bones.iter().zip(w.weights)) {
+        if let Some(t) = transforms.get(usize::from(*b)) {
+            *slot = (*t, x);
+        }
+    }
+    Rigid::blend(&parts)
 }
 
 #[cfg(test)]

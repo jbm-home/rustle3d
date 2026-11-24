@@ -1,23 +1,23 @@
 //! A body that moves: its bones follow rigid motions over time, its skin
-//! follows its bones (linear blend skinning), and the cloth collides with
-//! the skin (docs/physics.md §5).
+//! follows its bones (dual quaternion skinning, [`Rigid::blend`]), and the
+//! cloth collides with the skin (docs/physics.md §5).
 //!
 //! The body's distance field is built once, in the rest pose, with each
 //! node's nearest vertex and so its skin weights
 //! ([`StaticMesh::with_skin`]). To see the body from a point `p`, the
 //! point is taken back to the rest pose: the rest point `q` whose skinned
-//! position `Σ wₖ Gₖ(q)` is `p`. With the weights held constant around
-//! `q` this is one linear solve, `q = M⁻¹ (p − T)` where `M = Σ wₖ Rₖ` and
-//! `T = Σ wₖ tₖ`; it is repeated with the weights found there. Each bone
+//! position `G(q)` is `p`, `G` the blend of its bones' motions. With the
+//! weights held constant around `q`, `G` is rigid and `q = G⁻¹(p)`; this
+//! is repeated with the weights found there. Each bone
 //! whose rest box holds `G⁻¹(p)` gives a starting point (the bone's own
 //! inverse motion), so every limb near `p` is tried; a start is kept only
-//! if the skin it finds really passes through `p`. The distance read at
-//! `q` is mapped to the posed skin by `M` (to first order), and of the
-//! points found, the deepest wins. The cloth thus collides with the very
+//! if the skin it finds really passes through `p`. The distance and the
+//! normal read at `q` are carried to the posed skin by `G` (a rigid
+//! motion keeps distances), and of the points found, the deepest wins. The cloth thus collides with the very
 //! skin the views draw. (Our own scheme, on top of the distance field of
 //! `collide`.)
 
-use glam::{Mat3, Vec3};
+use glam::Vec3;
 use r3d_geom::Rigid;
 
 use crate::collide::{Contact, Skin, StaticMesh};
@@ -95,19 +95,16 @@ pub const ITERATIONS: usize = 3;
 /// point looked from (m).
 pub const ON_SKIN: f32 = 0.002;
 
-/// The skinning of a vertex with weights `skin` under `bones`, as
-/// `p ↦ M p + T`; `None` when it squashes space flat (`M` singular).
-fn blend(skin: &Skin, bones: &[Rigid]) -> Option<(Mat3, Vec3)> {
-    let mut m = Mat3::ZERO;
-    let mut t = Vec3::ZERO;
-    for (b, w) in skin.bones.iter().zip(skin.weights) {
+/// The motion of a vertex with weights `skin` under `bones`; `None` when
+/// a bone is missing.
+fn blend(skin: &Skin, bones: &[Rigid]) -> Option<Rigid> {
+    let mut parts = [(Rigid::IDENTITY, 0.0); 4];
+    for (slot, (b, w)) in parts.iter_mut().zip(skin.bones.iter().zip(skin.weights)) {
         if w > 0.0 {
-            let g = bones.get(usize::from(*b))?;
-            m += Mat3::from_quat(g.rotation) * w;
-            t += g.translation * w;
+            *slot = (*bones.get(usize::from(*b))?, w);
         }
     }
-    (m.determinant().abs() > 1e-3).then_some((m, t))
+    Rigid::blend(&parts)
 }
 
 /// The body seen from `p`: the contact (world frame), and how far the
@@ -149,41 +146,32 @@ pub fn touch_parts(
         }
         let mut solved = true;
         for _ in 0..ITERATIONS {
-            let Some((m, t)) = body.skin_at(q).and_then(|s| blend(s, &posed.now)) else {
+            let Some(g) = body.skin_at(q).and_then(|s| blend(s, &posed.now)) else {
                 solved = false;
                 break;
             };
-            q = m.inverse() * (p - t);
+            q = g.inverse().apply(p);
         }
         let Some(skin) = body.skin_at(q).filter(|_| solved) else {
             continue;
         };
-        let (Some((m, t)), Some((mb, tb))) = (blend(skin, &posed.now), blend(skin, &posed.before))
-        else {
+        let (Some(g), Some(before)) = (blend(skin, &posed.now), blend(skin, &posed.before)) else {
             continue;
         };
-        if (m * q + t).distance(p) > ON_SKIN {
+        if g.apply(q).distance(p) > ON_SKIN {
             continue;
         }
         let Some(c) = body.sample(q) else {
             continue;
         };
-        // A rest offset d·n becomes M d n: along the posed normal
-        // M⁻ᵀ n / |M⁻ᵀ n|, that is d / |M⁻ᵀ n|.
-        let n = m.inverse().transpose() * c.normal;
-        let stretch = n.length();
-        if stretch.is_nan() || stretch <= 1e-6 {
-            continue;
-        }
-        let distance = c.distance / stretch;
-        if best.is_some_and(|(b, _)| b.distance <= distance) {
+        if best.is_some_and(|(b, _)| b.distance <= c.distance) {
             continue;
         }
         let contact = Contact {
-            distance,
-            normal: n / stretch,
+            distance: c.distance,
+            normal: g.rotation * c.normal,
         };
-        best = Some((contact, p - (mb * q + tb)));
+        best = Some((contact, p - before.apply(q)));
     }
     best
 }

@@ -1,6 +1,6 @@
 # 22 — Animated avatars
 
-Provenance: maintainer's functional brief (ROADMAP M23: a skeleton for the avatar and a few motions, walk, turn, raise arms; the cloth follows the moving body; animation assets under a redistributable licence only); MakeHuman's default skeleton and skin weights (CC0 1.0, `assets/avatars/README.md`); general knowledge of human gait and movement for the motions (joint ranges of a normal walk, arm swing against the legs); public papers: linear blend skinning (Magnenat-Thalmann et al. 1988), the signed distance field and friction of the static body (docs/physics.md §5); captured motions: maintainer's brief (2026-11-19: import motion captures in the app to replace the procedural walk, starting with a slow walk of the CMU Graphics Lab database in its BVH conversion), the BVH format as publicly described (Meredith and Maddock, "Motion Capture File Formats Explained", University of Sheffield, 2001) and our own retargeting and loop search.
+Provenance: maintainer's functional brief (ROADMAP M23: a skeleton for the avatar and a few motions, walk, turn, raise arms; the cloth follows the moving body; animation assets under a redistributable licence only); MakeHuman's default skeleton and skin weights (CC0 1.0, `assets/avatars/README.md`); general knowledge of human gait and movement for the motions (joint ranges of a normal walk, arm swing against the legs); public papers: linear blend skinning (Magnenat-Thalmann et al. 1988), dual quaternion skinning (Kavan, Collins, Žára, O'Sullivan, ACM TOG 27(4), 2008), the signed distance field and friction of the static body (docs/physics.md §5); captured motions: maintainer's brief (2026-11-19: import motion captures in the app to replace the procedural walk, starting with a slow walk of the CMU Graphics Lab database in its BVH conversion), the BVH format as publicly described (Meredith and Maddock, "Motion Capture File Formats Explained", University of Sheffield, 2001) and our own retargeting and loop search.
 
 ## Status (2026-11-18, M23)
 
@@ -35,7 +35,8 @@ whether the shirt rides up at the waist.
   bones, neck, head; per side a clavicle, shoulder, upper arm, forearm,
   hand, thigh, shin, foot). It is fitted with the body: its joints follow
   the measurements like the skin does. Each skin vertex follows up to four
-  bones (linear blend skinning).
+  bones by dual quaternion skinning (since M36; linear blend skinning
+  before): a bent joint keeps its volume.
 - **Motions.** `walk`: walking on the spot, a step cycle of 1.15 s, an
   easy pace: the thigh from 22° forward to 16° back, the knee bending
   about 58° in swing, the ankle pushing off; the pelvis drops on the

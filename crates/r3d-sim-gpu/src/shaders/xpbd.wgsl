@@ -505,52 +505,70 @@ fn rigid(k: u32, p: vec3f) -> vec3f {
     return rotate(body[k], p) + body[k + 1u].xyz;
 }
 
-// A vertex's skinning `p ↦ M p + t`, M by its columns; `ok` is false when
-// a bone is missing or M is singular.
+// A vertex's motion: the dual quaternion blend of its bones' (r3d-geom
+// `Rigid::blend`, Kavan et al. 2008), a rotation `r` and a translation
+// `t`; `ok` is false when a bone is missing.
 struct Blend {
-    c0: vec3f,
-    c1: vec3f,
-    c2: vec3f,
+    r: vec4f,
     t: vec3f,
     ok: bool,
 }
 
+fn quat_mul(a: vec4f, b: vec4f) -> vec4f {
+    return vec4f(a.w * b.xyz + b.w * a.xyz + cross(a.xyz, b.xyz), a.w * b.w - dot(a.xyz, b.xyz));
+}
+
 // `which`: 0 for the bones' motions at the substep's end, 4 at its start.
 fn blend(s: SkinAt, base: u32, which: u32) -> Blend {
-    var m = Blend(vec3f(0.0), vec3f(0.0), vec3f(0.0), vec3f(0.0), true);
+    let none = Blend(vec4f(0.0, 0.0, 0.0, 1.0), vec3f(0.0), false);
+    // The heaviest bone's rotation sets the hemisphere.
+    var pivot = vec4f(0.0);
+    var heaviest = 0.0;
     for (var i = 0u; i < 4u; i++) {
-        let w = s.w[i];
+        let bone = (s.bones >> (8u * i)) & 0xffu;
+        if s.w[i] > heaviest {
+            if bone >= scene.body.y {
+                return none;
+            }
+            heaviest = s.w[i];
+            pivot = body[base + bone * 6u + which];
+        }
+    }
+    var real = vec4f(0.0);
+    var dual = vec4f(0.0);
+    for (var i = 0u; i < 4u; i++) {
+        var w = s.w[i];
         if w > 0.0 {
             let bone = (s.bones >> (8u * i)) & 0xffu;
             if bone >= scene.body.y {
-                m.ok = false;
-                return m;
+                return none;
             }
             let k = base + bone * 6u + which;
-            m.c0 += rotate(body[k], vec3f(1.0, 0.0, 0.0)) * w;
-            m.c1 += rotate(body[k], vec3f(0.0, 1.0, 0.0)) * w;
-            m.c2 += rotate(body[k], vec3f(0.0, 0.0, 1.0)) * w;
-            m.t += body[k + 1u].xyz * w;
+            let q = body[k];
+            if dot(q, pivot) < 0.0 {
+                w = -w;
+            }
+            real += q * w;
+            dual += quat_mul(vec4f(body[k + 1u].xyz, 0.0), q) * (0.5 * w);
         }
     }
-    m.ok = abs(dot(m.c0, cross(m.c1, m.c2))) > 1e-3;
-    return m;
+    let n = length(real);
+    if !(n > 1e-6) {
+        return none;
+    }
+    let r = real / n;
+    let d = dual / n;
+    let t = 2.0 * (r.w * d.xyz - d.w * r.xyz + cross(r.xyz, d.xyz));
+    return Blend(r, t, true);
 }
 
 fn apply_blend(m: Blend, q: vec3f) -> vec3f {
-    return m.c0 * q.x + m.c1 * q.y + m.c2 * q.z + m.t;
+    return rotate(m.r, q) + m.t;
 }
 
-// M⁻¹ y.
-fn solve(m: Blend, y: vec3f) -> vec3f {
-    let d = dot(m.c0, cross(m.c1, m.c2));
-    return vec3f(dot(cross(m.c1, m.c2), y), dot(cross(m.c2, m.c0), y), dot(cross(m.c0, m.c1), y)) / d;
-}
-
-// M⁻ᵀ n.
-fn inverse_transpose(m: Blend, n: vec3f) -> vec3f {
-    let d = dot(m.c0, cross(m.c1, m.c2));
-    return (cross(m.c1, m.c2) * n.x + cross(m.c2, m.c0) * n.y + cross(m.c0, m.c1) * n.z) / d;
+// The rest point the blend moves to `y`.
+fn unblend(m: Blend, y: vec3f) -> vec3f {
+    return rotate(vec4f(-m.r.xyz, m.r.w), y - m.t);
 }
 
 // The body seen from `p` (r3d-sim `motion::touch`).
@@ -585,7 +603,7 @@ fn touch(p: vec3f) -> Touch {
                 solved = false;
                 break;
             }
-            q = solve(m, p - m.t);
+            q = unblend(m, p);
         }
         let s = skin_at(q);
         if !solved || !s.found {
@@ -600,16 +618,10 @@ fn touch(p: vec3f) -> Touch {
         if c.w >= BAND {
             continue;
         }
-        let n = inverse_transpose(m, c.xyz);
-        let stretch = length(n);
-        if !(stretch > 1e-6) {
+        if c.w >= best.c.w {
             continue;
         }
-        let d = c.w / stretch;
-        if d >= best.c.w {
-            continue;
-        }
-        best = Touch(vec4f(n / stretch, d), p - apply_blend(mb, q));
+        best = Touch(vec4f(rotate(m.r, c.xyz), c.w), p - apply_blend(mb, q));
     }
     return best;
 }

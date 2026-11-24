@@ -412,8 +412,14 @@ after 4 s; the skirt still holds at the waist.
 
 ### Moving body (M23)
 
-The avatar moves by its skeleton (24 bones); its skin follows by linear
-blend skinning [19], each vertex by up to four bones. Rebuilding the
+The avatar moves by its skeleton (24 bones); its skin follows by dual
+quaternion skinning [26], each vertex by up to four bones: the vertex's
+bones' motions, written as unit dual quaternions, are summed by weight
+(each in the hemisphere of the heaviest one's rotation) and normalised,
+which gives a rigid motion per vertex. Linear blend skinning [19]
+(averaging the moved points) was used until M36: it shrinks a joint bent
+far (the armpit folded onto itself with the arms raised above about 40°,
+the elbow and the knee lost volume). Rebuilding the
 distance field of the posed body every frame (0.16 s on the CPU) is too
 slow, and a BVH over the moving mesh with continuous tests [6] would
 replace the constant-time query the solver is built on. Instead the
@@ -425,16 +431,18 @@ rest pose's field is queried through the skinning (our own scheme,
   of the nodes whose vertex it leads (weighs at least half the vertex's
   heaviest bone).
 - **Inverse skinning.** To see the body from a particle `p`, find the
-  rest point `q` whose skinned position `Σ wₖ Gₖ(q)` is `p`. With the
-  weights held constant near `q` it is one linear solve,
-  `q = M⁻¹ (p − T)` with `M = Σ wₖ Rₖ` and `T = Σ wₖ tₖ`, repeated three
+  rest point `q` whose skinned position `G(q)` is `p`, `G` the blend of
+  the bones' motions with the weights at `q`. With the weights held
+  constant near `q`, `G` is rigid and `q = G⁻¹(p)`, repeated three
   times with the weights found at the new `q`. Each bone whose rest box
   holds `Gᵦ⁻¹(p)` and leads the skin there gives a starting point, so
   every limb near `p` is tried; a start is kept only if the skin it
-  finds passes within 2 mm of `p`. The distance read at `q` is mapped to
-  the posed skin by `M` to first order (`d / |M⁻ᵀ n|`, along `M⁻ᵀ n`),
-  and of the points found the deepest wins. The cloth thus collides with
-  the very skin the views draw.
+  finds passes within 2 mm of `p`. The distance read at `q` is the
+  distance to the posed skin and the normal turns with `G` (a rigid
+  motion keeps both); of the points found the deepest wins. The cloth
+  thus collides with the very skin the views draw. (With linear blend
+  skinning `G` was a general linear map `p ↦ M p + T`: one linear solve,
+  and the distance mapped to first order by `M⁻ᵀ`.)
 - A first version took the body as the union of its bones' rigid pieces
   (each bone's inverse motion only). Raising an arm swept the rigid copy
   of the shoulder and the chest beside the armpit up through the shirt,
@@ -446,12 +454,12 @@ rest pose's field is queried through the skinning (our own scheme,
   position too, so it is undone without throwing the cloth out. Only
   for a moving body: a still one drapes exactly as before (trousers held
   at the hips by friction slid down with it). Where
-  linear blend skinning folds the skin onto itself (an arm raised high
-  folds the armpit), cloth caught in the fold was squeezed out at
-  10–20 m/s; the arms are therefore raised to about 40° above the
-  horizontal, which MakeHuman's weights (made for the A pose) handle.
+  linear blend skinning folded the skin onto itself (an arm raised high
+  folded the armpit), cloth caught in the fold was squeezed out at
+  10–20 m/s, and the arms were kept to about 40° above the horizontal;
+  dual quaternion skinning keeps the armpit open (M36).
 - **Friction** cancels the sliding relative to the touched surface,
-  which moved by `p − (M_before q + T_before)` during the substep: the
+  which moved by `p − G_before(q)` during the substep: the
   cloth is carried along with the body.
 - **Arms kept clear of the body** (`r3d_commands::drape::clearance`, our
   own scheme). A captured motion is played by a body of other
@@ -899,5 +907,6 @@ positions alone, so the CPU and GPU results read alike:
 23. E. Guendelman, R. Bridson, R. Fedkiw. *Nonconvex Rigid Bodies with Stacking.* SIGGRAPH 2003 (shock propagation).
 24. A. M. Andrew. *Another efficient algorithm for convex hulls in two dimensions.* Information Processing Letters 9(5), 1979.
 25. K.-J. Choi, H.-S. Ko. *Stable but Responsive Cloth.* SIGGRAPH 2002 (post-buckling response: cloth under compression buckles at a small force).
+26. L. Kavan, S. Collins, J. Žára, C. O'Sullivan. *Geometric Skinning with Approximate Dual Quaternion Blending.* ACM Transactions on Graphics 27(4), 2008.
 
 Reading order for contributors: [1] → [2] → [3] → [4] → [5] → [7] → [8] → [6].
