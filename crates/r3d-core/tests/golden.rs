@@ -18,8 +18,8 @@ use r3d_core::{
     Seam, SeamSide, Size, SourcePiece, Symmetry, TemplateRef, Transaction, UpAxis, Zipper,
 };
 use r3d_core::{
-    Detail, Elastic, Interfacing, InterfacingArea, InterfacingFabric, InterfacingWeight, Thread,
-    Topstitch,
+    Detail, Elastic, Interfacing, InterfacingArea, InterfacingFabric, InterfacingWeight,
+    QuiltPattern, Quilting, Thread, Topstitch,
 };
 
 fn golden_dir(version: u32) -> PathBuf {
@@ -436,6 +436,22 @@ fn sample() -> Project {
             },
             fabric: InterfacingFabric::NonWoven,
             weight: InterfacingWeight::Heavy,
+        }),
+    );
+    // The piece quilted in 50 mm diamonds over an 8 mm padding (v25).
+    let quilting = tx.new_detail_id();
+    tx.put_detail(
+        quilting,
+        Detail::Quilting(Quilting {
+            panel,
+            line: None,
+            pattern: QuiltPattern::Diamonds,
+            angle_deg: 45.0,
+            spacing_mm: 50.0,
+            loft_mm: 8.0,
+            padding_gsm: 100.0,
+            stitch_mm: 3.0,
+            color: None,
         }),
     );
     tx.commit();

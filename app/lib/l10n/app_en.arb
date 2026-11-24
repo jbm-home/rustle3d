@@ -1804,5 +1804,33 @@
   "tpInterfacingArea": "Area (m²)",
   "tpWoven": "woven",
   "tpNonWoven": "non-woven",
-  "tpKnit": "knit"
+  "tpKnit": "knit",
+  "barQuilting": "Quilting",
+  "barQuiltingHint": "Quilt the piece over a padding: it puffs between the stitched lines.",
+  "quiltingTitle": "Quilting",
+  "quiltingSpacing": "Between lines",
+  "quiltingLoft": "Padding",
+  "quiltingDiamonds": "diamonds",
+  "quiltingChannels": "channels",
+  "detailQuilting": "Quilted in {pattern} · {cm} cm apart, {mm} mm padding",
+  "@detailQuilting": {
+    "placeholders": {
+      "pattern": {
+        "type": "String"
+      },
+      "cm": {
+        "type": "String"
+      },
+      "mm": {
+        "type": "String"
+      }
+    }
+  },
+  "tpPadding": "Padding",
+  "tpLoft": "Loft (mm)",
+  "tpPaddingWeight": "Weight (g/m²)",
+  "tpQuilting": "Quilting",
+  "tpPatternKind": "Pattern",
+  "tpAngle": "Angle (°)",
+  "tpSpacing": "Spacing (mm)"
 }

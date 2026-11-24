@@ -3582,4 +3582,52 @@ class LFr extends L {
 
   @override
   String get tpKnit => 'maille';
+
+  @override
+  String get barQuilting => 'Matelassage';
+
+  @override
+  String get barQuiltingHint =>
+      'Matelasser la pièce sur un rembourrage : elle gonfle entre les piqûres.';
+
+  @override
+  String get quiltingTitle => 'Matelassage';
+
+  @override
+  String get quiltingSpacing => 'Entre les piqûres';
+
+  @override
+  String get quiltingLoft => 'Rembourrage';
+
+  @override
+  String get quiltingDiamonds => 'losanges';
+
+  @override
+  String get quiltingChannels => 'canaux';
+
+  @override
+  String detailQuilting(String pattern, String cm, String mm) {
+    return 'Matelassé en $pattern · tous les $cm cm, rembourrage $mm mm';
+  }
+
+  @override
+  String get tpPadding => 'Rembourrage';
+
+  @override
+  String get tpLoft => 'Épaisseur (mm)';
+
+  @override
+  String get tpPaddingWeight => 'Grammage (g/m²)';
+
+  @override
+  String get tpQuilting => 'Matelassage';
+
+  @override
+  String get tpPatternKind => 'Motif';
+
+  @override
+  String get tpAngle => 'Angle (°)';
+
+  @override
+  String get tpSpacing => 'Écart (mm)';
 }

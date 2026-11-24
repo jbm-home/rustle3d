@@ -66,9 +66,30 @@ pub struct Drape {
     pub edges: BTreeMap<EdgeId, Vec<usize>>,
     /// The elastic of each of `scene.elastics`, in its order.
     pub elastics: Vec<DetailId>,
+    /// How far each particle stands out of the cloth where it is quilted
+    /// (m): the padding's puff between stitched lines, drawn, not
+    /// simulated (docs/physics.md, "Composite cloth").
+    pub puff: Vec<f32>,
 }
 
 impl Drape {
+    /// `positions` with the quilted cloth puffed out along its normals;
+    /// the positions themselves when nothing is quilted.
+    pub fn puffed(&self, positions: &[Vec3]) -> Vec<Vec3> {
+        if self.puff.iter().all(|p| *p == 0.0) {
+            return positions.to_vec();
+        }
+        let normals = vertex_normals(self, positions);
+        positions
+            .iter()
+            .enumerate()
+            .map(|(i, p)| {
+                let out = self.puff.get(i).copied().unwrap_or(0.0);
+                *p + normals.get(i).copied().unwrap_or(Vec3::ZERO) * out
+            })
+            .collect()
+    }
+
     /// Each elastic's length on the cloth at `positions` and its relaxed
     /// length (m).
     pub fn elastic_lengths(&self, positions: &[Vec3]) -> Vec<(DetailId, f32, f32)> {
@@ -978,6 +999,10 @@ struct Laid {
     /// the panel.
     trims: BTreeMap<(ButtonId, usize), u32>,
     mesh: r3d_geom::mesh::PanelMesh,
+    /// The mesh vertices along each stitched line of its quiltings.
+    quilted: Vec<Vec<u32>>,
+    /// How far each mesh vertex puffs out (m).
+    puff: Vec<f32>,
     /// Pattern height of the panel's top (mm).
     top: f64,
 }
@@ -1307,6 +1332,8 @@ const TOPSTITCH_BAND_EXTRA_MM: f64 = 2.0;
 struct Covers {
     topstitched: bool,
     interfacing: Option<(r3d_sim::InterfacingMake, r3d_sim::InterfacingWeight)>,
+    /// A quilting's loft (0.1 mm) and padding (g/m²).
+    quilted: Option<(u32, u32)>,
 }
 
 impl Covers {
@@ -1314,6 +1341,9 @@ impl Covers {
     /// cloth").
     fn fabric(self, base: r3d_sim::FabricParams) -> r3d_sim::FabricParams {
         let mut out = base;
+        if let Some((loft, gsm)) = self.quilted {
+            out = out.quilted(loft as f32 / 10.0, gsm as f32);
+        }
         if let Some((make, weight)) = self.interfacing {
             out = out.fused(r3d_sim::fabric::interfacing(make, weight));
         }
@@ -1351,10 +1381,23 @@ struct PieceCovers {
         Vec<DVec2>,
         (r3d_sim::InterfacingMake, r3d_sim::InterfacingWeight),
     )>,
+    /// Each quilting's outline and its padding.
+    quilted: Vec<(Vec<DVec2>, (u32, u32))>,
 }
 
 impl PieceCovers {
     fn of(project: &Project, panel: PanelId) -> Self {
+        let quilted = project
+            .quiltings()
+            .filter(|(_, q)| q.panel == panel)
+            .filter_map(|(_, q)| {
+                let padding = (
+                    (q.loft_mm * 10.0).round() as u32,
+                    q.padding_gsm.round() as u32,
+                );
+                Some((project.quilting_outline(q)?, padding))
+            })
+            .collect();
         let interfaced = project
             .interfacings()
             .filter(|(_, i)| i.panel == panel)
@@ -1371,6 +1414,7 @@ impl PieceCovers {
         Self {
             stitched,
             interfaced,
+            quilted,
         }
     }
 
@@ -1392,8 +1436,30 @@ impl PieceCovers {
                 .iter()
                 .find(|(outline, _)| r3d_geom::polygon::contains(outline, centroid))
                 .map(|(_, what)| *what),
+            quilted: self
+                .quilted
+                .iter()
+                .find(|(outline, _)| r3d_geom::polygon::contains(outline, centroid))
+                .map(|(_, padding)| *padding),
         }
     }
+}
+
+/// A quilted piece is meshed this many points per spacing of its lines.
+const QUILT_POINTS_PER_SPACING: f64 = 4.0;
+
+/// `line` with points added so none are more than `step` apart, every
+/// point of it kept.
+fn subdivided(line: &[DVec2], step: f64) -> Vec<DVec2> {
+    let mut out = Vec::new();
+    for w in line.windows(2) {
+        if let [a, b] = w {
+            let n = ((a.distance(*b) / step).ceil() as usize).max(1);
+            out.extend((0..n).map(|k| a.lerp(*b, k as f64 / n as f64)));
+        }
+    }
+    out.extend(line.last());
+    out
 }
 
 /// A seam side's stretches with some length.
@@ -1673,8 +1739,59 @@ pub fn build(
                 })
             })
             .collect();
-        let mesh = mesh_panel(&boundary, &hole_pts, &line_pts, &fine, spacing)
+        // Quilted: the stitched lines are mesh lines, the piece meshed at
+        // a quarter of the lines' spacing at most so the puffs show.
+        let quilts: Vec<&r3d_core::Quilting> = project
+            .quiltings()
+            .filter(|(_, q)| q.panel == *panel_id)
+            .map(|(_, q)| q)
+            .collect();
+        let piece_spacing = quilts
+            .iter()
+            .map(|q| q.spacing_mm / QUILT_POINTS_PER_SPACING)
+            .fold(spacing, f64::min)
+            .max(2.0);
+        let quilt_start = line_pts.len();
+        for q in &quilts {
+            for line in project.quilting_lines(q) {
+                line_pts.push(subdivided(&line, piece_spacing));
+            }
+        }
+        let quilt_end = line_pts.len();
+        let mesh = mesh_panel(&boundary, &hole_pts, &line_pts, &fine, piece_spacing)
             .map_err(|e| internal(format!("{panel_id}: {e}")))?;
+        let quilted: Vec<Vec<u32>> = mesh
+            .lines
+            .get(quilt_start..quilt_end)
+            .map(<[Vec<u32>]>::to_vec)
+            .unwrap_or_default();
+        // How far each vertex puffs out: up to the loft halfway between
+        // stitched lines, nothing on them or at the area's edge (sewn
+        // flat there).
+        let mut puff = vec![0.0f32; mesh.vertices.len()];
+        for q in &quilts {
+            let (Some(area), lines) = (project.quilting_outline(q), project.quilting_lines(q))
+            else {
+                continue;
+            };
+            for (v, out) in mesh.vertices.iter().zip(&mut puff) {
+                if !r3d_geom::polygon::contains(&area, *v) {
+                    continue;
+                }
+                let d = lines
+                    .iter()
+                    .flat_map(|l| l.windows(2))
+                    .filter_map(|w| match w {
+                        [a, b] => Some(r3d_geom::fit::distance_to_segment(*v, *a, *b)),
+                        _ => None,
+                    })
+                    .fold(f64::INFINITY, f64::min)
+                    .min(r3d_geom::polygon::distance_to_loop(&area, *v))
+                    .min(q.spacing_mm / 2.0);
+                let rise = q.loft_mm * (std::f64::consts::PI * d / q.spacing_mm).sin();
+                *out = out.max((rise / 1000.0) as f32);
+            }
+        }
         let mut trims: BTreeMap<(ButtonId, usize), u32> = BTreeMap::new();
         for (k, (key, _)) in ends.iter().enumerate() {
             if let Some(v) = mesh.lines.get(lines.len() + k).and_then(|l| l.first()) {
@@ -1727,6 +1844,8 @@ pub fn build(
             tracks,
             trims,
             mesh,
+            quilted,
+            puff,
             top,
         });
     }
@@ -1817,6 +1936,7 @@ pub fn build(
 
     // Fabrics of the cloth under details, after the garments' own.
     let mut composite: BTreeMap<(u16, Covers), u16> = BTreeMap::new();
+    let mut puff: Vec<f32> = Vec::new();
     for (l, start) in laid.iter().zip(starts) {
         let Some(panel) = project.panel(l.panel) else {
             continue;
@@ -1834,6 +1954,7 @@ pub fn build(
             trim_particles.insert(*key, offset + v);
         }
 
+        puff.extend(&l.puff);
         scene.particles.extend(
             mesh.vertices
                 .iter()
@@ -1869,6 +1990,18 @@ pub fn build(
             .and_then(|k| u16::try_from(k).ok())
             .unwrap_or(0);
         let covers = PieceCovers::of(project, l.panel);
+        // The stitched lines fold with the shell and lining alone.
+        if let Some(base) = scene.fabrics.get(usize::from(garment)).copied() {
+            for line in &l.quilted {
+                for w in line.windows(2) {
+                    if let [a, b] = w {
+                        scene
+                            .creases
+                            .push(([offset + a, offset + b], base.quilted_crease()));
+                    }
+                }
+            }
+        }
         for t in &mesh.triangles {
             let corners = t.map(|i| mesh.vertices.get(i as usize).copied().unwrap_or_default());
             let cover = covers.covers(corners);
@@ -2011,6 +2144,7 @@ pub fn build(
         pins,
         edges,
         elastics,
+        puff,
     })
 }
 
@@ -2156,6 +2290,31 @@ impl<'a> Locator<'a> {
     }
 }
 
+/// The cloth's normal at each particle (out of the garment), from its
+/// triangles at `positions`.
+fn vertex_normals(drape: &Drape, positions: &[Vec3]) -> Vec<Vec3> {
+    let mut normals = vec![Vec3::ZERO; positions.len()];
+    for piece in &drape.pieces {
+        for t in piece.indices.as_chunks::<3>().0 {
+            let [a, b, c] = t.map(|i| piece.particles.start + i as usize);
+            if let (Some(pa), Some(pb), Some(pc)) =
+                (positions.get(a), positions.get(b), positions.get(c))
+            {
+                let n = (*pb - *pa).cross(*pc - *pa);
+                for i in [a, b, c] {
+                    if let Some(slot) = normals.get_mut(i) {
+                        *slot += n;
+                    }
+                }
+            }
+        }
+    }
+    for n in &mut normals {
+        *n = n.normalize_or(Vec3::Y);
+    }
+    normals
+}
+
 /// Internal lines are sampled this often along the pattern (mm).
 const LINE_STEP_MM: f64 = 10.0;
 
@@ -2175,33 +2334,17 @@ const STITCH_HOLE_MM: f64 = 0.6;
 pub struct LinesOnCloth<'a> {
     drape: &'a Drape,
     locator: Locator<'a>,
-    positions: &'a [Vec3],
+    /// The cloth as drawn: quilted parts puffed.
+    positions: Vec<Vec3>,
     /// Cloth normal per particle.
     normals: Vec<Vec3>,
 }
 
 impl<'a> LinesOnCloth<'a> {
     /// For `drape` with its particles at `positions`.
-    pub fn new(drape: &'a Drape, positions: &'a [Vec3]) -> Self {
-        let mut normals = vec![Vec3::ZERO; positions.len()];
-        for piece in &drape.pieces {
-            for t in piece.indices.as_chunks::<3>().0 {
-                let [a, b, c] = t.map(|i| piece.particles.start + i as usize);
-                if let (Some(pa), Some(pb), Some(pc)) =
-                    (positions.get(a), positions.get(b), positions.get(c))
-                {
-                    let n = (*pb - *pa).cross(*pc - *pa);
-                    for i in [a, b, c] {
-                        if let Some(slot) = normals.get_mut(i) {
-                            *slot += n;
-                        }
-                    }
-                }
-            }
-        }
-        for n in &mut normals {
-            *n = n.normalize_or(Vec3::Y);
-        }
+    pub fn new(drape: &'a Drape, positions: &[Vec3]) -> Self {
+        let positions = drape.puffed(positions);
+        let normals = vertex_normals(drape, &positions);
         Self {
             drape,
             locator: Locator::new(drape),
@@ -2293,33 +2436,47 @@ impl<'a> LinesOnCloth<'a> {
             .collect()
     }
 
-    /// Every topstitch on the cloth, stitch by stitch.
+    /// Every topstitch and quilting on the cloth, stitch by stitch.
     pub fn stitches(&self, project: &Project) -> Vec<ClothStitches> {
         let project = project.as_shown();
-        project
-            .topstitches()
-            .filter_map(|(_, t)| {
-                let panel = project.side_panel(&t.side)?;
-                let visible = (t.stitch_mm - STITCH_HOLE_MM).max(0.4 * t.stitch_mm);
-                let mut dashes = Vec::new();
-                for row in project.topstitch_rows(t) {
-                    let total = r3d_core::seam::polyline_length(&row);
-                    let mut s = 0.0;
-                    while s + visible <= total + 1e-9 {
-                        let (a, _) = r3d_core::seam::point_along(&row, s);
-                        let (b, _) = r3d_core::seam::point_along(&row, s + visible);
-                        if let (Some(a), Some(b)) =
-                            (self.on_cloth(panel, a), self.on_cloth(panel, b))
-                        {
-                            dashes.push([a, b]);
-                        }
-                        s += t.stitch_mm;
-                    }
+        let topstitches = project.topstitches().filter_map(|(_, t)| {
+            let panel = project.side_panel(&t.side)?;
+            let rows = project.topstitch_rows(t);
+            let width = (t.thread.width_mm() / 1000.0) as f32;
+            self.stitched(panel, &rows, t.stitch_mm, project.thread_rgb(t), width)
+        });
+        let quiltings = project.quiltings().filter_map(|(_, q)| {
+            let rows = project.quilting_lines(q);
+            let width = (r3d_core::Thread::Normal.width_mm() / 1000.0) as f32;
+            self.stitched(q.panel, &rows, q.stitch_mm, project.quilting_rgb(q), width)
+        });
+        topstitches.chain(quiltings).collect()
+    }
+
+    /// `rows` of `panel` on the cloth, stitch by stitch.
+    fn stitched(
+        &self,
+        panel: PanelId,
+        rows: &[Vec<DVec2>],
+        stitch_mm: f64,
+        rgb: u32,
+        width: f32,
+    ) -> Option<ClothStitches> {
+        let visible = (stitch_mm - STITCH_HOLE_MM).max(0.4 * stitch_mm);
+        let mut dashes = Vec::new();
+        for row in rows {
+            let total = r3d_core::seam::polyline_length(row);
+            let mut s = 0.0;
+            while s + visible <= total + 1e-9 {
+                let (a, _) = r3d_core::seam::point_along(row, s);
+                let (b, _) = r3d_core::seam::point_along(row, s + visible);
+                if let (Some(a), Some(b)) = (self.on_cloth(panel, a), self.on_cloth(panel, b)) {
+                    dashes.push([a, b]);
                 }
-                let width = (t.thread.width_mm() / 1000.0) as f32;
-                (!dashes.is_empty()).then(|| (dashes, project.thread_rgb(t), width))
-            })
-            .collect()
+                s += stitch_mm;
+            }
+        }
+        (!dashes.is_empty()).then_some((dashes, rgb, width))
     }
 
     /// A contour edge of a simulated panel.
@@ -2689,11 +2846,12 @@ pub fn scene3d(
             }
         })
         .collect();
+    let puffed = drape.puffed(positions);
     let pieces = drape
         .pieces
         .iter()
         .filter_map(|piece| {
-            let at = positions.get(piece.particles.clone())?;
+            let at = puffed.get(piece.particles.clone())?;
             Some(Mesh3d {
                 name: project
                     .panel(piece.panel)

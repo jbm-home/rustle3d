@@ -6042,6 +6042,96 @@ abstract class L {
   /// In en, this message translates to:
   /// **'knit'**
   String get tpKnit;
+
+  /// No description provided for @barQuilting.
+  ///
+  /// In en, this message translates to:
+  /// **'Quilting'**
+  String get barQuilting;
+
+  /// No description provided for @barQuiltingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Quilt the piece over a padding: it puffs between the stitched lines.'**
+  String get barQuiltingHint;
+
+  /// No description provided for @quiltingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Quilting'**
+  String get quiltingTitle;
+
+  /// No description provided for @quiltingSpacing.
+  ///
+  /// In en, this message translates to:
+  /// **'Between lines'**
+  String get quiltingSpacing;
+
+  /// No description provided for @quiltingLoft.
+  ///
+  /// In en, this message translates to:
+  /// **'Padding'**
+  String get quiltingLoft;
+
+  /// No description provided for @quiltingDiamonds.
+  ///
+  /// In en, this message translates to:
+  /// **'diamonds'**
+  String get quiltingDiamonds;
+
+  /// No description provided for @quiltingChannels.
+  ///
+  /// In en, this message translates to:
+  /// **'channels'**
+  String get quiltingChannels;
+
+  /// No description provided for @detailQuilting.
+  ///
+  /// In en, this message translates to:
+  /// **'Quilted in {pattern} · {cm} cm apart, {mm} mm padding'**
+  String detailQuilting(String pattern, String cm, String mm);
+
+  /// No description provided for @tpPadding.
+  ///
+  /// In en, this message translates to:
+  /// **'Padding'**
+  String get tpPadding;
+
+  /// No description provided for @tpLoft.
+  ///
+  /// In en, this message translates to:
+  /// **'Loft (mm)'**
+  String get tpLoft;
+
+  /// No description provided for @tpPaddingWeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Weight (g/m²)'**
+  String get tpPaddingWeight;
+
+  /// No description provided for @tpQuilting.
+  ///
+  /// In en, this message translates to:
+  /// **'Quilting'**
+  String get tpQuilting;
+
+  /// No description provided for @tpPatternKind.
+  ///
+  /// In en, this message translates to:
+  /// **'Pattern'**
+  String get tpPatternKind;
+
+  /// No description provided for @tpAngle.
+  ///
+  /// In en, this message translates to:
+  /// **'Angle (°)'**
+  String get tpAngle;
+
+  /// No description provided for @tpSpacing.
+  ///
+  /// In en, this message translates to:
+  /// **'Spacing (mm)'**
+  String get tpSpacing;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

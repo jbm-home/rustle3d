@@ -287,16 +287,14 @@ impl Dressed {
             .zip(latest.form.as_ref().map(|f| &f.triangles[..]));
         let values = fit_map.map(|m| (m, m.values(&latest.drape, positions, body)));
         let prints = Prints::default().all(project, Some(ws.dir()));
+        let puffed = latest.drape.puffed(positions);
         let pieces: Vec<DressedPiece> = latest
             .drape
             .pieces
             .iter()
             .filter_map(|p| {
                 let garment = project.garment_of(p.panel);
-                let mut m = mesh(
-                    positions.get(p.particles.clone())?.to_vec(),
-                    p.indices.clone(),
-                );
+                let mut m = mesh(puffed.get(p.particles.clone())?.to_vec(), p.indices.clone());
                 if let Some((map, v)) = &values {
                     m.colors = v
                         .get(p.particles.clone())?

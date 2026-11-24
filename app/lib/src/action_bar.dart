@@ -333,6 +333,30 @@ extension _Bar on _ShellState {
     _refresh();
   }
 
+  /// Quilt the selected piece: spacing and padding asked, diamonds or
+  /// channels picked.
+  Future<void> _quilt() async {
+    final l = context.l;
+    final panel = _panel?['id'] as String?;
+    if (panel == null) return;
+    final picked = await _askNumbers(
+      context,
+      title: l.quiltingTitle,
+      fields: [(l.quiltingSpacing, l.cm, 5), (l.quiltingLoft, 'mm', 8)],
+      choices: [l.quiltingDiamonds, l.quiltingChannels],
+    );
+    if (picked == null || !mounted) return;
+    final [spacing, loft] = picked.$1;
+    _run({
+      'type': 'quilting.add',
+      'panel': panel,
+      'pattern': picked.$2 == 1 ? 'channels' : 'diamonds',
+      'spacing_mm': spacing * 10,
+      'loft_mm': loft,
+    });
+    _refresh();
+  }
+
   /// Topstitch along an edge: rows, distance, stitch length and thread
   /// asked.
   Future<void> _addTopstitch(String edge) async {
@@ -465,6 +489,14 @@ extension _Bar on _ShellState {
             name: l.barInterfacing,
             hint: l.barInterfacingHint,
             onTap: (_) => _interface(),
+          ),
+          (
+            id: 'quilting',
+            icon: Icons.grid_on_rounded,
+            label: l.barQuilting,
+            name: l.barQuilting,
+            hint: l.barQuiltingHint,
+            onTap: (_) => _quilt(),
           ),
         ],
       if (!linked && others)

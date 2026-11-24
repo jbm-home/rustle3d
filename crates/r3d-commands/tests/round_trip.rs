@@ -204,6 +204,12 @@ fn every_command_round_trips() {
         "weight": "heavy", "width_mm": 40}),
     );
     h.round_trip(json!({"type": "interfacing.remove", "interfacing": interfacing}));
+    let quilting = h.round_trip(json!({"type": "quilting.add", "panel": poly_panel,
+        "spacing_mm": 60}));
+    let quilting = quilting.created[0].to_string();
+    h.round_trip(json!({"type": "quilting.set", "quilting": quilting,
+        "pattern": "channels", "loft_mm": 12}));
+    h.round_trip(json!({"type": "quilting.remove", "quilting": quilting}));
     h.round_trip(json!({"type": "elastic.shirr", "panel": poly_panel,
         "edge": poly.created[5].to_string(), "rows": 3}));
 

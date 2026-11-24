@@ -22,7 +22,13 @@ Built in four steps, each one commit; then the shirt template.
   the bill of materials; Interfacing in the action bar (the piece, or a
   band along a picked edge). Lines inside a piece may cross since (the
   mesher joins them at their crossings).
-- Quilting: planned.
+- Quilting (2026-11-24): the document (schema v25), `quilting.add`,
+  `quilting.set`, `quilting.remove`, `detail.list`; the padded cloth and
+  its creases on both solvers, the puffs in every view and export; its
+  stitches on the board, in 3D and photos; padding in the bill of
+  materials and a Quilting table in the sewing section; Quilting in the
+  action bar.
+- The shirt template: planned.
 
 ## User story
 As a designer, I gather a sleeve's cuff with an elastic two thirds its
@@ -107,7 +113,9 @@ and the topstitching.
   to bend; it folds more easily along the stitched lines. Between the
   lines the surface puffs out by up to the loft, in the 3D view, photos
   and 3D exports.
-- One quilting per area; areas on a piece do not overlap.
+- One quilting per area; areas on a piece do not overlap. The lines run
+  through the area's middle, a spacing apart; none is stitched on the
+  area's edge.
 
 ### Drape
 - **Elastic**: a tie along the side that only pulls, its rest length

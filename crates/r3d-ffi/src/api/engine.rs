@@ -147,6 +147,8 @@ fn piece_meshes(
     project: &r3d_core::Project,
     prints: &HashMap<r3d_core::GarmentId, Arc<PrintImage>>,
 ) -> Vec<ClothPiece> {
+    // Quilted cloth with its puffs.
+    let positions = &drape.puffed(positions);
     drape
         .pieces
         .iter()

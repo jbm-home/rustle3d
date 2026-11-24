@@ -102,6 +102,34 @@ impl FabricParams {
     }
 }
 
+/// A quilting's padding bends this much per square millimetre of its
+/// loft (N·m): with 8 mm on cotton, a bending length of about 7 cm (our
+/// estimate, docs/physics.md "Composite cloth").
+pub const PADDING_BENDING_PER_MM2: f32 = 15e-6;
+
+impl FabricParams {
+    /// The cloth quilted over a padding `loft_mm` thick weighing
+    /// `padding_gsm`, with a lining like itself: one layer standing for
+    /// the three.
+    pub fn quilted(self, loft_mm: f32, padding_gsm: f32) -> Self {
+        Self {
+            density: 2.0 * self.density + padding_gsm / 1000.0,
+            thickness: self.thickness + loft_mm / 1000.0,
+            stretch_warp: 2.0 * self.stretch_warp,
+            stretch_weft: 2.0 * self.stretch_weft,
+            shear: 2.0 * self.shear,
+            bending: 2.0 * self.bending + PADDING_BENDING_PER_MM2 * loft_mm * loft_mm,
+            ..self
+        }
+    }
+
+    /// Bending along a quilting's stitched lines: the shell and the
+    /// lining only.
+    pub fn quilted_crease(self) -> f32 {
+        2.0 * self.bending
+    }
+}
+
 /// The built-in fabrics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]

@@ -28,8 +28,8 @@ pub mod trim;
 
 pub use body::{Measure, MeasureGroup, MeasureValue, Measures};
 pub use detail::{
-    Detail, Elastic, Interfacing, InterfacingArea, InterfacingFabric, InterfacingWeight, Thread,
-    Topstitch,
+    Detail, Elastic, Interfacing, InterfacingArea, InterfacingFabric, InterfacingWeight,
+    QuiltPattern, Quilting, Thread, Topstitch,
 };
 pub use edit::{ChangeSet, Transaction};
 pub use id::DetailId;

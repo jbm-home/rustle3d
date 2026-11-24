@@ -75,6 +75,10 @@ pub struct SimScene {
     pub closures: Vec<Closure>,
     /// Elastics along lines of particles.
     pub elastics: Vec<ElasticLine>,
+    /// Mesh edges that bend differently from the cloth around them (a
+    /// quilting's stitched lines): their two particles and the bending
+    /// rigidity there (N·m).
+    pub creases: Vec<([u32; 2], f32)>,
     /// The body, if any.
     pub collider: Option<StaticMesh>,
     /// How the body's parts move; `None`: it stands still. Needs a

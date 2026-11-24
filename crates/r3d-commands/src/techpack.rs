@@ -58,6 +58,15 @@ pub const LABELS: &[(&str, &str)] = &[
     ("zipper", "Zipper"),
     ("elastic", "Elastic"),
     ("interfacing", "Interfacing"),
+    ("padding", "Padding"),
+    ("loft", "Loft (mm)"),
+    ("padding_weight", "Weight (g/m²)"),
+    ("quilting", "Quilting"),
+    ("pattern_kind", "Pattern"),
+    ("channels", "channels"),
+    ("diamonds", "diamonds"),
+    ("angle", "Angle (°)"),
+    ("spacing", "Spacing (mm)"),
     ("interfacing_fabric", "Kind"),
     ("interfacing_weight", "Weight"),
     ("interfacing_area", "Area (m²)"),
@@ -406,6 +415,20 @@ impl Writer<'_> {
                 rows: interfacing,
             });
         }
+        let padding = self.padding();
+        if !padding.is_empty() {
+            blocks.push(Block::Subheading(self.t("padding")));
+            blocks.push(Block::Table {
+                columns: vec![
+                    Column::text(self.t("garment"), 2.0),
+                    Column::number(self.t("loft"), 1.0),
+                    Column::number(self.t("padding_weight"), 1.2),
+                    Column::number(self.t("interfacing_area"), 1.0),
+                    Column::text(self.t("placement"), 4.0),
+                ],
+                rows: padding,
+            });
+        }
         let by_size = self.elastics_by_size(&sizes);
         if !by_size.is_empty() {
             let mut columns = vec![
@@ -489,6 +512,38 @@ impl Writer<'_> {
                 ]
             })
             .collect();
+        let quilted: Vec<Vec<String>> = p
+            .quiltings()
+            .map(|(_, q)| {
+                vec![
+                    self.piece_name(p, q.panel),
+                    self.t(match q.pattern {
+                        r3d_core::QuiltPattern::Channels => "channels",
+                        r3d_core::QuiltPattern::Diamonds => "diamonds",
+                    }),
+                    self.num(q.angle_deg, 0),
+                    self.num(q.spacing_mm, 0),
+                    self.num(q.loft_mm, 1),
+                    self.num(q.stitch_mm, 1),
+                    format!("#{:06X}", p.quilting_rgb(q)),
+                ]
+            })
+            .collect();
+        if !quilted.is_empty() {
+            blocks.push(Block::Subheading(self.t("quilting")));
+            blocks.push(Block::Table {
+                columns: vec![
+                    Column::text(self.t("piece"), 2.0),
+                    Column::text(self.t("pattern_kind"), 1.2),
+                    Column::number(self.t("angle"), 0.9),
+                    Column::number(self.t("spacing"), 1.1),
+                    Column::number(self.t("loft"), 1.0),
+                    Column::number(self.t("stitch"), 1.0),
+                    Column::text(self.t("colour"), 1.1),
+                ],
+                rows: quilted,
+            });
+        }
         if !elastics.is_empty() {
             blocks.push(Block::Subheading(self.t("elastics")));
             blocks.push(Block::Table {
@@ -503,6 +558,41 @@ impl Writer<'_> {
             });
         }
         blocks
+    }
+
+    /// The padding each garment takes, by loft and weight: its area in
+    /// the drawn size (m²) and the pieces it goes in.
+    fn padding(&self) -> Vec<Vec<String>> {
+        let p = self.project;
+        let mut rows: std::collections::BTreeMap<(GarmentId, i64, i64), (Vec<String>, f64)> =
+            Default::default();
+        for (_, q) in p.quiltings() {
+            let (Some(panel), Some(outline)) = (p.panel(q.panel), p.quilting_outline(q)) else {
+                continue;
+            };
+            let key = (
+                panel.garment,
+                (q.loft_mm * 10.0).round() as i64,
+                q.padding_gsm.round() as i64,
+            );
+            let row = rows.entry(key).or_default();
+            let name = self.piece_name(p, q.panel);
+            if !row.0.contains(&name) {
+                row.0.push(name);
+            }
+            row.1 += r3d_geom::polygon::signed_area(&outline).abs() / 1e6;
+        }
+        rows.into_iter()
+            .map(|((g, loft, gsm), (pieces, m2))| {
+                vec![
+                    self.garment_name(g),
+                    self.num(loft as f64 / 10.0, 1),
+                    self.num(gsm as f64, 0),
+                    self.num(m2, 2),
+                    pieces.join(", "),
+                ]
+            })
+            .collect()
     }
 
     /// The interfacing each garment takes, by kind and weight: its area

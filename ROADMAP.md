@@ -72,7 +72,8 @@ topstitching (drawn on the cloth as dashes of thread, the band under it
 slightly stiffer), interfacing (composite fabric on the whole piece, a
 band or a closed line's inside), quilting (one layer, puffs drawn by the
 views); then the shirt template uses them (interfaced collar stand,
-topstitched yoke, elastic cuffs offered).
+topstitched yoke, elastic cuffs offered). Done: the four details
+(2026-11-24); open: the shirt template.
 
 ## M36 — Natural motions
 

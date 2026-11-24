@@ -3552,4 +3552,52 @@ class LEn extends L {
 
   @override
   String get tpKnit => 'knit';
+
+  @override
+  String get barQuilting => 'Quilting';
+
+  @override
+  String get barQuiltingHint =>
+      'Quilt the piece over a padding: it puffs between the stitched lines.';
+
+  @override
+  String get quiltingTitle => 'Quilting';
+
+  @override
+  String get quiltingSpacing => 'Between lines';
+
+  @override
+  String get quiltingLoft => 'Padding';
+
+  @override
+  String get quiltingDiamonds => 'diamonds';
+
+  @override
+  String get quiltingChannels => 'channels';
+
+  @override
+  String detailQuilting(String pattern, String cm, String mm) {
+    return 'Quilted in $pattern · $cm cm apart, $mm mm padding';
+  }
+
+  @override
+  String get tpPadding => 'Padding';
+
+  @override
+  String get tpLoft => 'Loft (mm)';
+
+  @override
+  String get tpPaddingWeight => 'Weight (g/m²)';
+
+  @override
+  String get tpQuilting => 'Quilting';
+
+  @override
+  String get tpPatternKind => 'Pattern';
+
+  @override
+  String get tpAngle => 'Angle (°)';
+
+  @override
+  String get tpSpacing => 'Spacing (mm)';
 }

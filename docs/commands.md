@@ -4126,6 +4126,261 @@ Remove an interfacing.
 
 </details>
 
+### `quilting.add`
+
+Quilt a piece (or the inside of a closed internal `line` on it) over a padding: `pattern` channels or diamonds (default), `angle_deg` from the grainline (default 45 for diamonds, 0 for channels), lines `spacing_mm` apart (default 50), a padding `loft_mm` thick (default 8) weighing `padding_gsm` (default 100), `stitch_mm` stitches and a thread `color`. The cloth there drapes as shell, padding and lining together, folds along the stitched lines, and puffs out between them in the views. One quilting per area. Returns the quilting (a detail).
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "InternalLineId": {
+      "description": "Identifier of a line, e.g. `line:1`.",
+      "pattern": "^line:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "PanelId": {
+      "description": "Identifier of a panel, e.g. `panel:1`.",
+      "pattern": "^panel:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "QuiltPattern": {
+      "description": "How a quilting's lines run.",
+      "oneOf": [
+        {
+          "const": "channels",
+          "description": "Parallel lines.",
+          "type": "string"
+        },
+        {
+          "const": "diamonds",
+          "description": "Two families of lines, at the angle each side of the grainline.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Quilt a piece, or the inside of a closed line on it.",
+  "properties": {
+    "angle_deg": {
+      "description": "The lines' angle from the grainline (degrees; each side of it for\ndiamonds). Omitted: 45 for diamonds, 0 for channels.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "color": {
+      "description": "The thread's colour, `#RRGGBB`. Omitted: a darker shade of the\ngarment's.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "line": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/InternalLineId"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Only inside this closed internal line. Omitted: the whole piece."
+    },
+    "loft_mm": {
+      "description": "The padding's thickness (1–30 mm). Omitted: 8.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "padding_gsm": {
+      "description": "The padding's weight (10–600 g/m²). Omitted: 100.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "panel": {
+      "$ref": "#/$defs/PanelId"
+    },
+    "pattern": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/QuiltPattern"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "`channels` (parallel lines) or `diamonds`. Omitted: diamonds."
+    },
+    "spacing_mm": {
+      "description": "The distance between parallel lines (15–150 mm). Omitted: 50.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "stitch_mm": {
+      "description": "The stitches' length (1–8 mm). Omitted: 3.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "panel"
+  ],
+  "title": "QuiltingAdd",
+  "type": "object"
+}
+```
+
+</details>
+
+### `quilting.set`
+
+Change a quilting: its `pattern`, `angle_deg`, `spacing_mm`, `loft_mm`, `padding_gsm`, `stitch_mm` or `color` ("" for a darker shade of the garment's); what is omitted stays.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "DetailId": {
+      "description": "Identifier of a detail, e.g. `detail:1`.",
+      "pattern": "^detail:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "QuiltPattern": {
+      "description": "How a quilting's lines run.",
+      "oneOf": [
+        {
+          "const": "channels",
+          "description": "Parallel lines.",
+          "type": "string"
+        },
+        {
+          "const": "diamonds",
+          "description": "Two families of lines, at the angle each side of the grainline.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Change a quilting.",
+  "properties": {
+    "angle_deg": {
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "color": {
+      "description": "`#RRGGBB`, or `\"\"` for the garment's shade.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "loft_mm": {
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "padding_gsm": {
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "pattern": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/QuiltPattern"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "quilting": {
+      "$ref": "#/$defs/DetailId"
+    },
+    "spacing_mm": {
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "stitch_mm": {
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "quilting"
+  ],
+  "title": "QuiltingSet",
+  "type": "object"
+}
+```
+
+</details>
+
+### `quilting.remove`
+
+Remove a quilting and its padding.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "DetailId": {
+      "description": "Identifier of a detail, e.g. `detail:1`.",
+      "pattern": "^detail:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Remove a quilting.",
+  "properties": {
+    "quilting": {
+      "$ref": "#/$defs/DetailId"
+    }
+  },
+  "required": [
+    "quilting"
+  ],
+  "title": "QuiltingRemove",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `garment.set_fabric`
 
 Choose what the garment is made of: cotton, denim, jersey, silk or wool. Sets how it drapes and how it looks.
@@ -7003,7 +7258,7 @@ Every trim: buttons (the piece and point they are sewn at, diameter, the buttonh
 
 ### `detail.list`
 
-Every construction detail: elastics (their side, piece, ratio, width, the side's length and the relaxed length in each size of the range, or in the drawn size) topstitches (their side, piece, rows, distance, gap, stitch length, thread and its colour, the length of each row on the piece) and interfacings (their piece, area, fabric, weight, and the area they cover in mm²); mm.
+Every construction detail: elastics (their side, piece, ratio, width, the side's length and the relaxed length in each size of the range, or in the drawn size) topstitches (their side, piece, rows, distance, gap, stitch length, thread and its colour, the length of each row on the piece) interfacings (their piece, area, fabric, weight, and the area they cover in mm²) and quiltings (their piece and line, pattern, angle, spacing, padding, stitch, thread colour, the area quilted in mm² and the stitched lines' length); mm.
 
 <details><summary>Parameters (JSON schema)</summary>
 

@@ -1,6 +1,6 @@
 //! Construction details that change the cloth where they are
 //! (`docs/specs/31-construction-details-2.md`): elastic, topstitching,
-//! interfacing.
+//! interfacing, quilting.
 
 use glam::DVec2;
 use schemars::JsonSchema;
@@ -41,6 +41,76 @@ pub enum Detail {
     Topstitch(Topstitch),
     /// A fused interfacing on part of a piece.
     Interfacing(Interfacing),
+    /// Quilting over a padding on part of a piece.
+    Quilting(Quilting),
+}
+
+/// Quilting: the closest and widest spacing of its lines (mm).
+pub const QUILT_SPACING_MM: (f64, f64) = (15.0, 150.0);
+/// The thinnest and thickest padding (mm).
+pub const LOFT_MM: (f64, f64) = (1.0, 30.0);
+/// The lightest and heaviest padding (g/m²).
+pub const PADDING_GSM: (f64, f64) = (10.0, 600.0);
+
+/// How a quilting's lines run.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum QuiltPattern {
+    /// Parallel lines.
+    Channels,
+    /// Two families of lines, at the angle each side of the grainline.
+    #[default]
+    Diamonds,
+}
+
+/// A quilting: lines stitched through the cloth, a padding and a lining
+/// (one layer in the simulation, docs/physics.md "Composite cloth"), over
+/// the whole piece or inside a closed internal line.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Quilting {
+    pub panel: PanelId,
+    /// Inside this closed line of the piece; `None`: the whole piece.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub line: Option<InternalLineId>,
+    pub pattern: QuiltPattern,
+    /// The lines' angle from the grainline (degrees); for diamonds, each
+    /// family's, one each side.
+    pub angle_deg: f64,
+    /// The distance between parallel lines (mm).
+    pub spacing_mm: f64,
+    /// The padding's thickness (mm).
+    pub loft_mm: f64,
+    /// The padding's weight (g/m²).
+    pub padding_gsm: f64,
+    /// The stitches' length (mm).
+    pub stitch_mm: f64,
+    /// The thread's colour (`#RRGGBB`); `None`: a darker shade of the
+    /// garment's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+}
+
+impl Quilting {
+    /// Its values within their ranges.
+    pub fn valid(&self) -> bool {
+        (QUILT_SPACING_MM.0..=QUILT_SPACING_MM.1).contains(&self.spacing_mm)
+            && (LOFT_MM.0..=LOFT_MM.1).contains(&self.loft_mm)
+            && (PADDING_GSM.0..=PADDING_GSM.1).contains(&self.padding_gsm)
+            && (STITCH_MM.0..=STITCH_MM.1).contains(&self.stitch_mm)
+            && self.angle_deg.is_finite()
+            && self.color.as_deref().is_none_or(|c| parse_hex(c).is_some())
+    }
+
+    /// The stitched lines' directions on the pattern, for a piece whose
+    /// grainline turns `grain_deg`.
+    fn directions(&self, grain_deg: f64) -> Vec<DVec2> {
+        let at = |a: f64| DVec2::from_angle((grain_deg + a).to_radians());
+        match self.pattern {
+            QuiltPattern::Channels => vec![at(self.angle_deg)],
+            QuiltPattern::Diamonds => vec![at(self.angle_deg), at(-self.angle_deg)],
+        }
+    }
 }
 
 /// The widest band of interfacing along edges (mm).
@@ -178,6 +248,55 @@ fn darker(rgb: u32) -> u32 {
 
 /// An interfacing's bounds stay this far from the piece's outline (mm).
 const BOUND_CLEAR_MM: f64 = 1.0;
+
+/// `lines` with a point added on each where another crosses it: the
+/// same point on both (computed once), so a mesh joins them there.
+fn with_crossings(lines: &[Vec<DVec2>]) -> Vec<Vec<DVec2>> {
+    // For each line and segment, the crossings on it: where along it, and
+    // the point.
+    let mut cuts: std::collections::HashMap<(usize, usize), Vec<(f64, DVec2)>> =
+        std::collections::HashMap::new();
+    for (k, line) in lines.iter().enumerate() {
+        for (j, other) in lines.iter().enumerate().skip(k + 1) {
+            for (i, w) in line.windows(2).enumerate() {
+                let &[a, b] = w else { continue };
+                let d = b - a;
+                for (m, v) in other.windows(2).enumerate() {
+                    let &[c, e] = v else { continue };
+                    let s = e - c;
+                    let denom = d.perp_dot(s);
+                    if denom.abs() < 1e-12 {
+                        continue;
+                    }
+                    let w = c - a;
+                    let t = w.perp_dot(s) / denom;
+                    let u = w.perp_dot(d) / denom;
+                    if t > 1e-9 && t < 1.0 - 1e-9 && u > 1e-9 && u < 1.0 - 1e-9 {
+                        let p = a + d * t;
+                        cuts.entry((k, i)).or_default().push((t, p));
+                        cuts.entry((j, m)).or_default().push((u, p));
+                    }
+                }
+            }
+        }
+    }
+    lines
+        .iter()
+        .enumerate()
+        .map(|(k, line)| {
+            let mut out: Vec<DVec2> = line.first().copied().into_iter().collect();
+            for (i, w) in line.windows(2).enumerate() {
+                let &[_, b] = w else { continue };
+                if let Some(list) = cuts.get_mut(&(k, i)) {
+                    list.sort_by(|x, y| x.0.total_cmp(&y.0));
+                    out.extend(list.iter().map(|(_, p)| *p));
+                }
+                out.push(b);
+            }
+            out
+        })
+        .collect()
+}
 
 /// `line` with points added so none are more than `step` apart.
 fn densified(line: &[DVec2], step: f64) -> Vec<DVec2> {
@@ -343,6 +462,7 @@ impl Detail {
             Detail::Elastic(e) => p.side_panel(&e.side),
             Detail::Topstitch(t) => p.side_panel(&t.side),
             Detail::Interfacing(i) => Some(i.panel),
+            Detail::Quilting(q) => Some(q.panel),
         }
     }
 }
@@ -364,7 +484,89 @@ impl Project {
         })
     }
 
-    /// Every interfacing.
+    /// A closed internal line of `panel` as a loop (mm, its end left
+    /// out); `None` when it is open or on another piece.
+    pub fn closed_line_outline(&self, panel: PanelId, line: InternalLineId) -> Option<Vec<DVec2>> {
+        let l = self.internal_line(line)?;
+        let mut pts = self.internal_line_polyline(line)?;
+        let closed = pts.len() > 3
+            && pts
+                .first()
+                .zip(pts.last())
+                .is_some_and(|(a, b)| a.distance(*b) < 1e-6);
+        if l.panel != panel || !closed {
+            return None;
+        }
+        pts.pop();
+        Some(pts)
+    }
+
+    /// Every quilting.
+    pub fn quiltings(&self) -> impl Iterator<Item = (crate::id::DetailId, &Quilting)> {
+        self.details.iter().filter_map(|(id, d)| match d {
+            Detail::Quilting(q) => Some((*id, q)),
+            _ => None,
+        })
+    }
+
+    /// Where a quilting is (mm, a closed loop); `None` when its piece or
+    /// line is gone or the line is open.
+    pub fn quilting_outline(&self, q: &Quilting) -> Option<Vec<DVec2>> {
+        match q.line {
+            Some(line) => self.closed_line_outline(q.panel, line),
+            None => self.panel_outline(q.panel),
+        }
+    }
+
+    /// A quilting's thread colour (`0xRRGGBB`).
+    pub fn quilting_rgb(&self, q: &Quilting) -> u32 {
+        q.color.as_deref().and_then(parse_hex).unwrap_or_else(|| {
+            let garment = self
+                .panel(q.panel)
+                .and_then(|p| self.garments().get(&p.garment));
+            darker(garment.map_or(0x808080, |g| g.rgb()))
+        })
+    }
+
+    /// A quilting's stitched lines on the pattern (mm), inside its area
+    /// and its piece, spaced `spacing_mm` apart through the area's middle.
+    /// Where lines of the two families cross, both have a point.
+    pub fn quilting_lines(&self, q: &Quilting) -> Vec<Vec<DVec2>> {
+        let (Some(panel), Some(area)) = (self.panel(q.panel), self.quilting_outline(q)) else {
+            return Vec::new();
+        };
+        let Some(bb) = r3d_geom::polygon::bounding_box(&area) else {
+            return Vec::new();
+        };
+        let centre = (bb.min + bb.max) / 2.0;
+        let reach = bb.min.distance(bb.max) / 2.0 + q.spacing_mm;
+        let mut loops = vec![area.clone()];
+        loops.extend(self.hole_outlines(q.panel));
+        // A line on the area's edge is that edge: not stitched again.
+        let along_edge = |run: &[DVec2]| {
+            run.windows(2).all(|w| match w {
+                [a, b] => {
+                    r3d_geom::polygon::distance_to_loop(&area, (*a + *b) / 2.0) < BOUND_CLEAR_MM
+                }
+                _ => true,
+            })
+        };
+        let mut lines: Vec<Vec<DVec2>> = Vec::new();
+        for dir in q.directions(panel.grain_angle_deg) {
+            let across = dir.perp();
+            let n = (reach / q.spacing_mm).ceil() as i64;
+            for k in -n..=n {
+                let mid = centre + across * (k as f64 * q.spacing_mm);
+                let line = [mid - dir * reach, mid + dir * reach];
+                lines.extend(
+                    clip_inside(&line, &loops)
+                        .into_iter()
+                        .filter(|run| !along_edge(run)),
+                );
+            }
+        }
+        with_crossings(&lines)
+    }
     pub fn interfacings(&self) -> impl Iterator<Item = (crate::id::DetailId, &Interfacing)> {
         self.details.iter().filter_map(|(id, d)| match d {
             Detail::Interfacing(i) => Some((*id, i)),
@@ -378,20 +580,7 @@ impl Project {
         let panel = self.panel(i.panel)?;
         match &i.area {
             InterfacingArea::Whole => self.panel_outline(i.panel),
-            InterfacingArea::Inside { line } => {
-                let l = self.internal_line(*line)?;
-                let mut pts = self.internal_line_polyline(*line)?;
-                let closed = pts.len() > 3
-                    && pts
-                        .first()
-                        .zip(pts.last())
-                        .is_some_and(|(a, b)| a.distance(*b) < 1e-6);
-                if l.panel != i.panel || !closed {
-                    return None;
-                }
-                pts.pop();
-                Some(pts)
-            }
+            InterfacingArea::Inside { line } => self.closed_line_outline(i.panel, *line),
             InterfacingArea::Band { edges, width_mm } => {
                 let on_piece = !edges.is_empty()
                     && edges.iter().all(|e| panel.contour.contains(e))

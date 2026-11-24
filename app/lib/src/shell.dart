@@ -6333,7 +6333,8 @@ class _DetailsCard extends StatelessWidget {
   static bool on(Map<String, dynamic> d, String panel) =>
       _elastics(d, panel).isNotEmpty ||
       _of(d, 'topstitches', panel).isNotEmpty ||
-      _of(d, 'interfacings', panel).isNotEmpty;
+      _of(d, 'interfacings', panel).isNotEmpty ||
+      _of(d, 'quiltings', panel).isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -6397,6 +6398,30 @@ class _DetailsCard extends StatelessWidget {
               ),
             ),
           ],
+          for (final q in _of(details, 'quiltings', panel))
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    l.detailQuilting(
+                      q['pattern'] == 'channels'
+                          ? l.quiltingChannels
+                          : l.quiltingDiamonds,
+                      context.number((q['spacing_mm'] as num) / 10, 1),
+                      context.number(q['loft_mm'] as num, 0),
+                    ),
+                    style: label,
+                  ),
+                ),
+                IconButton(
+                  tooltip: l.trimRemove,
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.close_rounded, size: 16),
+                  onPressed: () =>
+                      run({'type': 'quilting.remove', 'quilting': q['id']}),
+                ),
+              ],
+            ),
           for (final i in _of(details, 'interfacings', panel))
             Row(
               children: [

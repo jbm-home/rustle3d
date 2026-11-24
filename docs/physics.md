@@ -228,7 +228,18 @@ area's boundary is a mesh line, so the change follows it.
   normal by `loft · sin(π d / s)`, `d` its distance on the pattern to
   the nearest stitched line and `s` the spacing (clamped at the
   middle), both families of lines for diamonds. A quilted piece is
-  meshed at a quarter of the spacing at most.
+  meshed at a quarter of the spacing at most. The puff is nothing at the
+  quilted area's edge too (sewn flat there), and stitches, buttons and
+  lines drawn on the cloth sit on the puffed surface. The two families
+  of lines of diamonds share their crossing points exactly (computed
+  once): computed twice, they differed by 10⁻¹³ mm and the mesher could
+  not join two lines through two vertices that close. Creases are
+  `SimScene::creases` (two particles, a bending rigidity), read when the
+  hinges are made: the GPU sees ordinary hinges.
+
+  Measured on the shirt with its fronts quilted in 5 cm diamonds and its
+  back in 6 cm channels (10 mm padding): 5 264 particles against about
+  1 800 unquilted, 89 ms per frame on the CPU.
 
 ### Fabric parameters (our own documented model)
 

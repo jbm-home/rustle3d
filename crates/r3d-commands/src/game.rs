@@ -402,6 +402,8 @@ pub fn game_scene(
 fn merge(d: &Dressed<'_>) -> Vec<Merged> {
     let project = d.project;
     let particles = &d.drape.scene.particles;
+    // Quilted cloth with its puffs.
+    let draped = d.drape.puffed(d.positions);
     project
         .garments_by_layer()
         .into_iter()
@@ -433,7 +435,7 @@ fn merge(d: &Dressed<'_>) -> Vec<Merged> {
             let mut flats: Vec<(usize, Vec<Vec2>)> = Vec::new();
             for piece in pieces {
                 let (Some(at), Some(rest)) = (
-                    d.positions.get(piece.particles.clone()),
+                    draped.get(piece.particles.clone()),
                     particles.get(piece.particles.clone()),
                 ) else {
                     continue;

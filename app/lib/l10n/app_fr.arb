@@ -990,5 +990,20 @@
   "tpInterfacingArea": "Surface (m²)",
   "tpWoven": "tissé",
   "tpNonWoven": "non tissé",
-  "tpKnit": "maille"
+  "tpKnit": "maille",
+  "barQuilting": "Matelassage",
+  "barQuiltingHint": "Matelasser la pièce sur un rembourrage : elle gonfle entre les piqûres.",
+  "quiltingTitle": "Matelassage",
+  "quiltingSpacing": "Entre les piqûres",
+  "quiltingLoft": "Rembourrage",
+  "quiltingDiamonds": "losanges",
+  "quiltingChannels": "canaux",
+  "detailQuilting": "Matelassé en {pattern} · tous les {cm} cm, rembourrage {mm} mm",
+  "tpPadding": "Rembourrage",
+  "tpLoft": "Épaisseur (mm)",
+  "tpPaddingWeight": "Grammage (g/m²)",
+  "tpQuilting": "Matelassage",
+  "tpPatternKind": "Motif",
+  "tpAngle": "Angle (°)",
+  "tpSpacing": "Écart (mm)"
 }

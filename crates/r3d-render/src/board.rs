@@ -77,6 +77,7 @@ pub struct BoardScene {
     pub zippers: Vec<BoardZipper>,
     /// Where each elastic runs (mm).
     pub elastics: Vec<Vec<DVec2>>,
+    /// Topstitches, then quiltings' stitched lines.
     pub topstitches: Vec<BoardTopstitch>,
     /// Each interfacing's outline (mm), hatched.
     pub interfacings: Vec<Vec<DVec2>>,
@@ -263,6 +264,12 @@ impl BoardScene {
                 rgb: project.thread_rgb(t),
                 width_mm: t.thread.width_mm(),
             })
+            .chain(project.quiltings().map(|(_, q)| BoardTopstitch {
+                rows: project.quilting_lines(q),
+                stitch_mm: q.stitch_mm,
+                rgb: project.quilting_rgb(q),
+                width_mm: r3d_core::Thread::Normal.width_mm(),
+            }))
             .collect();
         Self {
             panels,

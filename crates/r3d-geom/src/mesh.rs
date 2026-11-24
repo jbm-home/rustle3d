@@ -214,6 +214,8 @@ fn crossings(lines: &[Vec<DVec2>]) -> std::collections::HashMap<(usize, usize), 
     let mut out: std::collections::HashMap<(usize, usize), Vec<(f64, DVec2)>> =
         std::collections::HashMap::new();
     const EPS: f64 = 1e-9;
+    // Points this close (mm) are one.
+    const NEAR: f64 = 1e-3;
     for (n, (k1, i1, a, b)) in segments.iter().enumerate() {
         for (k2, i2, c, d) in segments.iter().skip(n + 1) {
             // Consecutive segments of one line share their end already.
@@ -232,12 +234,13 @@ fn crossings(lines: &[Vec<DVec2>]) -> std::collections::HashMap<(usize, usize), 
                 continue;
             }
             let p = *a + r * t;
-            // A crossing inside a segment becomes a vertex of it; at a
-            // segment's end, it is one already.
-            if t > EPS && t < 1.0 - EPS {
+            // A crossing inside a segment becomes a vertex of it; at (or
+            // within a micrometre of) a segment's end, it is one already.
+            let inside = |x: DVec2, y: DVec2| p.distance(x) > NEAR && p.distance(y) > NEAR;
+            if inside(*a, *b) {
                 out.entry((*k1, *i1)).or_default().push((t, p));
             }
-            if u > EPS && u < 1.0 - EPS {
+            if inside(*c, *d) {
                 out.entry((*k2, *i2)).or_default().push((u, p));
             }
         }

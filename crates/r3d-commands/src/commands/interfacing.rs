@@ -37,7 +37,7 @@ pub(crate) fn get_interfacing(p: &Project, id: DetailId) -> Result<Interfacing, 
 
 /// Two closed outlines share some area: one's point inside the other, or
 /// their edges cross.
-fn overlap(a: &[DVec2], b: &[DVec2]) -> bool {
+pub(crate) fn overlap(a: &[DVec2], b: &[DVec2]) -> bool {
     let edges = |l: &[DVec2]| -> Vec<(DVec2, DVec2)> {
         (0..l.len())
             .filter_map(|i| Some((*l.get(i)?, *l.get((i + 1) % l.len())?)))

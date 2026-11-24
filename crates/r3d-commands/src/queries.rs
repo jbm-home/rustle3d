@@ -759,7 +759,7 @@ impl QuerySpec for TrimList {
 pub struct DetailList {}
 
 impl Described for DetailList {
-    const SUMMARY: &'static str = "Every construction detail: elastics (their side, piece, ratio, width, the side's length and the relaxed length in each size of the range, or in the drawn size) topstitches (their side, piece, rows, distance, gap, stitch length, thread and its colour, the length of each row on the piece) and interfacings (their piece, area, fabric, weight, and the area they cover in mm²); mm.";
+    const SUMMARY: &'static str = "Every construction detail: elastics (their side, piece, ratio, width, the side's length and the relaxed length in each size of the range, or in the drawn size) topstitches (their side, piece, rows, distance, gap, stitch length, thread and its colour, the length of each row on the piece) interfacings (their piece, area, fabric, weight, and the area they cover in mm²) and quiltings (their piece and line, pattern, angle, spacing, padding, stitch, thread colour, the area quilted in mm² and the stitched lines' length); mm.";
 }
 
 impl QuerySpec for DetailList {
@@ -830,10 +830,39 @@ impl QuerySpec for DetailList {
                 })
             })
             .collect();
+        let quiltings: Vec<Value> = p
+            .quiltings()
+            .map(|(id, q)| {
+                let area = p
+                    .quilting_outline(q)
+                    .map(|o| r3(r3d_geom::polygon::signed_area(&o).abs()));
+                let stitched: f64 = p
+                    .quilting_lines(q)
+                    .iter()
+                    .map(|l| r3d_core::seam::polyline_length(l))
+                    .sum();
+                serde_json::json!({
+                    "id": id,
+                    "panel": q.panel,
+                    "panel_name": p.panel(q.panel).map(|panel| panel.name.clone()),
+                    "line": q.line,
+                    "pattern": q.pattern,
+                    "angle_deg": r3(q.angle_deg),
+                    "spacing_mm": r3(q.spacing_mm),
+                    "loft_mm": r3(q.loft_mm),
+                    "padding_gsm": r3(q.padding_gsm),
+                    "stitch_mm": r3(q.stitch_mm),
+                    "color": format!("#{:06X}", p.quilting_rgb(q)),
+                    "area_mm2": area,
+                    "stitched_mm": r3(stitched),
+                })
+            })
+            .collect();
         Ok(serde_json::json!({
             "elastics": elastics,
             "topstitches": topstitches,
             "interfacings": interfacings,
+            "quiltings": quiltings,
         }))
     }
 }

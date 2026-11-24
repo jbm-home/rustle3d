@@ -375,6 +375,7 @@ pub(crate) fn settle_details(tx: &mut Transaction<'_>) {
                 !p.side_length(side).is_some_and(|len| len > 0.0)
             }
             Detail::Interfacing(i) => p.interfacing_outline(i).is_none(),
+            Detail::Quilting(q) => p.quilting_outline(q).is_none(),
         })
         .map(|(id, _)| *id)
         .collect();

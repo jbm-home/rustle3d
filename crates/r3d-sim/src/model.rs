@@ -211,7 +211,12 @@ impl Model {
             }
         }
 
-        // Interior edges → hinges.
+        // Interior edges → hinges; creases bend as they say.
+        let creases: HashMap<(u32, u32), f32> = scene
+            .creases
+            .iter()
+            .map(|([a, b], bending)| ((*a.min(b), *a.max(b)), *bending))
+            .collect();
         let mut open: HashMap<(u32, u32), (usize, u32, u32, u32)> = HashMap::new();
         let mut hinges = Vec::new();
         for (ti, t) in triangles.iter().enumerate() {
@@ -226,7 +231,10 @@ impl Model {
                     ) else {
                         continue;
                     };
-                    let bending = 0.5 * (fabric_a.bending + fabric_b.bending);
+                    let bending = creases
+                        .get(&key)
+                        .copied()
+                        .unwrap_or(0.5 * (fabric_a.bending + fabric_b.bending));
                     let e2 = (rest(a0) - rest(b0)).length_squared();
                     let areas = rest_area[tj] + rest_area[ti];
                     if areas > 1e-10 && bending > 0.0 {
