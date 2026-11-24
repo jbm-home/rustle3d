@@ -1,11 +1,12 @@
 //! Construction details that change the cloth where they are
-//! (`docs/specs/31-construction-details-2.md`): elastic, topstitching.
+//! (`docs/specs/31-construction-details-2.md`): elastic, topstitching,
+//! interfacing.
 
 use glam::DVec2;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::id::PanelId;
+use crate::id::{EdgeId, InternalLineId, PanelId};
 use crate::model::{Project, SeamSide};
 
 /// The smallest and largest elastic ratios (relaxed length over the
@@ -38,6 +39,63 @@ pub enum Detail {
     Elastic(Elastic),
     /// Rows of stitches along a side, seen on the right side.
     Topstitch(Topstitch),
+    /// A fused interfacing on part of a piece.
+    Interfacing(Interfacing),
+}
+
+/// The widest band of interfacing along edges (mm).
+pub const INTERFACING_BAND_MM: f64 = 300.0;
+
+/// How an interfacing is made: how it stretches.
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum InterfacingFabric {
+    #[default]
+    Woven,
+    NonWoven,
+    /// Stretches across, with the cloth.
+    Knit,
+}
+
+/// How heavy an interfacing is.
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum InterfacingWeight {
+    Light,
+    #[default]
+    Medium,
+    Heavy,
+}
+
+/// Where an interfacing is fused.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum InterfacingArea {
+    /// The whole piece.
+    Whole,
+    /// A band `width_mm` wide inside consecutive outline edges, in their
+    /// order around the piece (a facing, a waistband, a front band).
+    Band { edges: Vec<EdgeId>, width_mm: f64 },
+    /// Inside a closed internal line (its ends together).
+    Inside { line: InternalLineId },
+}
+
+/// A fused interfacing on part of a piece: it makes the cloth there
+/// heavier, thicker and much stiffer to bend (docs/physics.md,
+/// "Composite cloth").
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Interfacing {
+    pub panel: PanelId,
+    pub area: InterfacingArea,
+    #[serde(default)]
+    pub fabric: InterfacingFabric,
+    #[serde(default)]
+    pub weight: InterfacingWeight,
 }
 
 /// The thread a topstitch is sewn with.
@@ -116,6 +174,42 @@ pub fn parse_hex(c: &str) -> Option<u32> {
 fn darker(rgb: u32) -> u32 {
     let ch = |s: u32| (((rgb >> s) & 0xFF) as f64 * 0.6).round() as u32;
     (ch(16) << 16) | (ch(8) << 8) | ch(0)
+}
+
+/// An interfacing's bounds stay this far from the piece's outline (mm).
+const BOUND_CLEAR_MM: f64 = 1.0;
+
+/// `line` with points added so none are more than `step` apart.
+fn densified(line: &[DVec2], step: f64) -> Vec<DVec2> {
+    let mut out = Vec::new();
+    for w in line.windows(2) {
+        if let [a, b] = w {
+            let n = ((a.distance(*b) / step).ceil() as usize).max(1);
+            out.extend((0..n).map(|k| a.lerp(*b, k as f64 / n as f64)));
+        }
+    }
+    out.extend(line.last());
+    out
+}
+
+/// The parts of `run` farther than `clear` from the loop `outline`.
+fn split_near(run: &[DVec2], outline: &[DVec2], clear: f64) -> Vec<Vec<DVec2>> {
+    let far = |p: DVec2| r3d_geom::polygon::distance_to_loop(outline, p) > clear;
+    let mut out = Vec::new();
+    let mut part: Vec<DVec2> = Vec::new();
+    for p in run {
+        if far(*p) {
+            part.push(*p);
+        } else if part.len() > 1 {
+            out.push(std::mem::take(&mut part));
+        } else {
+            part.clear();
+        }
+    }
+    if part.len() > 1 {
+        out.push(part);
+    }
+    out
 }
 
 /// Rows stop this far inside the outline (mm).
@@ -248,6 +342,7 @@ impl Detail {
         match self {
             Detail::Elastic(e) => p.side_panel(&e.side),
             Detail::Topstitch(t) => p.side_panel(&t.side),
+            Detail::Interfacing(i) => Some(i.panel),
         }
     }
 }
@@ -269,6 +364,83 @@ impl Project {
         })
     }
 
+    /// Every interfacing.
+    pub fn interfacings(&self) -> impl Iterator<Item = (crate::id::DetailId, &Interfacing)> {
+        self.details.iter().filter_map(|(id, d)| match d {
+            Detail::Interfacing(i) => Some((*id, i)),
+            _ => None,
+        })
+    }
+
+    /// The outline of an interfacing on the pattern (mm), a closed loop;
+    /// `None` when what it names is gone, open or not on its piece.
+    pub fn interfacing_outline(&self, i: &Interfacing) -> Option<Vec<DVec2>> {
+        let panel = self.panel(i.panel)?;
+        match &i.area {
+            InterfacingArea::Whole => self.panel_outline(i.panel),
+            InterfacingArea::Inside { line } => {
+                let l = self.internal_line(*line)?;
+                let mut pts = self.internal_line_polyline(*line)?;
+                let closed = pts.len() > 3
+                    && pts
+                        .first()
+                        .zip(pts.last())
+                        .is_some_and(|(a, b)| a.distance(*b) < 1e-6);
+                if l.panel != i.panel || !closed {
+                    return None;
+                }
+                pts.pop();
+                Some(pts)
+            }
+            InterfacingArea::Band { edges, width_mm } => {
+                let on_piece = !edges.is_empty()
+                    && edges.iter().all(|e| panel.contour.contains(e))
+                    && width_mm.is_finite()
+                    && *width_mm > 0.0;
+                if !on_piece {
+                    return None;
+                }
+                let mut side: Vec<DVec2> = Vec::new();
+                for e in edges {
+                    for p in self.edge_polyline(*e)? {
+                        if side.last().is_none_or(|q| q.distance(p) > 1e-9) {
+                            side.push(p);
+                        }
+                    }
+                }
+                // The edges, then back along them `width_mm` inside.
+                let mut inner = offset_polyline(&side, *width_mm);
+                inner.reverse();
+                side.extend(inner);
+                (side.len() > 3).then_some(side)
+            }
+        }
+    }
+
+    /// The lines that bound an interfacing inside its piece, for the
+    /// mesh: its outline cut where it runs on the piece's (mm). None for
+    /// a whole piece.
+    pub fn interfacing_bounds(&self, i: &Interfacing) -> Vec<Vec<DVec2>> {
+        let (Some(mut outline), Some(piece)) =
+            (self.interfacing_outline(i), self.panel_outline(i.panel))
+        else {
+            return Vec::new();
+        };
+        if matches!(i.area, InterfacingArea::Whole) {
+            return Vec::new();
+        }
+        if let Some(first) = outline.first().copied() {
+            outline.push(first);
+        }
+        // Only where it runs inside the piece, 1 mm clear of its outline
+        // (an edge along the piece's is the piece's own).
+        let mut loops = vec![piece.clone()];
+        loops.extend(self.hole_outlines(i.panel));
+        clip_inside(&outline, &loops)
+            .into_iter()
+            .flat_map(|run| split_near(&densified(&run, BOUND_CLEAR_MM), &piece, BOUND_CLEAR_MM))
+            .collect()
+    }
     /// A topstitch's thread colour (`0xRRGGBB`): its own, or a darker
     /// shade of its garment's.
     pub fn thread_rgb(&self, t: &Topstitch) -> u32 {

@@ -1306,28 +1306,60 @@ const TOPSTITCH_BAND_EXTRA_MM: f64 = 2.0;
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
 struct Covers {
     topstitched: bool,
+    interfacing: Option<(r3d_sim::InterfacingMake, r3d_sim::InterfacingWeight)>,
 }
 
 impl Covers {
     /// `base` changed by what covers it (docs/physics.md, "Composite
     /// cloth").
     fn fabric(self, base: r3d_sim::FabricParams) -> r3d_sim::FabricParams {
-        if self.topstitched {
-            base.topstitched()
-        } else {
-            base
+        let mut out = base;
+        if let Some((make, weight)) = self.interfacing {
+            out = out.fused(r3d_sim::fabric::interfacing(make, weight));
         }
+        if self.topstitched {
+            out = out.topstitched();
+        }
+        out
     }
+}
+
+/// The solver's interfacing for the document's.
+fn interfacing_of(
+    i: &r3d_core::Interfacing,
+) -> (r3d_sim::InterfacingMake, r3d_sim::InterfacingWeight) {
+    use r3d_core::{InterfacingFabric as F, InterfacingWeight as W};
+    let make = match i.fabric {
+        F::Woven => r3d_sim::InterfacingMake::Woven,
+        F::NonWoven => r3d_sim::InterfacingMake::NonWoven,
+        F::Knit => r3d_sim::InterfacingMake::Knit,
+    };
+    let weight = match i.weight {
+        W::Light => r3d_sim::InterfacingWeight::Light,
+        W::Medium => r3d_sim::InterfacingWeight::Medium,
+        W::Heavy => r3d_sim::InterfacingWeight::Heavy,
+    };
+    (make, weight)
 }
 
 /// Where the details of `panel` change its cloth, on the pattern (mm).
 struct PieceCovers {
     /// Each topstitch's side and how far from it its band reaches.
     stitched: Vec<(Vec<DVec2>, f64)>,
+    /// Each interfacing's outline and what it is.
+    interfaced: Vec<(
+        Vec<DVec2>,
+        (r3d_sim::InterfacingMake, r3d_sim::InterfacingWeight),
+    )>,
 }
 
 impl PieceCovers {
     fn of(project: &Project, panel: PanelId) -> Self {
+        let interfaced = project
+            .interfacings()
+            .filter(|(_, i)| i.panel == panel)
+            .filter_map(|(_, i)| Some((project.interfacing_outline(i)?, interfacing_of(i))))
+            .collect();
         let stitched = project
             .topstitches()
             .filter(|(_, t)| project.side_panel(&t.side) == Some(panel))
@@ -1336,7 +1368,10 @@ impl PieceCovers {
                 Some((line, t.reach_mm().abs() + TOPSTITCH_BAND_EXTRA_MM))
             })
             .collect();
-        Self { stitched }
+        Self {
+            stitched,
+            interfaced,
+        }
     }
 
     /// What covers the triangle with corners `corners` (mm).
@@ -1349,8 +1384,14 @@ impl PieceCovers {
                 })
             })
         };
+        let centroid = (corners[0] + corners[1] + corners[2]) / 3.0;
         Covers {
             topstitched: self.stitched.iter().any(|(line, reach)| near(line, *reach)),
+            interfacing: self
+                .interfaced
+                .iter()
+                .find(|(outline, _)| r3d_geom::polygon::contains(outline, centroid))
+                .map(|(_, what)| *what),
         }
     }
 }
@@ -1590,6 +1631,23 @@ pub fn build(
             .filter(|(_, p)| clear_of(*p, &boundary, &hole_pts, 0.25 * spacing))
             .collect();
         line_pts.extend(ends.iter().map(|(_, p)| vec![*p]));
+        // Interfacings end on mesh lines (but on lines meshed already).
+        for (_, i) in project.interfacings().filter(|(_, i)| i.panel == *panel_id) {
+            if let r3d_core::InterfacingArea::Inside { line } = &i.area
+                && samples.contains_key(&Track::Line(*line))
+            {
+                continue;
+            }
+            for bound in project.interfacing_bounds(i) {
+                let len = r3d_core::seam::polyline_length(&bound);
+                let n = ((len / spacing).ceil() as usize).max(1);
+                line_pts.push(
+                    (0..=n)
+                        .map(|k| r3d_core::seam::point_along(&bound, len * k as f64 / n as f64).0)
+                        .collect(),
+                );
+            }
+        }
         // Finer triangles along the piece's elastics.
         let fine: Vec<FineZone> = project
             .elastics()

@@ -78,6 +78,8 @@ pub struct BoardScene {
     /// Where each elastic runs (mm).
     pub elastics: Vec<Vec<DVec2>>,
     pub topstitches: Vec<BoardTopstitch>,
+    /// Each interfacing's outline (mm), hatched.
+    pub interfacings: Vec<Vec<DVec2>>,
 }
 
 /// A topstitch on the board: its rows (mm), its stitch length (mm), its
@@ -249,6 +251,10 @@ impl BoardScene {
             .elastics()
             .filter_map(|(_, e)| project.side_polyline(&e.side))
             .collect();
+        let interfacings = project
+            .interfacings()
+            .filter_map(|(_, i)| project.interfacing_outline(i))
+            .collect();
         let topstitches = project
             .topstitches()
             .map(|(_, t)| BoardTopstitch {
@@ -271,6 +277,7 @@ impl BoardScene {
             zippers,
             elastics,
             topstitches,
+            interfacings,
         }
     }
 
@@ -894,6 +901,14 @@ impl BoardRenderer {
                 .collect();
             batch.polyline(&zigzag, false, 1.5 * px, ELASTIC);
         }
+        // Interfacings: hatched at 45°, a few pixels apart on screen.
+        for outline in &scene.interfacings {
+            let mut color = theme.panel_line;
+            color[3] *= 0.3;
+            for (a, b) in hatch(outline, 7.0 * px) {
+                batch.segment(a, b, 1.0 * px, color);
+            }
+        }
         // Topstitches: their stitches at their real length, a gap where
         // the thread goes in, in the thread's colour over a faint dark
         // edge (a white thread shows on a white piece).
@@ -1040,4 +1055,43 @@ impl BoardRenderer {
         let used: Vec<u64> = runs.iter().map(|r| r.0).collect();
         self.prints.retain(&used);
     }
+}
+
+/// Segments at 45° every `gap` that fill the closed `outline` (even–odd).
+fn hatch(outline: &[DVec2], gap: f64) -> Vec<(DVec2, DVec2)> {
+    let Some(bb) = r3d_geom::polygon::bounding_box(outline) else {
+        return Vec::new();
+    };
+    if gap.is_nan() || gap <= 0.0 {
+        return Vec::new();
+    }
+    // Lines x − y = c, from the box's lowest c to its highest.
+    let dir = DVec2::new(1.0, 1.0).normalize();
+    let (c0, c1) = (bb.min.x - bb.max.y, bb.max.x - bb.min.y);
+    let step = gap * std::f64::consts::SQRT_2;
+    let n = outline.len();
+    let mut out = Vec::new();
+    let mut c = c0 + step / 2.0;
+    while c < c1 {
+        let origin = DVec2::new(c, 0.0);
+        let mut hits: Vec<f64> = (0..n)
+            .filter_map(|i| {
+                let (a, b) = (*outline.get(i)?, *outline.get((i + 1) % n)?);
+                let e = b - a;
+                let denom = dir.perp_dot(e);
+                if denom.abs() < 1e-12 {
+                    return None;
+                }
+                let w = a - origin;
+                let s = w.perp_dot(dir) / denom;
+                (0.0..1.0).contains(&s).then(|| w.perp_dot(e) / denom)
+            })
+            .collect();
+        hits.sort_by(f64::total_cmp);
+        for pair in hits.as_chunks::<2>().0 {
+            out.push((origin + dir * pair[0], origin + dir * pair[1]));
+        }
+        c += step;
+    }
+    out
 }

@@ -446,3 +446,41 @@ pub fn an_elastic_gathers_the_edge_it_is_sewn_on(make: Make) {
         "no gathers: {along} m along, {span} m across"
     );
 }
+
+/// How high a 30 × 8 cm band of `fabric`, clamped at its foot and leaning
+/// 5° at the start, stands after 3 s: its top's height over its width.
+fn band_stands(make: Make, fabric: r3d_sim::FabricParams) -> f32 {
+    let n = 16;
+    let lean = 5f32.to_radians();
+    let mut scene = sheet(0.3, 0.08, n, Vec2::Y, |r| {
+        Vec3::new(r.x, 1.0 + r.y * lean.cos(), r.y * lean.sin())
+    });
+    scene.fabrics = vec![fabric];
+    // Two rows held: a single one would be a hinge the band turns about
+    // (an edge of one triangle bends nothing).
+    for p in scene.particles.iter_mut().take(2 * n) {
+        p.pinned = true;
+    }
+    let s = run(make, scene, 3.0);
+    let top: f32 = (n * (n - 1)..n * n)
+        .map(|i| s.positions()[i].y)
+        .sum::<f32>()
+        / n as f32;
+    (top - 1.0) / 0.08
+}
+
+pub fn an_interfaced_band_stands_where_a_bare_one_falls(make: Make) {
+    let cotton = FabricPreset::Cotton.params();
+    let heavy = r3d_sim::fabric::interfacing(
+        r3d_sim::InterfacingMake::NonWoven,
+        r3d_sim::InterfacingWeight::Heavy,
+    );
+    let bare = band_stands(make, cotton);
+    let fused = band_stands(make, cotton.fused(heavy));
+    // Cotton's bending length is about 2 cm: 8 cm of it bends over
+    // (0.52 measured); fused, about 6.5 cm, it stands (0.95 on the CPU,
+    // 0.86 on the GPU, whose sweep in colour order converges the stiff
+    // hinges a little less).
+    assert!(bare < 0.7, "the bare band stands {bare}");
+    assert!(fused > 0.8, "the interfaced band falls: {fused}");
+}

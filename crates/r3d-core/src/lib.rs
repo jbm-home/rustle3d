@@ -27,7 +27,10 @@ pub mod seam;
 pub mod trim;
 
 pub use body::{Measure, MeasureGroup, MeasureValue, Measures};
-pub use detail::{Detail, Elastic, Thread, Topstitch};
+pub use detail::{
+    Detail, Elastic, Interfacing, InterfacingArea, InterfacingFabric, InterfacingWeight, Thread,
+    Topstitch,
+};
 pub use edit::{ChangeSet, Transaction};
 pub use id::DetailId;
 pub use id::{

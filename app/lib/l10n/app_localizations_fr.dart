@@ -3527,4 +3527,59 @@ class LFr extends L {
 
   @override
   String get tpRelaxed => 'Au repos (cm)';
+
+  @override
+  String get barInterfacing => 'Entoilage';
+
+  @override
+  String get barInterfacingHint =>
+      'Thermocoller un entoilage sur toute la pièce : plus raide, elle tient sa forme.';
+
+  @override
+  String get barInterfacingBandHint =>
+      'Thermocoller un entoilage en bande le long de ce bord (parementure, ceinture).';
+
+  @override
+  String get interfacingTitle => 'Entoilage';
+
+  @override
+  String get interfacingWidth => 'Largeur de la bande';
+
+  @override
+  String get interfacingLight => 'léger';
+
+  @override
+  String get interfacingMedium => 'moyen';
+
+  @override
+  String get interfacingHeavy => 'fort';
+
+  @override
+  String detailInterfacing(String weight, String cm2) {
+    return 'Entoilage $weight · $cm2 cm²';
+  }
+
+  @override
+  String get errNotClosed => 'Prenez une ligne fermée sur cette pièce.';
+
+  @override
+  String get tpInterfacing => 'Entoilage';
+
+  @override
+  String get tpInterfacingFabric => 'Sorte';
+
+  @override
+  String get tpInterfacingWeight => 'Poids';
+
+  @override
+  String get tpInterfacingArea => 'Surface (m²)';
+
+  @override
+  String get tpWoven => 'tissé';
+
+  @override
+  String get tpNonWoven => 'non tissé';
+
+  @override
+  String get tpKnit => 'maille';
 }

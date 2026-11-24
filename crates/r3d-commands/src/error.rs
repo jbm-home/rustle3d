@@ -96,6 +96,8 @@ pub enum Invalid {
     HasElastic,
     #[error("is another kind of detail")]
     OtherKind,
+    #[error("must be a closed line (its ends together) on the piece")]
+    NotClosed,
 }
 
 impl Invalid {
@@ -146,6 +148,7 @@ impl Invalid {
             Invalid::MissingMeasurement => "invalid.missing_measurement",
             Invalid::HasElastic => "invalid.has_elastic",
             Invalid::OtherKind => "invalid.other_kind",
+            Invalid::NotClosed => "invalid.not_closed",
         }
     }
 }

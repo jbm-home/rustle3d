@@ -196,6 +196,14 @@ fn every_command_round_trips() {
     h.round_trip(json!({"type": "topstitch.set", "topstitch": topstitch,
         "color": "#203040", "stitch_mm": 4}));
     h.round_trip(json!({"type": "topstitch.remove", "topstitch": topstitch}));
+    let interfacing = h.round_trip(json!({"type": "interfacing.add", "panel": poly_panel,
+        "area": {"kind": "band", "edges": [poly.created[7].to_string()], "width_mm": 30}}));
+    let interfacing = interfacing.created[0].to_string();
+    h.round_trip(
+        json!({"type": "interfacing.set", "interfacing": interfacing,
+        "weight": "heavy", "width_mm": 40}),
+    );
+    h.round_trip(json!({"type": "interfacing.remove", "interfacing": interfacing}));
     h.round_trip(json!({"type": "elastic.shirr", "panel": poly_panel,
         "edge": poly.created[5].to_string(), "rows": 3}));
 

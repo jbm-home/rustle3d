@@ -57,6 +57,16 @@ pub const LABELS: &[(&str, &str)] = &[
     ("button", "Button"),
     ("zipper", "Zipper"),
     ("elastic", "Elastic"),
+    ("interfacing", "Interfacing"),
+    ("interfacing_fabric", "Kind"),
+    ("interfacing_weight", "Weight"),
+    ("interfacing_area", "Area (m²)"),
+    ("woven", "woven"),
+    ("non_woven", "non-woven"),
+    ("knit", "knit"),
+    ("light", "light"),
+    ("medium", "medium"),
+    ("heavy", "heavy"),
     ("elastic_by_size", "Elastic per garment by size (cm)"),
     ("measurements", "Measurements"),
     ("size_chart", "Size chart (body, cm)"),
@@ -382,6 +392,20 @@ impl Writer<'_> {
                 rows: trims,
             });
         }
+        let interfacing = self.interfacing();
+        if !interfacing.is_empty() {
+            blocks.push(Block::Subheading(self.t("interfacing")));
+            blocks.push(Block::Table {
+                columns: vec![
+                    Column::text(self.t("garment"), 2.0),
+                    Column::text(self.t("interfacing_fabric"), 1.2),
+                    Column::text(self.t("interfacing_weight"), 1.0),
+                    Column::number(self.t("interfacing_area"), 1.0),
+                    Column::text(self.t("placement"), 4.0),
+                ],
+                rows: interfacing,
+            });
+        }
         let by_size = self.elastics_by_size(&sizes);
         if !by_size.is_empty() {
             let mut columns = vec![
@@ -479,6 +503,45 @@ impl Writer<'_> {
             });
         }
         blocks
+    }
+
+    /// The interfacing each garment takes, by kind and weight: its area
+    /// in the drawn size (m²) and the pieces it goes on.
+    fn interfacing(&self) -> Vec<Vec<String>> {
+        use r3d_core::{InterfacingFabric as F, InterfacingWeight as W};
+        let p = self.project;
+        let mut rows: std::collections::BTreeMap<(GarmentId, F, W), (Vec<String>, f64)> =
+            Default::default();
+        for (_, i) in p.interfacings() {
+            let (Some(panel), Some(outline)) = (p.panel(i.panel), p.interfacing_outline(i)) else {
+                continue;
+            };
+            let row = rows.entry((panel.garment, i.fabric, i.weight)).or_default();
+            let name = self.piece_name(p, i.panel);
+            if !row.0.contains(&name) {
+                row.0.push(name);
+            }
+            row.1 += r3d_geom::polygon::signed_area(&outline).abs() / 1e6;
+        }
+        rows.into_iter()
+            .map(|((g, fabric, weight), (pieces, m2))| {
+                vec![
+                    self.garment_name(g),
+                    self.t(match fabric {
+                        F::Woven => "woven",
+                        F::NonWoven => "non_woven",
+                        F::Knit => "knit",
+                    }),
+                    self.t(match weight {
+                        W::Light => "light",
+                        W::Medium => "medium",
+                        W::Heavy => "heavy",
+                    }),
+                    self.num(m2, 2),
+                    pieces.join(", "),
+                ]
+            })
+            .collect()
     }
 
     /// The elastic each garment takes, by width: its length (relaxed, each

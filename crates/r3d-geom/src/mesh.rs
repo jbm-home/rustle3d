@@ -198,6 +198,58 @@ fn constrain_loop(cdt: &mut Cdt, pts: &[DVec2]) -> Result<Vec<FixedVertexHandle>
     Ok(handles)
 }
 
+/// Where the lines cross or touch each other: for (line, segment) the
+/// points on that segment, in order from its start (its ends excluded).
+fn crossings(lines: &[Vec<DVec2>]) -> std::collections::HashMap<(usize, usize), Vec<DVec2>> {
+    let segments: Vec<(usize, usize, DVec2, DVec2)> = lines
+        .iter()
+        .enumerate()
+        .flat_map(|(k, l)| {
+            l.windows(2).enumerate().filter_map(move |(i, w)| match w {
+                [a, b] => Some((k, i, *a, *b)),
+                _ => None,
+            })
+        })
+        .collect();
+    let mut out: std::collections::HashMap<(usize, usize), Vec<(f64, DVec2)>> =
+        std::collections::HashMap::new();
+    const EPS: f64 = 1e-9;
+    for (n, (k1, i1, a, b)) in segments.iter().enumerate() {
+        for (k2, i2, c, d) in segments.iter().skip(n + 1) {
+            // Consecutive segments of one line share their end already.
+            if k1 == k2 && i1.abs_diff(*i2) <= 1 {
+                continue;
+            }
+            let (r, s) = (*b - *a, *d - *c);
+            let denom = r.perp_dot(s);
+            if denom.abs() < EPS {
+                continue;
+            }
+            let w = *c - *a;
+            let t = w.perp_dot(s) / denom;
+            let u = w.perp_dot(r) / denom;
+            if !((-EPS..=1.0 + EPS).contains(&t) && (-EPS..=1.0 + EPS).contains(&u)) {
+                continue;
+            }
+            let p = *a + r * t;
+            // A crossing inside a segment becomes a vertex of it; at a
+            // segment's end, it is one already.
+            if t > EPS && t < 1.0 - EPS {
+                out.entry((*k1, *i1)).or_default().push((t, p));
+            }
+            if u > EPS && u < 1.0 - EPS {
+                out.entry((*k2, *i2)).or_default().push((u, p));
+            }
+        }
+    }
+    out.into_iter()
+        .map(|(key, mut pts)| {
+            pts.sort_by(|x, y| x.0.total_cmp(&y.0));
+            (key, pts.into_iter().map(|(_, p)| p).collect())
+        })
+        .collect()
+}
+
 /// Triangulate the closed polygon `boundary` (counter-clockwise, without a
 /// repeated first point) with interior triangles of about `spacing` edge
 /// length, leaving out `holes` (closed loops inside it) and following
@@ -239,17 +291,29 @@ pub fn mesh_panel(
             .with_max_allowed_area(target_area * 1.2)
             .with_angle_limit(AngleLimit::from_deg(25.0)),
     );
+    if lines.iter().flatten().any(|p| !p.is_finite()) {
+        return Err(MeshError::LineOutside);
+    }
+    // Lines that cross or touch one another meet at a shared vertex.
+    let crossings = crossings(lines);
     let mut line_handles = Vec::with_capacity(lines.len());
-    for line in lines {
-        if line.iter().any(|p| !p.is_finite()) {
-            return Err(MeshError::LineOutside);
+    for (k, line) in lines.iter().enumerate() {
+        let mut handles = Vec::with_capacity(line.len());
+        let mut walk: Vec<FixedVertexHandle> = Vec::new();
+        for (i, p) in line.iter().enumerate() {
+            let h = cdt
+                .insert(Point2::new(p.x, p.y))
+                .map_err(|_| MeshError::LineOutside)?;
+            walk.push(h);
+            handles.push(h);
+            for q in crossings.get(&(k, i)).into_iter().flatten() {
+                walk.push(
+                    cdt.insert(Point2::new(q.x, q.y))
+                        .map_err(|_| MeshError::LineOutside)?,
+                );
+            }
         }
-        let handles: Vec<FixedVertexHandle> = line
-            .iter()
-            .map(|p| cdt.insert(Point2::new(p.x, p.y)))
-            .collect::<Result<_, _>>()
-            .map_err(|_| MeshError::LineOutside)?;
-        for w in handles.windows(2) {
+        for w in walk.windows(2) {
             if let [a, b] = w {
                 if a == b {
                     continue;
@@ -513,6 +577,25 @@ mod tests {
         assert!(positive);
         // Far from the line, the panel's spacing.
         assert!(fine.vertices.len() < coarse.vertices.len() + 400);
+    }
+
+    #[test]
+    fn crossing_lines_meet_at_a_vertex() {
+        let boundary = resample_closed(&square(100.0), 10.0);
+        let across: Vec<DVec2> = (0..=6)
+            .map(|k| DVec2::new(20.0 + 10.0 * k as f64, 45.0))
+            .collect();
+        let down = vec![DVec2::new(55.0, 20.0), DVec2::new(55.0, 80.0)];
+        let m = mesh_panel(&boundary, &[], &[across.clone(), down.clone()], &[], 10.0).unwrap();
+        // The lines keep their own points, and both pass through the
+        // crossing at (55, 45).
+        assert_eq!(m.lines[0].len(), across.len());
+        assert_eq!(m.lines[1].len(), 2);
+        assert!(
+            m.vertices
+                .iter()
+                .any(|v| v.distance(DVec2::new(55.0, 45.0)) < 1e-9)
+        );
     }
 
     #[test]

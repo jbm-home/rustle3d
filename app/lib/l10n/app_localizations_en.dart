@@ -3497,4 +3497,59 @@ class LEn extends L {
 
   @override
   String get tpRelaxed => 'Relaxed (cm)';
+
+  @override
+  String get barInterfacing => 'Interfacing';
+
+  @override
+  String get barInterfacingHint =>
+      'Fuse an interfacing on the whole piece: stiffer, it holds its shape.';
+
+  @override
+  String get barInterfacingBandHint =>
+      'Fuse an interfacing in a band along this edge (a facing, a waistband).';
+
+  @override
+  String get interfacingTitle => 'Interfacing';
+
+  @override
+  String get interfacingWidth => 'Band width';
+
+  @override
+  String get interfacingLight => 'light';
+
+  @override
+  String get interfacingMedium => 'medium';
+
+  @override
+  String get interfacingHeavy => 'heavy';
+
+  @override
+  String detailInterfacing(String weight, String cm2) {
+    return 'Interfacing, $weight · $cm2 cm²';
+  }
+
+  @override
+  String get errNotClosed => 'Use a closed line on this piece.';
+
+  @override
+  String get tpInterfacing => 'Interfacing';
+
+  @override
+  String get tpInterfacingFabric => 'Kind';
+
+  @override
+  String get tpInterfacingWeight => 'Weight';
+
+  @override
+  String get tpInterfacingArea => 'Area (m²)';
+
+  @override
+  String get tpWoven => 'woven';
+
+  @override
+  String get tpNonWoven => 'non-woven';
+
+  @override
+  String get tpKnit => 'knit';
 }

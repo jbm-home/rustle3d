@@ -37,6 +37,71 @@ impl FabricParams {
     }
 }
 
+/// How an interfacing is made (docs/physics.md, "Composite cloth").
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum InterfacingMake {
+    Woven,
+    NonWoven,
+    Knit,
+}
+
+/// How heavy an interfacing is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum InterfacingWeight {
+    Light,
+    Medium,
+    Heavy,
+}
+
+/// Fused layers bend about a shared neutral axis: their rigidity is this
+/// many times the sum of theirs (a plate's t³ law gives 4 for two equal
+/// layers; our estimate, to calibrate).
+pub const FUSED_BENDING: f32 = 3.0;
+
+/// An interfacing on its own: weight, thickness, stretch (warp, weft),
+/// shear and bending, in SI units. Estimates from general textile
+/// knowledge (docs/physics.md, "Composite cloth").
+pub fn interfacing(make: InterfacingMake, weight: InterfacingWeight) -> FabricParams {
+    // (g/m², mm, stretch N/m, woven shear N/m, non-woven shear N/m, µN·m)
+    let (gsm, mm, stretch, woven_shear, felt_shear, bend) = match weight {
+        InterfacingWeight::Light => (25.0, 0.15, 3000.0, 20.0, 100.0, 10.0),
+        InterfacingWeight::Medium => (45.0, 0.25, 5000.0, 40.0, 200.0, 40.0),
+        InterfacingWeight::Heavy => (80.0, 0.40, 8000.0, 80.0, 400.0, 150.0),
+    };
+    let (weft, shear) = match make {
+        InterfacingMake::Woven => (stretch, woven_shear),
+        InterfacingMake::NonWoven => (stretch, felt_shear),
+        InterfacingMake::Knit => (stretch / 20.0, woven_shear / 4.0),
+    };
+    FabricParams {
+        density: gsm / 1000.0,
+        thickness: mm / 1000.0,
+        stretch_warp: stretch,
+        stretch_weft: weft,
+        shear,
+        bending: bend * 1e-6,
+        friction: 0.0,
+        damping: 0.0,
+    }
+}
+
+impl FabricParams {
+    /// The cloth with `layer` fused to it: weights, thicknesses and
+    /// in-plane stiffnesses add; bending is [`FUSED_BENDING`] times the
+    /// sum. Friction and damping stay the cloth's.
+    pub fn fused(self, layer: FabricParams) -> Self {
+        Self {
+            density: self.density + layer.density,
+            thickness: self.thickness + layer.thickness,
+            stretch_warp: self.stretch_warp + layer.stretch_warp,
+            stretch_weft: self.stretch_weft + layer.stretch_weft,
+            shear: self.shear + layer.shear,
+            bending: FUSED_BENDING * (self.bending + layer.bending),
+            ..self
+        }
+    }
+}
+
 /// The built-in fabrics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]

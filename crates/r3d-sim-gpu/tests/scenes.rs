@@ -86,3 +86,8 @@ fn simulation_is_deterministic() {
 fn an_elastic_gathers_the_edge_it_is_sewn_on() {
     on_gpu(reference::an_elastic_gathers_the_edge_it_is_sewn_on);
 }
+
+#[test]
+fn an_interfaced_band_stands_where_a_bare_one_falls() {
+    on_gpu(reference::an_interfaced_band_stands_where_a_bare_one_falls);
+}

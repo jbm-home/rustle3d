@@ -20,7 +20,7 @@ use crate::model::Project;
 /// Identifies a Rustle3D project file.
 pub const FORMAT: &str = "rustle3d.project";
 /// Version written by this build.
-pub const SCHEMA_VERSION: u32 = 23;
+pub const SCHEMA_VERSION: u32 = 24;
 
 type Migration = fn(Value) -> Result<Value, FileError>;
 
@@ -48,6 +48,7 @@ const MIGRATIONS: &[Migration] = &[
     migrate_v20_to_v21,
     migrate_v21_to_v22,
     migrate_v22_to_v23,
+    migrate_v23_to_v24,
 ];
 
 fn object<'a>(
@@ -57,6 +58,12 @@ fn object<'a>(
     value.as_object_mut().ok_or_else(|| FileError::Json {
         detail: format!("{what} is not an object"),
     })
+}
+
+/// v24 adds interfacing to the construction details. Nothing to
+/// convert.
+fn migrate_v23_to_v24(project: Value) -> Result<Value, FileError> {
+    Ok(project)
 }
 
 /// v23 adds topstitching to the construction details. Nothing to

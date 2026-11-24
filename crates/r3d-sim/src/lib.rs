@@ -21,7 +21,7 @@ pub mod selfcollide;
 pub mod solver;
 
 pub use cpu::CpuSolver;
-pub use fabric::{FabricParams, FabricPreset};
+pub use fabric::{FabricParams, FabricPreset, InterfacingMake, InterfacingWeight};
 pub use model::Model;
 pub use scene::{Closure, ElasticLine, SimScene};
 pub use solver::{SUBSTEPS, Solver, StepError, StepStats};

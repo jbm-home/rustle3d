@@ -15,7 +15,14 @@ Built in four steps, each one commit; then the shirt template.
   the stiffer cloth under it on both solvers; the board, the 3D view
   and its renders, photos (which show buttons and zippers too since),
   the tech pack's sewing section; Topstitch in the action bar.
-- Interfacing, quilting: planned.
+- Interfacing (2026-11-24): the document (schema v24, `fabric` and
+  `weight`; `kind` names the detail), `interfacing.add`,
+  `interfacing.set`, `interfacing.remove`, `detail.list`; the fused
+  cloth on both solvers, its boundary a mesh line; hatched on the board;
+  the bill of materials; Interfacing in the action bar (the piece, or a
+  band along a picked edge). Lines inside a piece may cross since (the
+  mesher joins them at their crossings).
+- Quilting: planned.
 
 ## User story
 As a designer, I gather a sleeve's cuff with an elastic two thirds its
@@ -79,8 +86,8 @@ and the topstitching.
 - An **interfacing** is fused on part of a piece: the **whole piece**,
   a **band** along consecutive outline edges (`width_mm`, a facing, a
   waistband, a front band), or the **inside of a closed internal line**.
-- Its **kind** (woven, non-woven, knit) and **weight** (light, medium,
-  heavy) give its physical values (docs/physics.md §3, Interfacing): it
+- Its **fabric** (woven, non-woven, knit) and **weight** (light, medium,
+  heavy; default woven, medium) give its physical values (docs/physics.md §3, Interfacing): it
   adds its weight and thickness, makes the cloth much stiffer to bend
   (fused layers bend as one) and stiffer to stretch and shear (a knit
   one stretches with the cloth).
@@ -109,8 +116,8 @@ and the topstitching.
   (it buckles, finer than the mesh can show), and the cloth beyond it
   folds. Along elastic lines the cloth is meshed finer (about 8 mm, in
   a band of three triangles on each side), so the gathers are small.
-  Shirring rows must not cross another line sewn inside the piece (the
-  piece cannot be meshed: the drape reports it).
+  Lines inside a piece (shirring rows, an interfacing's edge, sewn
+  lines) may cross: the mesh joins them where they cross.
 - **Topstitching, interfacing, quilting** change the cloth where they
   are: the triangles there take the garment's fabric combined with
   them. Their boundaries (an interfacing's edge, the stitched lines of a
@@ -127,7 +134,7 @@ and the topstitching.
   inspector). Shirring: each row likewise.
 - Topstitching: its rows dashed at the stitch length, in the thread's
   colour over a faint dark edge (a white thread on a white piece).
-- Interfacing: its area hatched.
+- Interfacing: its area hatched at 45°.
 - Quilting: its stitched lines dashed, its area outlined.
 
 ### 3D view and photos
@@ -154,9 +161,9 @@ and the topstitching.
   (panel, edge, rows, first_mm?, gap_mm?, ratio?, width_mm?).
 - `topstitch.add` (side, rows?, offset_mm?, gap_mm?, stitch_mm?,
   color?, thread?), `topstitch.set`, `topstitch.remove`.
-- `interfacing.add` (panel, area: whole | band {edges, width_mm} |
-  inside {line}, kind?, weight?), `interfacing.set`,
-  `interfacing.remove`.
+- `interfacing.add` (panel, area?: {kind: whole} | {kind: band, edges,
+  width_mm} | {kind: inside, line}, fabric?, weight?), `interfacing.set`
+  (fabric?, weight?, width_mm?), `interfacing.remove`.
 - `quilting.add` (panel, line?, pattern, angle_deg?, spacing_mm?,
   loft_mm?, padding_gsm?, stitch_mm?, color?), `quilting.set`,
   `quilting.remove`.
@@ -184,9 +191,11 @@ and the topstitching.
 - **A topstitched yoke**: two rows on the yoke's seam edge show on the
   board, in the 3D view and in a photo (their pixels in the thread's
   colour), and in the tech pack.
-- **A collar that stands**: a shirt's collar stand with heavy
-  interfacing stays up (its top edge's mean height above its seam ≥ 80 %
-  of its width) where the same stand without it folds over.
+- **A collar that stands**: a 30 × 8 cm band of cotton clamped at its
+  foot, with heavy interfacing, stays up (its top ≥ 80 % of its height
+  above its foot) where the bare band folds over (< 70 %), on both
+  solvers. (The shirt's collar, a closed ring around the neck, already
+  stands without: 0.87 of its width, 0.89 with heavy interfacing.)
 - **A quilted panel**: a quilted panel weighs its cloth plus padding,
   and its points between stitched lines stand out from the lines by
   about the loft.

@@ -973,5 +973,22 @@
   "tpElastics": "Élastiques",
   "tpRatio": "Longueur au repos (%)",
   "tpElasticWidth": "Largeur (mm)",
-  "tpRelaxed": "Au repos (cm)"
+  "tpRelaxed": "Au repos (cm)",
+  "barInterfacing": "Entoilage",
+  "barInterfacingHint": "Thermocoller un entoilage sur toute la pièce : plus raide, elle tient sa forme.",
+  "barInterfacingBandHint": "Thermocoller un entoilage en bande le long de ce bord (parementure, ceinture).",
+  "interfacingTitle": "Entoilage",
+  "interfacingWidth": "Largeur de la bande",
+  "interfacingLight": "léger",
+  "interfacingMedium": "moyen",
+  "interfacingHeavy": "fort",
+  "detailInterfacing": "Entoilage {weight} · {cm2} cm²",
+  "errNotClosed": "Prenez une ligne fermée sur cette pièce.",
+  "tpInterfacing": "Entoilage",
+  "tpInterfacingFabric": "Sorte",
+  "tpInterfacingWeight": "Poids",
+  "tpInterfacingArea": "Surface (m²)",
+  "tpWoven": "tissé",
+  "tpNonWoven": "non tissé",
+  "tpKnit": "maille"
 }

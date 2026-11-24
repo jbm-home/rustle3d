@@ -363,7 +363,7 @@ impl CommandSpec for ElasticShirr {
     }
 }
 
-/// After a step: drop the details whose sides are gone. The changes join
+/// After a step: drop the details whose sides or areas are gone. The changes join
 /// the step's undo step.
 pub(crate) fn settle_details(tx: &mut Transaction<'_>) {
     let p = tx.project();
@@ -374,6 +374,7 @@ pub(crate) fn settle_details(tx: &mut Transaction<'_>) {
             Detail::Elastic(Elastic { side, .. }) | Detail::Topstitch(Topstitch { side, .. }) => {
                 !p.side_length(side).is_some_and(|len| len > 0.0)
             }
+            Detail::Interfacing(i) => p.interfacing_outline(i).is_none(),
         })
         .map(|(id, _)| *id)
         .collect();

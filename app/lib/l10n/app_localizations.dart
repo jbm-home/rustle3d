@@ -5940,6 +5940,108 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Relaxed (cm)'**
   String get tpRelaxed;
+
+  /// No description provided for @barInterfacing.
+  ///
+  /// In en, this message translates to:
+  /// **'Interfacing'**
+  String get barInterfacing;
+
+  /// No description provided for @barInterfacingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fuse an interfacing on the whole piece: stiffer, it holds its shape.'**
+  String get barInterfacingHint;
+
+  /// No description provided for @barInterfacingBandHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fuse an interfacing in a band along this edge (a facing, a waistband).'**
+  String get barInterfacingBandHint;
+
+  /// No description provided for @interfacingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Interfacing'**
+  String get interfacingTitle;
+
+  /// No description provided for @interfacingWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Band width'**
+  String get interfacingWidth;
+
+  /// No description provided for @interfacingLight.
+  ///
+  /// In en, this message translates to:
+  /// **'light'**
+  String get interfacingLight;
+
+  /// No description provided for @interfacingMedium.
+  ///
+  /// In en, this message translates to:
+  /// **'medium'**
+  String get interfacingMedium;
+
+  /// No description provided for @interfacingHeavy.
+  ///
+  /// In en, this message translates to:
+  /// **'heavy'**
+  String get interfacingHeavy;
+
+  /// No description provided for @detailInterfacing.
+  ///
+  /// In en, this message translates to:
+  /// **'Interfacing, {weight} · {cm2} cm²'**
+  String detailInterfacing(String weight, String cm2);
+
+  /// No description provided for @errNotClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a closed line on this piece.'**
+  String get errNotClosed;
+
+  /// No description provided for @tpInterfacing.
+  ///
+  /// In en, this message translates to:
+  /// **'Interfacing'**
+  String get tpInterfacing;
+
+  /// No description provided for @tpInterfacingFabric.
+  ///
+  /// In en, this message translates to:
+  /// **'Kind'**
+  String get tpInterfacingFabric;
+
+  /// No description provided for @tpInterfacingWeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Weight'**
+  String get tpInterfacingWeight;
+
+  /// No description provided for @tpInterfacingArea.
+  ///
+  /// In en, this message translates to:
+  /// **'Area (m²)'**
+  String get tpInterfacingArea;
+
+  /// No description provided for @tpWoven.
+  ///
+  /// In en, this message translates to:
+  /// **'woven'**
+  String get tpWoven;
+
+  /// No description provided for @tpNonWoven.
+  ///
+  /// In en, this message translates to:
+  /// **'non-woven'**
+  String get tpNonWoven;
+
+  /// No description provided for @tpKnit.
+  ///
+  /// In en, this message translates to:
+  /// **'knit'**
+  String get tpKnit;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

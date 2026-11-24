@@ -204,7 +204,20 @@ area's boundary is a mesh line, so the change follows it.
   | Heavy | 80 | 0.40 | 8 000 | 80, 400 | 150 |
 
   A knit interfacing has the woven's warp stiffness, a twentieth of it
-  across, and a quarter of the woven's shear.
+  across, and a quarter of the woven's shear (`r3d_sim::fabric::
+  interfacing`, `FabricParams::fused`). The triangles whose centroid is
+  inside the interfacing take the fused fabric; its edge inside the
+  piece is a mesh line (lines that cross are joined at their crossing
+  by `mesh_panel`).
+
+  Checked on both backends (`an_interfaced_band_stands_where_a_bare_one_falls`):
+  a 30 × 8 cm cotton band clamped at its foot (two rows held: one row
+  would be a free hinge, an edge of a single triangle bends nothing)
+  and leaning 5° bends over to 52 % of its height; with heavy non-woven
+  interfacing it stands at 95 % on the CPU, 86 % on the GPU (its sweep
+  in colour order converges stiff hinges a little less). Bending across
+  a seam is not modelled: a collar sewn to a neckline turns freely at
+  the seam, so the shirt's collar, a ring, stands by its shape.
 - **Quilting**: one layer stands for the shell, the padding and a
   lining like the shell: density `2 ρ + padding`, thickness `h + loft`,
   stretch and shear twice the shell's, bending `2 B + 15 µN·m × loft²`

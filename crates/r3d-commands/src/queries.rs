@@ -759,7 +759,7 @@ impl QuerySpec for TrimList {
 pub struct DetailList {}
 
 impl Described for DetailList {
-    const SUMMARY: &'static str = "Every construction detail: elastics (their side, piece, ratio, width, the side's length and the relaxed length in each size of the range, or in the drawn size) and topstitches (their side, piece, rows, distance, gap, stitch length, thread and its colour, the length of each row on the piece); mm.";
+    const SUMMARY: &'static str = "Every construction detail: elastics (their side, piece, ratio, width, the side's length and the relaxed length in each size of the range, or in the drawn size) topstitches (their side, piece, rows, distance, gap, stitch length, thread and its colour, the length of each row on the piece) and interfacings (their piece, area, fabric, weight, and the area they cover in mm²); mm.";
 }
 
 impl QuerySpec for DetailList {
@@ -813,7 +813,28 @@ impl QuerySpec for DetailList {
                 })
             })
             .collect();
-        Ok(serde_json::json!({ "elastics": elastics, "topstitches": topstitches }))
+        let interfacings: Vec<Value> = p
+            .interfacings()
+            .map(|(id, i)| {
+                let area = p
+                    .interfacing_outline(i)
+                    .map(|o| r3(r3d_geom::polygon::signed_area(&o).abs()));
+                serde_json::json!({
+                    "id": id,
+                    "panel": i.panel,
+                    "panel_name": p.panel(i.panel).map(|panel| panel.name.clone()),
+                    "area": i.area,
+                    "fabric": i.fabric,
+                    "weight": i.weight,
+                    "area_mm2": area,
+                })
+            })
+            .collect();
+        Ok(serde_json::json!({
+            "elastics": elastics,
+            "topstitches": topstitches,
+            "interfacings": interfacings,
+        }))
     }
 }
 

@@ -1777,5 +1777,32 @@
   "tpElastics": "Elastics",
   "tpRatio": "Relaxed length (%)",
   "tpElasticWidth": "Width (mm)",
-  "tpRelaxed": "Relaxed (cm)"
+  "tpRelaxed": "Relaxed (cm)",
+  "barInterfacing": "Interfacing",
+  "barInterfacingHint": "Fuse an interfacing on the whole piece: stiffer, it holds its shape.",
+  "barInterfacingBandHint": "Fuse an interfacing in a band along this edge (a facing, a waistband).",
+  "interfacingTitle": "Interfacing",
+  "interfacingWidth": "Band width",
+  "interfacingLight": "light",
+  "interfacingMedium": "medium",
+  "interfacingHeavy": "heavy",
+  "detailInterfacing": "Interfacing, {weight} · {cm2} cm²",
+  "@detailInterfacing": {
+    "placeholders": {
+      "weight": {
+        "type": "String"
+      },
+      "cm2": {
+        "type": "String"
+      }
+    }
+  },
+  "errNotClosed": "Use a closed line on this piece.",
+  "tpInterfacing": "Interfacing",
+  "tpInterfacingFabric": "Kind",
+  "tpInterfacingWeight": "Weight",
+  "tpInterfacingArea": "Area (m²)",
+  "tpWoven": "woven",
+  "tpNonWoven": "non-woven",
+  "tpKnit": "knit"
 }

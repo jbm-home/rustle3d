@@ -306,6 +306,33 @@ extension _Bar on _ShellState {
     _refresh();
   }
 
+  /// Fuse an interfacing on the selected piece: all of it, or a band
+  /// inside `edge` (its width asked); its weight picked.
+  Future<void> _interface({String? edge}) async {
+    final l = context.l;
+    final panel = _panel?['id'] as String?;
+    if (panel == null) return;
+    final picked = await _askNumbers(
+      context,
+      title: l.interfacingTitle,
+      fields: [if (edge != null) (l.interfacingWidth, l.cm, 4)],
+      choices: [l.interfacingLight, l.interfacingMedium, l.interfacingHeavy],
+    );
+    if (picked == null || !mounted) return;
+    _run({
+      'type': 'interfacing.add',
+      'panel': panel,
+      'weight': const ['light', 'medium', 'heavy'][picked.$2],
+      if (edge != null)
+        'area': {
+          'kind': 'band',
+          'edges': [edge],
+          'width_mm': picked.$1.first * 10,
+        },
+    });
+    _refresh();
+  }
+
   /// Topstitch along an edge: rows, distance, stitch length and thread
   /// asked.
   Future<void> _addTopstitch(String edge) async {
@@ -427,6 +454,17 @@ extension _Bar on _ShellState {
               });
               _refresh();
             },
+          ),
+        ],
+      if (!linked)
+        [
+          (
+            id: 'interfacing',
+            icon: Icons.texture_rounded,
+            label: l.barInterfacing,
+            name: l.barInterfacing,
+            hint: l.barInterfacingHint,
+            onTap: (_) => _interface(),
           ),
         ],
       if (!linked && others)
@@ -610,6 +648,13 @@ extension _Bar on _ShellState {
             l.barElastic,
             l.barElasticHint,
             () => _addElastic(edges[0]),
+          ),
+          act(
+            'interfacing_band',
+            Icons.texture_rounded,
+            l.barInterfacing,
+            l.barInterfacingBandHint,
+            () => _interface(edge: edges[0]),
           ),
           act(
             'topstitch',

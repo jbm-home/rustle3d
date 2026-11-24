@@ -3841,6 +3841,291 @@ Remove a topstitch.
 
 </details>
 
+### `interfacing.add`
+
+Fuse an interfacing on a piece: on the whole piece (default), in a band `width_mm` wide (up to 300) inside consecutive outline `edges` (a collar stand, a facing, a waistband), or inside a closed internal line. Its `fabric` (woven, non_woven, knit) and `weight` (light, medium, heavy) make the cloth there heavier, thicker and much stiffer to bend and stretch. Interfacings on one piece do not overlap. It is in the tech pack's bill of materials. Returns the interfacing (a detail).
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "AreaSpec": {
+      "description": "Where an interfacing goes on its piece.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "The whole piece.",
+          "properties": {
+            "kind": {
+              "const": "whole",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A band `width_mm` wide inside consecutive outline edges, in their\norder around the piece.",
+          "properties": {
+            "edges": {
+              "items": {
+                "$ref": "#/$defs/EdgeId"
+              },
+              "type": "array"
+            },
+            "kind": {
+              "const": "band",
+              "type": "string"
+            },
+            "width_mm": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "edges",
+            "width_mm"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Inside a closed internal line of the piece.",
+          "properties": {
+            "kind": {
+              "const": "inside",
+              "type": "string"
+            },
+            "line": {
+              "$ref": "#/$defs/InternalLineId"
+            }
+          },
+          "required": [
+            "kind",
+            "line"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "EdgeId": {
+      "description": "Identifier of a edge, e.g. `edge:1`.",
+      "pattern": "^edge:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "InterfacingFabric": {
+      "description": "How an interfacing is made: how it stretches.",
+      "oneOf": [
+        {
+          "enum": [
+            "woven",
+            "non_woven"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "knit",
+          "description": "Stretches across, with the cloth.",
+          "type": "string"
+        }
+      ]
+    },
+    "InterfacingWeight": {
+      "description": "How heavy an interfacing is.",
+      "enum": [
+        "light",
+        "medium",
+        "heavy"
+      ],
+      "type": "string"
+    },
+    "InternalLineId": {
+      "description": "Identifier of a line, e.g. `line:1`.",
+      "pattern": "^line:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "PanelId": {
+      "description": "Identifier of a panel, e.g. `panel:1`.",
+      "pattern": "^panel:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Fuse an interfacing on a piece.",
+  "properties": {
+    "area": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AreaSpec"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Where: `{\"kind\": \"whole\"}`, `{\"kind\": \"band\", \"edges\": [...],\n\"width_mm\": 30}` or `{\"kind\": \"inside\", \"line\": \"line:7\"}`.\nOmitted: the whole piece."
+    },
+    "fabric": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/InterfacingFabric"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "`woven`, `non_woven` or `knit` (stretches across). Omitted: woven."
+    },
+    "panel": {
+      "$ref": "#/$defs/PanelId"
+    },
+    "weight": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/InterfacingWeight"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "`light`, `medium` or `heavy`. Omitted: medium."
+    }
+  },
+  "required": [
+    "panel"
+  ],
+  "title": "InterfacingAdd",
+  "type": "object"
+}
+```
+
+</details>
+
+### `interfacing.set`
+
+Change an interfacing: its `fabric`, `weight`, or a band's `width_mm`; what is omitted stays.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "DetailId": {
+      "description": "Identifier of a detail, e.g. `detail:1`.",
+      "pattern": "^detail:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "InterfacingFabric": {
+      "description": "How an interfacing is made: how it stretches.",
+      "oneOf": [
+        {
+          "enum": [
+            "woven",
+            "non_woven"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "knit",
+          "description": "Stretches across, with the cloth.",
+          "type": "string"
+        }
+      ]
+    },
+    "InterfacingWeight": {
+      "description": "How heavy an interfacing is.",
+      "enum": [
+        "light",
+        "medium",
+        "heavy"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Change an interfacing.",
+  "properties": {
+    "fabric": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/InterfacingFabric"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "interfacing": {
+      "$ref": "#/$defs/DetailId"
+    },
+    "weight": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/InterfacingWeight"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "width_mm": {
+      "description": "A band's width (mm).",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "interfacing"
+  ],
+  "title": "InterfacingSet",
+  "type": "object"
+}
+```
+
+</details>
+
+### `interfacing.remove`
+
+Remove an interfacing.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "DetailId": {
+      "description": "Identifier of a detail, e.g. `detail:1`.",
+      "pattern": "^detail:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Remove an interfacing.",
+  "properties": {
+    "interfacing": {
+      "$ref": "#/$defs/DetailId"
+    }
+  },
+  "required": [
+    "interfacing"
+  ],
+  "title": "InterfacingRemove",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `garment.set_fabric`
 
 Choose what the garment is made of: cotton, denim, jersey, silk or wool. Sets how it drapes and how it looks.
@@ -6718,7 +7003,7 @@ Every trim: buttons (the piece and point they are sewn at, diameter, the buttonh
 
 ### `detail.list`
 
-Every construction detail: elastics (their side, piece, ratio, width, the side's length and the relaxed length in each size of the range, or in the drawn size) and topstitches (their side, piece, rows, distance, gap, stitch length, thread and its colour, the length of each row on the piece); mm.
+Every construction detail: elastics (their side, piece, ratio, width, the side's length and the relaxed length in each size of the range, or in the drawn size) topstitches (their side, piece, rows, distance, gap, stitch length, thread and its colour, the length of each row on the piece) and interfacings (their piece, area, fabric, weight, and the area they cover in mm²); mm.
 
 <details><summary>Parameters (JSON schema)</summary>
 

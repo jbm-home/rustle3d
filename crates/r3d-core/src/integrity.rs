@@ -207,6 +207,7 @@ impl Project {
             let ok = match d {
                 crate::detail::Detail::Elastic(e) => self.side_ok(&e.side) && e.valid(),
                 crate::detail::Detail::Topstitch(t) => self.side_ok(&t.side) && t.valid(),
+                crate::detail::Detail::Interfacing(i) => self.interfacing_outline(i).is_some(),
             };
             if !ok {
                 return Err(E::BadValue {

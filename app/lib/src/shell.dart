@@ -6331,7 +6331,9 @@ class _DetailsCard extends StatelessWidget {
 
   /// Whether `panel` has any detail.
   static bool on(Map<String, dynamic> d, String panel) =>
-      _elastics(d, panel).isNotEmpty || _of(d, 'topstitches', panel).isNotEmpty;
+      _elastics(d, panel).isNotEmpty ||
+      _of(d, 'topstitches', panel).isNotEmpty ||
+      _of(d, 'interfacings', panel).isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -6395,6 +6397,30 @@ class _DetailsCard extends StatelessWidget {
               ),
             ),
           ],
+          for (final i in _of(details, 'interfacings', panel))
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    l.detailInterfacing(switch (i['weight']) {
+                      'light' => l.interfacingLight,
+                      'heavy' => l.interfacingHeavy,
+                      _ => l.interfacingMedium,
+                    }, context.number((i['area_mm2'] as num? ?? 0) / 100, 0)),
+                    style: label,
+                  ),
+                ),
+                IconButton(
+                  tooltip: l.trimRemove,
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.close_rounded, size: 16),
+                  onPressed: () => run({
+                    'type': 'interfacing.remove',
+                    'interfacing': i['id'],
+                  }),
+                ),
+              ],
+            ),
           for (final t in _of(details, 'topstitches', panel))
             Row(
               children: [

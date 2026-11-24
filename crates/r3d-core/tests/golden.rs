@@ -17,7 +17,10 @@ use r3d_core::{
     PathSegment, PatternSource, Pin, Placement, Point, Print, PrintPlacement, PrintSource, Project,
     Seam, SeamSide, Size, SourcePiece, Symmetry, TemplateRef, Transaction, UpAxis, Zipper,
 };
-use r3d_core::{Detail, Elastic, Thread, Topstitch};
+use r3d_core::{
+    Detail, Elastic, Interfacing, InterfacingArea, InterfacingFabric, InterfacingWeight, Thread,
+    Topstitch,
+};
 
 fn golden_dir(version: u32) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("tests/golden/v{version}"))
@@ -419,6 +422,20 @@ fn sample() -> Project {
             stitch_mm: 3.0,
             color: Some("#FFFFFF".into()),
             thread: Thread::Heavy,
+        }),
+    );
+    // A heavy non-woven interfacing in a 40 mm band inside the top (v24).
+    let interfacing = tx.new_detail_id();
+    tx.put_detail(
+        interfacing,
+        Detail::Interfacing(Interfacing {
+            panel,
+            area: InterfacingArea::Band {
+                edges: vec![contour[2]],
+                width_mm: 40.0,
+            },
+            fabric: InterfacingFabric::NonWoven,
+            weight: InterfacingWeight::Heavy,
         }),
     );
     tx.commit();

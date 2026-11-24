@@ -90,3 +90,8 @@ fn results_do_not_depend_on_the_thread_count() {
 fn an_elastic_gathers_the_edge_it_is_sewn_on() {
     reference::an_elastic_gathers_the_edge_it_is_sewn_on(&cpu);
 }
+
+#[test]
+fn an_interfaced_band_stands_where_a_bare_one_falls() {
+    reference::an_interfaced_band_stands_where_a_bare_one_falls(&cpu);
+}
