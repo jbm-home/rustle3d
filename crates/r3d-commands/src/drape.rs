@@ -1792,6 +1792,13 @@ pub fn build(
                 *out = out.max((rise / 1000.0) as f32);
             }
         }
+        // The lines' own vertices lie on them, even where the mesher moved
+        // one a little (off the outline, onto a crossing).
+        for v in quilted.iter().flatten() {
+            if let Some(out) = puff.get_mut(*v as usize) {
+                *out = 0.0;
+            }
+        }
         let mut trims: BTreeMap<(ButtonId, usize), u32> = BTreeMap::new();
         for (k, (key, _)) in ends.iter().enumerate() {
             if let Some(v) = mesh.lines.get(lines.len() + k).and_then(|l| l.first()) {

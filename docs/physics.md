@@ -241,6 +241,19 @@ area's boundary is a mesh line, so the change follows it.
   back in 6 cm channels (10 mm padding): 5 264 particles against about
   1 800 unquilted, 89 ms per frame on the CPU.
 
+  The stitched lines end on the outline's curves, a hair off its
+  chords, and cross next to their own points. Inserted as given into
+  the refined mesh, they made triangles of a fraction of a degree (68
+  under 1° on a T-shirt quilted all over): one particle between two
+  slivers jumped 2 cm each substep, and the cloth never settled (42 m/s,
+  0.24 unquilted). `mesh_panel` now snaps a line's point to a given
+  point within a fifth of the spacing, moves one that close to the
+  outline or a hole that far inside it, and with lines triangulates the
+  piece again: outline, holes, lines, then only the refinement's points
+  at least 0.3 spacing from a line. The smallest angle went from 0.07°
+  to 6.8° and the T-shirt rests (0.00 m/s after 5 s, 4 605 particles
+  instead of 5 366). The lines' own vertices do not puff.
+
 ### Fabric parameters (our own documented model)
 
 | Parameter | Symbol | Unit | Meaning |

@@ -101,6 +101,205 @@ impl Taken {
     }
 }
 
+/// A line's point this close to a point placed already, in units of the
+/// spacing, is that point.
+const SNAP: f64 = 0.2;
+
+/// The refinement's points nearer a line than this, in units of the
+/// spacing, are left out when the lines are added: a triangle between a
+/// line's points (a spacing apart) and one of them keeps angles of about
+/// 15° at least.
+const CLEAR: f64 = 0.3;
+
+/// Insert `lines` as chains of constrained edges, each line point snapped
+/// to a point placed already within [`SNAP`] spacings (the outline's, a
+/// hole's, another line's or a crossing); lines that cross or touch
+/// meet at a shared vertex. For each line, its points' vertices.
+fn constrain_lines(
+    cdt: &mut Cdt,
+    boundary: &[DVec2],
+    holes: &[Vec<DVec2>],
+    outer: &[FixedVertexHandle],
+    hole_handles: &[Vec<FixedVertexHandle>],
+    lines: &[Vec<DVec2>],
+    spacing: f64,
+) -> Result<Vec<Vec<FixedVertexHandle>>, MeshError> {
+    let crossings = crossings(lines);
+    let mut placed = Placed::new(spacing * SNAP);
+    for (p, h) in boundary
+        .iter()
+        .chain(holes.iter().flatten())
+        .zip(outer.iter().chain(hole_handles.iter().flatten()))
+    {
+        placed.put(*p, *h);
+    }
+    let loops: Vec<Vec<DVec2>> = std::iter::once(boundary)
+        .chain(holes.iter().map(Vec::as_slice))
+        .map(|l| l.iter().chain(l.first()).copied().collect())
+        .collect();
+    let edges = Segments::new(&loops, spacing);
+    let inside = |p: DVec2| {
+        crate::polygon::contains(boundary, p)
+            && !holes.iter().any(|h| crate::polygon::contains(h, p))
+    };
+    let mut place = |cdt: &mut Cdt, p: DVec2| -> Result<FixedVertexHandle, MeshError> {
+        if let Some(h) = placed.near(p) {
+            return Ok(h);
+        }
+        // Just off the outline or a hole (a line ending on a curve the
+        // outline follows by chords): moved inside, clear of it.
+        let at = edges
+            .nearest(p, spacing * SNAP)
+            .and_then(|(foot, normal)| {
+                [1.0, -1.0]
+                    .map(|side| foot + normal * (side * spacing * SNAP))
+                    .into_iter()
+                    .find(|q| inside(*q))
+            })
+            .unwrap_or(p);
+        if let Some(h) = placed.near(at) {
+            placed.put(p, h);
+            return Ok(h);
+        }
+        let h = cdt
+            .insert(Point2::new(at.x, at.y))
+            .map_err(|_| MeshError::LineOutside)?;
+        placed.put(p, h);
+        placed.put(at, h);
+        Ok(h)
+    };
+    let mut line_handles = Vec::with_capacity(lines.len());
+    for (k, line) in lines.iter().enumerate() {
+        let mut handles = Vec::with_capacity(line.len());
+        let mut walk: Vec<FixedVertexHandle> = Vec::new();
+        for (i, p) in line.iter().enumerate() {
+            let h = place(cdt, *p)?;
+            walk.push(h);
+            handles.push(h);
+            for q in crossings.get(&(k, i)).into_iter().flatten() {
+                walk.push(place(cdt, *q)?);
+            }
+        }
+        for w in walk.windows(2) {
+            if let [a, b] = w {
+                if a == b {
+                    continue;
+                }
+                if !cdt.can_add_constraint(*a, *b) {
+                    return Err(MeshError::LineOutside);
+                }
+                cdt.add_constraint(*a, *b);
+            }
+        }
+        line_handles.push(handles);
+    }
+    Ok(line_handles)
+}
+
+/// The lines' segments, bucketed by the cells they pass near.
+struct Segments {
+    cell: f64,
+    grid: std::collections::HashMap<(i64, i64), Vec<(DVec2, DVec2)>>,
+}
+
+impl Segments {
+    /// Bucketed in cells of `cell`; [`Segments::near`] finds segments
+    /// within `cell` of a point.
+    fn new(lines: &[Vec<DVec2>], cell: f64) -> Self {
+        let cell = cell.max(1e-9);
+        let mut grid: std::collections::HashMap<(i64, i64), Vec<(DVec2, DVec2)>> =
+            std::collections::HashMap::new();
+        for line in lines {
+            for w in line.windows(2) {
+                if let [a, b] = w {
+                    let (lo, hi) = (a.min(*b) - cell, a.max(*b) + cell);
+                    let (x0, y0) = ((lo.x / cell).floor() as i64, (lo.y / cell).floor() as i64);
+                    let (x1, y1) = ((hi.x / cell).floor() as i64, (hi.y / cell).floor() as i64);
+                    for x in x0..=x1 {
+                        for y in y0..=y1 {
+                            grid.entry((x, y)).or_default().push((*a, *b));
+                        }
+                    }
+                }
+            }
+        }
+        Self { cell, grid }
+    }
+
+    /// The point nearest `p` on a segment within `r` (at most the cell),
+    /// and that segment's unit normal.
+    fn nearest(&self, p: DVec2, r: f64) -> Option<(DVec2, DVec2)> {
+        let key = (
+            (p.x / self.cell).floor() as i64,
+            (p.y / self.cell).floor() as i64,
+        );
+        self.grid
+            .get(&key)?
+            .iter()
+            .filter_map(|(a, b)| {
+                let ab = *b - *a;
+                let t = ((p - *a).dot(ab) / ab.length_squared()).clamp(0.0, 1.0);
+                let foot = *a + ab * t;
+                Some((foot.distance(p), foot, ab.try_normalize()?.perp()))
+            })
+            .filter(|(d, _, _)| *d < r)
+            .min_by(|x, y| x.0.total_cmp(&y.0))
+            .map(|(_, foot, normal)| (foot, normal))
+    }
+
+    /// Whether a segment passes within `r` (at most the cell) of `p`.
+    fn near(&self, p: DVec2, r: f64) -> bool {
+        let key = (
+            (p.x / self.cell).floor() as i64,
+            (p.y / self.cell).floor() as i64,
+        );
+        self.grid.get(&key).is_some_and(|segs| {
+            segs.iter()
+                .any(|(a, b)| crate::fit::distance_to_segment(p, *a, *b) < r)
+        })
+    }
+}
+
+/// The vertices placed so far, bucketed by position.
+struct Placed {
+    radius: f64,
+    grid: std::collections::HashMap<(i64, i64), Vec<(DVec2, FixedVertexHandle)>>,
+}
+
+impl Placed {
+    fn new(radius: f64) -> Self {
+        Self {
+            radius: radius.max(1e-9),
+            grid: std::collections::HashMap::new(),
+        }
+    }
+
+    fn key(&self, p: DVec2) -> (i64, i64) {
+        (
+            (p.x / self.radius).floor() as i64,
+            (p.y / self.radius).floor() as i64,
+        )
+    }
+
+    fn put(&mut self, p: DVec2, h: FixedVertexHandle) {
+        let key = self.key(p);
+        self.grid.entry(key).or_default().push((p, h));
+    }
+
+    /// The nearest vertex within the radius of `p`.
+    fn near(&self, p: DVec2) -> Option<FixedVertexHandle> {
+        let (x, y) = self.key(p);
+        (-1..=1)
+            .flat_map(|dx| (-1..=1).map(move |dy| (x + dx, y + dy)))
+            .filter_map(|key| self.grid.get(&key))
+            .flatten()
+            .map(|(q, h)| (q.distance(p), *h))
+            .filter(|(d, _)| *d < self.radius)
+            .min_by(|a, b| a.0.total_cmp(&b.0))
+            .map(|(_, h)| h)
+    }
+}
+
 /// The lattice points of `zones` inside the panel: clear of the outline,
 /// the holes, the given points and each other by half their spacing.
 fn lattice(
@@ -257,14 +456,18 @@ fn crossings(lines: &[Vec<DVec2>]) -> std::collections::HashMap<(usize, usize), 
 /// repeated first point) with interior triangles of about `spacing` edge
 /// length, leaving out `holes` (closed loops inside it) and following
 /// `lines` (open polylines inside it: their points become vertices joined
-/// by triangle edges, so a seam can run along them). Every given point is
-/// kept and never split.
+/// by triangle edges, so a seam can run along them). Every outline and
+/// hole point is kept and never split; a line's point closer than a fifth
+/// of the spacing to another given point becomes that point.
 ///
-/// Constrained Delaunay triangulation with Ruppert/Chew refinement over
-/// the outline and the holes; the lines are inserted after the refinement
-/// (a constraint that does not enclose anything would confuse the
-/// refinement's inside/outside test). Along each of `fine`'s lines the
-/// triangles are finer.
+/// Constrained Delaunay triangulation with Ruppert/Chew refinement
+/// over the outline and the holes. The refinement cannot see the lines
+/// (a constraint that does not enclose anything confuses its
+/// inside/outside test, a flood fill by parity), so with lines the panel
+/// is triangulated again: the outline, the holes, the lines, then the
+/// refinement's points clear of the lines (inserted after it, a point
+/// a fraction of a millimetre from a line made slivers that shook the
+/// cloth). Along each of `fine`'s lines the triangles are finer.
 pub fn mesh_panel(
     boundary: &[DVec2],
     holes: &[Vec<DVec2>],
@@ -275,16 +478,21 @@ pub fn mesh_panel(
     if spacing.is_nan() || spacing <= 0.0 {
         return Err(MeshError::InvalidBoundary);
     }
+    if lines.iter().flatten().any(|p| !p.is_finite()) {
+        return Err(MeshError::LineOutside);
+    }
+    let lattice = lattice(fine, boundary, holes, lines);
     let mut cdt: Cdt = ConstrainedDelaunayTriangulation::new();
-    let outer = constrain_loop(&mut cdt, boundary)?;
-    let hole_handles: Vec<Vec<FixedVertexHandle>> = holes
+    let mut outer = constrain_loop(&mut cdt, boundary)?;
+    let mut hole_handles: Vec<Vec<FixedVertexHandle>> = holes
         .iter()
         .map(|h| constrain_loop(&mut cdt, h))
         .collect::<Result<_, _>>()?;
-    for p in lattice(fine, boundary, holes, lines) {
+    for p in &lattice {
         cdt.insert(Point2::new(p.x, p.y))
             .map_err(|_| MeshError::InvalidBoundary)?;
     }
+    let given = cdt.num_vertices();
     // An equilateral triangle of side `spacing` has this area.
     let target_area = 3f64.sqrt() / 4.0 * spacing * spacing;
     cdt.refine(
@@ -294,40 +502,36 @@ pub fn mesh_panel(
             .with_max_allowed_area(target_area * 1.2)
             .with_angle_limit(AngleLimit::from_deg(25.0)),
     );
-    if lines.iter().flatten().any(|p| !p.is_finite()) {
-        return Err(MeshError::LineOutside);
-    }
-    // Lines that cross or touch one another meet at a shared vertex.
-    let crossings = crossings(lines);
     let mut line_handles = Vec::with_capacity(lines.len());
-    for (k, line) in lines.iter().enumerate() {
-        let mut handles = Vec::with_capacity(line.len());
-        let mut walk: Vec<FixedVertexHandle> = Vec::new();
-        for (i, p) in line.iter().enumerate() {
-            let h = cdt
-                .insert(Point2::new(p.x, p.y))
-                .map_err(|_| MeshError::LineOutside)?;
-            walk.push(h);
-            handles.push(h);
-            for q in crossings.get(&(k, i)).into_iter().flatten() {
-                walk.push(
-                    cdt.insert(Point2::new(q.x, q.y))
-                        .map_err(|_| MeshError::LineOutside)?,
-                );
-            }
+    if !lines.is_empty() {
+        let added: Vec<DVec2> = cdt
+            .vertices()
+            .filter(|v| v.fix().index() >= given)
+            .map(|v| DVec2::new(v.position().x, v.position().y))
+            .collect();
+        cdt = ConstrainedDelaunayTriangulation::new();
+        outer = constrain_loop(&mut cdt, boundary)?;
+        hole_handles = holes
+            .iter()
+            .map(|h| constrain_loop(&mut cdt, h))
+            .collect::<Result<_, _>>()?;
+        line_handles = constrain_lines(
+            &mut cdt,
+            boundary,
+            holes,
+            &outer,
+            &hole_handles,
+            lines,
+            spacing,
+        )?;
+        let clear = Segments::new(lines, spacing);
+        for p in lattice
+            .iter()
+            .chain(added.iter().filter(|p| !clear.near(**p, spacing * CLEAR)))
+        {
+            cdt.insert(Point2::new(p.x, p.y))
+                .map_err(|_| MeshError::InvalidBoundary)?;
         }
-        for w in walk.windows(2) {
-            if let [a, b] = w {
-                if a == b {
-                    continue;
-                }
-                if !cdt.can_add_constraint(*a, *b) {
-                    return Err(MeshError::LineOutside);
-                }
-                cdt.add_constraint(*a, *b);
-            }
-        }
-        line_handles.push(handles);
     }
     // Inside the outline and outside every hole, by each triangle's
     // centroid; flat slivers between points in line along the outline
@@ -599,6 +803,69 @@ mod tests {
                 .iter()
                 .any(|v| v.distance(DVec2::new(55.0, 45.0)) < 1e-9)
         );
+    }
+
+    /// The smallest angle of the mesh's triangles (degrees).
+    fn smallest_angle(m: &PanelMesh) -> f64 {
+        m.triangles
+            .iter()
+            .flat_map(|t| {
+                let p = t.map(|i| m.vertices[i as usize]);
+                (0..3).map(move |k| {
+                    let (a, b, c) = (p[k], p[(k + 1) % 3], p[(k + 2) % 3]);
+                    (b - a).angle_to(c - a).abs().to_degrees()
+                })
+            })
+            .fold(180.0, f64::min)
+    }
+
+    #[test]
+    fn lines_ending_near_the_outline_or_other_points_leave_no_sliver() {
+        // Quilting lines end on the true curve, a hair off the outline's
+        // chords, sometimes a hair from one of its points, and cross each
+        // other next to their own points. Inserted as given, such points
+        // made triangles of a fraction of a degree that shook the cloth.
+        let boundary = resample_closed(&square(200.0), 25.0);
+        let mut lines = Vec::new();
+        for k in 1..8 {
+            let c = 25.0 * k as f64;
+            // Down and up diagonals, ending 0.1 mm inside the outline.
+            lines.push(vec![DVec2::new(c, 0.1), DVec2::new(0.1, c)]);
+            lines.push(vec![DVec2::new(c, 0.1), DVec2::new(199.9, 200.0 - c)]);
+        }
+        // One ending 0.003 mm from an outline point.
+        lines.push(vec![DVec2::new(100.0, 199.997), DVec2::new(100.0, 120.0)]);
+        let lines: Vec<Vec<DVec2>> = lines.iter().map(|l| resample_open(l, 9.0)).collect();
+        let m = mesh_panel(&boundary, &[], &lines, &[], 10.0).unwrap();
+        let angle = smallest_angle(&m);
+        assert!(angle > 5.0, "smallest angle {angle}°");
+        // The lines are still followed, every point near where it was.
+        for (line, at) in lines.iter().zip(&m.lines) {
+            for (p, v) in line.iter().zip(at) {
+                assert!(p.distance(m.vertices[*v as usize]) <= 10.0 * SNAP + 1e-9);
+            }
+            for w in at.windows(2) {
+                let joined = w[0] == w[1]
+                    || m.triangles
+                        .iter()
+                        .any(|t| t.contains(&w[0]) && t.contains(&w[1]));
+                assert!(joined);
+            }
+        }
+        for (i, v) in m.boundary.iter().enumerate() {
+            assert_eq!(m.vertices[*v as usize], boundary[i]);
+        }
+    }
+
+    /// Points along an open polyline at most `spacing` apart.
+    fn resample_open(points: &[DVec2], spacing: f64) -> Vec<DVec2> {
+        let mut out = Vec::new();
+        for w in points.windows(2) {
+            let steps = ((w[0].distance(w[1]) / spacing).ceil() as usize).max(1);
+            out.extend((0..steps).map(|k| w[0].lerp(w[1], k as f64 / steps as f64)));
+        }
+        out.extend(points.last());
+        out
     }
 
     #[test]

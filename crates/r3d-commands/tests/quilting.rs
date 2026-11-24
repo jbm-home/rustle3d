@@ -127,3 +127,46 @@ fn quilted_cloth_is_padded_folds_on_its_lines_and_puffs() {
         .fold(0.0f32, f32::max);
     assert!((moved - most).abs() < 1e-5);
 }
+
+#[test]
+fn quilted_pieces_mesh_without_slivers() {
+    // Every piece of a T-shirt quilted (diamonds and channels): the
+    // stitched lines end on the outline's curves and cross next to their
+    // own points. Slivers there (angles under 1°) shook the cloth, which
+    // never came to rest (42 m/s on the CPU).
+    let mut s = Session::new(Project::new("t"));
+    common::women_m(&mut s);
+    run(
+        &mut s,
+        json!({"type": "template.apply", "template": "t_shirt"}),
+    )
+    .unwrap();
+    let panels: Vec<String> = s
+        .project()
+        .panels()
+        .keys()
+        .map(ToString::to_string)
+        .collect();
+    for (k, panel) in panels.iter().enumerate() {
+        let pattern = if k % 2 == 0 { "diamonds" } else { "channels" };
+        run(
+            &mut s,
+            json!({"type": "quilting.add", "panel": panel, "pattern": pattern}),
+        )
+        .unwrap();
+    }
+    let drape = build(s.project(), None, DEFAULT_SPACING_MM).unwrap();
+    let scene = &drape.scene;
+    let smallest = scene
+        .triangles
+        .iter()
+        .flat_map(|t| {
+            let p = t.vertices.map(|v| scene.particles[v as usize].rest);
+            (0..3).map(move |k| {
+                let (a, b, c) = (p[k], p[(k + 1) % 3], p[(k + 2) % 3]);
+                (b - a).angle_to(c - a).abs().to_degrees()
+            })
+        })
+        .fold(180.0f32, f32::min);
+    assert!(smallest > 5.0, "smallest angle {smallest}°");
+}

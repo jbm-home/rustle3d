@@ -51,6 +51,40 @@ maintainer's briefs that specs cite as "ROADMAP Mxx" in their
 Order of the next ones, as set by the maintainer on 2026-11-23: M36,
 M37 (M16's Linux part when the work moves to Linux).
 
+## Test report 2026-11-24 (to take up before M36)
+
+The maintainer had an agent build a hoodie and joggers over MCP, then
+used the app.
+
+- **Bugs**:
+  - The 3D view becomes unusable after pulling the garment in the
+    3D view (project "ProjetTest").
+  - `seam.add` picks a twisting direction for the front crotch resewn over
+    its whole height (edge:11 ↔ edge:31, the mirror copy, the fly
+    removed). The trousers fall to the floor in under a second.
+  - `seam.flip` holds the trousers up, but the front is stretched to
+    118–131 % at 84–89 cm high, and the front waist gapes.
+  - After 480 frames the drape is not settled: one point still moves at
+    3.2 m/s, and a seam is about 10 mm open.
+  - A waist elastic (ratio 0.78, 50 mm) stretches by 40 to 57 % and holds
+    nothing up, in cotton or jersey (maybe only a consequence of the
+    crotch).
+- **Annoyances**:
+  - `template.apply` renames a project the user named, even when it
+    has no pieces.
+  - `to_mm` equal to the edge's length (222 after `edge.set_length`
+    222) is refused as out of range: a rounding problem.
+  - `panel.create_path` puts the new piece in the first garment, not
+    in the last one created.
+  - `panel.create_path` gives a seam allowance of 0, where the
+    templates give 10 mm.
+  - `panel.set_seam_allowance` on a linked mirror copy fails, and the
+    whole batch is cancelled; it could be skipped instead, since the copy
+    follows its piece.
+- **Missing**:
+  - Hoodie and jogger templates.
+  - A way to take one garment out of the drape.
+
 ## M36 — Natural motions
 
 Maintainer's brief (2026-11-23): the motions look robotic. The walk makes
