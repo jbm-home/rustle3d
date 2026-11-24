@@ -3,10 +3,12 @@
 
 part of 'shell.dart';
 
-/// One of the bar's buttons.
+/// One of the bar's buttons: `label` under its icon, `name` and `hint`
+/// in its tip.
 typedef _BarAction = ({
   String id,
   IconData icon,
+  String label,
   String name,
   String hint,
   // Given the button's context, to open a menu under it.
@@ -16,7 +18,8 @@ typedef _BarAction = ({
 class _ActionBar extends StatelessWidget {
   const _ActionBar({required this.picked, required this.groups});
 
-  /// What is picked ("2 corners · 1 edge"); empty: nothing.
+  /// What is picked ("2 corners · 1 edge", a piece's name); empty:
+  /// nothing.
   final String picked;
 
   /// The buttons, in groups set apart by a line.
@@ -26,39 +29,33 @@ class _ActionBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
     final l = context.l;
-    Widget button(_BarAction a) => Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 1),
-      child: Tooltip(
-        richMessage: TextSpan(
-          children: [
-            TextSpan(
-              text: '${a.name}\n',
-              style: ts(fontWeight: FontWeight.w600),
-            ),
-            TextSpan(text: a.hint),
-          ],
-        ),
-        child: Builder(
-          builder: (at) => _RailButton(
-            key: ValueKey('bar_${a.id}'),
-            icon: a.icon,
-            label: a.name,
-            active: false,
-            grouped: false,
-            onTap: () => a.onTap(at),
+    Widget tip(String name, String hint, Widget child) => Tooltip(
+      richMessage: TextSpan(
+        children: [
+          TextSpan(
+            text: '$name\n',
+            style: ts(fontWeight: FontWeight.w600),
           ),
-        ),
+          TextSpan(text: hint),
+        ],
       ),
+      child: child,
+    );
+    Widget separator() => Container(
+      width: 1,
+      height: 32,
+      margin: const EdgeInsets.symmetric(horizontal: Space.s),
+      color: p.border,
     );
     return Container(
-      height: 50,
+      height: 60,
       margin: const EdgeInsets.fromLTRB(
         Space.s + 52 + Space.s,
         0,
         Space.m,
         Space.s,
       ),
-      padding: const EdgeInsets.symmetric(horizontal: Space.m),
+      padding: const EdgeInsets.symmetric(horizontal: Space.s),
       decoration: BoxDecoration(
         color: p.surface,
         borderRadius: BorderRadius.circular(Tokens.radius(context)),
@@ -68,50 +65,120 @@ class _ActionBar extends StatelessWidget {
       child: ExcludeFocus(
         child: Row(
           children: [
-            Icon(Icons.ads_click_rounded, size: 16, color: p.textMuted),
-            const SizedBox(width: Space.s),
-            if (picked.isEmpty)
-              Expanded(
-                child: Text(
-                  context.keys(l.barHint),
-                  style: ts(fontSize: 12.5, color: p.textMuted),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              )
-            else ...[
-              Text(
-                picked,
-                style: ts(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: p.text,
-                ),
+            // What is picked; greyed when nothing is, the tip says how.
+            tip(
+              picked.isEmpty ? l.barNothing : picked,
+              context.keys(l.barHint),
+              _BarTile(
+                icon: Icons.ads_click_rounded,
+                label: picked.isEmpty ? l.barNothing : picked,
+                enabled: picked.isNotEmpty,
               ),
-              const SizedBox(width: Space.m),
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      for (final (i, group) in groups.indexed) ...[
-                        if (i > 0)
-                          Container(
-                            width: 1,
-                            height: 24,
-                            margin: const EdgeInsets.symmetric(
-                              horizontal: Space.s,
+            ),
+            if (groups.isNotEmpty) separator(),
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final (i, group) in groups.indexed) ...[
+                      if (i > 0) separator(),
+                      for (final a in group)
+                        tip(
+                          a.name,
+                          a.hint,
+                          Builder(
+                            builder: (at) => _BarTile(
+                              key: ValueKey('bar_${a.id}'),
+                              icon: a.icon,
+                              label: a.label,
+                              onTap: () => a.onTap(at),
                             ),
-                            color: p.border,
                           ),
-                        for (final a in group) button(a),
-                      ],
+                        ),
                     ],
-                  ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A button of the action bar: an icon with a short label under it.
+/// Without `onTap`, a plain tile (what is picked), greyed unless
+/// `enabled`.
+class _BarTile extends StatefulWidget {
+  const _BarTile({
+    super.key,
+    required this.icon,
+    required this.label,
+    this.onTap,
+    this.enabled = true,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+  final bool enabled;
+
+  @override
+  State<_BarTile> createState() => _BarTileState();
+}
+
+class _BarTileState extends State<_BarTile> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    final tap = widget.onTap;
+    final color = !widget.enabled
+        ? p.textMuted.withValues(alpha: 0.55)
+        : tap == null
+        ? p.text
+        : p.textMuted;
+    final tile = AnimatedContainer(
+      duration: Motion.fast,
+      curve: Motion.curve,
+      constraints: const BoxConstraints(minWidth: 52, maxWidth: 160),
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      decoration: BoxDecoration(
+        color: tap != null && _hover ? p.surfaceMuted : Colors.transparent,
+        borderRadius: BorderRadius.circular(Tokens.radius(context, 0.75)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(widget.icon, size: 22, color: color),
+          const SizedBox(height: 3),
+          Text(
+            widget.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: ts(
+              fontSize: 10.5,
+              fontWeight: tap == null ? FontWeight.w600 : FontWeight.w500,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+    if (tap == null) return tile;
+    return Semantics(
+      button: true,
+      label: widget.label,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(onTap: tap, child: tile),
       ),
     );
   }
@@ -232,6 +299,7 @@ extension _Bar on _ShellState {
           (
             id: 'rotate',
             icon: Icons.rotate_left_rounded,
+            label: l.barShortRotate,
             name: l.rotatePiece,
             hint: l.barRotateHint,
             onTap: (_) async {
@@ -250,6 +318,7 @@ extension _Bar on _ShellState {
           (
             id: 'scale',
             icon: Icons.open_in_full_rounded,
+            label: l.barShortScale,
             name: l.scalePiece,
             hint: l.barScaleHint,
             onTap: (_) async {
@@ -272,6 +341,7 @@ extension _Bar on _ShellState {
           (
             id: 'mirror',
             icon: Icons.flip_rounded,
+            label: l.mirror,
             name: l.mirror,
             hint: l.barMirrorHint,
             onTap: (_) {
@@ -289,6 +359,7 @@ extension _Bar on _ShellState {
           (
             id: 'join',
             icon: Icons.join_full_rounded,
+            label: l.join,
             name: l.join,
             hint: l.barJoinHint,
             onTap: (at) => _combine(at, id, 'union'),
@@ -296,6 +367,7 @@ extension _Bar on _ShellState {
           (
             id: 'cut_out',
             icon: Icons.join_left_rounded,
+            label: l.cutOut,
             name: l.cutOut,
             hint: l.barCutOutHint,
             onTap: (at) => _combine(at, id, 'difference'),
@@ -305,6 +377,7 @@ extension _Bar on _ShellState {
         (
           id: 'delete',
           icon: Icons.delete_outline_rounded,
+          label: l.delete,
           name: l.delete,
           hint: l.barDeleteHint,
           onTap: (_) => _deleteSelected(),
@@ -324,12 +397,31 @@ extension _Bar on _ShellState {
       IconData icon,
       String name,
       String hint,
-      VoidCallback onTap,
-    ) => (id: id, icon: icon, name: name, hint: hint, onTap: (_) => onTap());
+      VoidCallback onTap, {
+      String? label,
+    }) => (
+      id: id,
+      icon: icon,
+      label: label ?? name,
+      name: name,
+      hint: hint,
+      onTap: (_) => onTap(),
+    );
     String kind(String k) => l.constraintKind(k);
     return switch ((pts.length, edges.length, notches.length, guides.length)) {
       (0, 0, 0, 0) => switch (_panel) {
         final panel? when _selection.length == 1 => _pieceActions(l, panel),
+        _ when _selection.length > 1 => [
+          [
+            act(
+              'delete',
+              Icons.delete_outline_rounded,
+              l.delete,
+              l.barDeleteAllHint,
+              _deleteSelected,
+            ),
+          ],
+        ],
         _ => const [],
       },
       (1, 0, 0, 0) => () {
@@ -366,6 +458,7 @@ extension _Bar on _ShellState {
               Icons.remove_circle_outline_rounded,
               l.pointRemove,
               l.barRemovePointHint,
+              label: l.delete,
               () {
                 _run({'type': 'point.remove', 'point': pts[0]});
                 _refresh();
@@ -519,20 +612,28 @@ extension _Bar on _ShellState {
       ],
       (0, 0, 1, 0) => [
         [
-          for (final (from, name, icon, hint) in [
+          for (final (from, name, short, icon, hint) in [
             (
               'start',
               l.barNotchStart,
+              l.barShortFromStart,
               Icons.first_page_rounded,
               l.barNotchStartHint,
             ),
-            ('end', l.barNotchEnd, Icons.last_page_rounded, l.barNotchEndHint),
+            (
+              'end',
+              l.barNotchEnd,
+              l.barShortFromEnd,
+              Icons.last_page_rounded,
+              l.barNotchEndHint,
+            ),
           ])
             act(
               'notch_$from',
               icon,
               name,
               hint,
+              label: short,
               () => _dimension({
                 'kind': 'notch_distance',
                 'notch': notches[0],
@@ -546,6 +647,7 @@ extension _Bar on _ShellState {
             Icons.delete_outline_rounded,
             l.barRemoveNotch,
             l.barRemoveNotchHint,
+            label: l.delete,
             () {
               _run({'type': 'notch.remove', 'notch': notches[0]});
               _refresh();
@@ -560,6 +662,7 @@ extension _Bar on _ShellState {
             Icons.format_line_spacing_rounded,
             kind('guide_distance'),
             l.barGuideDistanceHint,
+            label: kind('distance'),
             () => _dimension({
               'kind': 'guide_distance',
               'point': pts[0],
@@ -604,6 +707,7 @@ extension _Bar on _ShellState {
             Icons.delete_outline_rounded,
             l.barRemoveLine,
             l.barRemoveLineHint,
+            label: l.delete,
             () {
               _run({'type': 'guide.remove', 'guide': guides[0]});
               _refresh();

@@ -3661,6 +3661,42 @@ abstract class L {
   /// **'Delete the piece.'**
   String get barDeleteHint;
 
+  /// No description provided for @barNothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing picked'**
+  String get barNothing;
+
+  /// No description provided for @barShortRotate.
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate'**
+  String get barShortRotate;
+
+  /// No description provided for @barShortScale.
+  ///
+  /// In en, this message translates to:
+  /// **'Scale'**
+  String get barShortScale;
+
+  /// No description provided for @barShortFromStart.
+  ///
+  /// In en, this message translates to:
+  /// **'From start'**
+  String get barShortFromStart;
+
+  /// No description provided for @barShortFromEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'From end'**
+  String get barShortFromEnd;
+
+  /// No description provided for @barDeleteAllHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the selected pieces.'**
+  String get barDeleteAllHint;
+
   /// No description provided for @dimensionRename.
   ///
   /// In en, this message translates to:

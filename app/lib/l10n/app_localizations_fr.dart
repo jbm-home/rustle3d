@@ -2235,6 +2235,24 @@ class LFr extends L {
   String get barDeleteHint => 'Supprimer la pièce.';
 
   @override
+  String get barNothing => 'Aucune sélection';
+
+  @override
+  String get barShortRotate => 'Pivoter';
+
+  @override
+  String get barShortScale => 'Échelle';
+
+  @override
+  String get barShortFromStart => 'Du début';
+
+  @override
+  String get barShortFromEnd => 'De la fin';
+
+  @override
+  String get barDeleteAllHint => 'Supprimer les pièces sélectionnées.';
+
+  @override
   String get dimensionRename =>
       'Nom : les formules peuvent utiliser cette cote';
 

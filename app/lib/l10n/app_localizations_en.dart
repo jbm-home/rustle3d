@@ -2213,6 +2213,24 @@ class LEn extends L {
   String get barDeleteHint => 'Delete the piece.';
 
   @override
+  String get barNothing => 'Nothing picked';
+
+  @override
+  String get barShortRotate => 'Rotate';
+
+  @override
+  String get barShortScale => 'Scale';
+
+  @override
+  String get barShortFromStart => 'From start';
+
+  @override
+  String get barShortFromEnd => 'From end';
+
+  @override
+  String get barDeleteAllHint => 'Delete the selected pieces.';
+
+  @override
   String get dimensionRename => 'Name: formulas can use this dimension';
 
   @override

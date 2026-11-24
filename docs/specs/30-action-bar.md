@@ -39,9 +39,11 @@ name it `armhole`; on the sleeve I give the cap the formula
   piece), ⌘-click (Ctrl-click on Windows and Linux) or ⇧-click adds or
   takes one away; a click on empty board clears.
 - **The action bar** sits above the 2D and 3D views, from the tool
-  rail's edge to the window's: what is picked on its left ("2 corners"),
-  then buttons drawn like the rail's (icon, tip with the name and what it
-  does), in groups set apart by a line. Nothing picked: a short hint.
+  rail's edge to the window's: what is picked on its left ("2 corners",
+  the piece's name; greyed "Nothing picked" when nothing is, its tip
+  saying how to pick), then buttons with an icon and a short label under
+  it (a tip with the full name and what it does), in groups set apart by
+  a line.
   What it offers:
 
   | Picked | Dimensions | Constraints and actions |
@@ -56,6 +58,7 @@ name it `armhole`; on the sleeve I give the cap the formula
   | a corner and a construction line | Distance to the line | On the line |
   | a construction line | — | Level, Upright, Remove line |
   | a piece alone | — | Rotate, Scale, Mirror; Join, Cut out; Delete |
+  | several pieces | — | Delete |
 
   A piece selected with nothing on it picked shows its name and its
   own actions: Rotate and Scale ask for an angle or percentages,
