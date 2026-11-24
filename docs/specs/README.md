@@ -40,3 +40,4 @@ descriptions, public papers, open standards, general garment-making knowledge.
 | 28 | [Seamly2D and Valentina patterns](28-parametric-import.md) | M28 |
 | 29 | [Body measurements](29-body-measurements.md) | M33 |
 | 30 | [Sketching on the board: the action bar](30-action-bar.md) | M35 |
+| 31 | [Construction details 2: elastic, topstitching, interfacing, quilting](31-construction-details-2.md) | M34 |

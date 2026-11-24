@@ -1,0 +1,177 @@
+# 31 — Construction details 2: elastic, topstitching, interfacing, quilting
+
+Provenance: maintainer's functional brief (ROADMAP M34, 2026-11-23: elastic on an edge or a line with a relaxed length, shirring as several parallel elastic lines; topstitching in one or more rows at a distance from an edge or a seam, with thread colour and stitch length, seen on the board, in 3D, in photos and in the tech pack; interfacing on a piece or part of it, stiffer to bend and stretch, in the bill of materials; quilting and padding, thickness between stitched lines; a cuff gathered by elastic, a topstitched yoke, a collar that stands thanks to its interfacing, a quilted panel), and the maintainer's choices of 2026-11-24 (quilting as one layer with its puffs drawn; a finer mesh along elastic lines; topstitching slightly stiffens the cloth; the shirt template uses them); general garment-making knowledge (elastic cut shorter than the edge it gathers and stretched as it is sewn; shirring elastic in rows about 1–2 cm apart; topstitching 2–3 mm stitches, 1–10 mm from an edge or a seam, often in a heavier or contrasting thread; fusible interfacing in light, medium and heavy weights, woven, non-woven or knit, on collars, cuffs, bands, facings and waistbands; quilting in channels or diamonds a few centimetres apart over a batting); public papers: XPBD (Macklin, Müller, Chentanez, MIG 2016) for the elastic, Choi and Ko (SIGGRAPH 2002) for cloth that buckles rather than compresses, docs/physics.md §3.
+
+## Status
+
+Planned (M34). Built in four steps, each one commit: elastic and
+shirring, topstitching, interfacing, quilting; then the shirt template.
+
+## User story
+As a designer, I gather a sleeve's cuff with an elastic two thirds its
+length and see it close on the wrist; I shirr the top of a dress front
+in five rows; I topstitch a shirt's yoke twice, 1 mm and 6 mm from its
+seam, in a white heavy thread, and see the stitches on the board, the
+3D view, the photo and the tech pack; I interface the collar stand and
+see it stand; I quilt a jacket's front in 5 cm diamonds with 8 mm
+padding and see it puff between the stitches. The tech pack lists the
+elastic per size, the interfacing and the padding with their areas,
+and the topstitching.
+
+## Behavior
+
+### Elastic
+- An **elastic** runs along a side, given as a seam's: a whole edge,
+  consecutive outline edges, or an internal line, all of it or a
+  stretch (`from_mm`, `to_mm`).
+- Its **ratio** is its relaxed length over the side's length
+  (0.2–1; default 0.75): a 30 cm edge with a ratio of 2/3 takes a
+  20 cm elastic. The command also takes the relaxed length in mm and
+  turns it into the ratio, so the elastic follows the edge when it
+  changes and grades with it (each size's length is that size's side
+  × the ratio).
+- Its **width** (2–50 mm; default 10) sets how strongly it pulls: about
+  0.8 N per mm of width when stretched to twice its length (general
+  knowledge of knitted and braided elastics; an estimate to calibrate).
+- A side can carry one elastic (a stretch of it, another); an elastic
+  and a seam or a zipper may share a side (an elastic sewn into a
+  waistband seam).
+- **Shirring** (`elastic.shirr`): several parallel rows across a piece,
+  each a new internal line with its elastic, made in one step. The rows
+  run parallel to an edge's chord, the first at a distance from the
+  edge, the next ones a gap apart (default 15 mm), across the whole
+  piece, stopping 1 mm short of its outline. Undo removes the lines
+  and the elastics together.
+- Removing the side (the edge or the line) removes its elastic.
+
+### Topstitching
+- A **topstitch** runs along a side (as an elastic's) in 1 to 3
+  **rows**: the first `offset_mm` from the side (default 6), the next
+  ones `gap_mm` further (default 6). On outline edges the rows are
+  inside the piece (≥ 1 mm). On an internal line they are on its left
+  (walking from its start) when the offset is positive, on its right
+  when negative, on it when 0.
+- A **stitch length** (1–8 mm; default 3), a **thread colour**
+  (`#RRGGBB`; default a darker shade of the garment's colour) and a
+  **thread**: normal or heavy (topstitching thread, about twice as
+  thick).
+- To topstitch beside a seam (a yoke), topstitch the edge of the piece
+  the stitches show on.
+- The cloth under the rows (the band from the side to the last row,
+  plus 2 mm) bends 1.5 times harder: a topstitched edge stays flatter.
+- Rows are clipped to the piece; removing the side removes the
+  topstitch.
+
+### Interfacing
+- An **interfacing** is fused on part of a piece: the **whole piece**,
+  a **band** along consecutive outline edges (`width_mm`, a facing, a
+  waistband, a front band), or the **inside of a closed internal line**.
+- Its **kind** (woven, non-woven, knit) and **weight** (light, medium,
+  heavy) give its physical values (docs/physics.md §3, Interfacing): it
+  adds its weight and thickness, makes the cloth much stiffer to bend
+  (fused layers bend as one) and stiffer to stretch and shear (a knit
+  one stretches with the cloth).
+- Interfacings on one piece do not overlap (`invalid.overlap`).
+- Removing the piece, the edges or the line removes it.
+
+### Quilting
+- A **quilting** covers the whole piece or the inside of a closed
+  internal line, in **channels** (parallel lines) or **diamonds** (two
+  families of lines), at an angle from the grainline (default 45° for
+  diamonds, 0° for channels) and a **spacing** (15–150 mm; default
+  50), over a **padding** of a loft (thickness, 1–30 mm; default 8) and
+  a weight (g/m²; default 100). Its stitches are drawn as topstitching
+  (stitch length, thread colour).
+- One layer of cloth stands for the shell, the padding and the lining:
+  it is heavier, thicker against the body and other cloth, and stiffer
+  to bend; it folds more easily along the stitched lines. Between the
+  lines the surface puffs out by up to the loft, in the 3D view, photos
+  and 3D exports.
+- One quilting per area; areas on a piece do not overlap.
+
+### Drape
+- **Elastic**: a tie along the side that only pulls, its rest length
+  the side's times the ratio, reached over the sewing ramp. The cloth
+  along the elastic gathers: it may shorten there without resisting
+  (it buckles, finer than the mesh can show), and the cloth beyond it
+  folds. Along elastic lines the cloth is meshed finer (about 8 mm, in
+  a band of three triangles on each side), so the gathers are small.
+- **Topstitching, interfacing, quilting** change the cloth where they
+  are: the triangles there take the garment's fabric combined with
+  them. Their boundaries (an interfacing's edge, the stitched lines of a
+  quilting) are mesh lines, so the change is crisp.
+- A quilted piece is meshed at a quarter of its quilting's spacing at
+  most, so the puffs have the points to show.
+- Changing a detail during a drape rebuilds the scene; the cloth carries
+  on.
+- `simulate` reports the elastics' lengths on the cloth and how far each
+  is from its relaxed length.
+
+### Board
+- Elastic: a zigzag along its side, with its ratio. Shirring: each row
+  likewise.
+- Topstitching: its rows dashed at the stitch length, in the thread's
+  colour.
+- Interfacing: its area hatched.
+- Quilting: its stitched lines dashed, its area outlined.
+
+### 3D view and photos
+- Topstitches and quilting stitches as short raised dashes of thread on
+  the cloth, at their real size (in the 3D view no thinner than a
+  pixel), in the thread's colour. In the app's 3D view, the headless
+  renders, the tech pack's pictures and the photos.
+- Quilting puffs, as above.
+
+### Tech pack
+- Bill of materials, per garment: elastic by width, with its length per
+  size (relaxed, rounded up to the centimetre) and the total; interfacing
+  by kind and weight, with its area (m²); padding by loft and weight,
+  with its area.
+- Construction details: each topstitch (piece, edge, rows, distance,
+  gap, stitch length and stitches per inch, thread and colour), each
+  elastic (piece, edge or line, ratio, width), each quilting (piece,
+  pattern, spacing, loft).
+
+## Commands and queries
+- `elastic.add` (side, ratio? | relaxed_mm?, width_mm?), `elastic.set`
+  (ratio?, relaxed_mm?, width_mm?), `elastic.remove`, `elastic.shirr`
+  (panel, edge, rows, first_mm?, gap_mm?, ratio?, width_mm?).
+- `topstitch.add` (side, rows?, offset_mm?, gap_mm?, stitch_mm?,
+  color?, thread?), `topstitch.set`, `topstitch.remove`.
+- `interfacing.add` (panel, area: whole | band {edges, width_mm} |
+  inside {line}, kind?, weight?), `interfacing.set`,
+  `interfacing.remove`.
+- `quilting.add` (panel, line?, pattern, angle_deg?, spacing_mm?,
+  loft_mm?, padding_gsm?, stitch_mm?, color?), `quilting.set`,
+  `quilting.remove`.
+- `detail.list`: every elastic (its side, ratio, relaxed length in each
+  size), topstitch (its rows' lengths), interfacing (its area in mm²)
+  and quilting (its area, its stitched lines' total length).
+
+## UX
+- The action bar (spec 30): an edge picked offers **Elastic** and
+  **Topstitch**; a piece alone offers **Interfacing**, **Quilting** and
+  **Shirring**. Each opens a small card under its button with the
+  values (and, for Shirring, the edge the rows follow: the picked one,
+  else the piece's first edge), Apply.
+- The inspector lists the selected piece's elastics, topstitches,
+  interfacings and quiltings, each with its values to edit and a remove
+  action.
+
+## Acceptance criteria
+- Every command round-trips apply → undo → redo; a golden file per new
+  schema version holds the new details; older files load unchanged.
+- **A cuff gathered by elastic**: a 300 mm sleeve hem with an elastic
+  of ratio 0.6 drapes with its hem 180 mm ± 5 % around (on the cloth),
+  gathered (the cloth's surface beside it is at least 20 % longer than
+  its straight line), no NaN.
+- **A topstitched yoke**: two rows on the yoke's seam edge show on the
+  board, in the 3D view and in a photo (their pixels in the thread's
+  colour), and in the tech pack.
+- **A collar that stands**: a shirt's collar stand with heavy
+  interfacing stays up (its top edge's mean height above its seam ≥ 80 %
+  of its width) where the same stand without it folds over.
+- **A quilted panel**: a quilted panel weighs its cloth plus padding,
+  and its points between stitched lines stand out from the lines by
+  about the loft.
+- Removing a piece removes its details in the same undo step.

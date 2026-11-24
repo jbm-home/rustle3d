@@ -15,8 +15,8 @@ app: the Dart, Pleat and Hole tools, Join or cut in the
 inspector, the Ease of a seam in the edge card; since M32 the Sew tool
 picks every kind of side (spec 02, The Sew tool).
 
-Not yet (the solver would need more): elastic and shirring, visible
-topstitching, interfacing (local stiffening), quilting and padding. Holes are
+Elastic and shirring, topstitching, interfacing, quilting and padding:
+spec 31 (M34). Holes are
 cut on their line (no seam allowance inward). Mirror copies and
 symmetric pieces cannot have holes yet.
 

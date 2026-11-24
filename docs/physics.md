@@ -85,6 +85,8 @@ element's rest area or length as each method prescribes.
 | Seams | Zero-rest-length distance constraints between paired seam vertices, compliance ramped from soft to stiff during "sewing" | [2] | When a seam gap goes under a threshold, the pair can be **welded** into one particle (more stable, fewer constraints). |
 | Pins / grab | Attachment constraint to a world target, with its own compliance | [2] | The mouse grab uses a soft compliance, so cloth follows the cursor without exploding. |
 | Closures (buttons, zippers) | Stiff distance constraint whose rest length shrinks to zero at a bounded speed | [2] | See "Closures" below: fastened at any time without snapping. |
+| Elastic | Tension-only distance constraints along a side, rest length shortened by the elastic's ratio | [2] | See "Elastic" below; the cloth along it buckles instead of resisting compression [25]. |
+| Topstitching, interfacing, quilting | The triangles under them take a composite fabric; hinges on quilting lines keep the shell's bending | [4], [5] | See "Composite cloth" below. |
 | Avatar contact | Unilateral SDF constraint `φ(x) ≥ h` | [6], [7] | Thickness `h` from the fabric. |
 | Self-contact | Particle–particle unilateral distance `≥ h`, excluding rest neighbors | [7], [8] | Basic self-collision for the MVP; see §5. |
 | Friction | Position-based Coulomb friction (static/kinetic) on contacts | [7] | Separate cloth–body and cloth–cloth coefficients. |
@@ -124,6 +126,73 @@ correction let the momentum build: a 3 cm gap shut in one frame at
   skirt with a centre-back zipper (`r3d-commands` `tests/closures.rs`)
   drapes zipped, opens (only the stop holds), and closes again within
   2 mm in a second, each time carried over without starting again.
+
+### Elastic (M34)
+
+An elastic along a side (spec 31) is a chain of XPBD distance
+constraints [2] between the side's consecutive particles. Segment `i`,
+`lᵢ` long on the pattern, has the rest length `rᵢ = lᵢ · ratio`; the
+elastic's stiffness `K` (N per unit strain, ≈ 0.8 N per mm of width, an
+estimate to calibrate) gives it the compliance `αᵢ = rᵢ / K` (a spring
+`K / rᵢ` N/m). The constraint only pulls (`|xᵢ − xᵢ₊₁| > rᵢ`): an elastic
+does not push when slack. Its rest length goes from `lᵢ` to `rᵢ` over
+the sewing ramp (§4), so the gathers form while the garment is sewn,
+without a jolt; a scene rebuilt later starts at `rᵢ`.
+
+Real cloth sewn to a stretched elastic gathers in folds a few
+millimetres wide, far below the mesh. A membrane that resists
+compression as much as stretch would hold the elastic open. Cloth
+buckles under very little compressive force [25]. The triangles that
+touch an elastic therefore take a **buckling** factor: when stretched
+along the warp or the weft they resist as usual, and when compressed
+their compliance is 1 000 times larger. The elastic shortens them freely
+and the cloth beyond, at full length, folds out of the plane.
+
+To make those folds smaller than the default 25 mm, the cloth along an
+elastic is meshed finer: points of a triangular lattice at 8 mm
+(at most the piece's spacing), three rows on each side of the line, are
+added before the refinement (`r3d_geom::mesh_panel`'s fine zones), which
+grades the triangles back to the piece's spacing around them.
+
+On the GPU the elastic segments are coloured like seams and solved in
+their own dispatches after the closures; the buckling factor is a field
+of each membrane.
+
+### Composite cloth: topstitching, interfacing, quilting (M34)
+
+Where a detail covers the cloth, its triangles take a fabric of their
+own, the garment's combined with the detail; hinges between two
+fabrics average their bending (as between garments' fabrics). The
+area's boundary is a mesh line, so the change follows it.
+
+- **Topstitching**: the band from the side to the last row (plus 2 mm)
+  bends 1.5 times harder (the thread and the seam allowance under it).
+- **Interfacing** (fused): weights and thicknesses add, stretch and
+  shear stiffnesses add, and bending is `3 × (B_cloth + B_interfacing)`.
+  Bonded layers bend about a shared neutral axis, so their rigidity
+  grows faster than their sum (for two equal layers, a plate's `t³` law
+  gives 4 times the sum); 3 is our estimate, to calibrate. The
+  interfacing's own values (estimates from general textile knowledge):
+
+  | Weight | g/m² | mm | Stretch N/m (woven, non-woven) | Shear N/m (woven, non-woven) | Bending µN·m |
+  |---|---|---|---|---|---|
+  | Light | 25 | 0.15 | 3 000 | 20, 100 | 10 |
+  | Medium | 45 | 0.25 | 5 000 | 40, 200 | 40 |
+  | Heavy | 80 | 0.40 | 8 000 | 80, 400 | 150 |
+
+  A knit interfacing has the woven's warp stiffness, a twentieth of it
+  across, and a quarter of the woven's shear.
+- **Quilting**: one layer stands for the shell, the padding and a
+  lining like the shell: density `2 ρ + padding`, thickness `h + loft`,
+  stretch and shear twice the shell's, bending `2 B + 15 µN·m × loft²`
+  (loft in mm: an 8 mm padding on cotton gives ≈ 1 000 µN·m, a bending
+  length of about 7 cm). The hinges on the stitched lines keep `2 B`
+  (the layers only), so the panel folds along its stitches. The puffs
+  are not simulated: the views move each point out along the cloth's
+  normal by `loft · sin(π d / s)`, `d` its distance on the pattern to
+  the nearest stitched line and `s` the spacing (clamped at the
+  middle), both families of lines for diamonds. A quilted piece is
+  meshed at a quarter of the spacing at most.
 
 ### Fabric parameters (our own documented model)
 
@@ -740,5 +809,6 @@ positions alone, so the CPU and GPU results read alike:
 22. A. Van Oosterom, J. Strackee. *The Solid Angle of a Plane Triangle.* IEEE Transactions on Biomedical Engineering 30(2), 1983.
 23. E. Guendelman, R. Bridson, R. Fedkiw. *Nonconvex Rigid Bodies with Stacking.* SIGGRAPH 2003 (shock propagation).
 24. A. M. Andrew. *Another efficient algorithm for convex hulls in two dimensions.* Information Processing Letters 9(5), 1979.
+25. K.-J. Choi, H.-S. Ko. *Stable but Responsive Cloth.* SIGGRAPH 2002 (post-buckling response: cloth under compression buckles at a small force).
 
 Reading order for contributors: [1] → [2] → [3] → [4] → [5] → [7] → [8] → [6].

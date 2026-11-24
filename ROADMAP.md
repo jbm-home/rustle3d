@@ -65,6 +65,15 @@ Maintainer's brief (2026-11-23): the details left open by M29.
 - Quilting and padding (thickness between stitched lines).
 - Needs solver work: docs/physics.md first.
 
+Plan (agreed 2026-11-24; spec 31, physics.md "Elastic" and "Composite
+cloth"): four steps, one commit each: elastic and shirring (tension-only
+ties, the cloth along them buckling, a finer mesh along them),
+topstitching (drawn on the cloth as dashes of thread, the band under it
+slightly stiffer), interfacing (composite fabric on the whole piece, a
+band or a closed line's inside), quilting (one layer, puffs drawn by the
+views); then the shirt template uses them (interfaced collar stand,
+topstitched yoke, elastic cuffs offered).
+
 ## M36 — Natural motions
 
 Maintainer's brief (2026-11-23): the motions look robotic. The walk makes
