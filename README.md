@@ -19,7 +19,7 @@
 ---
 
 <p align="center">
-  <img src="assets/screenshots/app.png" alt="Rustle3D: the pattern of a shirt and trousers on the left, the outfit draped on an avatar in the middle, the inspector on the right" width="900">
+  <img src="assets/screenshots/app.png" alt="Rustle3D: the pattern of a gingham shirt and denim trousers on the left, the shirt tucked into the trousers and draped on an avatar in the middle, the inspector on the right" width="900">
 </p>
 
 Rustle3D is a free desktop app for making clothes: draft the pattern in
@@ -58,13 +58,13 @@ The 3D view needs a graphics card with Metal (macOS), Direct3D 12
 | Area | What you can do |
 |---|---|
 | **Patterns (2D)** | Start from templates drafted to the body's measurements (T-shirt, shirt, dress, skirts, trousers, tote bag) or draw pieces with polygon, curve and cut tools. Constraints, dimensions, formulas (`waist / 4 + 10 mm`), darts, pleats, holes, symmetric half pieces, notches and internal lines. |
-| **Sewing** | Sew edges together, see direction and length mismatches, gather, add ease, match both sides in one click. Buttons and zippers close the garment. |
+| **Sewing** | Sew edges together, see direction and length mismatches, gather, add ease, match both sides in one click. Buttons and zippers close the garment. Construction details: elastic and shirring, topstitching, interfacing, quilting over a padding. |
 | **Drape (3D)** | Real-time XPBD cloth simulation on the GPU, with collisions, self-collision, pins and pulling the cloth with the mouse. Several garments in layers. Fabric presets (cotton, denim, jersey, silk, wool) and prints that follow the grainline. |
 | **Avatars** | A parametric body set by its measurements, imported scans and characters (OBJ, glTF), walking motions and captured motions (BVH). |
 | **Sizes and fit** | Grading over a size range, each size draped on a matching body; fit maps and a virtual tape measure. |
 | **Production** | Markers with yardage and cost, a tech pack PDF, a projector mode for cutting on the table. |
 | **Images** | Path-traced studio photos of the draped garment. |
-| **Exchange** | Open formats only: patterns in SVG, PDF (1:1, tiled), DXF-AAMA; DXF, SVG and PDF import; the draped garment in glTF/GLB and OBJ, and game-ready exports (LODs, normal maps, skinning). |
+| **Exchange** | Open formats only: patterns in SVG, PDF (1:1, tiled), DXF-AAMA; DXF, SVG and PDF import, Seamly2D and Valentina patterns and measurement files; the draped garment in glTF/GLB and OBJ, and game-ready exports (LODs, normal maps, skinning). |
 | **Automation** | A headless CLI (`r3d`) and an MCP server, headless or attached live to the open app. |
 
 The app is in English and French.
@@ -82,8 +82,9 @@ r3d render Skirt.r3d --view photo --out skirt.png  # a studio photo of it
 r3d mcp --project Skirt.r3d                        # serve it to an AI agent over MCP
 ```
 
-The app can also let an agent work on the project open on screen (an
-option in the app, off by default). Every command and its parameters:
+The app can also let an agent work on the project open on screen: its
+**Agents** button walks you through it (off by default) and gives the
+settings to copy into your agent. Every command and its parameters:
 [`docs/commands.md`](docs/commands.md).
 
 ## Building from source and contributing
