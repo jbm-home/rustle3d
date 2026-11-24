@@ -1,5 +1,6 @@
-// Attached agents: allowed from the app, an agent connects with the token,
-// its change shows at once; the user disconnects it.
+// Attached agents: allowed from the Agents dialog (which shows how to add
+// the server), an agent connects with the token, its change shows at once;
+// the user disconnects it.
 
 import 'dart:async';
 import 'dart:convert';
@@ -7,6 +8,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:rustle3d/main.dart';
 import 'package:rustle3d/src/projects.dart';
 import 'package:rustle3d/src/rust/api/engine.dart';
@@ -35,11 +37,19 @@ void main() {
     }
 
     await frames();
-    expect(find.textContaining('3 pieces'), findsOneWidget);
+    expect(find.textContaining('3 pieces in'), findsOneWidget);
 
-    engine.allowAgents(libraryDir: dir, allow: true);
+    await tester.tap(find.byKey(const ValueKey('agentsButton')));
+    await frames();
+    expect(find.text('Agents are not allowed'), findsOneWidget);
+    final config = tester.widget<SelectableText>(
+      find.byKey(const ValueKey('agentsConfig')),
+    );
+    expect(config.data, contains('"args": ["mcp", "--attach"]'));
+    await tester.tap(find.byKey(const ValueKey('agentsAllow')));
     await frames();
     expect(find.text('Agents: waiting'), findsOneWidget);
+    expect(find.text('Waiting for an agent…'), findsOneWidget);
     final endpoint = jsonDecode(File('$dir/agent.json').readAsStringSync());
 
     // The agent: hello with the token, then MCP over newline JSON.
@@ -84,18 +94,26 @@ void main() {
 
     // The app shows it without being asked.
     await frames();
-    expect(find.textContaining('4 pieces'), findsOneWidget);
-    expect(find.text('Agent connected'), findsOneWidget);
+    expect(find.textContaining('4 pieces in'), findsOneWidget);
+    // On the toolbar button and in the dialog.
+    expect(find.text('Agent connected'), findsNWidgets(2));
 
     // The user disconnects it, then stops accepting agents.
-    engine.disconnectAgent();
+    // The dialog scrolls in the test's small window.
+    await tester.ensureVisible(find.text('Disconnect the agent'));
+    await frames(2);
+    await tester.tap(find.text('Disconnect the agent'));
     await frames();
     expect(find.text('Agents: waiting'), findsOneWidget);
     expect(
       await replies.moveNext().timeout(const Duration(seconds: 5)),
       isFalse,
     );
-    engine.allowAgents(libraryDir: dir, allow: false);
+    await tester.ensureVisible(find.byKey(const ValueKey('agentsAllow')));
+    await frames(2);
+    await tester.tap(find.byKey(const ValueKey('agentsAllow')));
+    await frames();
+    await tester.tap(find.text('Close'));
     await frames();
     expect(find.text('Agents'), findsOneWidget);
     expect(File('$dir/agent.json').existsSync(), isFalse);

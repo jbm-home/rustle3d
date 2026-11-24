@@ -9,6 +9,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'agents.dart';
 import 'body_check.dart';
 import 'body_panel.dart';
 import 'busy.dart';
@@ -2537,8 +2538,12 @@ class _ShellState extends State<Shell> {
                 },
                 onImport: _importPattern,
                 agent: _agent,
-                onAllowAgents: _allowAgents,
-                onDisconnectAgent: () => _guard(widget.engine.disconnectAgent),
+                onAgents: () => showAgents(
+                  context,
+                  engine: widget.engine,
+                  onAllow: _allowAgents,
+                  onDisconnect: () => _guard(widget.engine.disconnectAgent),
+                ),
                 bodyKey: _spotBody,
                 onLearn: () => _scaffold.currentState?.openEndDrawer(),
                 onHome: widget.onHome,
@@ -2990,8 +2995,7 @@ class _TopBar extends StatelessWidget {
     required this.onProduction,
     required this.onImport,
     required this.agent,
-    required this.onAllowAgents,
-    required this.onDisconnectAgent,
+    required this.onAgents,
     required this.bodyKey,
     required this.onLearn,
     required this.onHome,
@@ -3034,8 +3038,7 @@ class _TopBar extends StatelessWidget {
 
   /// AI agents: allowed or not, connected or not.
   final AgentStatus agent;
-  final ValueChanged<bool> onAllowAgents;
-  final VoidCallback onDisconnectAgent;
+  final VoidCallback onAgents;
 
   /// The Body button, for Learn to point at.
   final GlobalKey bodyKey;
@@ -3094,11 +3097,7 @@ class _TopBar extends StatelessWidget {
               showPoints: showPoints,
               onChoice: onBody,
             ),
-            _AgentButton(
-              status: agent,
-              onAllow: onAllowAgents,
-              onDisconnect: onDisconnectAgent,
-            ),
+            _AgentButton(status: agent, onOpen: onAgents),
             Tooltip(
               message: l.importTip,
               child: TextButton.icon(
@@ -6720,15 +6719,10 @@ class _LengthControlState extends State<_LengthControl> {
 /// AI agents: let one connect (`r3d mcp --attach`), see whether one is,
 /// disconnect it.
 class _AgentButton extends StatelessWidget {
-  const _AgentButton({
-    required this.status,
-    required this.onAllow,
-    required this.onDisconnect,
-  });
+  const _AgentButton({required this.status, required this.onOpen});
 
   final AgentStatus status;
-  final ValueChanged<bool> onAllow;
-  final VoidCallback onDisconnect;
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -6741,50 +6735,34 @@ class _AgentButton extends StatelessWidget {
       AgentStatus.connected => l.agentConnected,
     };
     final color = status == AgentStatus.off ? p.textMuted : p.accent;
-    return PopupMenuButton<String>(
-      tooltip: l.agentsTip,
-      onSelected: (choice) => switch (choice) {
-        'allow' => onAllow(status == AgentStatus.off),
-        'disconnect' => onDisconnect(),
-        _ => null,
-      },
-      itemBuilder: (_) => [
-        CheckedPopupMenuItem(
-          value: 'allow',
-          checked: status != AgentStatus.off,
-          child: Text(l.allowAgents),
-        ),
-        PopupMenuItem(
-          enabled: false,
-          child: Text(
-            l.agentsHow,
-            style: ts(fontSize: 12.5, color: p.textMuted),
+    return Tooltip(
+      message: l.agentsTip,
+      child: InkWell(
+        key: const ValueKey('agentsButton'),
+        onTap: onOpen,
+        borderRadius: BorderRadius.circular(999),
+        child: AnimatedContainer(
+          duration: Motion.fast,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: connected ? p.accentSoft : Colors.transparent,
+            borderRadius: BorderRadius.circular(999),
           ),
-        ),
-        if (connected)
-          PopupMenuItem(value: 'disconnect', child: Text(l.disconnectAgent)),
-      ],
-      child: AnimatedContainer(
-        duration: Motion.fast,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: connected ? p.accentSoft : Colors.transparent,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.smart_toy_outlined, size: 18, color: color),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: ts(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: color,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.smart_toy_outlined, size: 18, color: color),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: ts(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: color,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

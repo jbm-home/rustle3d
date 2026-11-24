@@ -642,7 +642,45 @@ class LFr extends L {
   String get allowAgents => 'Autoriser les agents IA';
 
   @override
-  String get agentsHow => 'Un agent se connecte avec : r3d mcp --attach';
+  String get agentsTitle => 'Connecter un agent IA';
+
+  @override
+  String get agentsIntro =>
+      'Un agent IA (un assistant qui utilise des outils) peut modifier ce projet en direct : tracer des pièces, coudre, simuler, regarder le résultat. Il dialogue avec Rustle3D par MCP ; les étapes ci-dessous prennent une minute, une seule fois.';
+
+  @override
+  String get agentsStepAllow => 'Laisser entrer les agents';
+
+  @override
+  String get agentsStepAdd => 'Ajouter Rustle3D à votre agent';
+
+  @override
+  String get agentsAddHint =>
+      'Ajoutez ce serveur aux serveurs MCP de votre agent, puis relancez l’agent. Il lance r3d, l’outil en ligne de commande installé avec l’app.';
+
+  @override
+  String get agentsJsonHint =>
+      'La plupart des assistants de bureau lisent ceci dans leur fichier de réglages MCP ; fusionnez-le dans son « mcpServers ».';
+
+  @override
+  String get agentsCopy => 'Copier';
+
+  @override
+  String get agentsNoR3d =>
+      'r3d est introuvable à côté de l’app (une version compilée depuis les sources ?) : compilez-le avec cargo build -p r3d-cli et mettez son chemin complet à la place de r3d.';
+
+  @override
+  String get agentsStepAsk => 'Demandez à votre agent';
+
+  @override
+  String get agentsAskHint =>
+      'Par exemple : « Regarde mon projet dans Rustle3D et rallonge les manches de 3 cm. » Chaque modification s’affiche ici aussitôt et peut être annulée.';
+
+  @override
+  String get agentsStateOff => 'Les agents ne sont pas autorisés';
+
+  @override
+  String get agentsStateWaiting => 'En attente d’un agent…';
 
   @override
   String get disconnectAgent => 'Déconnecter l’agent';

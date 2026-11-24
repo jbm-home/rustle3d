@@ -639,7 +639,45 @@ class LEn extends L {
   String get allowAgents => 'Allow AI agents';
 
   @override
-  String get agentsHow => 'An agent connects with: r3d mcp --attach';
+  String get agentsTitle => 'Connect an AI agent';
+
+  @override
+  String get agentsIntro =>
+      'An AI agent (an assistant that runs tools) can edit this project live: draft pieces, sew, drape, look at the result. It talks to Rustle3D over MCP; the steps below take a minute, once.';
+
+  @override
+  String get agentsStepAllow => 'Let agents in';
+
+  @override
+  String get agentsStepAdd => 'Add Rustle3D to your agent';
+
+  @override
+  String get agentsAddHint =>
+      'Add this server to your agent\'s MCP servers, then restart the agent. It starts r3d, the command-line tool installed with the app.';
+
+  @override
+  String get agentsJsonHint =>
+      'Most desktop assistants read this in their MCP settings file; merge it into the file\'s \"mcpServers\".';
+
+  @override
+  String get agentsCopy => 'Copy';
+
+  @override
+  String get agentsNoR3d =>
+      'r3d was not found next to the app (a build from source?): build it with cargo build -p r3d-cli and put its full path in place of r3d.';
+
+  @override
+  String get agentsStepAsk => 'Ask your agent';
+
+  @override
+  String get agentsAskHint =>
+      'For example: \"Look at my project in Rustle3D and lengthen the sleeves by 3 cm.\" Each change shows here at once and can be undone.';
+
+  @override
+  String get agentsStateOff => 'Agents are not allowed';
+
+  @override
+  String get agentsStateWaiting => 'Waiting for an agent…';
 
   @override
   String get disconnectAgent => 'Disconnect the agent';

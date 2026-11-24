@@ -1171,11 +1171,77 @@ abstract class L {
   /// **'Allow AI agents'**
   String get allowAgents;
 
-  /// No description provided for @agentsHow.
+  /// No description provided for @agentsTitle.
   ///
   /// In en, this message translates to:
-  /// **'An agent connects with: r3d mcp --attach'**
-  String get agentsHow;
+  /// **'Connect an AI agent'**
+  String get agentsTitle;
+
+  /// No description provided for @agentsIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'An AI agent (an assistant that runs tools) can edit this project live: draft pieces, sew, drape, look at the result. It talks to Rustle3D over MCP; the steps below take a minute, once.'**
+  String get agentsIntro;
+
+  /// No description provided for @agentsStepAllow.
+  ///
+  /// In en, this message translates to:
+  /// **'Let agents in'**
+  String get agentsStepAllow;
+
+  /// No description provided for @agentsStepAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Rustle3D to your agent'**
+  String get agentsStepAdd;
+
+  /// No description provided for @agentsAddHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add this server to your agent\'s MCP servers, then restart the agent. It starts r3d, the command-line tool installed with the app.'**
+  String get agentsAddHint;
+
+  /// No description provided for @agentsJsonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Most desktop assistants read this in their MCP settings file; merge it into the file\'s \"mcpServers\".'**
+  String get agentsJsonHint;
+
+  /// No description provided for @agentsCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get agentsCopy;
+
+  /// No description provided for @agentsNoR3d.
+  ///
+  /// In en, this message translates to:
+  /// **'r3d was not found next to the app (a build from source?): build it with cargo build -p r3d-cli and put its full path in place of r3d.'**
+  String get agentsNoR3d;
+
+  /// No description provided for @agentsStepAsk.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask your agent'**
+  String get agentsStepAsk;
+
+  /// No description provided for @agentsAskHint.
+  ///
+  /// In en, this message translates to:
+  /// **'For example: \"Look at my project in Rustle3D and lengthen the sleeves by 3 cm.\" Each change shows here at once and can be undone.'**
+  String get agentsAskHint;
+
+  /// No description provided for @agentsStateOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Agents are not allowed'**
+  String get agentsStateOff;
+
+  /// No description provided for @agentsStateWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for an agent…'**
+  String get agentsStateWaiting;
 
   /// No description provided for @disconnectAgent.
   ///

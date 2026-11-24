@@ -2,10 +2,14 @@
 
 Provenance: maintainer's functional brief (2026-11-14); Model Context Protocol specification (open).
 
-## Status (2026-11-17)
+## Status (2026-11-24)
 
 Implemented: headless (M2) and attached (M9). Attached: the app's Agents
-menu allows agents (off by default; nothing listens before); the app
+button opens a three-step guide: allow agents (off by default; nothing
+listens before), the server's settings to copy into the agent (a JSON
+`mcpServers` entry, or the command line of two common agents, naming
+the `r3d` shipped next to the app by its full path), and the live
+status with a Disconnect button. Once allowed, the app
 then listens on a loopback TCP port and writes the port and a secret
 token to `agent.json` in its support folder. `r3d mcp --attach
 [--endpoint file]` reads it, sends `R3D-ATTACH <token>` and relays stdio;
