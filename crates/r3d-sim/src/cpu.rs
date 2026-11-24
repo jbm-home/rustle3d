@@ -62,6 +62,11 @@ pub struct CpuSolver {
     /// Per particle: the sum and count of its edges' pushes out of the
     /// body in a substep (reused buffer).
     edge_push: Vec<(Vec3, u32)>,
+    /// Per particle: the pull of the elastics on it this substep (N), so
+    /// friction knows how hard they press it on the body.
+    press: Vec<Vec3>,
+    /// Where the particles were at the start of the last frame.
+    start: Vec<Vec3>,
     grab: Option<Grab>,
     time: f32,
     stats: StepStats,
@@ -96,6 +101,8 @@ impl CpuSolver {
             turned: Vec::new(),
             near: vec![false; n],
             edge_push: vec![(Vec3::ZERO, 0); n],
+            press: vec![Vec3::ZERO; n],
+            start: model.positions.clone(),
             grab: None,
             time: 0.0,
             stats: StepStats::default(),
@@ -139,8 +146,16 @@ impl CpuSolver {
         for [a, b] in &self.model.closures {
             close(&mut self.x, &self.prev, w, [*a as usize, *b as usize], h);
         }
+        self.press.fill(Vec3::ZERO);
         for link in &self.model.elastics {
-            stretch(&mut self.x, w, link, elastic_target(link, self.time), h2);
+            stretch(
+                &mut self.x,
+                w,
+                &mut self.press,
+                link,
+                elastic_target(link, self.time),
+                h2,
+            );
         }
         self.model.self_contact.solve(&self.pairs, &mut self.x, w);
         let m = &self.model;
@@ -165,7 +180,7 @@ impl CpuSolver {
                 self.x[*i] += pull;
             }
         }
-        self.collide(posed.as_ref());
+        self.collide(posed.as_ref(), h);
         for i in 0..self.x.len() {
             self.v[i] = (self.x[i] - self.prev[i]) / h;
             self.v[i] *= (1.0 - self.model.damping[i] * h).max(0.0);
@@ -174,8 +189,9 @@ impl CpuSolver {
 
     /// Contacts with the body and the ground. Independent per particle:
     /// solved in parallel, with the same result for any number of threads.
-    /// `posed`: where a moving body's parts are this substep.
-    fn collide(&mut self, posed: Option<&Posed>) {
+    /// `posed`: where a moving body's parts are this substep; `h`: the
+    /// substep.
+    fn collide(&mut self, posed: Option<&Posed>, h: f32) {
         let m = &self.model;
         let (w, thickness, friction) = (&m.inv_mass, &m.thickness, &m.friction);
         let (collider, ground) = (m.collider.as_ref(), m.ground);
@@ -183,9 +199,10 @@ impl CpuSolver {
             .par_iter_mut()
             .zip(self.prev.par_iter_mut())
             .zip(self.near.par_iter_mut())
+            .zip(self.press.par_iter())
             .enumerate()
             .with_min_len(64)
-            .for_each(|(i, ((x, prev), near))| {
+            .for_each(|(i, (((x, prev), near), press))| {
                 *near = false;
                 let (Some(w), Some(thickness), Some(friction)) =
                     (w.get(i), thickness.get(i), friction.get(i))
@@ -236,12 +253,16 @@ impl CpuSolver {
                     // surface touched, is cancelled up to `friction` × the
                     // push out of it, so the cloth holds where it presses
                     // (and goes along with a moving body) and slides where
-                    // it only rests.
+                    // it only rests. An elastic presses harder than its
+                    // push shows (docs/physics.md, "Elastic"): its pull
+                    // into the surface counts, as the displacement it
+                    // would give in a substep.
+                    let pressed = (-press.dot(n)).max(0.0) * w * h * h;
                     let moved = *x - *prev - carried;
                     let tangential = moved - n * moved.dot(n);
                     let sliding = tangential.length();
                     if sliding > 0.0 {
-                        *x -= tangential * (friction * depth / sliding).min(1.0);
+                        *x -= tangential * (friction * (depth + pressed) / sliding).min(1.0);
                     }
                 }
             });
@@ -306,6 +327,7 @@ impl Solver for CpuSolver {
 
     fn step(&mut self, frame_dt: f32) -> Result<(), StepError> {
         let h = frame_dt / SUBSTEPS as f32;
+        self.start.clone_from(&self.x);
         self.model
             .self_contact
             .candidates(&self.x, &self.model.inv_mass, &mut self.pairs);
@@ -339,7 +361,13 @@ impl Solver for CpuSolver {
             self.substep(h);
             self.time += h;
         }
-        self.stats = StepStats::measure(&self.x, &self.v, &self.model.seams, &self.model.closures);
+        self.stats = StepStats::measure(
+            &self.x,
+            &self.start,
+            frame_dt,
+            &self.model.seams,
+            &self.model.closures,
+        );
         Ok(())
     }
 
@@ -415,7 +443,16 @@ fn close(x: &mut [Vec3], prev: &[Vec3], w: &[f32], [a, b]: [usize; 2], h: f32) {
 
 /// An elastic segment: XPBD on `|x_b − x_a| ≤ target` (it only pulls),
 /// with the compliance of a spring of `stiffness / target` N/m.
-fn stretch(x: &mut [Vec3], w: &[f32], link: &ElasticLink, target: f32, h2: f32) {
+/// An elastic segment: pulls its ends to `target` apart if they are
+/// further, and adds its tension (N) to their `press`.
+fn stretch(
+    x: &mut [Vec3],
+    w: &[f32],
+    press: &mut [Vec3],
+    link: &ElasticLink,
+    target: f32,
+    h2: f32,
+) {
     let [a, b] = link.v.map(|i| i as usize);
     let d = x[b] - x[a];
     let len = d.length();
@@ -423,6 +460,9 @@ fn stretch(x: &mut [Vec3], w: &[f32], link: &ElasticLink, target: f32, h2: f32) 
         return;
     }
     let n = d / len;
+    let tension = n * (link.stiffness * (len - target) / target);
+    press[a] += tension;
+    press[b] -= tension;
     project(
         x,
         w,

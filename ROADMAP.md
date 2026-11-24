@@ -59,16 +59,15 @@ used the app.
 - **Bugs**:
   - The 3D view becomes unusable after pulling the garment in the
     3D view (project "ProjetTest").
-  - `seam.add` picks a twisting direction for the front crotch resewn over
-    its whole height (edge:11 ↔ edge:31, the mirror copy, the fly
-    removed). The trousers fall to the floor in under a second.
-  - `seam.flip` holds the trousers up, but the front is stretched to
-    118–131 % at 84–89 cm high, and the front waist gapes.
-  - After 480 frames the drape is not settled: one point still moves at
-    3.2 m/s, and a seam is about 10 mm open.
-  - A waist elastic (ratio 0.78, 50 mm) stretches by 40 to 57 % and holds
-    nothing up, in cotton or jersey (maybe only a consequence of the
-    crotch).
+  - Done: the trousers fell because no elastic held anything up
+    (friction did not count an elastic's tension, physics.md, Elastic).
+    `seam.add` had chosen the right direction for the crotch; the
+    flipped one twisted it, which held the trousers by the twist (118–131
+    %). "Not settled" came from the last substep's speed (now the
+    frame's).
+  - Still open: about 8 mm open at the seams beside an elastic waist (the
+    elastic, solved after the seams, pulls their ends apart each
+    substep).
 - **Annoyances**:
   - `template.apply` renames a project the user named, even when it
     has no pieces.

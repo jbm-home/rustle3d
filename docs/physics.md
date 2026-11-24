@@ -157,6 +157,35 @@ gathered cloth lies in folds on itself: within 8 cm along the cloth
 around each point of an elastic it does not repel itself (as around a
 button), which closed the last 5 %.
 
+**Holding up a garment.** Friction in positions takes the normal force
+from how far the contact pushed the particle out in the substep (§6).
+For a stiff constraint the body keeps from closing, that push is no
+measure of its force: with one iteration a substep, an elastic
+corrects about its whole error each substep whatever its stiffness,
+and along a ring most of that correction runs along the ring; only
+its error times the curvature goes into the body, about 0.2 mm a
+substep, a pressure some 300 times below its tension's (16 N around a
+waist: 0.8 N on each particle). Jersey joggers with an elastic waist
+slid to the knees at any ratio or stiffness. The elastics' tension
+is known, though: each segment adds `K (|xᵢ − xᵢ₊₁| − rᵢ) / rᵢ` along
+itself to both ends' pull, and a particle in contact counts the part
+of its pull into the surface as `w h²` times that force, the
+displacement it would give in a substep, on top of the push in the
+friction's bound. Checked on both backends by a jersey tube around a
+cylinder (`an_elastic_holds_the_cloth_up_on_the_body`): it slides
+more than 10 cm without an elastic and less than 1 cm with one (from
+the end of the sewing ramp; it slides a few centimetres while the
+elastic tightens). The joggers stay at the waist (top at 1.01 m,
+against 0.62 m).
+
+An elastic and the seams at its ends still pull a particle back and
+forth by about a tenth of a millimetre each substep: its speed at the
+last substep stayed at 0.25 m/s on joggers at rest (0.01 m/s over the
+frame). So the step's `max_speed`, which says whether a drape has
+settled, is how far a particle moved over the whole frame divided by
+the frame's time, on both backends (the GPU no longer reads the
+velocities back).
+
 To make the folds beyond the band smaller than the default 25 mm, the
 cloth along an elastic is meshed finer: points of a triangular lattice
 at 8 mm (at most the piece's spacing), three rows on each side of the

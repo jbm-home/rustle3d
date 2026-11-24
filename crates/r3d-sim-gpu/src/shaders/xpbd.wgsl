@@ -142,6 +142,9 @@ struct Elastic {
     _pad2: f32,
 }
 @group(1) @binding(29) var<storage, read> elastics: array<Elastic>;
+// Per particle: the elastics' pull on it this substep (N), read and
+// cleared by `collide` (r3d-sim `CpuSolver::press`).
+@group(1) @binding(30) var<storage, read_write> press: array<vec4f>;
 
 const WG: u32 = 64u;
 
@@ -365,6 +368,10 @@ fn elastic(@builtin(global_invocation_id) id: vec3u) {
     let dl = (len - goal) / denom;
     x[e.v.x] = vec4f(pa + n * (dl * wa), 0.0);
     x[e.v.y] = vec4f(pb - n * (dl * wb), 0.0);
+    // Coloured: no other segment of this dispatch touches either end.
+    let tension = n * ((len - goal) / (goal * e.inv_stiffness));
+    press[e.v.x] = vec4f(press[e.v.x].xyz + tension, 0.0);
+    press[e.v.y] = vec4f(press[e.v.y].xyz - tension, 0.0);
 }
 
 // ---------------------------------------------------------------------------
@@ -618,6 +625,8 @@ fn collide(@builtin(global_invocation_id) id: vec3u) {
         return;
     }
     near[i] = 0u;
+    let pressing = press[i].xyz;
+    press[i] = vec4f(0.0);
     let d = pdata[i];
     if d.x == 0.0 {
         return;
@@ -657,11 +666,15 @@ fn collide(@builtin(global_invocation_id) id: vec3u) {
         touching = true;
     }
     if touching {
+        // An elastic's pull into the surface counts as the displacement it
+        // would give in a substep (as on the CPU).
+        let h = step.gravity_h.w;
+        let pressed = max(-dot(pressing, normal), 0.0) * d.x * h * h;
         let moved = p - prev[i].xyz - carried;
         let tangential = moved - normal * dot(moved, normal);
         let sliding = length(tangential);
         if sliding > 0.0 {
-            p -= tangential * min(d.z * depth / sliding, 1.0);
+            p -= tangential * min(d.z * (depth + pressed) / sliding, 1.0);
         }
     }
     x[i] = vec4f(p, 0.0);

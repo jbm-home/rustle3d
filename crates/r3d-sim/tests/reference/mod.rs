@@ -447,6 +447,87 @@ pub fn an_elastic_gathers_the_edge_it_is_sewn_on(make: Make) {
     );
 }
 
+/// A closed vertical cylinder mesh of `radius` from `y0` up to `y1`, on
+/// the Y axis.
+pub fn cylinder(radius: f32, y0: f32, y1: f32) -> StaticMesh {
+    let segments = 48u32;
+    let mut positions = vec![Vec3::new(0.0, y1, 0.0), Vec3::new(0.0, y0, 0.0)];
+    for y in [y1, y0] {
+        for s in 0..segments {
+            let a = std::f32::consts::TAU * s as f32 / segments as f32;
+            positions.push(Vec3::new(radius * a.cos(), y, radius * a.sin()));
+        }
+    }
+    let (top, bottom) = (
+        |s: u32| 2 + s % segments,
+        |s: u32| 2 + segments + s % segments,
+    );
+    let mut triangles = Vec::new();
+    // Counter-clockwise seen from outside.
+    for s in 0..segments {
+        triangles.push([0, top(s + 1), top(s)]);
+        triangles.push([1, bottom(s), bottom(s + 1)]);
+        triangles.push([top(s), top(s + 1), bottom(s)]);
+        triangles.push([top(s + 1), bottom(s + 1), bottom(s)]);
+    }
+    StaticMesh::new(positions, triangles, 0.005)
+}
+
+/// How far the top of a jersey tube 30 cm long, 14 cm in radius, hung
+/// around a 12 cm cylinder (a body's waist), slides from the end of the
+/// sewing ramp (when an elastic has reached its relaxed length) to 2 s;
+/// with `elastic`, an elastic at 70 % along its top edge.
+fn tube_slides(make: Make, elastic: bool) -> f32 {
+    let (n, radius, top) = (24, 0.14, 1.0);
+    let around = std::f32::consts::TAU * radius;
+    let mut scene = sheet(around, 0.3, n, Vec2::Y, |r| {
+        let a = std::f32::consts::TAU * r.x / around;
+        Vec3::new(radius * a.cos(), top - 0.3 + r.y, -radius * a.sin())
+    });
+    scene.fabrics = vec![FabricPreset::Jersey.params()];
+    // Closed along its first and last columns.
+    scene.seams = (0..n)
+        .map(|j| [(j * n) as u32, (j * n + n - 1) as u32])
+        .collect();
+    let rim: Vec<usize> = ((n - 1) * n..n * n).collect();
+    if elastic {
+        scene.elastics.push(r3d_sim::ElasticLine {
+            particles: rim.iter().map(|i| *i as u32).collect(),
+            ratio: 0.7,
+            stiffness: 40.0,
+        });
+    }
+    scene.collider = Some(cylinder(0.12, 0.3, 1.2));
+    let height =
+        |s: &dyn Solver| rim.iter().map(|i| s.positions()[*i].y).sum::<f32>() / rim.len() as f32;
+    let mut s = make(scene);
+    let frames = |seconds: f32| (seconds * 60.0).round() as usize;
+    for _ in 0..frames(r3d_sim::solver::SEWING_TIME) {
+        s.step(1.0 / 60.0).unwrap();
+    }
+    let sewn = height(&*s);
+    for _ in frames(r3d_sim::solver::SEWING_TIME)..frames(2.0) {
+        s.step(1.0 / 60.0).unwrap();
+    }
+    assert!(
+        s.positions().iter().all(|p| p.is_finite()),
+        "NaN in the simulation"
+    );
+    sewn - height(&*s)
+}
+
+pub fn an_elastic_holds_the_cloth_up_on_the_body(make: Make) {
+    // In XPBD with one iteration a substep, a stiff constraint the body
+    // keeps from closing pushes the cloth into it no further than its
+    // error times the curvature, a hundredth of its tension's pressure:
+    // friction from that push alone let elastic waists slide off. Its
+    // tension counts in the friction (docs/physics.md, "Elastic").
+    let bare = tube_slides(make, false);
+    assert!(bare > 0.1, "a loose tube should slide down: {bare} m");
+    let held = tube_slides(make, true);
+    assert!(held < 0.01, "the elastic let the tube slide {held} m");
+}
+
 /// How high a 30 × 8 cm band of `fabric`, clamped at its foot and leaning
 /// 5° at the start, stands after 3 s: its top's height over its width.
 fn band_stands(make: Make, fabric: r3d_sim::FabricParams) -> f32 {

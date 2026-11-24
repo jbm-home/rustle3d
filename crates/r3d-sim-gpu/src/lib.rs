@@ -175,6 +175,7 @@ mod bind {
     pub const LAYER_DELTA: u32 = 27;
     pub const GATHERED: u32 = 28;
     pub const ELASTICS: u32 = 29;
+    pub const PRESS: u32 = 30;
     /// Bindings the kernels only read.
     pub const READ_ONLY: [u32; 16] = [
         PDATA, MEMBRANES, HINGES, SEAMS, EDGE_ROWS, SEWN, EXCLUDED, SDF_SLOTS, SDF_VALUES, GRAB,
@@ -222,7 +223,7 @@ mod kernel {
         ("pull", &[X, PDATA, GRAB]),
         (
             "collide",
-            &[X, PREV, PDATA, NEARBY, SDF_SLOTS, SDF_VALUES, BODY],
+            &[X, PREV, PDATA, NEARBY, SDF_SLOTS, SDF_VALUES, BODY, PRESS],
         ),
         (
             "edges",
@@ -286,7 +287,7 @@ mod kernel {
             &[X, TRIANGLES, TOUCHES, SDF_SLOTS, SDF_VALUES, BODY],
         ),
         ("layer_average", &[X, LAYER_DELTA, DELTA, SEWN]),
-        ("elastic", &[X, PDATA, ELASTICS]),
+        ("elastic", &[X, PDATA, ELASTICS, PRESS]),
     ];
 }
 
@@ -503,7 +504,6 @@ pub struct GpuSolver {
     body_buffer: wgpu::Buffer,
     motion: Option<BodyMotion>,
     x_buffer: wgpu::Buffer,
-    vel_buffer: wgpu::Buffer,
     readback: wgpu::Buffer,
     /// Once per frame, before the substeps.
     frame_passes: Vec<Dispatch>,
@@ -521,9 +521,9 @@ pub struct GpuSolver {
     seams: Vec<[u32; 2]>,
     closures: Vec<[u32; 2]>,
     has_seams: bool,
-    /// Positions and velocities read back after the last step.
+    /// Positions read back after the last step, and before it.
     x: Vec<Vec3>,
-    v: Vec<Vec3>,
+    start: Vec<Vec3>,
     grab: Option<Vec3>,
     time: f32,
     stats: StepStats,
@@ -847,7 +847,7 @@ impl GpuSolver {
         let vel_buffer = storage(
             "cloth v",
             bytemuck::cast_slice(&vec![[0f32; 4]; n]),
-            U::COPY_SRC,
+            U::empty(),
         );
         let buffers: HashMap<u32, wgpu::Buffer> = [
             (
@@ -888,6 +888,7 @@ impl GpuSolver {
             ),
             (bind::NEARBY, zeroed("cloth near", 4 * n as u64)),
             (bind::DELTA, zeroed("cloth delta", 16 * n as u64)),
+            (bind::PRESS, zeroed("cloth press", 16 * n as u64)),
             (
                 bind::EDGE_ROWS,
                 storage("cloth edges", bytemuck::cast_slice(&edge_csr), U::empty()),
@@ -972,7 +973,7 @@ impl GpuSolver {
         });
         let readback = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("cloth readback"),
-            size: (32 * n as u64).max(16),
+            size: (16 * n as u64).max(16),
             usage: U::MAP_READ | U::COPY_DST,
             mapped_at_creation: false,
         });
@@ -1160,7 +1161,6 @@ impl GpuSolver {
             body_buffer,
             motion: model.motion.filter(|_| parts > 0),
             x_buffer,
-            vel_buffer,
             readback,
             frame_passes,
             substep_passes,
@@ -1176,8 +1176,8 @@ impl GpuSolver {
             seams: model.seams,
             closures: model.closures,
             has_seams: !seams.is_empty(),
+            start: model.positions.clone(),
             x: model.positions,
-            v: vec![Vec3::ZERO; n],
             grab: None,
             time: 0.0,
             stats: StepStats::default(),
@@ -1232,16 +1232,15 @@ impl GpuSolver {
         }
     }
 
-    /// Copy positions and velocities to the readback buffer, run the
-    /// frame and read them back.
+    /// Copy the positions to the readback buffer, run the frame and read
+    /// them back (the previous ones kept in `start`).
     fn run_frame(&mut self, encoder: wgpu::CommandEncoder) -> Result<(), StepError> {
         let mut encoder = encoder;
         let n = self.x.len() as u64;
         encoder.copy_buffer_to_buffer(&self.x_buffer, 0, &self.readback, 0, 16 * n);
-        encoder.copy_buffer_to_buffer(&self.vel_buffer, 0, &self.readback, 16 * n, 16 * n);
         self.context.queue.submit([encoder.finish()]);
         let (tx, rx) = std::sync::mpsc::channel();
-        let slice = self.readback.slice(..32 * n);
+        let slice = self.readback.slice(..16 * n);
         slice.map_async(wgpu::MapMode::Read, move |r| {
             let _ = tx.send(r);
         });
@@ -1256,14 +1255,11 @@ impl GpuSolver {
             let view = slice
                 .get_mapped_range()
                 .map_err(|e| StepError::Device(e.to_string()))?;
-            let all: &[[f32; 4]] =
+            let x: &[[f32; 4]] =
                 bytemuck::try_cast_slice(&view).map_err(|e| StepError::Device(e.to_string()))?;
-            let (x, v) = all.split_at(all.len() / 2);
-            let three = |p: &[f32; 4]| Vec3::new(p[0], p[1], p[2]);
+            std::mem::swap(&mut self.start, &mut self.x);
             self.x.clear();
-            self.x.extend(x.iter().map(three));
-            self.v.clear();
-            self.v.extend(v.iter().map(three));
+            self.x.extend(x.iter().map(|p| Vec3::new(p[0], p[1], p[2])));
         }
         self.readback.unmap();
         Ok(())
@@ -1329,7 +1325,8 @@ impl Solver for GpuSolver {
         }
         result?;
         self.time += frame_dt;
-        self.stats = StepStats::measure(&self.x, &self.v, &self.seams, &self.closures);
+        self.stats =
+            StepStats::measure(&self.x, &self.start, frame_dt, &self.seams, &self.closures);
         Ok(())
     }
 

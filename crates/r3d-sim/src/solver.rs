@@ -74,14 +74,23 @@ pub struct StepStats {
     pub max_seam_gap: f32,
     /// Largest distance between two points held by a closure (m).
     pub max_closure_gap: f32,
-    /// Largest particle speed (m/s).
+    /// Largest particle speed over the frame (m/s): how far a particle
+    /// moved in it, not its speed at the last substep, which a cloth at
+    /// rest can keep (an elastic and a seam pulling a particle back and
+    /// forth a tenth of a millimetre each substep).
     pub max_speed: f32,
 }
 
 impl StepStats {
-    /// Measured on positions `x` and velocities `v`; `seams` and
-    /// `closures` index both.
-    pub fn measure(x: &[Vec3], v: &[Vec3], seams: &[[u32; 2]], closures: &[[u32; 2]]) -> Self {
+    /// Measured on positions `x`, after a frame of `dt` that started at
+    /// `start`; `seams` and `closures` index them.
+    pub fn measure(
+        x: &[Vec3],
+        start: &[Vec3],
+        dt: f32,
+        seams: &[[u32; 2]],
+        closures: &[[u32; 2]],
+    ) -> Self {
         let at = |i: u32| x.get(i as usize).copied().unwrap_or_default();
         let gap = |pairs: &[[u32; 2]]| {
             pairs
@@ -92,7 +101,11 @@ impl StepStats {
         Self {
             max_seam_gap: gap(seams),
             max_closure_gap: gap(closures),
-            max_speed: v.iter().map(|v| v.length()).fold(0.0, f32::max),
+            max_speed: x
+                .iter()
+                .zip(start)
+                .map(|(a, b)| a.distance(*b) / dt)
+                .fold(0.0, f32::max),
         }
     }
 }
