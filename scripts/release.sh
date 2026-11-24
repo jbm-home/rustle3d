@@ -4,8 +4,12 @@
 #   macOS   dist/Rustle3D-<version>-macos-universal.dmg   (Intel and Apple
 #           silicon; Rustle3D.app with r3d in Contents/MacOS, to drag to
 #           Applications)
+#           dist/Rustle3D-<version>-macos-universal.zip   (portable: the same
+#           app, to unpack and run where you like)
 #   Windows dist/Rustle3D-<version>-windows-x64-setup.exe (installer, Inno
 #           Setup; app folder + r3d.exe; Git Bash)
+#           dist/Rustle3D-<version>-windows-x64.zip       (portable: the same
+#           folder, to unpack and run without installing)
 #   Linux   dist/Rustle3D-<version>-linux-x64.tar.gz      (app bundle + r3d)
 # Each package also holds what the GPL and the dependencies' licences ask
 # for: LICENSE, THIRD_PARTY_NOTICES.md, the licences of the Rust crates
@@ -92,9 +96,9 @@ notices="$(find "$built" -name NOTICES.Z | head -n 1)"
 "$python" -c 'import sys, zlib; sys.stdout.buffer.write(zlib.decompress(open(sys.argv[1], "rb").read(), 47))' \
   "$notices" > "$legal/LICENSES-flutter.txt"
 case "$os" in
-  Darwin) cli_where="It is inside the app: /Applications/Rustle3D.app/Contents/MacOS/r3d" ;;
+  Darwin) cli_where="It is inside the app: Rustle3D.app/Contents/MacOS/r3d" ;;
   Linux) cli_where="It is in this folder" ;;
-  *) cli_where="It is in the folder where Rustle3D is installed" ;;
+  *) cli_where="It is in the folder Rustle3D is installed in (or unpacked in)" ;;
 esac
 cat > "$legal/README.txt" <<EOF
 Rustle3D $version - 3D garment design: draft patterns, sew, drape.
@@ -127,6 +131,12 @@ case "$os" in
     codesign --force --sign - --preserve-metadata=entitlements,requirements,flags,runtime "$app"
     codesign --verify --deep --strict "$app"
     cp "$legal/README.txt" "$stage/"
+    # Portable: the folder as it is now; ditto keeps the app's symbolic
+    # links and signature.
+    portable="dist/Rustle3D-$version-macos-universal.zip"
+    rm -f "$portable"
+    ditto -c -k --keepParent "$stage" "$portable"
+    echo "$portable"
     ln -s /Applications "$stage/Applications"
     out="dist/Rustle3D-$version-macos-universal.dmg"
     rm -f "$out"
@@ -141,6 +151,21 @@ case "$os" in
   *)
     cp -R "$built/." "$stage/"
     cp "$r3d" "$legal"/* "$stage/"
+    # Portable: the installer's folder, zipped and compressed with Python
+    # (Git Bash has no zip; python -m zipfile does not compress).
+    portable="dist/Rustle3D-$version-windows-x64.zip"
+    rm -f "$portable"
+    "$python" -c '
+import os, sys, zipfile
+root, out = sys.argv[1], sys.argv[2]
+base = os.path.dirname(root)
+with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+    for d, _, files in os.walk(root):
+        for f in files:
+            p = os.path.join(d, f)
+            z.write(p, os.path.relpath(p, base))
+' "$(cygpath -w "$stage")" "$(cygpath -w "$PWD/$portable")"
+    echo "$portable"
     name="Rustle3D-$version-windows-x64-setup"
     out="dist/$name.exe"
     rm -f "$out"

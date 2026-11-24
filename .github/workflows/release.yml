@@ -2,8 +2,8 @@ name: Release
 
 # Push a tag v<version> (the workspace version in Cargo.toml, e.g.
 # v26.11.19): builds the app and the CLI on each OS with
-# scripts/release.sh (a .dmg on macOS, an installer on Windows, a .tar.gz
-# on Linux), then publishes a GitHub Release with the packages and
+# scripts/release.sh (a .dmg and a portable .zip on macOS, an installer and
+# a portable .zip on Windows, a .tar.gz on Linux), then publishes a GitHub Release with the packages and
 # SHA256SUMS.txt (unsigned). Run by hand (Actions tab > Release > Run
 # workflow), it only builds and keeps the packages as artifacts.
 on:
@@ -71,4 +71,4 @@ jobs:
           gh release create "${GITHUB_REF_NAME}" dist/* \
             --repo "${GITHUB_REPOSITORY}" --verify-tag \
             --title "Rustle3D ${GITHUB_REF_NAME#v}" \
-            --notes "Rustle3D ${GITHUB_REF_NAME#v} for macOS (one disk image for Intel and Apple silicon), Windows (installer, x64; Windows on Arm runs it too) and Linux (x64). The packages are not signed yet: see Installing in the user guide, https://rustle3d.com/en/guide/. Check a download against SHA256SUMS.txt. Source code: the archives below, or https://github.com/${GITHUB_REPOSITORY}/tree/${GITHUB_REF_NAME}."
+            --notes "Rustle3D ${GITHUB_REF_NAME#v} for macOS (one disk image for Intel and Apple silicon), Windows (installer, x64; Windows on Arm runs it too) and Linux (x64). The .zip files for macOS and Windows are portable: unpack and run, nothing to install. The packages are not signed yet: see Installing in the user guide, https://rustle3d.com/en/guide/. Check a download against SHA256SUMS.txt. Source code: the archives below, or https://github.com/${GITHUB_REPOSITORY}/tree/${GITHUB_REF_NAME}."
