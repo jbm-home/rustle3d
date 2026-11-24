@@ -1,6 +1,6 @@
 # 22 — Animated avatars
 
-Provenance: maintainer's functional brief (ROADMAP M23: a skeleton for the avatar and a few motions, walk, turn, raise arms; the cloth follows the moving body; animation assets under a redistributable licence only); MakeHuman's default skeleton and skin weights (CC0 1.0, `assets/avatars/README.md`); general knowledge of human gait and movement for the motions (joint ranges of a normal walk, arm swing against the legs); public papers: linear blend skinning (Magnenat-Thalmann et al. 1988), dual quaternion skinning (Kavan, Collins, Žára, O'Sullivan, ACM TOG 27(4), 2008), the signed distance field and friction of the static body (docs/physics.md §5); captured motions: maintainer's brief (2026-11-19: import motion captures in the app to replace the procedural walk, starting with a slow walk of the CMU Graphics Lab database in its BVH conversion), the BVH format as publicly described (Meredith and Maddock, "Motion Capture File Formats Explained", University of Sheffield, 2001) and our own retargeting and loop search.
+Provenance: maintainer's functional brief (ROADMAP M23: a skeleton for the avatar and a few motions, walk, turn, raise arms; the cloth follows the moving body; animation assets under a redistributable licence only); MakeHuman's default skeleton and skin weights (CC0 1.0, `assets/avatars/README.md`); general knowledge of human gait and movement for the motions (joint ranges of a normal walk, arm swing against the legs); natural motions (maintainer's brief 2026-11-23, ROADMAP M36: the walk hopped and moved like a stiff robot): published gait studies, D. A. Winter, *The Biomechanics and Motor Control of Human Gait* (2nd ed., 1991), Kadaba, Ramakrishnan, Wootten, J. Orthop. Res. 8(3), 1990, J. Perry, *Gait Analysis* (1992), Murray, Drought, Kory, J. Bone Joint Surg. 46-A(2), 1964, Saunders, Inman, Eberhart, J. Bone Joint Surg. 35-A(3), 1953 (shapes and ranges, rounded; no data set copied); two-bone inverse kinematics in closed form (Tolani, Goswami, Badler, Graphical Models 62(5), 2000); public papers: linear blend skinning (Magnenat-Thalmann et al. 1988), dual quaternion skinning (Kavan, Collins, Žára, O'Sullivan, ACM TOG 27(4), 2008), the signed distance field and friction of the static body (docs/physics.md §5); captured motions: maintainer's brief (2026-11-19: import motion captures in the app to replace the procedural walk, starting with a slow walk of the CMU Graphics Lab database in its BVH conversion), the BVH format as publicly described (Meredith and Maddock, "Motion Capture File Formats Explained", University of Sheffield, 2001) and our own retargeting and loop search.
 
 ## Status (2026-11-18, M23)
 
@@ -17,9 +17,18 @@ looped; in the app's Motion menu and through `simulate`'s
 shared by every project (the app's): add to it after an import,
 manage it in a dialog, play its motions from the Motion menu.
 
-Not yet: walking forward along a path (the avatar walks on the spot),
-arms raised straight overhead (linear blend skinning folds the armpit;
-a better skinning, e.g. dual quaternions, would allow it), motions of
+2026-11-25 (M36): natural motions. Dual quaternion skinning; the feet
+placed first and the legs reaching them by inverse kinematics, so a
+planted foot neither slides nor lifts; the pelvis lowered as the legs
+need, smoothly; the walk after published gait studies, a supple trunk,
+a steady head, relaxed arms; the turn made in steps; the arms raised in
+a V above the head.
+
+Not yet: walking forward along a path (the avatar walks on the spot,
+as on a treadmill), arms raised straight overhead (the body takes it,
+but the shoulders' skin then carries a T-shirt's neckline in and up and
+it rolls over at the chest), a standing stance narrower than the rest
+pose's (idle keeps the feet where they rest), motions of
 imported avatars (M31 imports bodies but they stand still, spec 27), a timeline to scrub through a motion, recording
 a motion as a video, captured motions in the game export, glTF
 animations as captured motions, the motion library for agents and the
@@ -37,22 +46,52 @@ whether the shirt rides up at the waist.
   the measurements like the skin does. Each skin vertex follows up to four
   bones by dual quaternion skinning (since M36; linear blend skinning
   before): a bent joint keeps its volume.
-- **Motions.** `walk`: walking on the spot, a step cycle of 1.15 s, an
-  easy pace: the thigh from 22° forward to 16° back, the knee bending
-  about 58° in swing, the ankle pushing off; the pelvis drops on the
-  swing side and turns with the swinging leg, the shoulders stay level
-  and turn against it, the head looks ahead; the arms hang relaxed and
-  swing against the legs, the elbow bending as the arm comes forward
-  (ranges checked against a slow walk of the CMU motion capture
-  database played on our skeleton, and kept smaller). `idle`: standing
-  at rest over 8 s: the weight shifts onto one leg and the other (the
-  hips about 3 cm over the loaded foot, the other knee easing), two
-  breaths, the head looking a little around. `turn`: half a turn to
-  the left over two seconds, a pause, back, a pause (6 s). `raise_arms`:
-  both arms raised to about 40° above the horizontal over 1.5 s, held,
-  lowered, held (4 s). Every
-  motion grows from the standing pose over its first second and then
-  repeats; the feet stay on the floor.
+- **Motions.** The built-in motions place the feet first, on the floor
+  or in the air, and the legs reach them by inverse kinematics (two
+  bones and a hinge, the knee pointing as at rest, never straighter
+  than at rest). The pelvis comes down only as far as the legs need:
+  their limit over the whole cycle, eroded by parabolas of 2 m/s² and
+  smoothed over 0.08 s, so it starts down early enough, rises and falls
+  smoothly and never goes above its rest height. The trunk turns
+  against the pelvis and keeps the shoulders level, the head is kept
+  level and looking ahead (or where the motion looks), the arms hang
+  relaxed from the A pose (brought 30° down, elbows straightened to
+  15°, wrists a little bent).
+  - `walk`: on the spot, as on a treadmill, a stride of 1.15 s (about
+    105 steps a minute), a stride length of 1.2 times the hip height.
+    A planted foot goes back with the belt at one steady speed: it lands
+    on its heel at 18° to the floor, rolls flat by 8 % of the cycle,
+    stays flat, lifts its heel from 40 % rolling about its front, and
+    leaves at 62 % at 32°. The swinging foot follows the swing of
+    published hip, knee and ankle curves (every 5 % of the cycle),
+    bent to leave and land exactly where the planted foot is, clearing
+    the floor by 12 mm. The feet are 85 % of the hips' width apart,
+    turned out 6°. The pelvis drops 4° on the swing side, turns 4.5°
+    with the swinging leg and sways 2 cm over the loaded foot; the
+    thorax turns 3° the other way and leans 2° forward. The arms swing
+    ±15° about 3° back, against the legs and a little late, the elbow
+    bending up to 10° more just after the arm is forward, the wrist
+    following. The knee bends about 5–7° as the foot takes the weight
+    and about 50° in swing.
+  - `idle`: standing at rest over 8 s: the weight shifts onto one leg
+    and the other (the hips 3 cm over the loaded foot, its side of the
+    pelvis 1.5° up, the other knee easing and its heel lifting a
+    little, the feet where they rest), two breaths, the head looking a
+    little around.
+  - `turn`: half a turn to the left and back over 6 s, in steps about
+    the vertical between the feet: still for half a second, round over
+    two (the left foot opens a third of the way, the right follows, and
+    so on, four steps of 0.45 s each lifting the foot 3.5 cm, the weight
+    shifting over the foot that stays), a pause, back the same way led
+    by the right foot, a pause. The head turns ahead of the trunk and
+    the trunk ahead of the pelvis.
+  - `raise_arms`: both arms raised over 1.5 s in a V above the head
+    (about 55° above the horizontal), held 0.5 s, lowered over 1.5 s,
+    held (4 s); the clavicles rise 8°, the elbows straighten to 10°,
+    the chest opens a little.
+  Walking and standing grow from the rest pose over their first second
+  (stride, sway and arm swing); turning and raising the arms start from
+  it. Every motion then repeats; the feet stay on the floor.
 - **Captured motions.** A BVH file (the common motion capture format) is
   copied into the project's `motions/` folder and named by its path
   there. It is read, retargeted and looped when chosen:
@@ -135,10 +174,20 @@ whether the shirt rides up at the waist.
 ## Acceptance criteria
 - A moving box carries a sheet lying on it, and the sheet never goes
   inside it, on the CPU and the GPU (`a_moving_body_carries_the_cloth`).
-- Every motion keeps the avatar's feet on the floor and its skin finite;
-  the rest pose moves no vertex; walking swings the arms against the
-  legs; raising the arms brings the hands well above the shoulders;
-  turning brings the left hand to the right side.
+- Every motion starts from the rest pose and keeps the avatar's feet
+  on the floor and its skin finite; the rest pose moves no vertex;
+  walking swings the arms against the legs; raising the arms brings
+  the hands above the top of the head; turning brings the left hand to
+  the right side.
+- Walking: the heel of a flat foot and the front of a foot rolling onto
+  it go back with the belt at one speed, within 3 mm, and stay on the
+  floor; the pelvis rises and falls by 1 to 4.5 cm with a vertical
+  acceleration under 4 m/s² (sampled 240 times a stride); the knee
+  bends 5–25° before 50 % of the cycle and 45–70° in swing; the head
+  turns less than 1.5°. Standing, the front of each foot stays within
+  2 mm; turning, a foot between its steps stays within 1 mm.
+- A leg placed by inverse kinematics reaches its foot within 0.1 mm and
+  rests at rest.
 - A dress walking (CPU and GPU), a skirt turning and a T-shirt raising
   its arms stay on the body: no particle more than 3 mm inside the moving
   skin, seams closed; the skirt's front ends up behind after half a turn;
@@ -163,7 +212,8 @@ whether the shirt rides up at the waist.
 ## Provenance notes
 The skeleton's joints and skin weights are MakeHuman's (CC0), reduced
 to 24 bones by `cargo xtask fetch-makehuman`; nothing of MakeHuman's
-code is used. The built-in motions are our own: joint angles written as smooth
-functions of the cycle, no motion capture data. Captured motions are
+code is used. The built-in motions are our own: feet placed and joint angles written
+as smooth functions of the cycle after the published shapes and ranges
+cited above, no motion capture data. Captured motions are
 the user's files; none is shipped. The retargeting and the loop search
 are our own (no code from motion capture tools).

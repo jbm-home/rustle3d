@@ -45,13 +45,13 @@ maintainer's briefs that specs cite as "ROADMAP Mxx" in their
 | M33 | Body measurements ✅ (2026-11-23) | A project made with four measurements; later its arm length and neck are set, the avatar and a sleeve drafted from `arm_length` follow |
 | M34 | Construction details 2 ✅ (2026-11-24) | A cuff gathered by elastic, a topstitched yoke, a collar that stands thanks to its interfacing, a quilted panel |
 | M35 | Sketching on the board: the action bar ✅ (2026-11-24) | A half bodice drawn and constrained without the inspector: what fits the selection is offered above the board, one click applies it |
-| M36 | Natural motions | The walk looks human: no hop, a supple trunk, relaxed arms |
+| M36 | Natural motions ✅ (2026-11-25) | The walk looks human: no hop, a supple trunk, relaxed arms |
 | M37 | Imported avatars in motion, game export checked | A scanned body walks in its garment; the garment and its motion open in a game engine as exported |
 
 Order of the next ones, as set by the maintainer on 2026-11-23: M36,
 M37 (M16's Linux part when the work moves to Linux).
 
-## Test report 2026-11-24 (to take up before M36)
+## Test report 2026-11-24 (open points: to take up next)
 
 The maintainer had an agent build a hoodie and joggers over MCP, then
 used the app.
@@ -75,22 +75,6 @@ used the app.
 - **Missing**:
   - Hoodie and jogger templates.
   - A way to take one garment out of the drape.
-
-## M36 — Natural motions
-
-Maintainer's brief (2026-11-23): the motions look robotic. The walk makes
-the avatar hop and moves it like a stiff robot; make every built-in
-motion natural and good-looking.
-
-- A planted foot neither slides nor lifts; the pelvis rises and falls
-  smoothly with the legs (no hop); the weight passes from one foot to
-  the other.
-- A supple trunk (the spine and the shoulders turning against the
-  pelvis, the head steady), relaxed arms and wrists, ease in and out of
-  every move.
-- A skinning that keeps the shoulders and the armpits in shape (e.g.
-  dual quaternions), so arms can go straight overhead.
-- Joint angle curves from published gait studies, cited in the spec.
 
 ## M37 — Imported avatars in motion, game export checked
 
@@ -124,6 +108,16 @@ back through the CPU every frame.
 ## Open points of closed milestones
 
 As noted when each milestone closed; recheck before taking one up.
+
+- **Natural motions (M36)**: arms straight overhead (the body takes it
+  with dual quaternion skinning, but the shoulders' skin carries a
+  T-shirt's neckline in and up and it rolls over at the chest; the
+  motion stops at a V); walking forward along a path (on the spot, as
+  on a treadmill); the knee bends about 7° as the foot takes the weight
+  where published curves give 15–20°; standing keeps the rest pose's
+  wide stance; the stop back to rest blends poses, so the feet may
+  slide during that second; the game export skins by glTF's linear
+  blend (an engine's elbows and shoulders differ a little from ours).
 
 - **Construction details 2 (M34)**: elastics, topstitches and the like
   copied with a pasted or mirrored piece; bending across seams (a collar

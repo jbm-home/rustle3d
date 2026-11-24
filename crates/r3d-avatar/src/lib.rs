@@ -22,6 +22,8 @@
 pub mod bvh;
 pub mod captured;
 pub mod fit;
+mod gait;
+mod legs;
 pub mod measure;
 pub mod model;
 pub mod motion;

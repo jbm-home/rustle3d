@@ -112,10 +112,35 @@ impl Skeleton {
         self.bones.iter().position(|b| b.name == name)
     }
 
+    /// The rest points of the sole of the foot `bone`.
+    pub fn sole(&self, bone: usize) -> impl Iterator<Item = Vec3> + '_ {
+        self.soles
+            .iter()
+            .filter(move |(b, _)| *b == bone)
+            .map(|(_, p)| *p)
+    }
+
     /// Each bone's motion from the rest pose to `pose`, the body then
     /// raised or lowered so that its lowest sole point is on the floor,
     /// as in the rest pose.
     pub fn transforms(&self, pose: &Pose) -> Vec<Rigid> {
+        let mut out = self.forward(pose);
+        let lowest = self
+            .soles
+            .iter()
+            .filter_map(|(b, p)| Some(out.get(*b)?.apply(*p).y))
+            .fold(f32::INFINITY, f32::min);
+        if lowest.is_finite() {
+            for t in &mut out {
+                t.translation.y -= lowest;
+            }
+        }
+        out
+    }
+
+    /// Each bone's motion from the rest pose to `pose` (forward
+    /// kinematics), the body where the pose's offset puts it.
+    pub fn forward(&self, pose: &Pose) -> Vec<Rigid> {
         let mut out: Vec<Rigid> = Vec::with_capacity(self.bones.len());
         for (i, bone) in self.bones.iter().enumerate() {
             let turn = pose.rotations.get(i).copied().unwrap_or(Quat::IDENTITY);
@@ -128,16 +153,6 @@ impl Skeleton {
                 },
             };
             out.push(parent.after(&local));
-        }
-        let lowest = self
-            .soles
-            .iter()
-            .filter_map(|(b, p)| Some(out.get(*b)?.apply(*p).y))
-            .fold(f32::INFINITY, f32::min);
-        if lowest.is_finite() {
-            for t in &mut out {
-                t.translation.y -= lowest;
-            }
         }
         out
     }
