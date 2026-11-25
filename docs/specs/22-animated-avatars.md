@@ -57,8 +57,8 @@ whether the shirt rides up at the waist.
   level and looking ahead (or where the motion looks), the arms hang
   relaxed from the A pose (brought 30° down, elbows straightened to
   15°, wrists a little bent).
-  - `walk`: on the spot, as on a treadmill, a stride of 1.15 s (about
-    105 steps a minute), a stride length of 1.2 times the hip height.
+  - `walk`: on the spot, as on a treadmill, a stride of 1 s (120
+    steps a minute), a stride length of 1.2 times the hip height.
     A planted foot goes back with the belt at one steady speed: it lands
     on its heel at 18° to the floor, rolls flat by 8 % of the cycle,
     stays flat, lifts its heel from 40 % rolling about its front, and

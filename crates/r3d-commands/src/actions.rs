@@ -190,7 +190,7 @@ pub struct Simulate {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum AvatarMotion {
-    /// Walking on the spot (a 1.15 s step cycle).
+    /// Walking on the spot (a 1 s step cycle).
     Walk,
     /// Half a turn to the left and back (6 s).
     Turn,

@@ -2022,8 +2022,13 @@ impl Engine {
             );
             g.gpu.queue.submit([encoder.finish()]);
         }
-        g.gpu
-            .device
+        // Wait without the locks: the GPU may be busy with the drape for a
+        // while, and the UI thread (which also takes the clicks on Windows)
+        // calls in synchronously for these.
+        let device = g.gpu.device.clone();
+        drop(slot);
+        drop(ws);
+        device
             .poll(wgpu::PollType::wait_indefinitely())
             .map_err(|e| ApiError::new("gpu", e.to_string()))?;
         Ok(start.elapsed().as_secs_f64() * 1000.0)

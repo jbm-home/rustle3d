@@ -38,8 +38,8 @@ use crate::legs::{Leg, foot_at};
 use crate::motion::{Builder, SIDES, Stance, drop_at, ease, periodic};
 use crate::skeleton::Pose;
 
-/// One stride (two steps) at about 105 steps a minute (s).
-pub(crate) const PERIOD_S: f32 = 1.15;
+/// One stride (two steps) at 120 steps a minute (s).
+pub(crate) const PERIOD_S: f32 = 1.0;
 
 /// Where the cycle of a leg, from its heel strike, reaches foot flat, heel
 /// off and toe off.
