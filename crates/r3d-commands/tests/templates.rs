@@ -296,3 +296,41 @@ fn skirts_hang_from_the_waist() {
         assert!(low > 0.3, "{template} hem at {low}");
     }
 }
+
+#[test]
+fn a_hoodie_has_a_hood_and_gathered_cuffs() {
+    let s = draft("hoodie");
+    let p = s.project();
+    assert_eq!(p.garments().values().next().unwrap().name, "Hoodie");
+    // The T-shirt's four pieces and two hood halves; the hood sewn down
+    // its middle and to both necklines.
+    assert_eq!(p.panels().len(), 6);
+    assert_eq!(p.seams().len(), 15);
+    // Elastic at both cuffs and along the hem.
+    assert_eq!(p.elastics().count(), 4);
+    let (low, high) = drape(&s, 180);
+    eprintln!("hoodie: {low:.3}..{high:.3}");
+    // The hood settles over the head and falls down the back, below the
+    // head's top (1.68 m); the hem gathered above the thighs.
+    assert!(high > 1.42 && high < 1.65, "top at {high}");
+    assert!(low > 0.7, "hem at {low}");
+}
+
+#[test]
+fn joggers_hang_from_their_elastic_waist() {
+    let s = draft("joggers");
+    let p = s.project();
+    assert_eq!(p.garments().values().next().unwrap().name, "Joggers");
+    assert_eq!(p.panels().len(), 4);
+    // Pulled on: no fly, the centre front sewn all the way.
+    assert_eq!(p.seams().len(), 6);
+    assert!(p.zippers().is_empty());
+    // An elastic along each piece's waist and hem.
+    assert_eq!(p.elastics().count(), 8);
+    let (low, high) = drape(&s, 180);
+    eprintln!("joggers: {low:.3}..{high:.3}");
+    // The elastic holds the waist (1.04 m) up; the ankles gathered just
+    // above the floor.
+    assert!(high > 1.0, "joggers slid down: top at {high}");
+    assert!(low > 0.02 && low < 0.1, "hem at {low}");
+}

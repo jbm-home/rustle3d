@@ -57,23 +57,26 @@ The maintainer had an agent build a hoodie and joggers over MCP, then
 used the app.
 
 - **Bugs**:
-  - The 3D view becomes unusable after pulling the garment in the
-    3D view (project "ProjetTest").
+  - Done: the 3D view became unusable after pulling the garment in
+    the 3D view (project "ProjetTest").
   - Done: the trousers fell because no elastic held anything up
     (friction did not count an elastic's tension, physics.md, Elastic).
     `seam.add` had chosen the right direction for the crotch; the
     flipped one twisted it, which held the trousers by the twist (118–131
     %). "Not settled" came from the last substep's speed (now the
     frame's).
-  - Still open: about 8 mm open at the seams beside an elastic waist (the
-    elastic, solved after the seams, pulls their ends apart each
-    substep).
+  - Done: the seams beside an elastic waist stayed open (36 mm on a
+    jersey tube): the elastic pulled their ends apart and its pressure
+    made friction hold each end where it was. The elastics are solved
+    before the seams, and friction holds a seam's two ends by their
+    common motion where an elastic pulls on it (physics.md §5,
+    "Friction on a seam").
 - **Annoyances** (all done): templates no longer rename the project; a
   range's end within 0.05 mm of the path's length is its end; a new
   piece joins the newest garment with a 10 mm allowance; an allowance set
   on a linked copy goes to its piece.
 - **Missing**:
-  - Hoodie and jogger templates.
+  - Done: hoodie and joggers templates (spec 11).
   - A way to take one garment out of the drape.
 
 ## M37 — Imported avatars in motion, game export checked

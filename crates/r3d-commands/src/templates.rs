@@ -12,6 +12,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 use rayon::prelude::*;
 
+use r3d_core::detail::ELASTIC_RATIO;
 use r3d_core::{
     AnyId, Around, Avatar, Body, Edge, EdgeCurve, EdgeId, Fabric, Garment, GarmentId, Measure,
     PanelId, Point, Project, TemplateRef, Transaction,
@@ -21,10 +22,10 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::commands::{
-    ButtonAdd, CurveSpec, EdgeSetCurve, EdgeSplit, GarmentAdd, GarmentRename, GarmentSetFabric,
-    InterfacingAdd, NotchAdd, PanelCreatePolygon, PanelMirror, PanelPlace, PanelSetGarment,
-    PanelSetSeamAllowance, PinAdd, SeamAdd, SeamSideSpec, TopstitchAdd, ZipperAdd, mirrored_source,
-    waist_height_cm,
+    ButtonAdd, CurveSpec, EdgeSetCurve, EdgeSplit, ElasticAdd, GarmentAdd, GarmentRename,
+    GarmentSetFabric, InterfacingAdd, NotchAdd, PanelCreatePolygon, PanelMirror, PanelPlace,
+    PanelSetGarment, PanelSetSeamAllowance, PinAdd, SeamAdd, SeamSideSpec, TopstitchAdd, ZipperAdd,
+    mirrored_source, waist_height_cm,
 };
 use crate::drape::arm_drop;
 use crate::error::{CommandError, positive};
@@ -47,6 +48,12 @@ pub enum Template {
     /// Trousers: a front and a back for each leg, from the waist to the
     /// ankle.
     Trousers,
+    /// A hoodie: the T-shirt's block, looser, with long sleeves gathered
+    /// at the wrists, an elastic hem and a hood in two halves.
+    Hoodie,
+    /// Joggers: the trousers' block in jersey, pulled on: an elastic
+    /// waist and elastic ankles, no fly.
+    Joggers,
     /// A sleeveless dress: front and back from the neck to the knee,
     /// shaped at the waist, flared at the hem.
     Dress,
@@ -55,10 +62,12 @@ pub enum Template {
 }
 
 impl Template {
-    pub const ALL: [Template; 7] = [
+    pub const ALL: [Template; 9] = [
         Template::TShirt,
         Template::Shirt,
         Template::Trousers,
+        Template::Hoodie,
+        Template::Joggers,
         Template::Dress,
         Template::StraightSkirt,
         Template::ALineSkirt,
@@ -74,6 +83,8 @@ impl Template {
             Template::TShirt => "t_shirt",
             Template::Shirt => "shirt",
             Template::Trousers => "trousers",
+            Template::Hoodie => "hoodie",
+            Template::Joggers => "joggers",
             Template::Dress => "dress",
         }
     }
@@ -87,6 +98,8 @@ impl Template {
             Template::TShirt => "T-shirt",
             Template::Shirt => "Shirt",
             Template::Trousers => "Trousers",
+            Template::Hoodie => "Hoodie",
+            Template::Joggers => "Joggers",
             Template::Dress => "Dress",
         }
     }
@@ -94,10 +107,11 @@ impl Template {
     /// The sizes this template reads.
     fn uses(self) -> &'static [&'static str] {
         match self {
-            Template::StraightSkirt | Template::ALineSkirt | Template::Trousers => {
-                &["waist_cm", "hips_cm", "length_cm", "ease_cm"]
-            }
-            Template::TShirt | Template::Shirt => {
+            Template::StraightSkirt
+            | Template::ALineSkirt
+            | Template::Trousers
+            | Template::Joggers => &["waist_cm", "hips_cm", "length_cm", "ease_cm"],
+            Template::TShirt | Template::Shirt | Template::Hoodie => {
                 &["chest_cm", "length_cm", "sleeve_cm", "ease_cm"]
             }
             Template::Dress => &["chest_cm", "waist_cm", "hips_cm", "length_cm", "ease_cm"],
@@ -235,6 +249,8 @@ const SHORT_SLEEVE: f64 = 0.4;
 /// is the waist's height less this. A fraction of the stature left the
 /// hem on the floor of one body and 19 cm above it on another.
 const TROUSER_HEM_CM: f64 = 4.0;
+/// Joggers end higher, their elastic cuffs at the ankles (cm).
+const JOGGER_HEM_CM: f64 = 8.0;
 
 impl Sizes {
     /// Every size `template` reads, filled in from `avatar`, whose waist
@@ -246,6 +262,8 @@ impl Sizes {
             Template::StraightSkirt => (0.33 * h, 2.0),
             Template::ALineSkirt => (0.36 * h, 2.0),
             Template::Trousers => (waist_height_cm - TROUSER_HEM_CM, 4.0),
+            Template::Joggers => (waist_height_cm - JOGGER_HEM_CM, 8.0),
+            Template::Hoodie => (0.40 * h, 16.0),
             Template::TShirt => (0.39 * h, 10.0),
             Template::Shirt => (0.43 * h, 12.0),
             Template::Dress => (0.55 * h, 8.0),
@@ -255,7 +273,7 @@ impl Sizes {
         // upper arm.
         let arm = avatar.measure(Measure::ArmLength).cm;
         let sleeve = match template {
-            Template::Shirt => arm - LONG_SLEEVE_SHORT_CM,
+            Template::Shirt | Template::Hoodie => arm - LONG_SLEEVE_SHORT_CM,
             _ => SHORT_SLEEVE * arm,
         };
         let all = Sizes {
@@ -624,6 +642,19 @@ impl Draft<'_, '_> {
         Ok(())
     }
 
+    /// An elastic along `side`, gathering it to `ratio` × its length.
+    fn elastic(&mut self, side: SeamSideSpec, ratio: f64) -> Result<(), CommandError> {
+        let out = ElasticAdd {
+            side,
+            ratio: Some(ratio.clamp(ELASTIC_RATIO.0, ELASTIC_RATIO.1)),
+            relaxed_mm: None,
+            width_mm: None,
+        }
+        .apply(self.tx)?;
+        self.created.extend(out.created);
+        Ok(())
+    }
+
     fn notch(&mut self, edge: EdgeId, offset_mm: f64) -> Result<(), CommandError> {
         let out = NotchAdd { edge, offset_mm }.apply(self.tx)?;
         self.created.extend(out.created);
@@ -980,14 +1011,16 @@ fn draft_in(
     match template {
         Template::StraightSkirt => skirt(&mut d, &sizes, &avatar.body, 0.0)?,
         Template::ALineSkirt => skirt(&mut d, &sizes, &avatar.body, 0.2)?,
-        Template::TShirt => t_shirt(&mut d, &sizes, &avatar.body)?,
+        Template::TShirt => t_shirt(&mut d, &sizes, &avatar, false)?,
+        Template::Hoodie => t_shirt(&mut d, &sizes, &avatar, true)?,
         Template::Shirt => shirt(&mut d, &sizes, &avatar.body)?,
-        Template::Trousers => trousers(&mut d, &sizes, &avatar.body)?,
+        Template::Trousers => trousers(&mut d, &sizes, &avatar, false)?,
+        Template::Joggers => trousers(&mut d, &sizes, &avatar, true)?,
         Template::Dress => dress(&mut d, &sizes, &avatar.body)?,
         Template::ToteBag => tote_bag(&mut d, &sizes)?,
     }
     let fabric = match template {
-        Template::TShirt => Fabric::Jersey,
+        Template::TShirt | Template::Hoodie | Template::Joggers => Fabric::Jersey,
         Template::ToteBag | Template::Trousers => Fabric::Denim,
         _ => Fabric::Cotton,
     };
@@ -1129,8 +1162,12 @@ fn reverse([c1, c2]: [DVec2; 2]) -> [DVec2; 2] {
 }
 
 /// A T-shirt: front and back bodices (whole, symmetric) and two short
-/// sleeves (the right one a mirror copy of the left).
-fn t_shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
+/// sleeves (the right one a mirror copy of the left). As a `hoodie`, the
+/// sleeves are long and narrow towards the wrists, gathered there by an
+/// elastic, the hem gathered to the hips and a hood sewn to the
+/// neckline.
+fn t_shirt(d: &mut Draft, s: &Sizes, avatar: &Avatar, hoodie: bool) -> Result<(), CommandError> {
+    let body = &avatar.body;
     let chest = mm("chest_cm", s.chest_cm)?;
     let len = mm("length_cm", s.length_cm)?;
     let sleeve = mm("sleeve_cm", s.sleeve_cm)?;
@@ -1172,7 +1209,13 @@ fn t_shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
     let back = bodice(d, "Back", 20.0)?;
     let hole_len = armhole_length(d, &front, &back)?;
     let half = (0.33 * chest + 60.0) / 2.0;
-    let left = sleeve_piece(d, "Sleeve left", hole_len, half, half - 15.0, sleeve)?;
+    // A long sleeve narrows to the shirt's cuff.
+    let sleeve_hem = if hoodie {
+        (0.12 * chest + 150.0) / 2.0
+    } else {
+        half - 15.0
+    };
+    let left = sleeve_piece(d, "Sleeve left", hole_len, half, sleeve_hem, sleeve)?;
     let right = d.mirror(&left, "Sleeve right")?;
     // Seen from outside, the front's +x side is the body's left, the
     // back's +x side its right; a left sleeve's +x side faces the back.
@@ -1187,10 +1230,109 @@ fn t_shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
     d.sew(left.edge(1)?, left.edge(4)?)?;
     d.sew(right.edge(1)?, right.edge(4)?)?;
     let h = body.height_cm;
-    d.place(&front, Around::Body, 0.0, NECK_HEIGHT * h + TOP_LIFT_CM)?;
-    d.place(&back, Around::Body, 180.0, NECK_HEIGHT * h + TOP_LIFT_CM)?;
+    let top = NECK_HEIGHT * h + TOP_LIFT_CM;
+    d.place(&front, Around::Body, 0.0, top)?;
+    d.place(&back, Around::Body, 180.0, top)?;
     d.place(&left, Around::LeftArm, 0.0, SHOULDER_HEIGHT * h)?;
     d.place(&right, Around::RightArm, 0.0, SHOULDER_HEIGHT * h)?;
+    if hoodie {
+        // The cuffs close to the wrist with room for the hand to slide
+        // through; the hem's band to the hips.
+        let wrist = (avatar.measure(Measure::Wrist).cm + 4.0) * 10.0;
+        for sleeve in [&left, &right] {
+            d.elastic(whole(sleeve.edge(0)?), wrist / (2.0 * sleeve_hem))?;
+        }
+        let band = body.hips_cm * 10.0 / (4.0 * hem);
+        for piece in [&front, &back] {
+            d.elastic(whole(piece.edge(0)?), band)?;
+        }
+        hood(d, body, &front, &back)?;
+    }
+    Ok(())
+}
+
+/// A whole edge, as a seam's side.
+fn whole(edge: EdgeId) -> SeamSideSpec {
+    SeamSideSpec {
+        edge: Some(edge),
+        ..SeamSideSpec::default()
+    }
+}
+
+/// A hood's height (neck to the top, along its face opening's side) and
+/// depth (face to the back of the head), as fractions of stature.
+const HOOD_HEIGHT: f64 = 0.21;
+const HOOD_DEPTH: f64 = 0.14;
+/// A hood starts this far over the head's top (cm).
+const HOOD_OVER_HEAD_CM: f64 = 2.0;
+
+/// A hood in two halves sewn down the middle, over the head, and to the
+/// neckline of `front` and `back` (their edge 4), the halves meeting at
+/// the centre front.
+fn hood(d: &mut Draft, body: &Body, front: &Piece, back: &Piece) -> Result<(), CommandError> {
+    let len = |d: &Draft, e: EdgeId| d.tx.project().edge_length(e).unwrap_or_default();
+    // Each half takes half of each neckline.
+    let (f, b) = (len(d, front.edge(4)?) / 2.0, len(d, back.edge(4)?) / 2.0);
+    let h = body.height_cm * 10.0;
+    let height = HOOD_HEIGHT * h;
+    let depth = (HOOD_DEPTH * h).max(f + b + 30.0);
+    // The body's left half, seen from outside, the face on its left:
+    // edges 0 front neckline, 1 back neckline, 2 the middle seam, from
+    // the back of the neck over the head, 3 the face opening.
+    let left = d.panel(
+        "Hood left",
+        &[
+            (p(0.0, 0.0), None),
+            (p(f, 0.0), None),
+            (
+                p(f + b, 0.0),
+                Some([
+                    p(depth + 20.0, 0.3 * height),
+                    p(0.75 * depth, height + 10.0),
+                ]),
+            ),
+            (p(0.25 * depth, height), None),
+        ],
+    )?;
+    let right = d.mirror(&left, "Hood right")?;
+    d.sew(left.edge(2)?, right.edge(2)?)?;
+    // The front's neckline runs from the body's left over the centre
+    // front, the back's from the body's right over the centre back.
+    d.sew_sides(
+        whole(left.edge(0)?),
+        stretch(front.edge(4)?, None, Some(f), true),
+    )?;
+    d.sew_sides(
+        whole(right.edge(0)?),
+        stretch(front.edge(4)?, Some(f), None, true),
+    )?;
+    d.sew_sides(
+        whole(left.edge(1)?),
+        stretch(back.edge(4)?, Some(b), None, true),
+    )?;
+    d.sew_sides(
+        whole(right.edge(1)?),
+        stretch(back.edge(4)?, None, Some(b), true),
+    )?;
+    // Its top just over the head, the middle seam at the back (as a
+    // skirt's backs): it settles over the head and falls down the back.
+    // Started its height above the neck, 11 cm above the head, it
+    // crumpled at the nape.
+    let bbox = |piece: &Piece| d.tx.project().panel_bounding_box(piece.id);
+    let (Some(left_box), Some(right_box)) = (bbox(&left), bbox(&right)) else {
+        return Err(internal("a hood piece has no outline".into()));
+    };
+    let (left_back, right_back) = (left_box.max.x, right_box.min.x);
+    let hood_top = body.height_cm + HOOD_OVER_HEAD_CM;
+    d.place_at(&left, Around::Body, 180.0, hood_top, 30.0, Some(left_back))?;
+    d.place_at(
+        &right,
+        Around::Body,
+        180.0,
+        hood_top,
+        30.0,
+        Some(right_back),
+    )?;
     Ok(())
 }
 
@@ -1510,8 +1652,12 @@ fn shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
 /// a longer crotch extension and a centre back raised and slanted. The
 /// side seams of front and back have the same shape, and the back's
 /// crotch point is lowered until its inseam is as long as the front's,
-/// so every seam matches.
-fn trousers(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
+/// so every seam matches. As `joggers`, pulled on: the waist is drafted
+/// as wide as the hips and gathered to the body's waist by an elastic,
+/// the hems to the ankles; the centre front is sewn all the way (no
+/// fly).
+fn trousers(d: &mut Draft, s: &Sizes, avatar: &Avatar, joggers: bool) -> Result<(), CommandError> {
+    let body = &avatar.body;
     let waist = mm("waist_cm", s.waist_cm)?;
     let hips = mm("hips_cm", s.hips_cm)?;
     let len = mm("length_cm", s.length_cm)?;
@@ -1539,7 +1685,11 @@ fn trousers(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
     // cm and rises 1.5 cm; the side seams take the rest, the waist
     // fitting the body without ease (the trousers hang from it).
     let (cf_in, cb_in, cb_up) = (10.0, 25.0, 15.0);
-    let side_in = ((front_hip + back_hip - waist / 2.0 - cf_in - cb_in) / 2.0).max(0.0);
+    let side_in = if joggers {
+        0.0
+    } else {
+        ((front_hip + back_hip - waist / 2.0 - cf_in - cb_in) / 2.0).max(0.0)
+    };
     let crotch_f = p(cf - ext_f, y_c);
     let inseam = crotch_f.distance(p(-hem_f, 0.0));
     let crotch_bx = cb + ext_b;
@@ -1602,16 +1752,34 @@ fn trousers(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
         d.tx.project()
             .edge_length(front.edge(3)?)
             .unwrap_or_default();
-    let fly = FLY_MM.min(0.6 * cf_len);
-    d.zip(
-        stretch(front.edge(3)?, None, Some(fly), true),
-        stretch(front_right.edge(3)?, Some(cf_len - fly), None, false),
-    )?;
-    d.sew_sides(
-        stretch(front.edge(3)?, Some(fly), None, false),
-        stretch(front_right.edge(3)?, None, Some(cf_len - fly), true),
-    )?;
+    if joggers {
+        d.sew(front.edge(3)?, front_right.edge(3)?)?;
+    } else {
+        let fly = FLY_MM.min(0.6 * cf_len);
+        d.zip(
+            stretch(front.edge(3)?, None, Some(fly), true),
+            stretch(front_right.edge(3)?, Some(cf_len - fly), None, false),
+        )?;
+        d.sew_sides(
+            stretch(front.edge(3)?, Some(fly), None, false),
+            stretch(front_right.edge(3)?, None, Some(cf_len - fly), true),
+        )?;
+    }
     d.sew(back.edge(2)?, back_right.edge(2)?)?;
+    if joggers {
+        let len = |d: &Draft, e: EdgeId| d.tx.project().edge_length(e).unwrap_or_default();
+        // The waist gathered to the body's, the hems to the ankles with
+        // room for the foot.
+        let top = 2.0 * (len(d, front.edge(2)?) + len(d, back.edge(3)?));
+        let ankle = (avatar.measure(Measure::Ankle).cm + 6.0) * 10.0;
+        let hem = len(d, front.edge(0)?) + len(d, back.edge(0)?);
+        for (f, b) in [(&front, &back), (&front_right, &back_right)] {
+            d.elastic(whole(f.edge(2)?), waist / top)?;
+            d.elastic(whole(b.edge(3)?), waist / top)?;
+            d.elastic(whole(f.edge(0)?), ankle / hem)?;
+            d.elastic(whole(b.edge(0)?), ankle / hem)?;
+        }
+    }
     // Each piece's crease goes to the front or the back of its leg; the
     // backs' tops are their raised centres.
     let back_top = waist_top + cb_up / 10.0;

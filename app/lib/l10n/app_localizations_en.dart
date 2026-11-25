@@ -84,6 +84,20 @@ class LEn extends L {
       'Straight legs from the waist to the ankle.';
 
   @override
+  String get templateHoodie => 'Hoodie';
+
+  @override
+  String get templateHoodieBlurb =>
+      'Jersey, long sleeves, a hood, gathered at the wrists and the hem.';
+
+  @override
+  String get templateJoggers => 'Joggers';
+
+  @override
+  String get templateJoggersBlurb =>
+      'Jersey, pulled on: an elastic waist and elastic ankles.';
+
+  @override
   String get templateDress => 'Dress';
 
   @override

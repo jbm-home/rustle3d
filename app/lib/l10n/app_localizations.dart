@@ -241,6 +241,30 @@ abstract class L {
   /// **'Straight legs from the waist to the ankle.'**
   String get templateTrousersBlurb;
 
+  /// No description provided for @templateHoodie.
+  ///
+  /// In en, this message translates to:
+  /// **'Hoodie'**
+  String get templateHoodie;
+
+  /// No description provided for @templateHoodieBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Jersey, long sleeves, a hood, gathered at the wrists and the hem.'**
+  String get templateHoodieBlurb;
+
+  /// No description provided for @templateJoggers.
+  ///
+  /// In en, this message translates to:
+  /// **'Joggers'**
+  String get templateJoggers;
+
+  /// No description provided for @templateJoggersBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Jersey, pulled on: an elastic waist and elastic ankles.'**
+  String get templateJoggersBlurb;
+
   /// No description provided for @templateDress.
   ///
   /// In en, this message translates to:

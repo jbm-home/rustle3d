@@ -85,6 +85,20 @@ class LFr extends L {
       'Jambes droites, de la taille à la cheville.';
 
   @override
+  String get templateHoodie => 'Sweat à capuche';
+
+  @override
+  String get templateHoodieBlurb =>
+      'En jersey, manches longues, une capuche, froncé aux poignets et en bas.';
+
+  @override
+  String get templateJoggers => 'Jogging';
+
+  @override
+  String get templateJoggersBlurb =>
+      'En jersey, à enfiler : taille et chevilles élastiques.';
+
+  @override
   String get templateDress => 'Robe';
 
   @override

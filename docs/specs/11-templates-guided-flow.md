@@ -2,10 +2,10 @@
 
 Provenance: maintainer's functional brief (2026-11-14); general garment-making knowledge (basic garment blocks drafted from body measurements).
 
-## Status (2026-11-17)
+## Status (2026-11-25)
 
-Implemented: T-shirt, shirt, trousers, dress, straight skirt, A-line
-skirt and tote bag as
+Implemented: T-shirt, shirt, trousers, hoodie, joggers, dress, straight
+skirt, A-line skirt and tote bag as
 Rust recipes in `r3d_commands::templates` (`template.apply`,
 `template.list`; sizes in cm, filled in from the avatar); the start screen
 with rendered thumbnails and a sizes sheet per body; the Learn panel (task
@@ -23,7 +23,18 @@ rows; each sleeve's back cap sewn to both), long sleeves with cuffs
 and the cuffs interfaced (medium, woven); the trousers a front and a back per leg, placed on the legs
 (`left_leg`, `right_leg`), a straight-leg block without darts whose back
 crotch point is lowered until both inseams match, with an 18 cm fly
-zipper (at most 60 % of the centre front) above the crotch seam (M20). Not yet: sizes on a body silhouette (plain fields for
+zipper (at most 60 % of the centre front) above the crotch seam (M20).
+The hoodie (test report 2026-11-24) is the T-shirt's block in jersey,
+16 cm of ease, its long sleeves narrowing to the shirt's cuff width,
+an elastic at each wrist (relaxed to the wrist + 4 cm) and along the
+hem (relaxed to the hips), and a hood in two halves (21 % of the
+stature high, 14 % deep), sewn down the middle and to both necklines,
+the halves meeting at the centre front; the hood starts just over the
+head and falls down the back. The joggers are the trousers' block in
+jersey, pulled on: no waist shaping at the sides, no fly (the centre
+front sewn all the way), an elastic along each piece's waist (relaxed
+to the body's waist) and hem (relaxed to the ankle + 6 cm), 8 cm
+shorter than the waist's height. Not yet: sizes on a body silhouette (plain fields for
 now). Templates are recipes in code
 rather than data files: the drafts compute curves and lengths (e.g. the
 sleeve cap is solved to the armhole's length).

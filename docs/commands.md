@@ -5389,6 +5389,16 @@ Draft a starter garment (t_shirt, shirt, trousers, dress, straight_skirt, a_line
           "type": "string"
         },
         {
+          "const": "hoodie",
+          "description": "A hoodie: the T-shirt's block, looser, with long sleeves gathered\nat the wrists, an elastic hem and a hood in two halves.",
+          "type": "string"
+        },
+        {
+          "const": "joggers",
+          "description": "Joggers: the trousers' block in jersey, pulled on: an elastic\nwaist and elastic ankles, no fly.",
+          "type": "string"
+        },
+        {
           "const": "dress",
           "description": "A sleeveless dress: front and back from the neck to the knee,\nshaped at the waist, flared at the hem.",
           "type": "string"
