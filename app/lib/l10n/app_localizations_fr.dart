@@ -3181,9 +3181,6 @@ class LFr extends L {
   String get bodyHasWarnings => 'Le corps a des points à vérifier.';
 
   @override
-  String get motionImportedTip => 'Un corps importé reste immobile';
-
-  @override
   String get pointChest => 'Poitrine';
 
   @override
@@ -3298,8 +3295,11 @@ class LFr extends L {
   }
 
   @override
-  String get checkMotionUnavailable =>
-      'Un corps importé reste immobile : les mouvements sont désactivés.';
+  String get checkMotionFileSkeleton => 'Bouge avec le squelette du fichier.';
+
+  @override
+  String get checkMotionPoints =>
+      'Bouge avec un squelette placé par les points de placement : déplacez-les si un membre plie au mauvais endroit.';
 
   @override
   String errModelMalformed(String format, String detail) {
@@ -3327,10 +3327,6 @@ class LFr extends L {
   String errBodyUnavailable(String file) {
     return 'Le fichier du corps $file manque ou a changé : importez-le à nouveau.';
   }
-
-  @override
-  String get errImportedBodyStill =>
-      'Un corps importé ne peut pas encore bouger.';
 
   @override
   String get errNoImportedBody => 'L\'avatar n\'a pas de corps importé.';
@@ -3385,10 +3381,7 @@ class LFr extends L {
 
   @override
   String get gameSkinHint =>
-      'Le vêtement bouge avec le corps, avec la marche, le demi-tour et les bras levés en animations.';
-
-  @override
-  String get gameSkinImported => 'Un corps importé n\'a pas de squelette.';
+      'Le vêtement bouge avec le corps, avec les mouvements intégrés et ceux capturés du projet en animations.';
 
   @override
   String get gameAvatar => 'Inclure le corps';
@@ -3409,7 +3402,7 @@ class LFr extends L {
 
   @override
   String get errNoSkeleton =>
-      'Ce corps n\'a pas de squelette : exportez sans le lier.';
+      'Il n\'y a pas d\'avatar auquel lier le vêtement : exportez sans le lier.';
 
   @override
   String get motionImport => 'Importer un mouvement capturé…';

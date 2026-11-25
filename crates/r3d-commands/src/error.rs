@@ -213,11 +213,10 @@ pub enum CommandError {
         "the body file {file} is missing from the project folder or was changed since it was imported: import it again"
     )]
     BodyUnavailable { file: String },
-    #[error("an imported body cannot move yet: drape it standing still")]
-    ImportedBodyStill,
+
     #[error(transparent)]
     Motion(#[from] r3d_avatar::captured::MotionError),
-    #[error("the avatar has no skeleton (an imported body, or no avatar): export without skinning")]
+    #[error("the project has no avatar to skin the garment to: export without skinning")]
     NoSkeleton,
     #[error(transparent)]
     Pattern(#[from] r3d_io::import::val::ValError),
@@ -300,7 +299,7 @@ impl Localizable for CommandError {
             Self::BodyUnavailable { file } => {
                 Message::new("avatar.mesh_unavailable", text).arg("file", file)
             }
-            Self::ImportedBodyStill => Message::new("motion.imported_body", text),
+
             Self::Motion(e) => e.message(),
             Self::NoSkeleton => Message::new("export.no_skeleton", text),
             Self::Pattern(e) => e.message(),

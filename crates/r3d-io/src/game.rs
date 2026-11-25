@@ -59,15 +59,17 @@ pub struct GameImage {
     pub image: Image3d,
 }
 
-/// A joint of the skeleton, in its rest pose.
+/// A joint of the skeleton, in its bind pose.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Joint {
     pub name: String,
     /// Always lower than the joint's own index.
     pub parent: Option<usize>,
-    /// Rest position relative to the parent (m); the rest pose has no
-    /// rotation.
+    /// Bind position relative to the parent (m).
     pub translation: [f32; 3],
+    /// Bind rotation relative to the parent (unit quaternion `x, y, z,
+    /// w`).
+    pub rotation: [f32; 4],
     /// The inverse of the joint's rest transform in the scene (column
     /// major).
     pub inverse_bind: [f32; 16],
@@ -150,7 +152,13 @@ pub fn to_glb(scene: &GameScene) -> Vec<u8> {
     let mut nodes: Vec<Value> = scene
         .joints
         .iter()
-        .map(|j| json!({ "name": j.name, "translation": j.translation }))
+        .map(|j| {
+            let mut node = json!({ "name": j.name, "translation": j.translation });
+            if j.rotation != [0.0, 0.0, 0.0, 1.0] {
+                node["rotation"] = json!(j.rotation);
+            }
+            node
+        })
         .collect();
     for (i, j) in scene.joints.iter().enumerate() {
         if let Some(node) = j.parent.and_then(|p| nodes.get_mut(p)) {
@@ -339,12 +347,14 @@ mod tests {
                     name: "pelvis".into(),
                     parent: None,
                     translation: [0.0, 1.0, 0.0],
+                    rotation: [0.0, 0.0, 0.0, 1.0],
                     inverse_bind: identity,
                 },
                 Joint {
                     name: "spine".into(),
                     parent: Some(0),
                     translation: [0.0, 0.2, 0.0],
+                    rotation: [0.0, 0.0, 0.0, 1.0],
                     inverse_bind: identity,
                 },
             ],

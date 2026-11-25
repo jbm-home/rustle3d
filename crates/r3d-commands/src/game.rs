@@ -35,6 +35,7 @@ use crate::actions::{ActionSpec, export_stem};
 use crate::drape::{Animation, Drape, Form, Latest};
 use crate::error::{CommandError, Invalid};
 use crate::prints::PrintImage;
+use crate::skinning::{Nearest, corners, transfer};
 use crate::spec::Described;
 use crate::workspace::{Workspace, WorkspaceError};
 
@@ -42,8 +43,6 @@ use crate::workspace::{Workspace, WorkspaceError};
 pub const MAX_LODS: usize = 5;
 /// Animations are sampled this many times a second.
 const CLIP_FPS: f32 = 30.0;
-/// Laplacian smoothing passes over the transferred weights.
-const SMOOTHING_PASSES: usize = 3;
 /// Texels of padding around each piece in the maps.
 const PADDING: u32 = 8;
 /// Size of the base-colour atlas when no normal map sets it.
@@ -193,7 +192,7 @@ impl Default for ExportGame {
 }
 
 impl Described for ExportGame {
-    const SUMMARY: &'static str = "Export the draped garment ready for a game engine as glTF 2.0 binary (GLB): per garment one mesh per level of detail (`lods`, ratios of the triangle count; simplified by quadric error metrics, the pieces' edges kept), texture coordinates in an atlas of the pieces, the full drape's wrinkles baked into a tangent-space normal map for each lower LOD (`normal_map` pixels), tangents, the print baked into a base-colour atlas, `sides` double_sided or a `shell` of `thickness_mm`, and with `skin` the avatar's 24-bone skeleton, weights transferred from the body (closest point, smoothed, four bones) and the walk, turn and raise_arms motions as animations; `preset` godot, unity or unreal sets the defaults and names. Metres, Y up. Uses the cached drape from `simulate` if it is up to date. An imported body has no skeleton: use skin false. Returns the path and each LOD's triangles.";
+    const SUMMARY: &'static str = "Export the draped garment ready for a game engine as glTF 2.0 binary (GLB): per garment one mesh per level of detail (`lods`, ratios of the triangle count; simplified by quadric error metrics, the pieces' edges kept), texture coordinates in an atlas of the pieces, the full drape's wrinkles baked into a tangent-space normal map for each lower LOD (`normal_map` pixels), tangents, the print baked into a base-colour atlas, `sides` double_sided or a `shell` of `thickness_mm`, and with `skin` the avatar's 24-bone skeleton in the pose the body stands in (an imported body's own), weights transferred from the body (closest point, smoothed, four bones) and as animations the walk, idle, turn and raise_arms motions and the captured motions of the project's `motions/` folder; `preset` godot, unity or unreal sets the defaults and names. Metres, Y up. Uses the cached drape from `simulate` if it is up to date. Returns the path, each LOD's triangles and the animations.";
 }
 
 /// The options with the preset's defaults filled in, checked.
@@ -259,6 +258,9 @@ pub struct Dressed<'a> {
     pub animation: Option<&'a Animation>,
     pub time: f32,
     pub prints: &'a HashMap<GarmentId, Arc<PrintImage>>,
+    /// Captured motions exported as animations besides the built-in
+    /// ones.
+    pub motions: &'a [Motion],
 }
 
 /// One garment's pieces merged into one mesh.
@@ -322,10 +324,10 @@ pub fn game_scene(
     let posed_body = form.map(|f| f.posed(dressed.animation, dressed.time));
 
     let mut garments = merge(dressed);
-    if let (Some((_, weights)), Some(f), Some(body)) = (rig, form, &posed_body) {
+    if let (Some(r), Some(f), Some(body)) = (rig, form, &posed_body) {
         let finder = Nearest::new(body, &f.triangles);
         for g in &mut garments {
-            g.skin = transfer(&g.positions, &g.triangles, &finder, weights);
+            g.skin = transfer(&g.positions, &g.triangles, &finder, r.weights);
             if let Some(t) = &moved {
                 g.positions = unpose(&g.positions, &g.skin, t);
             }
@@ -353,9 +355,9 @@ pub fn game_scene(
         add_garment(&mut scene, g, dressed, &s, &mut lod_triangles);
     }
 
-    let mut animations = Vec::new();
-    if let Some((skeleton, weights)) = rig {
-        let (joints, shift) = joints(skeleton);
+    let mut animations: Vec<String> = Vec::new();
+    if let Some(r) = rig {
+        let (joints, shift) = joints(r.skeleton, r.bind);
         scene.joints = joints;
         if shift > 0 {
             for m in &mut scene.meshes {
@@ -369,9 +371,16 @@ pub fn game_scene(
             }
         }
         if s.animations {
-            for motion in &Motion::BUILT_IN {
-                scene.clips.push(clip(skeleton, motion, shift));
-                animations.push(motion.name().to_owned());
+            for motion in Motion::BUILT_IN.iter().chain(dressed.motions) {
+                // A captured motion named as a built-in one is numbered.
+                let mut name = motion.name().to_owned();
+                let mut n = 1;
+                while animations.contains(&name) {
+                    n += 1;
+                    name = format!("{} ({n})", motion.name());
+                }
+                scene.clips.push(clip(r.skeleton, motion, shift, &name));
+                animations.push(name);
             }
         }
         if s.avatar
@@ -381,7 +390,7 @@ pub fn game_scene(
                 &mut scene,
                 &f.positions,
                 &f.triangles,
-                Some((weights, shift)),
+                Some((r.weights, shift)),
             );
         }
     } else if s.avatar
@@ -559,211 +568,6 @@ fn pack(flats: &[(usize, Vec<Vec2>)], n: usize) -> Vec<Vec2> {
     out
 }
 
-/// Body triangles binned in a grid, for closest-point queries.
-struct Nearest<'a> {
-    positions: &'a [Vec3],
-    triangles: &'a [[u32; 3]],
-    cell: f32,
-    grid: HashMap<[i32; 3], Vec<u32>>,
-}
-
-impl<'a> Nearest<'a> {
-    fn new(positions: &'a [Vec3], triangles: &'a [[u32; 3]]) -> Self {
-        let cell = 0.04;
-        let mut grid: HashMap<[i32; 3], Vec<u32>> = HashMap::new();
-        let key = |p: Vec3| (p / cell).floor().as_ivec3().to_array();
-        for (i, t) in triangles.iter().enumerate() {
-            let Some(c) = corners(positions, *t) else {
-                continue;
-            };
-            let (a, b) = (key(c[0].min(c[1]).min(c[2])), key(c[0].max(c[1]).max(c[2])));
-            for x in a[0]..=b[0] {
-                for y in a[1]..=b[1] {
-                    for z in a[2]..=b[2] {
-                        grid.entry([x, y, z]).or_default().push(i as u32);
-                    }
-                }
-            }
-        }
-        Self {
-            positions,
-            triangles,
-            cell,
-            grid,
-        }
-    }
-
-    /// The triangle closest to `p` and the closest point's barycentric
-    /// weights in it.
-    fn find(&self, p: Vec3) -> Option<([u32; 3], Vec3)> {
-        let centre = (p / self.cell).floor().as_ivec3();
-        let mut best: Option<(f32, [u32; 3], Vec3)> = None;
-        for ring in 0..64i32 {
-            // Every cell at Chebyshev distance `ring` from the centre.
-            for x in -ring..=ring {
-                for y in -ring..=ring {
-                    for z in -ring..=ring {
-                        if x.abs().max(y.abs()).max(z.abs()) != ring {
-                            continue;
-                        }
-                        let key = (centre + glam::IVec3::new(x, y, z)).to_array();
-                        for t in self.grid.get(&key).into_iter().flatten() {
-                            let Some(tri) = self.triangles.get(*t as usize) else {
-                                continue;
-                            };
-                            let Some(c) = corners(self.positions, *tri) else {
-                                continue;
-                            };
-                            let (q, _) = r3d_sim::collide::closest_feature(p, c[0], c[1], c[2]);
-                            let d = q.distance_squared(p);
-                            if best.as_ref().is_none_or(|b| d < b.0) {
-                                best = Some((d, *tri, barycentric(q, c)));
-                            }
-                        }
-                    }
-                }
-            }
-            // Cells beyond this ring are at least `ring` cells away.
-            if let Some((d, ..)) = best
-                && d.sqrt() <= ring as f32 * self.cell
-            {
-                break;
-            }
-        }
-        best.map(|(_, t, w)| (t, w))
-    }
-}
-
-fn corners<T: Copy>(values: &[T], t: [u32; 3]) -> Option<[T; 3]> {
-    Some([
-        *values.get(t[0] as usize)?,
-        *values.get(t[1] as usize)?,
-        *values.get(t[2] as usize)?,
-    ])
-}
-
-/// Barycentric weights of `q` (in the triangle's plane) in `c`.
-fn barycentric(q: Vec3, c: [Vec3; 3]) -> Vec3 {
-    let (v0, v1, v2) = (c[1] - c[0], c[2] - c[0], q - c[0]);
-    let (d00, d01, d11) = (v0.dot(v0), v0.dot(v1), v1.dot(v1));
-    let (d20, d21) = (v2.dot(v0), v2.dot(v1));
-    let den = d00 * d11 - d01 * d01;
-    if den.abs() < 1e-20 {
-        return Vec3::new(1.0, 0.0, 0.0);
-    }
-    let v = (d11 * d20 - d01 * d21) / den;
-    let w = (d00 * d21 - d01 * d20) / den;
-    Vec3::new(1.0 - v - w, v, w)
-}
-
-/// The garment's skin weights from the body's: at each vertex those of
-/// the closest body point, smoothed over the garment's edges, the four
-/// heaviest kept and normalized.
-fn transfer(
-    positions: &[Vec3],
-    triangles: &[[u32; 3]],
-    finder: &Nearest<'_>,
-    weights: &[Influences],
-) -> Vec<Influences> {
-    let bones = weights
-        .iter()
-        .flat_map(|w| w.bones)
-        .map(|b| usize::from(b) + 1)
-        .max()
-        .unwrap_or(1);
-    let mut dense: Vec<Vec<f32>> = positions
-        .iter()
-        .map(|p| {
-            let mut out = vec![0.0f32; bones];
-            if let Some((t, w)) = finder.find(*p) {
-                for (corner, share) in t.iter().zip([w.x, w.y, w.z]) {
-                    if let Some(inf) = weights.get(*corner as usize) {
-                        for (b, x) in inf.bones.iter().zip(inf.weights) {
-                            if let Some(slot) = out.get_mut(usize::from(*b)) {
-                                *slot += x * share.max(0.0);
-                            }
-                        }
-                    }
-                }
-            }
-            out
-        })
-        .collect();
-    let mut neighbours: Vec<Vec<u32>> = vec![Vec::new(); positions.len()];
-    for t in triangles {
-        for k in 0..3 {
-            let (a, b) = (t[k], t[(k + 1) % 3]);
-            if let Some(n) = neighbours.get_mut(a as usize) {
-                n.push(b);
-            }
-            if let Some(n) = neighbours.get_mut(b as usize) {
-                n.push(a);
-            }
-        }
-    }
-    for n in &mut neighbours {
-        n.sort_unstable();
-        n.dedup();
-    }
-    for _ in 0..SMOOTHING_PASSES {
-        dense = dense
-            .iter()
-            .zip(&neighbours)
-            .map(|(own, around)| {
-                if around.is_empty() {
-                    return own.clone();
-                }
-                let mut avg = vec![0.0f32; bones];
-                for v in around {
-                    if let Some(w) = dense.get(*v as usize) {
-                        for (a, x) in avg.iter_mut().zip(w) {
-                            *a += x;
-                        }
-                    }
-                }
-                let k = around.len() as f32;
-                own.iter()
-                    .zip(&avg)
-                    .map(|(o, a)| 0.5 * o + 0.5 * a / k)
-                    .collect()
-            })
-            .collect();
-    }
-    dense.iter().map(|w| strongest(w)).collect()
-}
-
-/// The four heaviest bones of `dense`, their weights summing to 1
-/// (unused slots: bone 0, weight 0).
-fn strongest(dense: &[f32]) -> Influences {
-    let mut order: Vec<usize> = (0..dense.len()).collect();
-    order.sort_by(|a, b| {
-        let w = |i: &usize| dense.get(*i).copied().unwrap_or(0.0);
-        w(b).total_cmp(&w(a)).then(a.cmp(b))
-    });
-    let mut out = Influences::default();
-    let top: Vec<(usize, f32)> = order
-        .into_iter()
-        .take(4)
-        .map(|i| (i, dense.get(i).copied().unwrap_or(0.0)))
-        .filter(|(_, w)| *w > 1e-4)
-        .collect();
-    let total: f32 = top.iter().map(|(_, w)| w).sum();
-    if total <= 0.0 {
-        out.weights[0] = 1.0;
-        return out;
-    }
-    for (k, (b, w)) in top.iter().enumerate() {
-        if let (Some(slot), Some(weight)) = (out.bones.get_mut(k), out.weights.get_mut(k)) {
-            *slot = u8::try_from(*b).unwrap_or(0);
-            *weight = w / total;
-        }
-    }
-    // Exactly 1: the rounding left on the heaviest.
-    let rest: f32 = out.weights.iter().skip(1).sum();
-    out.weights[0] = 1.0 - rest;
-    out
-}
-
 /// The blended bone motion of a vertex with `skin`, as a matrix and a
 /// translation.
 fn blended(skin: &Influences, transforms: &[Rigid]) -> (Mat3, Vec3) {
@@ -904,7 +708,11 @@ impl Surface {
 
 /// `surface` as a mesh; as a shell `thickness` thick when asked: an
 /// inner copy offset along the normals, facing in, and a rim along the
-/// border edges.
+/// border edges. The inner copy shares the outer's texture coordinates
+/// and normal map: its tangents point the other way, so that a texel
+/// gives it the opposite of the outer normal there (with the tangents
+/// found on its own turned-over triangles, a fold's slope would light
+/// the same way inside as outside: the relief reversed).
 fn mesh_of(
     surface: &Surface,
     g: &Merged,
@@ -917,8 +725,8 @@ fn mesh_of(
     let mut atlas = surface.atlas.clone();
     let mut origin: Vec<u32> = surface.vertices.clone();
     let mut triangles = surface.triangles.clone();
+    let n = positions.len() as u32;
     if let Some(t) = shell {
-        let n = positions.len() as u32;
         let inner: Vec<Vec3> = surface
             .positions
             .iter()
@@ -969,12 +777,18 @@ fn mesh_of(
     }
     let normals = normals(&positions, &triangles);
     let tangents = if shell.is_some() {
-        tangents(&Sheet {
+        let mut t = tangents(&Sheet {
             positions: &positions,
             normals: &normals,
             uvs: &atlas,
             triangles: &triangles,
-        })
+        });
+        for inner in t.iter_mut().skip(n as usize).take(n as usize) {
+            for c in inner.iter_mut().take(3) {
+                *c = -*c;
+            }
+        }
+        t
     } else {
         surface.tangents.clone()
     };
@@ -1201,10 +1015,12 @@ fn clean_slots(joints: Vec<[u8; 4]>, weights: Vec<[f32; 4]>) -> (Vec<[u8; 4]>, V
         .unzip()
 }
 
-/// The skeleton as joints at rest (no rotation, each at its head joint),
-/// under one root: a `root` joint at the origin is added when the
-/// skeleton has several. Also how much the bone indices shift.
-fn joints(skeleton: &Skeleton) -> (Vec<Joint>, u8) {
+/// The skeleton as joints in the pose the body stands in (`bind`: each
+/// bone's motion from the rest pose; without it, at rest: no rotation,
+/// each joint at its bone's head), under one root: a `root` joint at the
+/// origin is added when the skeleton has several. Also how much the bone
+/// indices shift.
+fn joints(skeleton: &Skeleton, bind: Option<&[Rigid]>) -> (Vec<Joint>, u8) {
     let roots = skeleton.bones.iter().filter(|b| b.parent.is_none()).count();
     let shift = usize::from(roots > 1);
     let mut out = Vec::with_capacity(skeleton.bones.len() + shift);
@@ -1213,27 +1029,48 @@ fn joints(skeleton: &Skeleton) -> (Vec<Joint>, u8) {
             name: "root".into(),
             parent: None,
             translation: [0.0; 3],
+            rotation: Quat::IDENTITY.to_array(),
             inverse_bind: Mat4::IDENTITY.to_cols_array(),
         });
     }
-    for bone in &skeleton.bones {
-        let parent_head = bone
-            .parent
-            .and_then(|p| skeleton.bones.get(p))
-            .map_or(Vec3::ZERO, |p| p.head);
+    // Each joint's place in the scene: its bone's motion applied to the
+    // rest joint (which has no rotation).
+    let world: Vec<Rigid> = skeleton
+        .bones
+        .iter()
+        .enumerate()
+        .map(|(i, b)| {
+            let t = bind
+                .and_then(|t| t.get(i))
+                .copied()
+                .unwrap_or(Rigid::IDENTITY);
+            Rigid {
+                rotation: t.rotation,
+                translation: t.apply(b.head),
+            }
+        })
+        .collect();
+    for (bone, w) in skeleton.bones.iter().zip(&world) {
+        let local = match bone.parent.and_then(|p| world.get(p)) {
+            Some(parent) => parent.inverse().after(w),
+            None => *w,
+        };
+        let inverse = w.inverse();
         out.push(Joint {
             name: bone.name.clone(),
             parent: bone.parent.map(|p| p + shift).or((shift == 1).then_some(0)),
-            translation: (bone.head - parent_head).to_array(),
-            inverse_bind: Mat4::from_translation(-bone.head).to_cols_array(),
+            translation: local.translation.to_array(),
+            rotation: local.rotation.normalize().to_array(),
+            inverse_bind: Mat4::from_rotation_translation(inverse.rotation, inverse.translation)
+                .to_cols_array(),
         });
     }
     (out, shift as u8)
 }
 
 /// One cycle of `motion` at full amplitude, from phase 0, as local joint
-/// rotations (and the root bones' translations), looping.
-fn clip(skeleton: &Skeleton, motion: &Motion, shift: u8) -> Clip {
+/// rotations (and the root bones' translations), looping, named `name`.
+fn clip(skeleton: &Skeleton, motion: &Motion, shift: u8, name: &str) -> Clip {
     let period = motion.period();
     let frames = (period * CLIP_FPS).round().max(2.0) as usize;
     // The first cycle start after the motion has fully grown in.
@@ -1292,10 +1129,23 @@ fn clip(skeleton: &Skeleton, motion: &Motion, shift: u8) -> Clip {
         }
     }
     Clip {
-        name: motion.name().into(),
+        name: name.into(),
         times,
         channels,
     }
+}
+
+/// The project's captured motions (spec 22) that the avatar can play,
+/// named after their files.
+pub fn captured_motions(ws: &Workspace) -> Vec<Motion> {
+    ws.motion_files()
+        .iter()
+        .filter_map(|path| {
+            let bytes = ws.read(path).ok()?;
+            let stem = std::path::Path::new(path).file_stem()?.to_str()?;
+            crate::drape::captured_motion(stem, &bytes).ok()
+        })
+        .collect()
 }
 
 impl ActionSpec for ExportGame {
@@ -1303,6 +1153,7 @@ impl ActionSpec for ExportGame {
         let project = ws.session().project();
         let latest = Latest::load(ws.dir(), project)?;
         let prints = crate::prints::Prints::default().all(project, Some(ws.dir()));
+        let motions = captured_motions(ws);
         let dressed = Dressed {
             project,
             drape: &latest.drape,
@@ -1311,6 +1162,7 @@ impl ActionSpec for ExportGame {
             animation: latest.animation.as_ref(),
             time: latest.time,
             prints: &prints,
+            motions: &motions,
         };
         let (scene, report) = game_scene(&dressed, self)?;
         let path = self
@@ -1362,16 +1214,6 @@ mod tests {
             .settings()
             .is_ok()
         );
-    }
-
-    #[test]
-    fn the_strongest_four_bones_sum_to_one() {
-        let w = strongest(&[0.1, 0.0, 0.3, 0.2, 0.25, 0.15]);
-        assert_eq!(w.bones, [2, 4, 3, 5]);
-        assert!((w.weights.iter().sum::<f32>() - 1.0).abs() < 1e-6);
-        assert!(w.weights[0] > w.weights[3]);
-        let none = strongest(&[0.0; 4]);
-        assert_eq!(none.weights, [1.0, 0.0, 0.0, 0.0]);
     }
 
     #[test]

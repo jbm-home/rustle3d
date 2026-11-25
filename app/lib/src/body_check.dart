@@ -80,7 +80,9 @@ String checkText(BuildContext context, Map<String, dynamic> item) {
     'points.outside' => l.checkPointsOutside(pointName(l, a('point'))),
     'points.side' => l.checkPointsSide(pointName(l, a('point'))),
     'measurements.clamped' => l.checkMeasurementsClamped(a('measurement')),
-    'motion.unavailable' => l.checkMotionUnavailable,
+    'motion.rig' => a('source') == 'file'
+        ? l.checkMotionFileSkeleton
+        : l.checkMotionPoints,
     final code => '$code',
   };
 }

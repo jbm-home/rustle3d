@@ -1478,7 +1478,7 @@
   "bodyPointsHint": "Inside the body, in cm: across (left +), height, depth (front +). Drag them in the 3D view with Body › Show arrangement points.",
   "bodyGuessAgain": "Guess again",
   "bodyHasWarnings": "The body has things to check.",
-  "motionImportedTip": "An imported body stands still",
+
   "pointChest": "Chest",
   "pointWaist": "Waist",
   "pointHips": "Hips",
@@ -1595,7 +1595,8 @@
       }
     }
   },
-  "checkMotionUnavailable": "An imported body stands still: motions are off.",
+  "checkMotionFileSkeleton": "Moves with the file's own skeleton.",
+  "checkMotionPoints": "Moves with a skeleton placed by the arrangement points: move them if a limb bends in the wrong place.",
   "errModelMalformed": "This {format} file cannot be read: {detail}",
   "@errModelMalformed": {
     "placeholders": {
@@ -1636,7 +1637,7 @@
       }
     }
   },
-  "errImportedBodyStill": "An imported body cannot move yet.",
+
   "errNoImportedBody": "The avatar has no imported body.",
   "exportGame": "Garment for a game engine (glTF)…",
   "gameTitle": "Export for a game engine",
@@ -1653,14 +1654,13 @@
   "gameThickness": "Thickness",
   "gameThicknessMm": "Thickness",
   "gameSkin": "Skin to the body's skeleton",
-  "gameSkinHint": "The garment moves with the body, with the walk, turn and raise-arms motions as animations.",
-  "gameSkinImported": "An imported body has no skeleton.",
+  "gameSkinHint": "The garment moves with the body, with the built-in motions and the project's captured motions as animations.",
   "gameAvatar": "Include the body",
   "gameExport": "Export…",
   "mm": "mm",
   "errLods": "Levels of detail: start at 100 and go down, each above 0, at most five.",
   "errTextureSize": "Choose no map, or a power of two from 256 to 4096.",
-  "errNoSkeleton": "This body has no skeleton: export without skinning.",
+  "errNoSkeleton": "There is no avatar to skin the garment to: export without skinning.",
   "motionImport": "Import a captured motion…",
   "motionFiles": "Motion captures (BVH)",
   "errMotionFormat": "This BVH file cannot be read: {detail}",

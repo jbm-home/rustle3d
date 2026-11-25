@@ -111,7 +111,7 @@ extension Messages on BuildContext {
       'model.too_large' => l.errModelTooLarge(arg('triangles'), arg('limit')),
       'avatar.mesh_unavailable' => l.errBodyUnavailable(arg('file')),
       'avatar.no_mesh' => l.errNoImportedBody,
-      'motion.imported_body' => l.errImportedBodyStill,
+
       'motion.format' => l.errMotionFormat(arg('detail')),
       'motion.skeleton' => l.errMotionSkeleton(arg('bone')),
       'motion.too_short' => l.errMotionTooShort(arg('seconds')),

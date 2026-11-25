@@ -24,15 +24,17 @@ need, smoothly; the walk after published gait studies, a supple trunk,
 a steady head, relaxed arms; the turn made in steps; the arms raised in
 a V above the head.
 
+2026-11-25 (M37): imported bodies move (spec 27); the game export
+carries the project's captured motions as animations (spec 15).
+
 Not yet: walking forward along a path (the avatar walks on the spot,
 as on a treadmill), arms raised straight overhead (the body takes it,
 but the shoulders' skin then carries a T-shirt's neckline in and up and
 it rolls over at the chest), a standing stance narrower than the rest
-pose's (idle keeps the feet where they rest), motions of
-imported avatars (M31 imports bodies but they stand still, spec 27), a timeline to scrub through a motion, recording
-a motion as a video, captured motions in the game export, glTF
-animations as captured motions, the motion library for agents and the
-CLI (they import files into the project).
+pose's (idle keeps the feet where they rest), a timeline to scrub
+through a motion, recording a motion as a video, glTF animations as
+captured motions, the motion library for agents and the CLI (they
+import files into the project).
 
 ## User story
 As a designer, I want to see how my garment moves: I drape a dress, make

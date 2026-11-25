@@ -267,6 +267,23 @@ impl Workspace {
         )?)
     }
 
+    /// The captured motions in the project's `motions/` folder, by path
+    /// in the project, sorted.
+    pub fn motion_files(&self) -> Vec<String> {
+        let mut out: Vec<String> = fs::read_dir(self.dir().join("motions"))
+            .map(|entries| {
+                entries
+                    .filter_map(Result::ok)
+                    .filter_map(|e| e.file_name().to_str().map(str::to_owned))
+                    .filter(|n| n.to_ascii_lowercase().ends_with(".bvh"))
+                    .map(|n| format!("motions/{n}"))
+                    .collect()
+            })
+            .unwrap_or_default();
+        out.sort();
+        out
+    }
+
     /// Copy a BVH motion capture from anywhere into the project's
     /// `motions/` folder, as [`Self::adopt`] does, after checking that the
     /// avatar can play it (spec 22). Returns its relative path.

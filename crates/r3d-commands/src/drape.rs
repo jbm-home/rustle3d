@@ -26,7 +26,7 @@ use r3d_avatar::captured::CapturedMotion;
 use r3d_avatar::fit::{fitted_body, fitted_positions};
 use r3d_avatar::motion::{EASE_IN_S, Motion, ease};
 use r3d_avatar::pack::Influences;
-use r3d_avatar::skeleton::{Skeleton, skin};
+use r3d_avatar::skeleton::{Pose, Skeleton, skin};
 use r3d_core::seam::{Span, Track};
 use r3d_core::{
     Around, ButtonId, DetailId, EdgeId, Fabric, GarmentId, PanelId, PinId, PointId, Project,
@@ -168,11 +168,86 @@ pub struct Parts {
 
 /// A body's skeleton and skin weights.
 #[derive(Debug, Clone)]
-struct Rig {
+pub(crate) struct Rig {
     skeleton: Skeleton,
     weights: Vec<Influences>,
     /// The arms, kept clear of the body in every pose.
     arms: clearance::Arms,
+    /// For a body that does not stand in the skeleton's rest pose (an
+    /// imported one, spec 27): the pose it stands in.
+    bound: Option<Bound>,
+}
+
+/// The pose a body stands in, and each bone's motion from the rest pose
+/// to it and back.
+#[derive(Debug, Clone)]
+struct Bound {
+    pose: Pose,
+    transforms: Vec<Rigid>,
+    inverse: Vec<Rigid>,
+}
+
+/// A body's rig, as an export sees it.
+#[derive(Debug, Clone, Copy)]
+pub struct Rigged<'a> {
+    pub skeleton: &'a Skeleton,
+    /// One per vertex of the body.
+    pub weights: &'a [Influences],
+    /// Each bone's motion from the skeleton's rest pose to where the body
+    /// stands; `None` when it stands at rest.
+    pub bind: Option<&'a [Rigid]>,
+}
+
+impl Rig {
+    /// The rig of a body standing in pose `bind` of `skeleton`, its
+    /// vertices (`positions`, as it stands) moved by `weights`.
+    pub(crate) fn bound(
+        skeleton: Skeleton,
+        weights: Vec<Influences>,
+        positions: &[Vec3],
+        bind: Pose,
+    ) -> Self {
+        let transforms = skeleton.transforms(&bind);
+        let inverse = transforms.iter().map(Rigid::inverse).collect();
+        let arms = clearance::Arms::new(&skeleton, positions, &weights);
+        Self {
+            skeleton,
+            weights,
+            arms,
+            bound: Some(Bound {
+                pose: bind,
+                transforms,
+                inverse,
+            }),
+        }
+    }
+
+    /// Each bone's motion from where the body stands to `pose`.
+    fn transforms(&self, pose: &Pose) -> Vec<Rigid> {
+        let t = self.skeleton.transforms(pose);
+        match &self.bound {
+            None => t,
+            Some(b) => t.iter().zip(&b.inverse).map(|(t, i)| t.after(i)).collect(),
+        }
+    }
+
+    /// `pose`, `w` of the way from where the body stands.
+    fn eased(&self, pose: Pose, w: f32) -> Pose {
+        match &self.bound {
+            None => pose.scaled(w),
+            Some(b) => b.pose.towards(&pose, w),
+        }
+    }
+
+    /// A motion's `pose` `since` seconds after it started. Motions grow
+    /// from the rest pose; a body standing otherwise comes from its
+    /// stance over the same time.
+    fn started(&self, pose: Pose, since: f32) -> Pose {
+        match &self.bound {
+            None => pose,
+            Some(b) => b.pose.towards(&pose, ease(since / EASE_IN_S)),
+        }
+    }
 }
 
 /// The solver gets a motion sampled this many times a second.
@@ -718,13 +793,14 @@ impl Form {
 
     /// A dress form for an imported body: its limbs where `parts` says,
     /// its chest, waist and hips at `levels` (m); it does not move.
-    pub fn imported(
+    pub(crate) fn imported(
         positions: Vec<Vec3>,
         triangles: Vec<[u32; 3]>,
         parts: &Parts,
         levels: [f32; 3],
+        rig: Rig,
     ) -> Self {
-        let mut form = Self::build(positions, triangles, None, Some(parts));
+        let mut form = Self::build(positions, triangles, Some(rig), Some(parts));
         form.levels = Some(levels);
         form
     }
@@ -782,12 +858,14 @@ impl Form {
         }
     }
 
-    /// The body's skeleton and each vertex's skin weights; `None` for a
-    /// body without a skeleton (an imported one).
-    pub fn rig(&self) -> Option<(&Skeleton, &[Influences])> {
-        self.rig
-            .as_ref()
-            .map(|r| (&r.skeleton, r.weights.as_slice()))
+    /// The body's skeleton, each vertex's skin weights and the pose it
+    /// stands in.
+    pub fn rig(&self) -> Option<Rigged<'_>> {
+        self.rig.as_ref().map(|r| Rigged {
+            skeleton: &r.skeleton,
+            weights: &r.weights,
+            bind: r.bound.as_ref().map(|b| b.transforms.as_slice()),
+        })
     }
 
     /// Each bone's motion at `time` (simulated, s) of `animation`; `None`
@@ -795,21 +873,21 @@ impl Form {
     pub fn transforms(&self, animation: &Animation, time: f32) -> Option<Vec<Rigid>> {
         let rig = self.rig.as_ref()?;
         let since = |t: f32| (t - animation.start).max(0.0);
-        let pose = match animation.stop {
+        let playing =
+            |motion: &Motion, since: f32| rig.started(motion.pose(&rig.skeleton, since), since);
+        let mut pose = match animation.stop {
             Some(stop) if time >= stop => match &animation.then {
-                Some(next) if time >= stop + STOP_S => {
-                    next.pose(&rig.skeleton, time - stop - STOP_S)
-                }
+                Some(next) if time >= stop + STOP_S => playing(next, time - stop - STOP_S),
                 _ => {
-                    let left = animation.motion.pose(&rig.skeleton, since(stop));
-                    left.scaled(1.0 - ease((time - stop) / STOP_S))
+                    let left = playing(&animation.motion, since(stop));
+                    rig.eased(left, 1.0 - ease((time - stop) / STOP_S))
                 }
             },
-            _ => animation.motion.pose(&rig.skeleton, since(time)),
+            _ => playing(&animation.motion, since(time)),
         };
-        let mut pose = pose;
-        rig.arms.clear(&rig.skeleton, &self.collider, &mut pose);
-        Some(rig.skeleton.transforms(&pose))
+        rig.arms
+            .clear(&self.collider, &mut pose, |p| rig.transforms(p));
+        Some(rig.transforms(&pose))
     }
 
     /// The body's surface at `time` of `animation` (at rest without one).
@@ -878,6 +956,7 @@ impl Form {
             skeleton,
             weights: model.weights().to_vec(),
             arms,
+            bound: None,
         };
         Ok(Self::with_rig(
             shaped.positions,

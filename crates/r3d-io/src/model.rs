@@ -54,8 +54,29 @@ pub struct Model {
     /// In file units and axes.
     pub positions: Vec<[f32; 3]>,
     pub triangles: Vec<[u32; 3]>,
-    /// The file has a skeleton (glTF skins); not used yet.
+    /// The file has a skeleton (glTF skins).
     pub skeleton: bool,
+    /// The joints of the file's first skin (the one the meshes use), in
+    /// its order.
+    pub joints: Vec<ModelJoint>,
+    /// Each vertex's joints and weights, when every vertex is skinned by
+    /// that skin; empty otherwise.
+    pub weights: Vec<Influence>,
+}
+
+/// A vertex's four joints (indices into [`Model::joints`]) and their
+/// weights.
+pub type Influence = ([u16; 4], [f32; 4]);
+
+/// A joint of a model's skeleton.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ModelJoint {
+    pub name: String,
+    /// Index into the joints.
+    pub parent: Option<usize>,
+    /// Where it is in the bind pose (file units and axes, the meshes'
+    /// space).
+    pub at: [f32; 3],
 }
 
 /// Why a model cannot be read.
@@ -284,6 +305,8 @@ impl Gltf<'_> {
             _ => 4,
         } * match want {
             "VEC3" => 3,
+            "VEC4" => 4,
+            "MAT4" => 16,
             _ => 1,
         };
         let count = usize_at(a, "count").unwrap_or(0);
@@ -341,8 +364,85 @@ impl Gltf<'_> {
             .collect())
     }
 
-    /// Add mesh `index`'s triangle primitives, moved by `to_world`.
-    fn add_mesh(&self, index: usize, to_world: DMat4, out: &mut Model) -> Result<(), ModelError> {
+    /// Accessor `index` of `want` (`VEC4`, `MAT4`) as numbers, `n` per
+    /// element: floats, or unsigned bytes and shorts (divided by their
+    /// largest value when the accessor is normalized).
+    fn numbers(&self, index: usize, want: &str, n: usize) -> Result<Vec<f32>, ModelError> {
+        let (starts, data, component) = self.accessor(index, want, &[5121, 5123, 5126])?;
+        let normalized = self
+            .list("accessors")
+            .get(index)
+            .and_then(|a| a.get("normalized"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let mut out = Vec::with_capacity(starts.len() * n);
+        for s in starts {
+            for k in 0..n {
+                let v = match component {
+                    5121 => data.get(s + k).map(|b| (f32::from(*b), f32::from(u8::MAX))),
+                    5123 => data.get(s + 2 * k..s + 2 * k + 2).map(|b| {
+                        (
+                            f32::from(u16::from_le_bytes([b[0], b[1]])),
+                            f32::from(u16::MAX),
+                        )
+                    }),
+                    _ => data
+                        .get(s + 4 * k..s + 4 * k + 4)
+                        .map(|b| (f32::from_le_bytes([b[0], b[1], b[2], b[3]]), 1.0)),
+                };
+                let (v, max) = v.unwrap_or((0.0, 1.0));
+                out.push(if normalized && component != 5126 {
+                    v / max
+                } else {
+                    v
+                });
+            }
+        }
+        Ok(out)
+    }
+
+    /// The joints and weights of primitive `p`'s vertices (`count`), if
+    /// it has them.
+    fn skin_weights(&self, p: &Value, count: usize) -> Result<Option<Vec<Influence>>, ModelError> {
+        let attributes = p.get("attributes");
+        let (Some(j), Some(w)) = (
+            attributes.and_then(|a| usize_at(a, "JOINTS_0")),
+            attributes.and_then(|a| usize_at(a, "WEIGHTS_0")),
+        ) else {
+            return Ok(None);
+        };
+        let (joints, weights) = (self.numbers(j, "VEC4", 4)?, self.numbers(w, "VEC4", 4)?);
+        if joints.len() != 4 * count || weights.len() != 4 * count {
+            return Ok(None);
+        }
+        Ok(Some(
+            joints
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .zip(weights.as_chunks::<4>().0)
+                .map(|(j, w)| {
+                    let mut out = ([0u16; 4], [0.0f32; 4]);
+                    for k in 0..4 {
+                        out.0[k] = j[k] as u16;
+                        out.1[k] = w[k].max(0.0);
+                    }
+                    out
+                })
+                .collect(),
+        ))
+    }
+
+    /// Add mesh `index`'s triangle primitives, moved by `to_world`; with
+    /// `skinned`, by the skin being read (their vertices' weights then
+    /// kept).
+    fn add_mesh(
+        &self,
+        index: usize,
+        to_world: DMat4,
+        skinned: bool,
+        out: &mut Reading,
+    ) -> Result<(), ModelError> {
         let gltf = |d: String| bad(ModelFormat::Gltf, d);
         let mesh = self
             .list("meshes")
@@ -365,6 +465,18 @@ impl Gltf<'_> {
                 Some(i) => self.indices(i)?,
                 None => (0..positions.len() as u32).collect(),
             };
+            let weights = if skinned {
+                self.skin_weights(p, positions.len())?
+            } else {
+                None
+            };
+            match weights {
+                Some(w) => out.weights.extend(w.into_iter().map(Some)),
+                None => out
+                    .weights
+                    .extend(std::iter::repeat_n(None, positions.len())),
+            }
+            let out = &mut out.model;
             let base = out.positions.len() as u32;
             let n = positions.len() as u32;
             out.positions.extend(
@@ -413,7 +525,7 @@ impl Gltf<'_> {
         index: usize,
         parent: DMat4,
         depth: usize,
-        out: &mut Model,
+        out: &mut Reading,
     ) -> Result<(), ModelError> {
         if depth > 64 {
             return Err(bad(
@@ -454,10 +566,21 @@ impl Gltf<'_> {
             }
         };
         let world = parent * local;
+        if let Some(slot) = out.world.get_mut(index) {
+            *slot = Some(world);
+        }
         // A skinned mesh is drawn in its skeleton's space, not its node's.
         if let Some(mesh) = usize_at(node, "mesh") {
-            let skinned = node.get("skin").is_some();
-            self.add_mesh(mesh, if skinned { DMat4::IDENTITY } else { world }, out)?;
+            let skin = usize_at(node, "skin");
+            if skin.is_some() && out.skin.is_none() {
+                out.skin = skin;
+            }
+            let to_world = if skin.is_some() {
+                DMat4::IDENTITY
+            } else {
+                world
+            };
+            self.add_mesh(mesh, to_world, skin.is_some() && skin == out.skin, out)?;
         }
         for child in node
             .get("children")
@@ -519,9 +642,14 @@ fn read_gltf(json: &Value, bin: Option<&[u8]>) -> Result<Model, ModelError> {
         buffers.push(data);
     }
     let doc = Gltf { json, buffers };
-    let mut model = Model {
-        skeleton: !doc.list("skins").is_empty(),
-        ..Model::default()
+    let mut out = Reading {
+        model: Model {
+            skeleton: !doc.list("skins").is_empty(),
+            ..Model::default()
+        },
+        skin: None,
+        weights: Vec::new(),
+        world: vec![None; doc.list("nodes").len()],
     };
     let scene = usize_at(json, "scene").unwrap_or(0);
     match doc.list("scenes").get(scene) {
@@ -533,17 +661,114 @@ fn read_gltf(json: &Value, bin: Option<&[u8]>) -> Result<Model, ModelError> {
                 .iter()
                 .filter_map(Value::as_u64)
             {
-                doc.add_node(node as usize, DMat4::IDENTITY, 0, &mut model)?;
+                doc.add_node(node as usize, DMat4::IDENTITY, 0, &mut out)?;
             }
         }
         // No scene: every mesh as it is.
         None => {
             for i in 0..doc.list("meshes").len() {
-                doc.add_mesh(i, DMat4::IDENTITY, &mut model)?;
+                doc.add_mesh(i, DMat4::IDENTITY, false, &mut out)?;
             }
         }
     }
+    let mut model = out.model;
+    if let Some(skin) = out.skin.and_then(|s| doc.list("skins").get(s)) {
+        model.joints = joints(&doc, skin, &out.world)?;
+        let n = model.joints.len();
+        if out
+            .weights
+            .iter()
+            .all(|w| w.is_some_and(|(j, w)| (0..4).all(|k| w[k] == 0.0 || usize::from(j[k]) < n)))
+        {
+            model.weights = out.weights.into_iter().flatten().collect();
+        }
+    }
     Ok(model)
+}
+
+/// What is gathered while a glTF file is read.
+struct Reading {
+    model: Model,
+    /// The skin whose weights are kept: the first a mesh node uses.
+    skin: Option<usize>,
+    /// Per vertex of `model`, its weights in that skin, if it has some.
+    weights: Vec<Option<Influence>>,
+    /// Each node's transform in the scene, once visited.
+    world: Vec<Option<DMat4>>,
+}
+
+/// The joints of `skin`: named after their nodes, their parents among
+/// them, placed by the inverse of their bind matrices (or, without
+/// those, where the scene puts their nodes).
+fn joints(
+    doc: &Gltf<'_>,
+    skin: &Value,
+    world: &[Option<DMat4>],
+) -> Result<Vec<ModelJoint>, ModelError> {
+    let nodes: Vec<usize> = skin
+        .get("joints")
+        .and_then(Value::as_array)
+        .map_or(&[][..], Vec::as_slice)
+        .iter()
+        .filter_map(|v| v.as_u64().map(|n| n as usize))
+        .collect();
+    let inverse_binds = match usize_at(skin, "inverseBindMatrices") {
+        Some(i) => doc.numbers(i, "MAT4", 16)?,
+        None => Vec::new(),
+    };
+    let mut parent_of = vec![None; doc.list("nodes").len()];
+    for (i, node) in doc.list("nodes").iter().enumerate() {
+        for c in node
+            .get("children")
+            .and_then(Value::as_array)
+            .map_or(&[][..], Vec::as_slice)
+            .iter()
+            .filter_map(Value::as_u64)
+        {
+            if let Some(slot) = parent_of.get_mut(c as usize) {
+                *slot = Some(i);
+            }
+        }
+    }
+    Ok(nodes
+        .iter()
+        .enumerate()
+        .map(|(k, node)| {
+            let name = doc
+                .list("nodes")
+                .get(*node)
+                .and_then(|n| n.get("name"))
+                .and_then(Value::as_str)
+                .map_or_else(|| format!("joint{k}"), str::to_owned);
+            // The nearest ancestor that is a joint of this skin.
+            let mut parent = None;
+            let mut up = parent_of.get(*node).copied().flatten();
+            for _ in 0..nodes.len() {
+                let Some(p) = up else { break };
+                if let Some(j) = nodes.iter().position(|n| *n == p) {
+                    parent = Some(j);
+                    break;
+                }
+                up = parent_of.get(p).copied().flatten();
+            }
+            let bind = inverse_binds
+                .get(16 * k..16 * k + 16)
+                .map(|m| {
+                    let mut cols = [0.0f64; 16];
+                    for (c, v) in cols.iter_mut().zip(m) {
+                        *c = f64::from(*v);
+                    }
+                    DMat4::from_cols_array(&cols).inverse()
+                })
+                .or_else(|| world.get(*node).copied().flatten())
+                .unwrap_or(DMat4::IDENTITY);
+            ModelJoint {
+                name,
+                parent,
+                at: bind.w_axis.truncate().as_vec3().to_array(),
+            }
+        })
+        .collect())
 }
 
 #[cfg(test)]
@@ -588,6 +813,54 @@ mod tests {
         let m = read(obj.as_bytes(), ModelFormat::Obj).unwrap();
         assert_eq!(m.positions.len(), 4);
         assert_eq!(m.triangles.len(), 4);
+    }
+
+    #[test]
+    fn a_skinned_glb_gives_its_joints_and_weights() {
+        use crate::game::{GameMesh, GameScene, Joint};
+        let joint = |name: &str, parent, at: [f32; 3]| Joint {
+            name: name.into(),
+            parent,
+            translation: at,
+            rotation: [0.0, 0.0, 0.0, 1.0],
+            inverse_bind: glam::Mat4::from_translation(-glam::Vec3::from(at)).to_cols_array(),
+        };
+        let t = tetra();
+        let scene = GameScene {
+            generator: "test".into(),
+            name: "t".into(),
+            meshes: vec![GameMesh {
+                name: "Body".into(),
+                positions: t.positions.clone(),
+                normals: vec![[0.0, 1.0, 0.0]; 4],
+                joints: vec![[0, 0, 0, 0], [1, 0, 0, 0], [0, 1, 0, 0], [1, 0, 0, 0]],
+                weights: vec![
+                    [1.0, 0.0, 0.0, 0.0],
+                    [1.0, 0.0, 0.0, 0.0],
+                    [0.25, 0.75, 0.0, 0.0],
+                    [1.0, 0.0, 0.0, 0.0],
+                ],
+                indices: t.indices.clone(),
+                ..GameMesh::default()
+            }],
+            materials: Vec::new(),
+            images: Vec::new(),
+            // Placed by their inverse bind matrices.
+            joints: vec![
+                joint("Hips", None, [0.0, 1.0, 0.0]),
+                joint("Spine", Some(0), [0.0, 0.5, 0.0]),
+            ],
+            clips: Vec::new(),
+            extras: serde_json::Value::Null,
+        };
+        let m = read(&crate::game::to_glb(&scene), ModelFormat::Glb).unwrap();
+        assert!(m.skeleton);
+        let names: Vec<&str> = m.joints.iter().map(|j| j.name.as_str()).collect();
+        assert_eq!(names, ["Hips", "Spine"]);
+        assert_eq!(m.joints[1].parent, Some(0));
+        assert_eq!(m.joints[1].at, [0.0, 0.5, 0.0]);
+        assert_eq!(m.weights.len(), 4);
+        assert_eq!(m.weights[2], ([0, 1, 0, 0], [0.25, 0.75, 0.0, 0.0]));
     }
 
     #[test]

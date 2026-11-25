@@ -7234,7 +7234,7 @@ Built-in body presets: standard women's and men's sizes, as {name, body} pairs u
 
 ### `avatar.check`
 
-Check the imported body before draping: `ready` (no error), triangle and vertex counts, height, units/up axis/turn used, whether the file has a skeleton, `items` (each a stable `code`, a `severity` error/warning/info and `args`: file.unavailable, mesh.open, mesh.non_manifold, mesh.pieces, mesh.heavy, mesh.coarse, mesh.reoriented, mesh.inside_out, mesh.degenerate, scale.height, orientation.up, orientation.facing, points.outside, points.side, measurements.clamped, motion.unavailable) and the arrangement points with their distance to the surface (mm, negative inside). Fails when the avatar has no imported body.
+Check the imported body before draping: `ready` (no error), triangle and vertex counts, height, units/up axis/turn used, whether the file has a skeleton, `items` (each a stable `code`, a `severity` error/warning/info and `args`: file.unavailable, mesh.open, mesh.non_manifold, mesh.pieces, mesh.heavy, mesh.coarse, mesh.reoriented, mesh.inside_out, mesh.degenerate, scale.height, orientation.up, orientation.facing, points.outside, points.side, measurements.clamped, motion.rig with `source` file or points: what places the skeleton the body moves with) and the arrangement points with their distance to the surface (mm, negative inside). Fails when the avatar has no imported body.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -7871,7 +7871,7 @@ Export the draped garment as Wavefront OBJ: one object per piece, metres, Y up, 
 
 ### `export.game`
 
-Export the draped garment ready for a game engine as glTF 2.0 binary (GLB): per garment one mesh per level of detail (`lods`, ratios of the triangle count; simplified by quadric error metrics, the pieces' edges kept), texture coordinates in an atlas of the pieces, the full drape's wrinkles baked into a tangent-space normal map for each lower LOD (`normal_map` pixels), tangents, the print baked into a base-colour atlas, `sides` double_sided or a `shell` of `thickness_mm`, and with `skin` the avatar's 24-bone skeleton, weights transferred from the body (closest point, smoothed, four bones) and the walk, turn and raise_arms motions as animations; `preset` godot, unity or unreal sets the defaults and names. Metres, Y up. Uses the cached drape from `simulate` if it is up to date. An imported body has no skeleton: use skin false. Returns the path and each LOD's triangles.
+Export the draped garment ready for a game engine as glTF 2.0 binary (GLB): per garment one mesh per level of detail (`lods`, ratios of the triangle count; simplified by quadric error metrics, the pieces' edges kept), texture coordinates in an atlas of the pieces, the full drape's wrinkles baked into a tangent-space normal map for each lower LOD (`normal_map` pixels), tangents, the print baked into a base-colour atlas, `sides` double_sided or a `shell` of `thickness_mm`, and with `skin` the avatar's 24-bone skeleton in the pose the body stands in (an imported body's own), weights transferred from the body (closest point, smoothed, four bones) and as animations the walk, idle, turn and raise_arms motions and the captured motions of the project's `motions/` folder; `preset` godot, unity or unreal sets the defaults and names. Metres, Y up. Uses the cached drape from `simulate` if it is up to date. Returns the path, each LOD's triangles and the animations.
 
 <details><summary>Parameters (JSON schema)</summary>
 

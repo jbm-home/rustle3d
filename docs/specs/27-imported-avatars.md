@@ -1,8 +1,8 @@
 # 27 — Imported avatars
 
-Provenance: maintainer's functional brief (ROADMAP M31: import a body in OBJ, glTF or GLB, the user owning its licence; check the collision mesh before draping; arrangement points placed with help and checked; motions only with a usable skeleton); open standards (Wavefront OBJ, glTF 2.0); public papers: generalized winding numbers (Jacobson, Kavan & Sorkine-Hornung 2013) and their fast hierarchical evaluation (Barill, Dickson, Schmidt, Levin & Jacobson 2018) for the sign of the distance field of open meshes, the solid angle of a triangle (Van Oosterom & Strackee 1983), angle-weighted pseudo-normals (Bærentzen & Aanæs 2005, already used for the built-in body); general tailoring knowledge (girths taken as a tape around the body, body proportions as fractions of stature).
+Provenance: maintainer's functional brief (ROADMAP M31: import a body in OBJ, glTF or GLB, the user owning its licence; check the collision mesh before draping; arrangement points placed with help and checked; motions only with a usable skeleton); open standards (Wavefront OBJ, glTF 2.0); public papers: generalized winding numbers (Jacobson, Kavan & Sorkine-Hornung 2013) and their fast hierarchical evaluation (Barill, Dickson, Schmidt, Levin & Jacobson 2018) for the sign of the distance field of open meshes, the solid angle of a triangle (Van Oosterom & Strackee 1983), angle-weighted pseudo-normals (Bærentzen & Aanæs 2005, already used for the built-in body); general tailoring knowledge (girths taken as a tape around the body, body proportions as fractions of stature); motions (maintainer's brief 2026-11-23, ROADMAP M37: an imported body moves, its own skeleton mapped onto ours when it has one, otherwise our skeleton fitted to it and skin weights computed): the glTF 2.0 specification (skins, inverse bind matrices, `JOINTS_0`/`WEIGHTS_0`), closest-point skin weight transfer (Abdrashitov et al., SIGGRAPH Asia 2023 Technical Communications, as in spec 15), our own placement of the skeleton.
 
-## Status (2026-11-19, M31)
+## Status (2026-11-25, M37)
 
 Implemented: import of OBJ, glTF and GLB bodies into the project's
 `avatars/` folder (schema v18); detection of the units, the up axis and
@@ -13,11 +13,20 @@ moved in the app, checked before draping; measurements estimated from
 the body; `r3d avatar import` / `r3d avatar check`, MCP tools from the
 registry; the app's Body menu (Import body…, Check body…, Points).
 
-Not yet: motions of an imported body (its skeleton, if the file has
-one, is reported but not used: mapping it onto our motions is a project
-of its own), an imported body in other sizes than its own (every size
+2026-11-25 (M37): imported bodies move. Our skeleton is placed on the
+body, by the file's own skeleton when its joints are found by their
+names, otherwise by the arrangement points; the skin follows the file's
+weights, or weights carried from the built-in body; every motion
+(built-in and captured) plays on it, on the CPU and the GPU, and the
+game export skins it.
+
+Not yet: an imported body in other sizes than its own (every size
 drapes on the same body), automatic fit of the arrangement points as the
-garment drapes, a disk cache of the distance field of large scans.
+garment drapes, a disk cache of the distance field of large scans, the
+file's own extra bones (fingers, twist bones) moving (they follow the
+bone of ours they hang from), hands and feet turned as in the file (they
+keep the forearm's and the shin's turn: a few centimetres at the
+fingertips).
 
 ## User story
 As a designer, I drape on my client's body scan, or on the character of
@@ -98,8 +107,9 @@ result and shown when the drape starts in the app.
 - `measurements.clamped` (warning, `measurement`): an estimated
   measurement was outside the range `avatar.set` accepts and was brought
   into it.
-- `motion.unavailable` (info, `skeleton`): an imported body does not
-  move; `skeleton` says whether the file had one (not used yet).
+- `motion.rig` (info, `source`): what places the skeleton the body
+  moves with: `file` (the file's own skeleton) or `points` (the
+  arrangement points).
 The report also gives the triangle and vertex counts, the height, the
 orientation and the arrangement points with their distance to the
 surface (negative inside).
@@ -147,9 +157,52 @@ waist-to-hips ratio: 0 at 0.72 or less, 1 at 0.90 or more. Out of the
 ranges `avatar.set` accepts, a value is brought into range and flagged.
 
 ### Motions
-Imported bodies stand still: `simulate` with a `motion` fails with
-`motion.imported_body`, and the app's Motion button is off with a tooltip
-saying why.
+An imported body plays every motion of the built-in one (spec 22), in
+the app, `simulate` and the game export. The motions are written for our
+24-bone skeleton standing in its rest (A) pose; the body stands as its
+file has it (an A or a T pose, its own proportions). So:
+- **The reference.** The built-in body fitted to the measurements taken
+  on the imported one, with its skeleton.
+- **Where the joints are** (the anchors: the pelvis, the bottom of the
+  neck and of the head, per side the shoulder, elbow and wrist joints,
+  the hip, knee and ankle joints, and the clavicle when known):
+  - **The file's skeleton**, when it has one (a glTF skin) in which our
+    joints are found by their names, as for a captured motion (spec 22:
+    hips, head, neck, spine, and per side the arm, forearm, hand, up-leg,
+    leg, foot and optionally the clavicle and toe, whatever the namespace,
+    case and side spelling). The joints stand where the inverse bind
+    matrices put them, placed as the body (units, up axis, facing).
+  - **Otherwise, the arrangement points.** The same points are found on
+    the reference by the guess; each reference joint keeps its place
+    relative to them: the pelvis, neck and head their offset from the
+    torso's middle at their height, an arm's joints the turn and scale
+    that take the reference's shoulder–elbow (and elbow–wrist) points
+    onto the body's, a leg's joints those that take its axis points onto
+    the body's. Moving the points moves the skeleton: on a T pose, the
+    shoulder, elbow and wrist points moved onto the raised arms raise the
+    skeleton's arms.
+  The other joints follow the reference's proportions between the
+  anchors.
+- **The rest skeleton and the stance.** Each bone, parents first, keeps
+  its length on the body and takes the reference's direction: that rest
+  skeleton is ours in its A pose with the body's proportions, so every
+  motion plays on it as on the built-in body. The stance is the pose
+  that turns it into the body as it stands (each bone turned by the
+  shortest arc from the reference's direction to the body's; a bone of
+  no length takes its first child's direction, or its parent's turn).
+- **Skin weights.** From the file when every vertex has them: each of
+  its joints' weights go to its bone of ours, or its nearest ancestor's
+  that has one (fingers to the hand, twist bones to their limb), the
+  four heaviest kept. Otherwise carried from the reference posed in the
+  stance: each vertex takes the weights at the closest point of its
+  surface, smoothed over the body's mesh (spec 15's transfer).
+- **Moving.** A motion's pose moves the body by each bone's motion from
+  the stance to that pose (the stance's inverse, then the pose), so the
+  body stands as imported until a motion starts, and comes from its
+  stance into the motion over the same first second as the built-in body
+  from its rest; stopped, it goes back to its stance. The soles (foot
+  vertices within 2 cm of the floor) keep the body on the floor, the
+  arms are kept clear of the body as on the built-in one.
 
 ## UX
 - The top bar's **Body** button opens a menu: Measurements…, Import
@@ -180,3 +233,13 @@ saying why.
   `avatar.set_point`, `avatar.guess_points`, `avatar.remove_mesh`) has
   an apply → undo → redo test; the golden file v18 holds an imported
   body.
+- Motions (M37): a game character (the built-in body under another
+  rig's joint names, its twist bones unknown to us) imported as GLB
+  moves with its own skeleton (`motion.rig` `file`), each point of its
+  skin within 4 mm on average of the built-in body's walking; the
+  built-in body raised to a T pose and imported as OBJ, its arm points
+  moved onto the raised arms, stands in its T and walks arms down
+  within 2 cm on average of the built-in body; on an imported body, a
+  dress walks (CPU and GPU) and a T-shirt raises its arms, its hem
+  riding up (seams closed, nothing more than 3 mm inside the moving
+  body).

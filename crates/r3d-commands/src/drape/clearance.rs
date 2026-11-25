@@ -13,6 +13,7 @@
 use glam::{Quat, Vec3};
 use r3d_avatar::pack::Influences;
 use r3d_avatar::skeleton::{Pose, Skeleton, skin};
+use r3d_geom::Rigid;
 use r3d_sim::collide::StaticMesh;
 use r3d_sim::motion::{Posed, touch_parts};
 
@@ -45,8 +46,8 @@ pub(super) struct Arms {
 }
 
 impl Arms {
-    /// The arms of a body with `skeleton`, skin `positions` (rest pose,
-    /// m) and their `weights`.
+    /// The arms of a body with `skeleton`, skin `positions` (as it
+    /// stands, m) and their `weights`.
     pub(super) fn new(skeleton: &Skeleton, positions: &[Vec3], weights: &[Influences]) -> Self {
         let mut arm_bones = 0u32;
         let mut arms = Vec::new();
@@ -95,9 +96,15 @@ impl Arms {
     }
 
     /// `pose` with each arm turned out as far as its forearm and hand
-    /// need to clear the rest of the body, the distance field `body` of
-    /// the rest pose seen through `skeleton`'s skinning.
-    pub(super) fn clear(&self, skeleton: &Skeleton, body: &StaticMesh, pose: &mut Pose) {
+    /// need to clear the rest of the body: the distance field `body` of
+    /// the body as it stands, seen through its skinning, `transforms`
+    /// giving each bone's motion from there to a pose.
+    pub(super) fn clear(
+        &self,
+        body: &StaticMesh,
+        pose: &mut Pose,
+        transforms: impl Fn(&Pose) -> Vec<Rigid>,
+    ) {
         for arm in &self.arms {
             let Some(rotation) = pose.rotations.get(arm.upper).copied() else {
                 continue;
@@ -110,7 +117,7 @@ impl Arms {
                 p
             };
             let is_clear = |p: &Pose| {
-                let t = skeleton.transforms(p);
+                let t = transforms(p);
                 let points = skin(&arm.points, &arm.weights, &t);
                 let posed = Posed::new(t.clone(), t);
                 points.iter().all(|q| {

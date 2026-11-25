@@ -46,10 +46,11 @@ maintainer's briefs that specs cite as "ROADMAP Mxx" in their
 | M34 | Construction details 2 ✅ (2026-11-24) | A cuff gathered by elastic, a topstitched yoke, a collar that stands thanks to its interfacing, a quilted panel |
 | M35 | Sketching on the board: the action bar ✅ (2026-11-24) | A half bodice drawn and constrained without the inspector: what fits the selection is offered above the board, one click applies it |
 | M36 | Natural motions ✅ (2026-11-25) | The walk looks human: no hop, a supple trunk, relaxed arms |
-| M37 | Imported avatars in motion, game export checked | A scanned body walks in its garment; the garment and its motion open in a game engine as exported |
+| M37 | Imported avatars in motion, game export checked ✅ (2026-11-25) | A scanned body walks in its garment; the garment and its motion open in a game engine as exported |
+| M38 | Pattern library | In an open project, a jean and a short are added from the library; a skirt saved there from one project is added to another, drafted for its body |
 
-Order of the next ones, as set by the maintainer on 2026-11-23: M36,
-M37 (M16's Linux part when the work moves to Linux).
+Next: M38 (added by the maintainer on 2026-11-25); M16's Linux part
+when the work moves to Linux.
 
 ## Test report 2026-11-24 (open points: to take up next)
 
@@ -80,20 +81,29 @@ used the app.
   - Done: a garment taken out of the drape and put back
     (`garment.set_draped`, spec 17).
 
-## M37 — Imported avatars in motion, game export checked
+## M38 — Pattern library
 
-Maintainer's brief (2026-11-23): the animation of imported avatars, and
-the game export.
+Maintainer's brief (2026-11-25): a library of patterns to add to the
+project one is working on (T-shirt, shirt, hoodie, trousers, jeans,
+joggers, shorts, skirt, dress…), where one can also save one's own
+work to reuse it in new projects.
 
-- An imported body moves: its own skeleton mapped onto ours when it has
-  one, otherwise our skeleton fitted to it and skin weights computed;
-  built-in and captured motions play on it.
-- The game export carries the motion (built-in and captured motions as
-  glTF animations) and skins an imported body.
-- The exports opened in game engines and every problem found fixed (the
-  inside of a shell showing the outside's wrinkles reversed among
-  them); Godot can be checked by the tests, the others by the
-  maintainer with a written check list.
+- A library panel in the project: the patterns by kind (tops, bottoms,
+  dresses and skirts, accessories), each with its thumbnail; one click
+  adds it as a new garment drafted for the avatar (and every size of a
+  range), as templates do from the start screen today.
+- More built-in patterns: jeans (five pockets, yoke, fly, waistband
+  with belt loops), shorts, and whatever else the list above lacks.
+- **My patterns**: save a garment (its pieces, seams, construction
+  details, trims, fabric and grading) to a user library on disk,
+  shared by every project, with a name, a kind and a thumbnail; add it
+  to another project. Pieces drafted from measurements (M28 formulas,
+  templates) are drafted again for the new body; the others come as
+  drawn. Rename, delete, and export or import one as a file to share it.
+- The same through commands (CLI and MCP), so an agent can list, add
+  and save library patterns.
+- The library's storage is the one the prints' and fabrics' user
+  libraries (M21 open point, spec 05) will use.
 
 ## M16 — Zero-copy views on Linux (open)
 
@@ -113,6 +123,13 @@ back through the CPU every frame.
 
 As noted when each milestone closed; recheck before taking one up.
 
+- **Imported bodies in motion, game export (M37)**: the Godot check
+  (`scripts/godot-check.sh`, a CI job) has not run yet: its first CI
+  run, or locally with Godot installed; Unity, Unreal and Blender by
+  hand with spec 15's check list. An imported body's hands and feet
+  keep the turn of its forearms and shins (a few centimetres at the
+  fingertips), and its file's extra bones (fingers, twist bones) follow
+  ours.
 - **Natural motions (M36)**: arms straight overhead (the body takes it
   with dual quaternion skinning, but the shoulders' skin carries a
   T-shirt's neckline in and up and it rolls over at the chest; the
@@ -204,14 +221,16 @@ As noted when each milestone closed; recheck before taking one up.
   fabric's stiffness per direction) and a pressure map; the tape
   following the cloth as it moves; the length of an opening's edge (a
   neckline, an armhole).
-- **Imported avatars (M31)** (motions: see M37): an imported body per
+- **Imported avatars (M31)**: an imported body per
   size of a range,
   automatic fit of the arrangement points as the garment drapes, points
   guessed on a T pose, templates placing their pieces from the points
-  rather than from fractions of the height, a disk cache of the distance
+  rather than from fractions of the height (on the built-in body raised
+  to a T pose, its arm points moved, a T-shirt's seams stay 8–9 mm open
+  instead of 1), a disk cache of the distance
   field of large scans, compressed glTF.
-- **Game export (M15)** (engines, motions, imported bodies: see M37):
-  the `MSFT_lod` extension; roughness or sheen maps.
+- **Game export (M15)**: the `MSFT_lod` extension; roughness or sheen
+  maps.
 
 ## Later (architecture kept ready, not scheduled)
 

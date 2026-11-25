@@ -5377,12 +5377,6 @@ abstract class L {
   /// **'The body has things to check.'**
   String get bodyHasWarnings;
 
-  /// No description provided for @motionImportedTip.
-  ///
-  /// In en, this message translates to:
-  /// **'An imported body stands still'**
-  String get motionImportedTip;
-
   /// No description provided for @pointChest.
   ///
   /// In en, this message translates to:
@@ -5557,11 +5551,17 @@ abstract class L {
   /// **'A measurement ({measurement}) was out of range and was brought into it.'**
   String checkMeasurementsClamped(String measurement);
 
-  /// No description provided for @checkMotionUnavailable.
+  /// No description provided for @checkMotionFileSkeleton.
   ///
   /// In en, this message translates to:
-  /// **'An imported body stands still: motions are off.'**
-  String get checkMotionUnavailable;
+  /// **'Moves with the file\'s own skeleton.'**
+  String get checkMotionFileSkeleton;
+
+  /// No description provided for @checkMotionPoints.
+  ///
+  /// In en, this message translates to:
+  /// **'Moves with a skeleton placed by the arrangement points: move them if a limb bends in the wrong place.'**
+  String get checkMotionPoints;
 
   /// No description provided for @errModelMalformed.
   ///
@@ -5598,12 +5598,6 @@ abstract class L {
   /// In en, this message translates to:
   /// **'The body\'s file {file} is missing or was changed: import it again.'**
   String errBodyUnavailable(String file);
-
-  /// No description provided for @errImportedBodyStill.
-  ///
-  /// In en, this message translates to:
-  /// **'An imported body cannot move yet.'**
-  String get errImportedBodyStill;
 
   /// No description provided for @errNoImportedBody.
   ///
@@ -5704,14 +5698,8 @@ abstract class L {
   /// No description provided for @gameSkinHint.
   ///
   /// In en, this message translates to:
-  /// **'The garment moves with the body, with the walk, turn and raise-arms motions as animations.'**
+  /// **'The garment moves with the body, with the built-in motions and the project\'s captured motions as animations.'**
   String get gameSkinHint;
-
-  /// No description provided for @gameSkinImported.
-  ///
-  /// In en, this message translates to:
-  /// **'An imported body has no skeleton.'**
-  String get gameSkinImported;
 
   /// No description provided for @gameAvatar.
   ///
@@ -5746,7 +5734,7 @@ abstract class L {
   /// No description provided for @errNoSkeleton.
   ///
   /// In en, this message translates to:
-  /// **'This body has no skeleton: export without skinning.'**
+  /// **'There is no avatar to skin the garment to: export without skinning.'**
   String get errNoSkeleton;
 
   /// No description provided for @motionImport.

@@ -71,6 +71,9 @@ fn a_draped_t_shirt_exports_with_lods_maps_and_skin() {
         &mut ws,
         json!({"type": "garment.set_print", "print": {"builtin": "stripes"}, "width_mm": 20}),
     );
+    // A captured motion of the project, named as a built-in one.
+    let capture = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/walk.bvh");
+    ws.adopt_motion(&capture).unwrap();
     run(&mut ws, json!({"type": "simulate", "frames": 40}));
     let out = run(
         &mut ws,
@@ -90,7 +93,7 @@ fn a_draped_t_shirt_exports_with_lods_maps_and_skin() {
     );
     assert_eq!(
         out["animations"],
-        json!(["walk", "turn", "raise_arms", "idle"])
+        json!(["walk", "turn", "raise_arms", "idle", "walk (2)"])
     );
 
     let glb = std::fs::read(ws.dir().join("a.glb")).unwrap();
@@ -233,17 +236,48 @@ fn a_shell_unreal_export_without_skin() {
     };
     let full = out["lods"][0]["triangles"].as_u64().unwrap();
     assert!(count(0) > 2 * full, "{} {full}", count(0));
+
+    // The inside shows the outside's relief from the other side: where
+    // the same texel gives the outside normal n, it gives the inside -n.
+    // The inner copy of vertex 0 is the first vertex 2 mm under it with
+    // the same texture coordinates.
+    let (doc, bin) = chunks(&std::fs::read(ws.dir().join("exports/Tee-unreal.glb")).unwrap());
+    let attrs = &doc["meshes"][0]["primitives"][0]["attributes"];
+    let p = read(&doc, &bin, &attrs["POSITION"]);
+    let uv = read(&doc, &bin, &attrs["TEXCOORD_0"]);
+    let nrm = read(&doc, &bin, &attrs["NORMAL"]);
+    let tan = read(&doc, &bin, &attrs["TANGENT"]);
+    let v3 = |a: &[f32], i: usize| Vec3::new(a[3 * i], a[3 * i + 1], a[3 * i + 2]);
+    let n = (1..p.len() / 3)
+        .find(|j| {
+            uv[2 * j] == uv[0]
+                && uv[2 * j + 1] == uv[1]
+                && (v3(&p, *j).distance(v3(&p, 0)) - 0.002).abs() < 2e-4
+        })
+        .unwrap();
+    for i in (0..n).step_by(13) {
+        // A texel tilted along u and v, decoded as glTF does.
+        let decode = |k: usize, x: f32, y: f32| {
+            let normal = v3(&nrm, k);
+            let t = Vec3::new(tan[4 * k], tan[4 * k + 1], tan[4 * k + 2]);
+            let b = normal.cross(t) * tan[4 * k + 3];
+            (t * x + b * y + normal * 0.8).normalize()
+        };
+        let (outside, inside) = (decode(i, 0.4, -0.3), decode(n + i, 0.4, -0.3));
+        assert!(outside.dot(inside) < -0.95, "{i}: {outside} {inside}");
+    }
 }
 
 #[test]
-fn bad_options_and_bodies_without_a_skeleton_are_refused() {
+fn bad_options_are_refused_and_an_imported_body_is_skinned() {
     let (_dir, mut ws) = t_shirt();
     let err = ws
         .run_step(&Step::from_value(json!({"type": "export.game", "lods": [1, 0.6, 0.7]})).unwrap())
         .unwrap_err();
     assert_eq!(err.message().code, "invalid.lods");
 
-    // The built-in body imported as a file has no skeleton.
+    // The built-in body imported as a file, without a skeleton: ours is
+    // placed on it, and the garment and the body are skinned to it.
     let form = Form::of_body(&women(), &Default::default()).unwrap();
     let mut obj = String::new();
     for p in &form.positions {
@@ -258,12 +292,56 @@ fn bad_options_and_bodies_without_a_skeleton_are_refused() {
         &mut ws,
         json!({"type": "avatar.import", "path": "avatars/body.obj"}),
     );
-    let err = ws
-        .run_step(&Step::from_value(json!({"type": "export.game"})).unwrap())
-        .unwrap_err();
-    assert_eq!(err.message().code, "export.no_skeleton");
-    run(
+    let out = run(
         &mut ws,
-        json!({"type": "export.game", "skin": false, "normal_map": 0}),
+        json!({"type": "export.game", "path": "i.glb", "avatar": true, "normal_map": 0}),
     );
+    assert_eq!(out["skinned"], true);
+    assert_eq!(out["animations"].as_array().unwrap().len(), 4);
+    // The joints stand in the pose the body stands in: each node's
+    // transform in the scene is the inverse of its bind matrix, so the
+    // body and the garment are where they were draped.
+    let (doc, bin) = chunks(&std::fs::read(ws.dir().join("i.glb")).unwrap());
+    let ibm = read(&doc, &bin, &doc["skins"][0]["inverseBindMatrices"]);
+    let joints = doc["skins"][0]["joints"].as_array().unwrap();
+    let local = |node: &Value| {
+        let f = |k: &str, n: usize, d: &[f32]| -> Vec<f32> {
+            node[k].as_array().map_or(d.to_vec(), |a| {
+                a.iter()
+                    .take(n)
+                    .map(|v| v.as_f64().unwrap() as f32)
+                    .collect()
+            })
+        };
+        let t = f("translation", 3, &[0.0; 3]);
+        let r = f("rotation", 4, &[0.0, 0.0, 0.0, 1.0]);
+        glam::Mat4::from_rotation_translation(
+            glam::Quat::from_xyzw(r[0], r[1], r[2], r[3]),
+            Vec3::new(t[0], t[1], t[2]),
+        )
+    };
+    let parent = |i: usize| {
+        doc["nodes"].as_array().unwrap().iter().position(|n| {
+            n["children"]
+                .as_array()
+                .is_some_and(|c| c.iter().any(|c| c.as_u64() == Some(i as u64)))
+        })
+    };
+    let mut turned = false;
+    for (k, j) in joints.iter().enumerate() {
+        let mut at = j.as_u64().unwrap() as usize;
+        let mut world = local(&doc["nodes"][at]);
+        while let Some(p) = parent(at) {
+            world = local(&doc["nodes"][p]) * world;
+            at = p;
+        }
+        let inverse = glam::Mat4::from_cols_slice(&ibm[16 * k..16 * k + 16]);
+        let product = world * inverse;
+        assert!(
+            product.abs_diff_eq(glam::Mat4::IDENTITY, 1e-4),
+            "{k}: {product}"
+        );
+        turned |= !doc["nodes"][j.as_u64().unwrap() as usize]["rotation"].is_null();
+    }
+    assert!(turned, "the bind pose has rotations");
 }

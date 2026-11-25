@@ -271,7 +271,8 @@ fn hands_are_kept_clear_of_the_hips() {
     let form = r3d_commands::drape::Form::of_project(s.project())
         .unwrap()
         .unwrap();
-    let (skeleton, weights) = form.rig().unwrap();
+    let rig = form.rig().unwrap();
+    let (skeleton, weights) = (rig.skeleton, rig.weights);
     let bone = |name: &str| skeleton.find(name).unwrap();
     let arm_bones = ["upper_arm", "forearm", "hand"]
         .iter()

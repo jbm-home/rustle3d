@@ -36,6 +36,7 @@ pub mod queries;
 pub mod registry;
 pub mod script;
 pub mod session;
+mod skinning;
 pub mod sources;
 pub mod spec;
 pub mod step;

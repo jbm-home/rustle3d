@@ -372,7 +372,10 @@ after 4 s; the skirt still holds at the waist.
   T-shirt drapes on the built-in body with its soles cut open, on both
   backends (`r3d-commands` `tests/imported.rs`, `r3d-sim-gpu`
   `a_t_shirt_drapes_on_an_imported_body_on_the_gpu`). Imported bodies
-  stand still (no skeleton is mapped onto our motions yet).
+  move with our skeleton placed on them (spec 27): their collider skins
+  its vertices by each bone's motion from the stance they stand in, so
+  the solvers see them as the built-in moving body
+  (`a_dress_walks_on_an_imported_body_on_the_gpu`).
 - Particle vs SDF at every substep: trilinear distance and gradient,
   constant time. Penetrations up to the band (2 cm) are pushed back out,
   far more than a particle moves in a substep.

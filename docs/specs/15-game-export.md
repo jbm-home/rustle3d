@@ -1,6 +1,6 @@
 # 15 — Game-engine export
 
-Provenance: maintainer's functional description (2026-11-14; ROADMAP M15, 2026-11-19: LODs, baked wrinkle normal maps, back faces or thickness, skinning to the avatar skeleton with the procedural motions, presets for Godot, Unity and Unreal); Khronos glTF 2.0 specification (skins, animations, `TANGENT`, `normalTexture`, `KHR_materials_sheen`); public papers: Garland & Heckbert, *Surface Simplification Using Quadric Error Metrics*, SIGGRAPH 1997 (LODs); Cohen, Olano & Manocha, *Appearance-Preserving Simplification*, SIGGRAPH 1998 (normal maps through a shared parameterization); Mikkelsen, *Simulation of Wrinkled Surfaces Revisited*, 2008 (tangent frames); Magnenat-Thalmann et al. 1988 (linear blend skinning, spec 22); Abdrashitov et al., *Robust Skin Weights Transfer via Weight Inpainting*, SIGGRAPH Asia 2023 Technical Communications (closest-point weight transfer); general real-time asset practice (LOD naming, texture sizes, atlas padding) and general knowledge of how Godot, Unity and Unreal import glTF (no engine was run).
+Provenance: maintainer's functional description (2026-11-14; ROADMAP M15, 2026-11-19: LODs, baked wrinkle normal maps, back faces or thickness, skinning to the avatar skeleton with the procedural motions, presets for Godot, Unity and Unreal); Khronos glTF 2.0 specification (skins, animations, `TANGENT`, `normalTexture`, `KHR_materials_sheen`); public papers: Garland & Heckbert, *Surface Simplification Using Quadric Error Metrics*, SIGGRAPH 1997 (LODs); Cohen, Olano & Manocha, *Appearance-Preserving Simplification*, SIGGRAPH 1998 (normal maps through a shared parameterization); Mikkelsen, *Simulation of Wrinkled Surfaces Revisited*, 2008 (tangent frames); Magnenat-Thalmann et al. 1988 (linear blend skinning, spec 22); Abdrashitov et al., *Robust Skin Weights Transfer via Weight Inpainting*, SIGGRAPH Asia 2023 Technical Communications (closest-point weight transfer); general real-time asset practice (LOD naming, texture sizes, atlas padding) and general knowledge of how Godot, Unity and Unreal import glTF; maintainer's brief 2026-11-23 (ROADMAP M37: the game export carries the motion, built-in and captured, skins an imported body, and is opened in game engines, every problem found fixed, the inside of a shell showing the outside's wrinkles reversed among them; Godot checked by the tests, the others by the maintainer with a written check list); Godot 4 (MIT), run headless by a script to open the exports.
 
 ## User story
 As a game or real-time artist, I export the garment so it drops into Godot,
@@ -8,7 +8,7 @@ Unity, Unreal or Blender and looks like it did in Rustle3D: lighter
 versions for far away, the wrinkles kept in a normal map, and the garment
 moving with the character's skeleton.
 
-## Status (2026-11-19, M15)
+## Status (2026-11-25, M37)
 
 Implemented (M9): `export.gltf` (GLB) and `export.obj`, also `r3d export
 --format glb|obj [--avatar]` and the MCP tools. Every template exports
@@ -24,11 +24,16 @@ Unreal; `r3d export --format game`, the MCP tool `export_game`, and the
 app's Export menu (Garment for a game engine…). Checked by the glTF validator in
 `check.sh`.
 
-Not yet: imports checked by hand in the engines (the presets follow
-their documented importers); the `MSFT_lod` extension (LODs are separate
-nodes, named for the engines' LOD conventions); skinning of imported
-bodies (they have no skeleton, spec 27); dual-quaternion skinning;
-roughness or sheen maps; OpenUSD.
+2026-11-25 (M37): an imported body is skinned (to our skeleton placed
+on it, spec 27), its joints and the garment in the pose it stands in;
+the project's captured motions are animations besides the built-in
+ones; the inside of a shell shows the outside's relief the right way
+round; every export kind is opened in Godot by `scripts/godot-check.sh`
+(a CI job); a check list for Unity, Unreal and Blender, by hand.
+
+Not yet: the `MSFT_lod` extension (LODs are separate nodes, named for
+the engines' LOD conventions); dual-quaternion skinning; roughness or
+sheen maps; OpenUSD.
 
 ## Behavior
 
@@ -74,21 +79,31 @@ one object per panel, UVs and normals, geometry only.
   material drawn from both sides, or `shell`: an inner surface offset
   inwards by `thickness_mm` (default 1 mm, 0.2–20) facing the other way
   and a rim joining it to the outer one along the pieces' edges, with a
-  one-sided material (for engines or shaders that cull back faces).
+  one-sided material (for engines or shaders that cull back faces). The
+  inner surface shares the outer's atlas and normal map; its tangents
+  point the other way, so a texel gives it the opposite of the outer
+  normal: from inside, a fold shows its other side (tangents found on
+  its own turned-over triangles lit a fold's slope as from outside,
+  the relief reversed).
 - **Skinning** (`skin`, default on): the avatar's 24-bone skeleton (spec
-  22) as joint nodes in its rest pose, the garment's skin weights
+  22) as joint nodes in the pose the body stands in (the built-in body's
+  rest pose, without rotations; an imported body's stance, spec 27, each
+  joint turned as its bone, its inverse bind matrix the inverse of its
+  place), the garment's skin weights
   transferred from the body: each garment vertex takes the weights at the
   closest point of the body's surface (interpolated from that triangle's
   corners), smoothed over the garment's mesh (a few Laplacian passes) and
-  kept to the four heaviest bones, normalized. The garment is exported in
-  the body's rest pose: a drape that ended while the avatar moved is
-  carried back to the rest pose by inverting each vertex's blended bone
-  motion. With `animations` (default on), the three motions (`walk`,
-  `turn`, `raise_arms`, `idle`) are baked as glTF animations, one cycle each at
+  kept to the four heaviest bones, normalized. The garment is exported
+  where the body stands: a drape that ended while the avatar moved is
+  carried back by inverting each vertex's blended bone motion. With
+  `animations` (default on), the built-in motions (`walk`, `turn`,
+  `raise_arms`, `idle`) and the captured motions of the project's
+  `motions/` folder (named after their files, a name taken by another
+  numbered: `walk (2)`) are baked as glTF animations, one cycle each at
   30 frames a second, at full amplitude, looping. With `avatar`, the body
-  is exported too, skinned with its own weights. An imported body has no
-  skeleton: skinning is refused with `export.no_skeleton` (export with
-  `skin: false`); a project without an avatar too.
+  is exported too, skinned with its own weights. A project without an
+  avatar cannot be skinned (`export.no_skeleton`: export with `skin:
+  false`).
 - **Presets** (`preset`): `generic`, `godot`, `unity`, `unreal`. Every
   file stays a valid glTF (metres, Y up, +Z forward): all three engines'
   importers convert units and axes themselves, so a preset never scales
@@ -111,12 +126,40 @@ one object per panel, UVs and normals, geometry only.
 ### Importing (documented in the user guide)
 - **Godot 4**: drop the `.glb` into the project; the scene has the
   skeleton, one `MeshInstance3D` per LOD (show one, or use visibility
-  ranges), and an `AnimationPlayer` with the three motions.
+  ranges), and an `AnimationPlayer` with the motions.
 - **Unity**: with the glTFast package (open source, Apache-2.0), drop the
   `.glb` into Assets; put the `_LODn` meshes in a LOD Group.
 - **Unreal Engine 5**: Import (Interchange glTF) as a skeletal mesh with
   its animations; units become centimetres and Z up on import.
 - **Blender**: File › Import › glTF 2.0.
+
+### Checked in the engines
+- **Godot** (by the tests): `scripts/godot-check.sh` exports a T-shirt
+  skinned to the built-in body with the avatar, its motions and a
+  captured one; the same T-shirt as an Unreal shell without skin; a
+  dress on an imported body (the built-in body as an OBJ, without a
+  skeleton). It imports them in a headless Godot 4 (an import error
+  fails it) and opens each as a game does (`scripts/godot-check.gd`): one
+  skeleton of at least 24 bones, every mesh skinned to it, one mesh per
+  LOD and the avatar, every animation reported present and moving bones.
+  Run by a CI job (Godot downloaded once into `target/godot`), and by
+  `check.sh` when Godot is installed (`godot` on the `PATH` or `GODOT`).
+- **Unity, Unreal, Blender** (by hand, on the same three files, exported
+  from the app or with the commands of the script): for each,
+  1. the file imports without an error or a warning about the skin or
+     the animations;
+  2. the garment stands on the avatar as in Rustle3D (not lying down,
+     not mirrored, not 100 times too big or small), the imported body as
+     it stands in its file;
+  3. each animation plays: the avatar walks, turns, raises its arms,
+     stands at ease, plays the captured motion; the garment moves with
+     it without coming apart at the seams or sinking into the body;
+  4. the levels of detail switch (Unity: the `_LOD` meshes in a LOD
+     Group; Unreal: the LODs of the skeletal mesh) and keep their
+     wrinkles in the normal map;
+  5. the shell, seen from inside (the camera in the sleeve), shows its
+     folds lit the right way and no hole along its edges;
+  6. the print sits on the pieces as in Rustle3D.
 
 ## UX
 - Export menu › **Garment for a game engine (glTF)…** opens a dialog: preset (Generic,
@@ -124,8 +167,7 @@ one object per panel, UVs and normals, geometry only.
   normal map size (none, 512, 1024, 2048, 4096), back faces (double-sided
   or thickness, with the thickness in mm), skin to the avatar's skeleton
   (with its motions), include the avatar. Choosing a preset fills the
-  fields. Export asks where to save the `.glb`. The skin switch is off
-  and explained for an imported body.
+  fields. Export asks where to save the `.glb`.
 
 ## Acceptance criteria
 - Exports pass the Khronos glTF validator with no errors
@@ -140,4 +182,12 @@ one object per panel, UVs and normals, geometry only.
 - Skin weights sum to 1 on every vertex; a sleeve vertex follows the arm
   bones; skinning the exported garment with a motion's pose moves it with
   the body.
-- An imported body and skinning give `export.no_skeleton`.
+- A project without an avatar and skinning give `export.no_skeleton`.
+- An imported body (the built-in body as an OBJ) is skinned with its
+  avatar and the four motions; each joint's place in the scene (its
+  node's transform composed up the hierarchy) is the inverse of its bind
+  matrix, some joints turned. A captured motion of the project named as
+  a built-in one is exported as `walk (2)`.
+- The inner surface of a shell decodes each texel of the normal map to
+  the opposite of the outer surface's normal there.
+- `scripts/godot-check.sh` passes (CI).

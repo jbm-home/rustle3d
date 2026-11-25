@@ -47,3 +47,12 @@ jobs:
         with:
           node-version: 22
       - run: ./scripts/validate-exports.sh
+
+  godot:
+    name: Game exports opened in Godot
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: ./scripts/godot-check.sh

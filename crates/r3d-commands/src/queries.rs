@@ -577,7 +577,7 @@ impl QuerySpec for AvatarGet {
 pub struct AvatarCheck {}
 
 impl Described for AvatarCheck {
-    const SUMMARY: &'static str = "Check the imported body before draping: `ready` (no error), triangle and vertex counts, height, units/up axis/turn used, whether the file has a skeleton, `items` (each a stable `code`, a `severity` error/warning/info and `args`: file.unavailable, mesh.open, mesh.non_manifold, mesh.pieces, mesh.heavy, mesh.coarse, mesh.reoriented, mesh.inside_out, mesh.degenerate, scale.height, orientation.up, orientation.facing, points.outside, points.side, measurements.clamped, motion.unavailable) and the arrangement points with their distance to the surface (mm, negative inside). Fails when the avatar has no imported body.";
+    const SUMMARY: &'static str = "Check the imported body before draping: `ready` (no error), triangle and vertex counts, height, units/up axis/turn used, whether the file has a skeleton, `items` (each a stable `code`, a `severity` error/warning/info and `args`: file.unavailable, mesh.open, mesh.non_manifold, mesh.pieces, mesh.heavy, mesh.coarse, mesh.reoriented, mesh.inside_out, mesh.degenerate, scale.height, orientation.up, orientation.facing, points.outside, points.side, measurements.clamped, motion.rig with `source` file or points: what places the skeleton the body moves with) and the arrangement points with their distance to the surface (mm, negative inside). Fails when the avatar has no imported body.";
 }
 
 impl QuerySpec for AvatarCheck {

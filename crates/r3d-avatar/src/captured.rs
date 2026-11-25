@@ -146,14 +146,38 @@ struct Mapping {
     thighs: [usize; 2],
 }
 
-fn map(bvh: &Bvh, basis: Quat, rest: &[Vec3]) -> Result<Mapping, MotionError> {
-    let keys: Vec<String> = bvh.joints.iter().map(|j| key(&j.name)).collect();
+/// The joints of a skeleton found by their names (spec 22): indices
+/// into the joints named.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Named {
+    pub hips: usize,
+    pub head: usize,
+    pub neck: Option<usize>,
+    /// The spine, from the hips up to the joint the neck (or the head)
+    /// hangs from.
+    pub spine: Vec<usize>,
+    /// Per side, left first, the joint of each limb bone ([`limb_bone`]).
+    pub limbs: [[Option<usize>; 8]; 2],
+}
+
+/// The limb bone `k` of [`Named::limbs`] without its side (`_l`, `_r`):
+/// `clavicle`, `upper_arm`, `forearm`, `hand`, `thigh`, `shin`, `foot`,
+/// and `toe` (not one of ours).
+pub fn limb_bone(k: usize) -> Option<&'static str> {
+    LIMBS.get(k).map(|l| l.0)
+}
+
+/// Find our joints among a skeleton's by their usual names, whatever
+/// the namespace or case (spec 22): `names` and `parents` (each always
+/// lower than the joint's own index, or any order: only followed up).
+pub fn name_joints(names: &[String], parents: &[Option<usize>]) -> Result<Named, MotionError> {
+    let keys: Vec<String> = names.iter().map(|n| key(n)).collect();
     let find = |names: &[String]| names.iter().find_map(|n| keys.iter().position(|k| k == n));
     let owned = |names: &[&str]| names.iter().map(|n| (*n).to_owned()).collect::<Vec<_>>();
     let hips =
         find(&owned(&["hips", "hip", "pelvis"])).ok_or(MotionError::Skeleton { bone: "hips" })?;
     let head = find(&owned(&["head"])).ok_or(MotionError::Skeleton { bone: "head" })?;
-    let neck = find(&owned(&["neck1", "neck"]));
+    let neck = find(&owned(&["neck1", "neck", "neck01"]));
     let limb = |stems: &[&str], side: usize| {
         let (word, letter) = [("left", "l"), ("right", "r")][side.min(1)];
         let names: Vec<String> = stems
@@ -181,24 +205,42 @@ fn map(bvh: &Bvh, basis: Quat, rest: &[Vec3]) -> Result<Mapping, MotionError> {
             }
         }
     }
-    // The captured spine: the hips up to the joint the neck (or the head)
-    // hangs from.
-    let top = bvh
-        .joints
+    // The spine: the hips up to the joint the neck (or the head) hangs
+    // from.
+    let top = parents
         .get(neck.unwrap_or(head))
-        .and_then(|j| j.parent)
+        .copied()
+        .flatten()
         .ok_or(MotionError::Skeleton { bone: "spine" })?;
     let mut spine = vec![top];
     while let Some(&j) = spine.last()
         && j != hips
     {
-        let parent = bvh.joints.get(j).and_then(|j| j.parent);
-        match parent {
-            Some(p) if spine.len() < bvh.joints.len() => spine.push(p),
+        match parents.get(j).copied().flatten() {
+            Some(p) if spine.len() < names.len() => spine.push(p),
             _ => return Err(MotionError::Skeleton { bone: "spine" }),
         }
     }
     spine.reverse();
+    Ok(Named {
+        hips,
+        head,
+        neck,
+        spine,
+        limbs,
+    })
+}
+
+fn map(bvh: &Bvh, basis: Quat, rest: &[Vec3]) -> Result<Mapping, MotionError> {
+    let names: Vec<String> = bvh.joints.iter().map(|j| j.name.clone()).collect();
+    let parents: Vec<Option<usize>> = bvh.joints.iter().map(|j| j.parent).collect();
+    let Named {
+        head,
+        neck,
+        spine,
+        limbs,
+        ..
+    } = name_joints(&names, &parents)?;
 
     let direction = |from: usize, to: Option<usize>| {
         let (a, b) = (rest.get(from)?, rest.get(to?)?);

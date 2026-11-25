@@ -15,7 +15,7 @@ use crate::pack::Influences;
 
 /// Vertices of a foot this close to the floor in the rest pose are its
 /// sole (m).
-const SOLE_HEIGHT_M: f32 = 0.02;
+pub const SOLE_HEIGHT_M: f32 = 0.02;
 
 /// A bone of a shaped body.
 #[derive(Debug, Clone, PartialEq)]
@@ -62,6 +62,19 @@ impl Pose {
         }
     }
 
+    /// Between this pose (`w` = 0) and `other` (`w` = 1).
+    pub fn towards(&self, other: &Pose, w: f32) -> Self {
+        Self {
+            rotations: self
+                .rotations
+                .iter()
+                .zip(&other.rotations)
+                .map(|(a, b)| a.slerp(*b, w))
+                .collect(),
+            offset: self.offset.lerp(other.offset, w),
+        }
+    }
+
     /// Between the rest pose (`w` = 0) and this one (`w` = 1).
     pub fn scaled(&self, w: f32) -> Self {
         Self {
@@ -105,6 +118,12 @@ impl Skeleton {
                 feet.contains(&bone).then_some((bone, *p))
             })
             .collect();
+        Self { bones, soles }
+    }
+
+    /// A skeleton of `bones` (parents first) whose feet rest on `soles`
+    /// (bone, rest point).
+    pub fn from_parts(bones: Vec<SkeletonBone>, soles: Vec<(usize, Vec3)>) -> Self {
         Self { bones, soles }
     }
 

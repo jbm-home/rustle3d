@@ -20,6 +20,9 @@ fi
 if command -v node >/dev/null; then
   echo "== glTF validator"; ./scripts/validate-exports.sh
 fi
+if [ -n "${GODOT:-}" ] || command -v godot >/dev/null || command -v godot4 >/dev/null; then
+  echo "== Godot"; ./scripts/godot-check.sh
+fi
 if command -v flutter >/dev/null; then
   echo "== flutter analyze"; (cd app && flutter analyze --no-pub)
   echo "== flutter test";    (cd app && flutter test --no-pub)

@@ -971,15 +971,6 @@ impl Engine {
     /// in motion first comes back to rest. Can take seconds when the
     /// garment is not loaded yet (see [`Engine::reset_simulation`]).
     pub fn set_motion(&self, motion: Option<String>) -> Result<SimStatus, ApiError> {
-        let imported = self
-            .workspace()?
-            .session()
-            .project()
-            .avatar()
-            .is_some_and(|a| a.mesh.is_some());
-        if imported && motion.is_some() {
-            return Err(err(r3d_commands::CommandError::ImportedBodyStill));
-        }
         let to = match motion {
             Some(path) if path.to_ascii_lowercase().ends_with(".bvh") => {
                 Some(self.workspace()?.captured_motion(&path).map_err(err)?)
@@ -1326,7 +1317,7 @@ impl Engine {
     /// Returns its result as JSON (each LOD's triangles, the map size,
     /// whether it is skinned, the animations). Off the UI thread.
     pub fn export_game(&self, path: String, options_json: String) -> Result<String, ApiError> {
-        use r3d_commands::game::{Dressed, ExportGame, game_scene};
+        use r3d_commands::game::{Dressed, ExportGame, captured_motions, game_scene};
         self.long("export", |_| {
             let request: ExportGame =
                 serde_json::from_str(&options_json).map_err(|e| ApiError {
@@ -1359,6 +1350,7 @@ impl Engine {
                 };
                 let animation = self.animation.lock().map_err(|_| poisoned())?.clone();
                 let prints = self.prints_of(project, ws.dir())?;
+                let motions = captured_motions(&ws);
                 let dressed = Dressed {
                     project,
                     drape,
@@ -1367,6 +1359,7 @@ impl Engine {
                     animation: animation.as_ref(),
                     time,
                     prints: &prints,
+                    motions: &motions,
                 };
                 let (scene, report) = game_scene(&dressed, &request).map_err(err)?;
                 (r3d_io::game::to_glb(&scene), report)
@@ -1691,19 +1684,7 @@ impl Engine {
     /// in the project, sorted.
     #[frb(sync)]
     pub fn motions(&self) -> Result<Vec<String>, ApiError> {
-        let dir = self.workspace()?.dir().join("motions");
-        let mut out: Vec<String> = std::fs::read_dir(dir)
-            .map(|entries| {
-                entries
-                    .filter_map(Result::ok)
-                    .filter_map(|e| e.file_name().to_str().map(str::to_owned))
-                    .filter(|n| n.to_ascii_lowercase().ends_with(".bvh"))
-                    .map(|n| format!("motions/{n}"))
-                    .collect()
-            })
-            .unwrap_or_default();
-        out.sort();
-        Ok(out)
+        Ok(self.workspace()?.motion_files())
     }
 
     /// The imported body's arrangement points as seen in 3D view `view`:

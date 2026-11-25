@@ -16,6 +16,7 @@
 //! - [`motion`]: walking, turning, raising the arms, captured motions.
 //! - [`bvh`], [`captured`]: motions captured on real people, from BVH
 //!   files, played by our skeleton.
+//! - [`rig`]: our skeleton on an imported body.
 //! - [`motion_library`]: the user's captured motions, shared by every
 //!   project.
 
@@ -30,5 +31,6 @@ pub mod motion;
 pub mod motion_library;
 pub mod pack;
 pub mod presets;
+pub mod rig;
 pub mod skeleton;
 pub mod tape;

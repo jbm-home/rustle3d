@@ -2159,7 +2159,6 @@ class _ShellState extends State<Shell> {
       builder: (_) => _GameExportDialog(
         engine: widget.engine,
         name: (_summary['name'] as String?) ?? 'Rustle3D',
-        importedBody: _bodyCheck != null,
       ),
     );
     if (saved != null && mounted) _toast(context.l.exported(saved));
@@ -2795,7 +2794,6 @@ class _ShellState extends State<Shell> {
                                             onLibraryMotion: _useLibraryMotion,
                                             onImportMotion: _importMotion,
                                             onMotionLibrary: _showMotionLibrary,
-                                            still: _bodyCheck != null,
                                           ),
                                           const SizedBox(width: Space.s),
                                           _FitButton(
@@ -5129,15 +5127,11 @@ class _SimControls extends StatelessWidget {
     required this.onLibraryMotion,
     required this.onImportMotion,
     required this.onMotionLibrary,
-    required this.still,
   });
 
   final SimStatus? status;
   final ValueChanged<bool> onRun;
   final VoidCallback onRestart;
-
-  /// The body cannot move (an imported one): the motion menu is off.
-  final bool still;
 
   /// A motion's name, or `null` to stand still.
   final ValueChanged<String?> onMotion;
@@ -5219,20 +5213,6 @@ class _SimControls extends StatelessWidget {
     final p = Tokens.of(context);
     final l = context.l;
     final current = status?.motion;
-    if (still) {
-      return Tooltip(
-        message: l.motionImportedTip,
-        child: IconButton(
-          key: const ValueKey('motionButton'),
-          onPressed: null,
-          icon: Icon(
-            Icons.directions_walk_rounded,
-            size: 19,
-            color: p.textMuted.withValues(alpha: 0.5),
-          ),
-        ),
-      );
-    }
     // Menu values cannot be null: '' stands for standing still.
     return PopupMenuButton<String>(
       key: const ValueKey('motionButton'),

@@ -21,16 +21,12 @@ class _GameExportDialog extends StatefulWidget {
   const _GameExportDialog({
     required this.engine,
     required this.name,
-    required this.importedBody,
   });
 
   final Engine engine;
 
   /// The project's name, for the file.
   final String name;
-
-  /// The body is imported: it has no skeleton to skin to.
-  final bool importedBody;
 
   @override
   State<_GameExportDialog> createState() => _GameExportDialogState();
@@ -42,7 +38,7 @@ class _GameExportDialogState extends State<_GameExportDialog> {
   int _map = 1024;
   bool _shell = false;
   final _thickness = TextEditingController(text: '1');
-  late bool _skin = !widget.importedBody;
+  bool _skin = true;
   bool _avatar = false;
   String? _error;
 
@@ -213,13 +209,9 @@ class _GameExportDialogState extends State<_GameExportDialog> {
                 contentPadding: EdgeInsets.zero,
                 dense: true,
                 title: Text(l.gameSkin),
-                subtitle: Text(
-                  widget.importedBody ? l.gameSkinImported : l.gameSkinHint,
-                ),
+                subtitle: Text(l.gameSkinHint),
                 value: _skin,
-                onChanged: widget.importedBody
-                    ? null
-                    : (v) => setState(() => _skin = v),
+                onChanged: (v) => setState(() => _skin = v),
               ),
               SwitchListTile(
                 key: const ValueKey('gameAvatar'),

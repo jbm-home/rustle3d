@@ -191,13 +191,59 @@ fn a_dress_walks_on_the_gpu() {
     ] {
         s.run_step(&Step::from_value(step).unwrap()).unwrap();
     }
+    dress_walks(gpu, &s);
+}
+
+/// The built-in body imported from an OBJ (no skeleton in the file: ours
+/// is placed on it, spec 27) walks in a dress on the GPU.
+#[test]
+fn a_dress_walks_on_an_imported_body_on_the_gpu() {
+    let Some(gpu) = gpu::context() else {
+        return;
+    };
+    let body: r3d_core::Body = serde_json::from_value(json!({"masculinity": 0,
+        "height_cm": 168, "bust_cm": 90, "waist_cm": 73, "hips_cm": 98}))
+    .unwrap();
+    let form = Form::of_body(&body, &Default::default()).unwrap();
+    let mut obj = String::new();
+    for p in &form.positions {
+        obj += &format!(
+            "v {} {} {}
+",
+            p.x, p.y, p.z
+        );
+    }
+    for t in &form.triangles {
+        obj += &format!(
+            "f {} {} {}
+",
+            t[0] + 1,
+            t[1] + 1,
+            t[2] + 1
+        );
+    }
+    let loaded =
+        r3d_commands::bodies::register(obj.as_bytes(), r3d_io::model::ModelFormat::Obj).unwrap();
+    let mut s = Session::new(Project::new("Untitled"));
+    for step in [
+        json!({"type": "avatar.import_mesh", "file": "avatars/walker.obj", "hash": loaded.hash}),
+        json!({"type": "template.apply", "template": "dress"}),
+    ] {
+        s.run_step(&Step::from_value(step).unwrap()).unwrap();
+    }
+    dress_walks(gpu, &s);
+}
+
+/// The dress of `s` walks on the GPU: 1.5 s of draping, a second of
+/// easing in, a step cycle; it stays finite, outside the moving body,
+/// sewn, and up on the shoulders.
+fn dress_walks(gpu: &'static r3d_sim_gpu::GpuContext, s: &Session) {
     let form = Form::of_project(s.project()).unwrap().unwrap();
     let mut scene = build(s.project(), Some(&form), DEFAULT_SPACING_MM)
         .unwrap()
         .scene;
     scene.motion = form.body_motion(&Animation::starting(AvatarMotion::Walk.into(), 0.0));
     let mut solver = GpuSolver::new(gpu, scene.clone()).unwrap();
-    // 1.5 s of draping, a second of easing in, a step cycle.
     let frames = 220;
     for _ in 0..frames {
         solver.step(1.0 / 60.0).unwrap();

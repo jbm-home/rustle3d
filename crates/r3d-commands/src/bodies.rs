@@ -23,8 +23,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::commands::{BUST_RANGE, HEIGHT_RANGE, HIPS_RANGE, WAIST_RANGE};
-use crate::drape::{Form, Parts};
+use crate::drape::{Form, Parts, Rig};
 use crate::error::CommandError;
+use crate::skinning::{Nearest, strongest, transfer};
 
 /// A model file as read.
 #[derive(Debug)]
@@ -35,8 +36,12 @@ pub struct Loaded {
     pub format: ModelFormat,
 }
 
-/// How many files, placed bodies and dress forms are kept.
+/// How many placed bodies and dress forms are kept.
 const KEPT: usize = 4;
+/// How many files read are kept: more, as the others are made from them
+/// and a file dropped is only read again when its project is opened
+/// (several projects open at once in an agents' server, or in tests).
+const KEPT_FILES: usize = 16;
 
 static LOADED: Mutex<Vec<Arc<Loaded>>> = Mutex::new(Vec::new());
 static PLACED: Mutex<Vec<(String, Orientation, Arc<Placed>)>> = Mutex::new(Vec::new());
@@ -51,7 +56,12 @@ fn lock<T>(m: &Mutex<T>) -> Result<MutexGuard<'_, T>, CommandError> {
 
 /// Keep `item`, dropping the oldest beyond [`KEPT`].
 fn keep<T>(list: &mut Vec<T>, item: T) {
-    if list.len() >= KEPT {
+    keep_at_most(list, item, KEPT);
+}
+
+/// Keep `item`, dropping the oldest beyond `most`.
+fn keep_at_most<T>(list: &mut Vec<T>, item: T, most: usize) {
+    if list.len() >= most {
         list.remove(0);
     }
     list.push(item);
@@ -70,7 +80,7 @@ pub fn register(bytes: &[u8], format: ModelFormat) -> Result<Arc<Loaded>, ModelE
         format,
     });
     if let Ok(mut list) = LOADED.lock() {
-        keep(&mut list, l.clone());
+        keep_at_most(&mut list, l.clone(), KEPT_FILES);
     }
     Ok(l)
 }
@@ -152,8 +162,14 @@ pub struct Placed {
     /// What turning the triangles outward changed.
     pub oriented: Oriented,
     pub height: f32,
-    /// The file has a skeleton (not used).
+    /// The file has a skeleton.
     pub skeleton: bool,
+    /// The joints of the file's skeleton placed as the body: name,
+    /// parent, bind position (m).
+    pub joints: Vec<(String, Option<usize>, Vec3)>,
+    /// Each vertex's joints and weights in that skeleton, when the file
+    /// gives them for every vertex; empty otherwise.
+    pub joint_weights: Vec<r3d_io::model::Influence>,
 }
 
 /// The hips' band (fractions of the height), where the body's front and
@@ -161,12 +177,8 @@ pub struct Placed {
 const HIPS_BAND: (f32, f32) = (0.47, 0.56);
 
 fn place(l: &Loaded, o: Orientation) -> Placed {
-    let mut positions: Vec<Vec3> = l
-        .model
-        .positions
-        .iter()
-        .map(|p| turned(upright(*p, o.up) * o.scale, o.turn_deg).as_vec3())
-        .collect();
+    let to_avatar = |p: [f32; 3]| turned(upright(p, o.up) * o.scale, o.turn_deg).as_vec3();
+    let mut positions: Vec<Vec3> = l.model.positions.iter().map(|p| to_avatar(*p)).collect();
     let (lo, hi) = bounds(positions.iter());
     let height = (hi.y - lo.y).max(0.0);
     let hips = positions.iter().filter(|p| {
@@ -194,6 +206,13 @@ fn place(l: &Loaded, o: Orientation) -> Placed {
         oriented,
         height,
         skeleton: l.model.skeleton,
+        joints: l
+            .model
+            .joints
+            .iter()
+            .map(|j| (j.name.clone(), j.parent, to_avatar(j.at) - shift))
+            .collect(),
+        joint_weights: l.model.weights.clone(),
     }
 }
 
@@ -375,10 +394,10 @@ fn levels_of(p: &Placed) -> [f32; 3] {
     [chest, waist, heights(&p.positions, &p.triangles).hips]
 }
 
-/// The middle of the torso at height `y` (x on the axis).
-fn torso_middle(p: &Placed, y: f32) -> Vec3 {
-    let band = p
-        .positions
+/// The middle of the torso of a body (`positions`, standing on its
+/// vertical axis) at height `y` (x on the axis).
+fn torso_middle(positions: &[Vec3], y: f32) -> Vec3 {
+    let band = positions
         .iter()
         .filter(|v| (v.y - y).abs() < TORSO_SLICE_M && v.x.abs() < TORSO_HALF_M);
     let (lo, hi) = bounds(band);
@@ -414,7 +433,7 @@ pub fn guess_points(p: &Placed) -> BTreeMap<BodyPoint, [f64; 3]> {
         .map(|v| v.z)
         .collect();
     let z = if low.is_empty() {
-        torso_middle(p, crotch_y).z
+        torso_middle(&p.positions, crotch_y).z
     } else {
         low.iter().sum::<f32>() / low.len() as f32
     };
@@ -427,9 +446,9 @@ pub fn guess_points(p: &Placed) -> BTreeMap<BodyPoint, [f64; 3]> {
     let [[ls, le, lw], [rs, re, rw]] = parts.arms;
     let [[lt, lsh], [rt, rsh]] = parts.legs;
     [
-        (BodyPoint::Chest, torso_middle(p, chest)),
-        (BodyPoint::Waist, torso_middle(p, waist)),
-        (BodyPoint::Hips, torso_middle(p, hips)),
+        (BodyPoint::Chest, torso_middle(&p.positions, chest)),
+        (BodyPoint::Waist, torso_middle(&p.positions, waist)),
+        (BodyPoint::Hips, torso_middle(&p.positions, hips)),
         (BodyPoint::Crotch, crotch),
         (BodyPoint::LeftShoulder, ls),
         (BodyPoint::LeftElbow, le),
@@ -517,14 +536,133 @@ pub fn form(mesh: &AvatarMesh) -> Result<Arc<Form>, CommandError> {
     }
     let p = placed(mesh)?;
     let (parts, levels) = parts_of(&p, &mesh.points);
+    let rig = rig_of(&p, &mesh.points, &parts)?;
     let f = Arc::new(Form::imported(
         p.positions.clone(),
         p.triangles.clone(),
         &parts,
         levels,
+        rig,
     ));
     keep(&mut *lock(&FORMS)?, (mesh.clone(), f.clone()));
     Ok(f)
+}
+
+/// Where our skeleton's place on an imported body comes from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RigSource {
+    /// The file's own skeleton, its joints found by their names.
+    File,
+    /// The arrangement points.
+    Points,
+}
+
+impl RigSource {
+    /// The source for a placed body: its file's skeleton when ours can
+    /// be found in it.
+    pub fn of(p: &Placed) -> Self {
+        let names: Vec<String> = p.joints.iter().map(|j| j.0.clone()).collect();
+        let parents: Vec<Option<usize>> = p.joints.iter().map(|j| j.1).collect();
+        if r3d_avatar::captured::name_joints(&names, &parents).is_ok() {
+            Self::File
+        } else {
+            Self::Points
+        }
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::File => "file",
+            Self::Points => "points",
+        }
+    }
+}
+
+/// Our skeleton on a placed body (spec 27), so that it moves: the
+/// skeleton of the built-in body fitted to its measurements, placed by
+/// the file's own skeleton ([`RigSource`]) or by the arrangement points
+/// (`parts`); skin weights from the file when it gives them for every
+/// vertex (each joint's going to its bone of ours), otherwise carried
+/// from the fitted built-in body posed as the body stands.
+fn rig_of(
+    p: &Placed,
+    points: &BTreeMap<BodyPoint, [f64; 3]>,
+    parts: &Parts,
+) -> Result<Rig, CommandError> {
+    use r3d_avatar::rig::{Anchors, FileSkeleton, Guides, Targets, bind};
+    use r3d_avatar::skeleton::{SOLE_HEIGHT_M, Skeleton, skin};
+    let model = crate::queries::body_model()?;
+    let (body, _) = measure(p, points);
+    let shaped = r3d_avatar::fit::fitted_body(
+        model,
+        &crate::queries::fitted(&body, &r3d_core::Measures::default())?,
+    );
+    let reference = Skeleton::new(model, &shaped);
+    let file = match RigSource::of(p) {
+        RigSource::File => FileSkeleton::find(&reference, &p.joints).ok(),
+        RigSource::Points => None,
+    };
+    let anchors = match &file {
+        Some(f) => f.anchors.clone(),
+        None => {
+            let found = Parts::find(&shaped.positions);
+            let on_reference = Guides {
+                middle: |y| torso_middle(&shaped.positions, y),
+                arms: found.arms,
+                legs: found.legs,
+            };
+            let on_body = Guides {
+                middle: |y| torso_middle(&p.positions, y),
+                arms: parts.arms,
+                legs: parts.legs,
+            };
+            Anchors::from_points(&reference, &on_reference, &on_body)
+        }
+    };
+    let (bones, stance) = bind(&reference, &Targets::new(&reference, &anchors));
+    let weights: Vec<_> = match &file {
+        Some(f) if p.joint_weights.len() == p.positions.len() => p
+            .joint_weights
+            .iter()
+            .map(|(joints, weights)| {
+                let mut dense = vec![0.0f32; reference.bones.len()];
+                for (j, w) in joints.iter().zip(weights) {
+                    if let Some(slot) = f.bones.get(usize::from(*j)).and_then(|b| dense.get_mut(*b))
+                    {
+                        *slot += w;
+                    }
+                }
+                strongest(&dense)
+            })
+            .collect(),
+        _ => {
+            let posed = skin(
+                &shaped.positions,
+                model.weights(),
+                &reference.forward(&stance),
+            );
+            let finder = Nearest::new(&posed, model.triangles());
+            transfer(&p.positions, &p.triangles, &finder, model.weights())
+        }
+    };
+    // The soles in the rest pose, for the motions to keep on the floor.
+    let to_stance = Skeleton::from_parts(bones.clone(), Vec::new()).forward(&stance);
+    let soles = p
+        .positions
+        .iter()
+        .zip(&weights)
+        .filter(|(v, _)| v.y < SOLE_HEIGHT_M)
+        .filter_map(|(v, w)| {
+            let b = usize::from(w.bones[0]);
+            bones
+                .get(b)
+                .filter(|bone| bone.name.starts_with("foot"))
+                .and_then(|_| to_stance.get(b))
+                .map(|t| (b, t.inverse().apply(*v)))
+        })
+        .collect();
+    let skeleton = Skeleton::from_parts(bones, soles);
+    Ok(Rig::bound(skeleton, weights, &p.positions, stance))
 }
 
 /// How much an item of the check matters.
@@ -771,9 +909,9 @@ fn check_now(mesh: &AvatarMesh) -> Report {
         ));
     }
     items.push(item(
-        "motion.unavailable",
+        "motion.rig",
         Info,
-        &[("skeleton", json!(p.skeleton))],
+        &[("source", json!(RigSource::of(&p).name()))],
     ));
     report
 }

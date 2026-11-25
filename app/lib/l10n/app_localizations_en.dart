@@ -3153,9 +3153,6 @@ class LEn extends L {
   String get bodyHasWarnings => 'The body has things to check.';
 
   @override
-  String get motionImportedTip => 'An imported body stands still';
-
-  @override
   String get pointChest => 'Chest';
 
   @override
@@ -3269,8 +3266,11 @@ class LEn extends L {
   }
 
   @override
-  String get checkMotionUnavailable =>
-      'An imported body stands still: motions are off.';
+  String get checkMotionFileSkeleton => 'Moves with the file\'s own skeleton.';
+
+  @override
+  String get checkMotionPoints =>
+      'Moves with a skeleton placed by the arrangement points: move them if a limb bends in the wrong place.';
 
   @override
   String errModelMalformed(String format, String detail) {
@@ -3298,9 +3298,6 @@ class LEn extends L {
   String errBodyUnavailable(String file) {
     return 'The body\'s file $file is missing or was changed: import it again.';
   }
-
-  @override
-  String get errImportedBodyStill => 'An imported body cannot move yet.';
 
   @override
   String get errNoImportedBody => 'The avatar has no imported body.';
@@ -3355,10 +3352,7 @@ class LEn extends L {
 
   @override
   String get gameSkinHint =>
-      'The garment moves with the body, with the walk, turn and raise-arms motions as animations.';
-
-  @override
-  String get gameSkinImported => 'An imported body has no skeleton.';
+      'The garment moves with the body, with the built-in motions and the project\'s captured motions as animations.';
 
   @override
   String get gameAvatar => 'Include the body';
@@ -3379,7 +3373,7 @@ class LEn extends L {
 
   @override
   String get errNoSkeleton =>
-      'This body has no skeleton: export without skinning.';
+      'There is no avatar to skin the garment to: export without skinning.';
 
   @override
   String get motionImport => 'Import a captured motion…';

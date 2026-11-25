@@ -229,11 +229,6 @@ impl ActionSpec for Simulate {
         if !(1..=3600).contains(&self.frames) {
             return Err(CommandError::invalid("frames", Invalid::Range(1.0, 3600.0)).into());
         }
-        let project = ws.session().project();
-        let imported = project.avatar().and_then(|a| a.mesh.as_ref());
-        if imported.is_some() && (self.motion.is_some() || self.motion_file.is_some()) {
-            return Err(CommandError::ImportedBodyStill.into());
-        }
         let file = match &self.motion_file {
             Some(_) if self.motion.is_some() => {
                 return Err(CommandError::invalid("motion_file", Invalid::WithMotion).into());
@@ -246,7 +241,10 @@ impl ActionSpec for Simulate {
             None => self.motion.map(Into::into),
         };
         let project = ws.session().project();
-        let body_warnings = imported.map(|m| crate::bodies::check(m).warnings());
+        let body_warnings = project
+            .avatar()
+            .and_then(|a| a.mesh.as_ref())
+            .map(|m| crate::bodies::check(m).warnings());
         let out = drape::simulate(project, self.frames, motion, progress)?;
         let cache = drape::encode_cache(
             drape::fingerprint(project)?,
