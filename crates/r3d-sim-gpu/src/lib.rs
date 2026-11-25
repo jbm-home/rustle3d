@@ -176,10 +176,11 @@ mod bind {
     pub const GATHERED: u32 = 28;
     pub const ELASTICS: u32 = 29;
     pub const PRESS: u32 = 30;
+    pub const PARTNER: u32 = 31;
     /// Bindings the kernels only read.
-    pub const READ_ONLY: [u32; 16] = [
+    pub const READ_ONLY: [u32; 17] = [
         PDATA, MEMBRANES, HINGES, SEAMS, EDGE_ROWS, SEWN, EXCLUDED, SDF_SLOTS, SDF_VALUES, GRAB,
-        BODY, CLOSURES, GARMENT, INCIDENT, TRIANGLES, ELASTICS,
+        BODY, CLOSURES, GARMENT, INCIDENT, TRIANGLES, ELASTICS, PARTNER,
     ];
 }
 
@@ -214,8 +215,9 @@ mod kernel {
     pub const LAYER_TURNED: usize = 23;
     pub const LAYER_AVERAGE: usize = 24;
     pub const ELASTIC: usize = 25;
+    pub const SHARE: usize = 26;
 
-    pub const ALL: [(&str, &[u32]); 26] = [
+    pub const ALL: [(&str, &[u32]); 27] = [
         ("predict", &[X, PREV, VEL, PDATA]),
         ("membrane", &[X, PDATA, MEMBRANES]),
         ("hinge", &[X, PDATA, HINGES]),
@@ -288,6 +290,7 @@ mod kernel {
         ),
         ("layer_average", &[X, LAYER_DELTA, DELTA, SEWN]),
         ("elastic", &[X, PDATA, ELASTICS, PRESS]),
+        ("share", &[X, PREV, PRESS, PARTNER]),
     ];
 }
 
@@ -888,7 +891,16 @@ impl GpuSolver {
             ),
             (bind::NEARBY, zeroed("cloth near", 4 * n as u64)),
             (bind::DELTA, zeroed("cloth delta", 16 * n as u64)),
-            (bind::PRESS, zeroed("cloth press", 16 * n as u64)),
+            // Per particle: the elastics' pull and the seam's sliding share.
+            (bind::PRESS, zeroed("cloth press", 32 * n as u64)),
+            (
+                bind::PARTNER,
+                storage(
+                    "cloth partner",
+                    bytemuck::cast_slice(&model.partner),
+                    U::empty(),
+                ),
+            ),
             (
                 bind::EDGE_ROWS,
                 storage("cloth edges", bytemuck::cast_slice(&edge_csr), U::empty()),
@@ -1117,9 +1129,10 @@ impl GpuSolver {
         };
         substep_passes.extend(coloured(MEMBRANE, &membrane_slots));
         substep_passes.extend(coloured(HINGE, &hinge_slots));
+        // The elastics before the seams, as on the CPU.
+        substep_passes.extend(coloured(ELASTIC, &elastic_slots));
         substep_passes.extend(coloured(SEAM, &seam_slots));
         substep_passes.extend(coloured(CLOSURE, &closure_slots));
-        substep_passes.extend(coloured(ELASTIC, &elastic_slots));
         if layered {
             frame_passes.push(all(LAYER_MOVED));
         }
@@ -1144,6 +1157,7 @@ impl GpuSolver {
             frame_passes.push(one(LAYER_RESET));
         }
         let pull_at = substep_passes.len();
+        substep_passes.push(all(SHARE));
         substep_passes.push(all(COLLIDE));
         if model.collider.is_some() {
             substep_passes.push(all(EDGES));

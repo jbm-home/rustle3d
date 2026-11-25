@@ -407,6 +407,25 @@ after 4 s; the skirt still holds at the waist.
   0.7³⁰ ≈ 2·10⁻⁵ of it left per frame, so cloth touching the body was
   glued there and folds made while the garment closed never slid out (the
   back of the dress stayed crumpled; seen from the back only).
+- **Friction on a seam.** An elastic ending at a seam (a waistband
+  sewn in two halves, a cuff) pulls the seam's two ends apart along
+  the body, and its pressure (§3, "Elastic") makes friction hold each
+  end where it is: friction cancelled the seam's closing every substep
+  and the seam stayed open, 36 mm on a jersey tube held on a cylinder
+  by its elastic, about 8 mm at a jogger's side seams. Two changes,
+  on both backends: the elastics are solved before the seams (solved
+  after, they pulled the seam open again within the substep), and
+  where an elastic pulls on either end of a seam friction holds the
+  two ends by their common motion: half the difference of their
+  motions before the contacts is added to each one's own, so their
+  relative motion, the seam closing, is left alone (a particle is
+  paired with the other end of its first seam). The seam now closes
+  within 2 mm (`an_elastic_holds_the_cloth_up_on_the_body`). Not on
+  every seam: shared there, the side seams of a waist shifted against
+  each other and the men's trousers slid 1.3 cm further down. On the
+  GPU the pair's share is a kernel of its own (`share`) before the
+  contacts, kept with the elastics' pull in one buffer, so no kernel
+  binds more than eight storage buffers.
 - Without self-collision (below) a wide hem can fold through itself; this
   is visible on the A-line skirt and is the next physics item (M7).
 

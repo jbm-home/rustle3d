@@ -61,6 +61,25 @@ pub struct Hinge {
     pub alpha: f32,
 }
 
+/// No seam partner (in [`Model::partner`]).
+pub const UNSEWN: u32 = u32::MAX;
+
+/// Per particle of `n`, the other end of its first seam in `seams`.
+fn partners(n: usize, seams: &[[u32; 2]]) -> Vec<u32> {
+    let mut partner = vec![UNSEWN; n];
+    for [a, b] in seams {
+        for (i, j) in [(*a, *b), (*b, *a)] {
+            if let Some(p) = partner.get_mut(i as usize)
+                && *p == UNSEWN
+                && i != j
+            {
+                *p = j;
+            }
+        }
+    }
+    partner
+}
+
 /// A scene ready to simulate. Indices in every constraint are valid.
 #[derive(Debug, Clone)]
 pub struct Model {
@@ -78,6 +97,10 @@ pub struct Model {
     pub hinges: Vec<Hinge>,
     /// Vertex pairs sewn together.
     pub seams: Vec<[u32; 2]>,
+    /// Per particle, the one it is sewn to (by its first seam), or
+    /// [`UNSEWN`]: friction holds a sewn pair by its common motion
+    /// (docs/physics.md §5, "Friction on a seam").
+    pub partner: Vec<u32>,
     /// Vertex pairs held by closures (buttons, closed zippers).
     pub closures: Vec<[u32; 2]>,
     pub elastics: Vec<ElasticLink>,
@@ -318,6 +341,7 @@ impl Model {
             damping,
             membranes,
             hinges,
+            partner: partners(n, &seams),
             seams,
             closures: closures.iter().map(|c| c.pair).collect(),
             elastics,

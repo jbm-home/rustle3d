@@ -476,8 +476,9 @@ pub fn cylinder(radius: f32, y0: f32, y1: f32) -> StaticMesh {
 /// How far the top of a jersey tube 30 cm long, 14 cm in radius, hung
 /// around a 12 cm cylinder (a body's waist), slides from the end of the
 /// sewing ramp (when an elastic has reached its relaxed length) to 2 s;
-/// with `elastic`, an elastic at 70 % along its top edge.
-fn tube_slides(make: Make, elastic: bool) -> f32 {
+/// with `elastic`, an elastic at 70 % along its top edge. Also its seam's
+/// largest gap at the end.
+fn tube_slides(make: Make, elastic: bool) -> (f32, f32) {
     let (n, radius, top) = (24, 0.14, 1.0);
     let around = std::f32::consts::TAU * radius;
     let mut scene = sheet(around, 0.3, n, Vec2::Y, |r| {
@@ -513,7 +514,7 @@ fn tube_slides(make: Make, elastic: bool) -> f32 {
         s.positions().iter().all(|p| p.is_finite()),
         "NaN in the simulation"
     );
-    sewn - height(&*s)
+    (sewn - height(&*s), s.stats().max_seam_gap)
 }
 
 pub fn an_elastic_holds_the_cloth_up_on_the_body(make: Make) {
@@ -522,10 +523,14 @@ pub fn an_elastic_holds_the_cloth_up_on_the_body(make: Make) {
     // error times the curvature, a hundredth of its tension's pressure:
     // friction from that push alone let elastic waists slide off. Its
     // tension counts in the friction (docs/physics.md, "Elastic").
-    let bare = tube_slides(make, false);
+    let (bare, _) = tube_slides(make, false);
     assert!(bare > 0.1, "a loose tube should slide down: {bare} m");
-    let held = tube_slides(make, true);
+    let (held, gap) = tube_slides(make, true);
     assert!(held < 0.01, "the elastic let the tube slide {held} m");
+    // The elastic pulls the seam's two ends apart along the rim and its
+    // pressure made friction hold each where it was: the seam stayed 36
+    // mm open (docs/physics.md §5, "Friction on a seam").
+    assert!(gap < 0.002, "the seam beside the elastic is {gap} m open");
 }
 
 /// How high a 30 × 8 cm band of `fabric`, clamped at its foot and leaning

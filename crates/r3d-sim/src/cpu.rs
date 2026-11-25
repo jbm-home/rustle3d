@@ -26,7 +26,7 @@ use rayon::prelude::*;
 
 use crate::collide::BAND;
 use crate::layers::{Cloth, Touch};
-use crate::model::{ElasticLink, Hinge, Membrane, Model};
+use crate::model::{ElasticLink, Hinge, Membrane, Model, UNSEWN};
 use crate::motion::{Posed, touch};
 use crate::scene::SimScene;
 use crate::solver::{
@@ -65,6 +65,10 @@ pub struct CpuSolver {
     /// Per particle: the pull of the elastics on it this substep (N), so
     /// friction knows how hard they press it on the body.
     press: Vec<Vec3>,
+    /// Per particle: what friction adds to its own motion this substep to
+    /// hold it as one with the particle it is sewn to (half the
+    /// difference of their motions; zero when held alone; reused buffer).
+    slide: Vec<Vec3>,
     /// Where the particles were at the start of the last frame.
     start: Vec<Vec3>,
     grab: Option<Grab>,
@@ -102,6 +106,7 @@ impl CpuSolver {
             near: vec![false; n],
             edge_push: vec![(Vec3::ZERO, 0); n],
             press: vec![Vec3::ZERO; n],
+            slide: vec![Vec3::ZERO; n],
             start: model.positions.clone(),
             grab: None,
             time: 0.0,
@@ -134,6 +139,20 @@ impl CpuSolver {
         for hinge in &self.model.hinges {
             bend(&mut self.x, w, hinge, h2);
         }
+        self.press.fill(Vec3::ZERO);
+        for link in &self.model.elastics {
+            stretch(
+                &mut self.x,
+                w,
+                &mut self.press,
+                link,
+                elastic_target(link, self.time),
+                h2,
+            );
+        }
+        // The seams after the elastics: an elastic ends at a seam, and
+        // solved after it pulled the seam open again every substep
+        // (docs/physics.md §5, "Friction on a seam").
         for [a, b] in &self.model.seams {
             let (a, b) = (*a as usize, *b as usize);
             let d = self.x[b] - self.x[a];
@@ -145,17 +164,6 @@ impl CpuSolver {
         }
         for [a, b] in &self.model.closures {
             close(&mut self.x, &self.prev, w, [*a as usize, *b as usize], h);
-        }
-        self.press.fill(Vec3::ZERO);
-        for link in &self.model.elastics {
-            stretch(
-                &mut self.x,
-                w,
-                &mut self.press,
-                link,
-                elastic_target(link, self.time),
-                h2,
-            );
         }
         self.model.self_contact.solve(&self.pairs, &mut self.x, w);
         let m = &self.model;
@@ -180,10 +188,35 @@ impl CpuSolver {
                 self.x[*i] += pull;
             }
         }
+        self.share_sliding();
         self.collide(posed.as_ref(), h);
         for i in 0..self.x.len() {
             self.v[i] = (self.x[i] - self.prev[i]) / h;
             self.v[i] *= (1.0 - self.model.damping[i] * h).max(0.0);
+        }
+    }
+
+    /// What friction adds to each particle's own motion this substep.
+    /// Where an elastic pulls on a seam's end, it holds the two ends' common
+    /// motion: the elastic's pressure made friction hold each end where
+    /// it was, cancelling the seam's closing (docs/physics.md §5,
+    /// "Friction on a seam"). Elsewhere each end's own: shared on every
+    /// seam, a waist's side seams shifted against each other and trousers
+    /// slid down.
+    fn share_sliding(&mut self) {
+        let (x, prev, press) = (&self.x, &self.prev, &self.press);
+        let moved = |i: usize| match (x.get(i), prev.get(i)) {
+            (Some(a), Some(b)) => *a - *b,
+            _ => Vec3::ZERO,
+        };
+        let pulled = |i: usize| press.get(i).is_some_and(|p| *p != Vec3::ZERO);
+        for (i, (slide, partner)) in self.slide.iter_mut().zip(&self.model.partner).enumerate() {
+            let j = *partner as usize;
+            *slide = if *partner != UNSEWN && (pulled(i) || pulled(j)) {
+                (moved(j) - moved(i)) / 2.0
+            } else {
+                Vec3::ZERO
+            };
         }
     }
 
@@ -200,9 +233,10 @@ impl CpuSolver {
             .zip(self.prev.par_iter_mut())
             .zip(self.near.par_iter_mut())
             .zip(self.press.par_iter())
+            .zip(self.slide.par_iter())
             .enumerate()
             .with_min_len(64)
-            .for_each(|(i, (((x, prev), near), press))| {
+            .for_each(|(i, ((((x, prev), near), press), slide))| {
                 *near = false;
                 let (Some(w), Some(thickness), Some(friction)) =
                     (w.get(i), thickness.get(i), friction.get(i))
@@ -258,7 +292,7 @@ impl CpuSolver {
                     // into the surface counts, as the displacement it
                     // would give in a substep.
                     let pressed = (-press.dot(n)).max(0.0) * w * h * h;
-                    let moved = *x - *prev - carried;
+                    let moved = *x - *prev + *slide - carried;
                     let tangential = moved - n * moved.dot(n);
                     let sliding = tangential.length();
                     if sliding > 0.0 {
