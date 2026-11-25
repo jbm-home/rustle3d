@@ -77,7 +77,8 @@ used the app.
   on a linked copy goes to its piece.
 - **Missing**:
   - Done: hoodie and joggers templates (spec 11).
-  - A way to take one garment out of the drape.
+  - Done: a garment taken out of the drape and put back
+    (`garment.set_draped`, spec 17).
 
 ## M37 — Imported avatars in motion, game export checked
 

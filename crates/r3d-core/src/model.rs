@@ -537,6 +537,20 @@ pub struct Garment {
     /// garment drawn here or from another format.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<PatternSource>,
+    /// Whether it is draped. A garment taken out of the drape keeps its
+    /// pieces, seams and placements, but is not simulated nor shown on
+    /// the avatar (spec 17).
+    #[serde(default = "draped", skip_serializing_if = "is_draped")]
+    pub draped: bool,
+}
+
+/// A garment is draped unless taken out (serde default).
+fn draped() -> bool {
+    true
+}
+
+fn is_draped(draped: &bool) -> bool {
+    *draped
 }
 
 /// A parametric pattern a garment was imported from (spec 28): the files'
@@ -1045,6 +1059,7 @@ impl Project {
                 notes: String::new(),
                 print: None,
                 source: None,
+                draped: true,
             },
         );
         Self {

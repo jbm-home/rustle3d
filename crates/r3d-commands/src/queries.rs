@@ -110,6 +110,7 @@ impl QuerySpec for ProjectSummary {
                         "id": id, "name": g.name, "fabric": g.fabric, "color": g.color,
                         "layer": g.layer, "notes": g.notes, "print": g.print,
                         "source": g.source.as_ref().map(|s| &s.file),
+                        "draped": g.draped,
                     })
                 })
                 .collect(),

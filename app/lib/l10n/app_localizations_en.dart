@@ -1165,6 +1165,15 @@ class LEn extends L {
   String get garmentMoveOut => 'Wear it over';
 
   @override
+  String get garmentTakeOut => 'Take it out of the drape';
+
+  @override
+  String get garmentPutBack => 'Put it back in the drape';
+
+  @override
+  String get garmentOutOfDrape => 'Out of the drape';
+
+  @override
   String get garmentRemove => 'Delete the garment and its pieces';
 
   @override

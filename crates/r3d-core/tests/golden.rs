@@ -143,6 +143,8 @@ fn sample() -> Project {
                 angle_deg: 45.0,
             }),
             source: None,
+            // Taken out of the drape (v26).
+            draped: false,
         },
     );
     // The first garment was imported from a parametric pattern.

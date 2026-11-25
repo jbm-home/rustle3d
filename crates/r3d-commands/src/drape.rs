@@ -14,6 +14,7 @@
 //! for the solver ([`Form::body_motion`]) and its skin posed for the views
 //! ([`Form::posed`]).
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap};
 use std::ops::Range;
 use std::path::Path;
@@ -29,7 +30,7 @@ use r3d_avatar::skeleton::{Skeleton, skin};
 use r3d_core::seam::{Span, Track};
 use r3d_core::{
     Around, ButtonId, DetailId, EdgeId, Fabric, GarmentId, PanelId, PinId, PointId, Project,
-    SeamSide,
+    SeamSide, Transaction,
 };
 use r3d_geom::DVec2;
 use r3d_geom::Rigid;
@@ -1594,14 +1595,50 @@ fn sample_index(positions: &[f64], s: f64) -> Option<usize> {
     positions.iter().position(|p| (p - s).abs() < 1e-6)
 }
 
+/// The project without the garments taken out of the drape: their
+/// pieces unplaced, so nothing of them is simulated (spec 17).
+fn draped_only(project: &Project) -> Cow<'_, Project> {
+    let out: Vec<(PanelId, r3d_core::Panel)> = project
+        .panels()
+        .iter()
+        .filter(|(_, p)| {
+            p.placement.is_some()
+                && project
+                    .garments()
+                    .get(&p.garment)
+                    .is_some_and(|g| !g.draped)
+        })
+        .map(|(id, p)| {
+            (
+                *id,
+                r3d_core::Panel {
+                    placement: None,
+                    ..p.clone()
+                },
+            )
+        })
+        .collect();
+    if out.is_empty() {
+        return Cow::Borrowed(project);
+    }
+    let mut copy = project.clone();
+    let mut tx = Transaction::begin(&mut copy);
+    for (id, panel) in out {
+        tx.put_panel(id, panel);
+    }
+    tx.commit();
+    Cow::Owned(copy)
+}
+
 /// Build the scene, in the project's shown size. Panels without a
-/// placement are left out.
+/// placement, and the garments taken out of the drape, are left out.
 pub fn build(
     project: &Project,
     form: Option<&Form>,
     spacing_mm: f64,
 ) -> Result<Drape, CommandError> {
-    let project = &*project.as_shown();
+    let shown = project.as_shown();
+    let project = &*draped_only(&shown);
     let spacing = spacing_mm.max(2.0);
     let samples = sample_tracks(project, spacing);
     // One fabric per garment, and the garments simulated (those with a

@@ -2113,6 +2113,24 @@ abstract class L {
   /// **'Wear it over'**
   String get garmentMoveOut;
 
+  /// No description provided for @garmentTakeOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Take it out of the drape'**
+  String get garmentTakeOut;
+
+  /// No description provided for @garmentPutBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Put it back in the drape'**
+  String get garmentPutBack;
+
+  /// No description provided for @garmentOutOfDrape.
+  ///
+  /// In en, this message translates to:
+  /// **'Out of the drape'**
+  String get garmentOutOfDrape;
+
   /// No description provided for @garmentRemove.
   ///
   /// In en, this message translates to:

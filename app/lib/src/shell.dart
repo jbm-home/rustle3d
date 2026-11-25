@@ -5360,7 +5360,7 @@ class _GarmentList extends StatelessWidget {
 }
 
 /// One garment: its name and layer, moved under or over its neighbours,
-/// deleted, and its fabric.
+/// taken out of the drape or put back, deleted, and its fabric.
 class _GarmentCard extends StatelessWidget {
   const _GarmentCard({
     required this.engine,
@@ -5387,6 +5387,7 @@ class _GarmentCard extends StatelessWidget {
     final p = Tokens.of(context);
     final l = context.l;
     final id = garment['id'] as String;
+    final draped = garment['draped'] as bool? ?? true;
     void setLayer(int to) =>
         run({'type': 'garment.set_layer', 'garment': id, 'layer': to});
     return Container(
@@ -5415,7 +5416,11 @@ class _GarmentCard extends StatelessWidget {
                     ),
                     if (count > 1)
                       Text(
-                        layer == 0 ? l.garmentNextToBody : l.garmentOver,
+                        !draped
+                            ? l.garmentOutOfDrape
+                            : layer == 0
+                            ? l.garmentNextToBody
+                            : l.garmentOver,
                         style: ts(fontSize: 12, color: p.textMuted),
                       ),
                   ],
@@ -5431,6 +5436,17 @@ class _GarmentCard extends StatelessWidget {
                   icon: Icons.arrow_downward_rounded,
                   tip: l.garmentMoveOut,
                   onTap: layer < count - 1 ? () => setLayer(layer + 1) : null,
+                ),
+                _IconAction(
+                  icon: draped
+                      ? Icons.layers_clear_outlined
+                      : Icons.layers_outlined,
+                  tip: draped ? l.garmentTakeOut : l.garmentPutBack,
+                  onTap: () => run({
+                    'type': 'garment.set_draped',
+                    'garment': id,
+                    'draped': !draped,
+                  }),
                 ),
                 _IconAction(
                   icon: Icons.delete_outline_rounded,

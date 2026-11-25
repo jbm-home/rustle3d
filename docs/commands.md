@@ -4999,6 +4999,44 @@ Choose where a garment is worn among the others: layer 0 is next to the body, th
 
 </details>
 
+### `garment.set_draped`
+
+Take a garment out of the drape (`draped: false`) or put it back (`true`). Out of the drape it keeps its pieces, seams and placements, and is still edited and exported as a pattern, but it is not simulated nor shown on the avatar; the other garments drape without it.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "GarmentId": {
+      "description": "Identifier of a garment, e.g. `garment:1`.",
+      "pattern": "^garment:[1-9][0-9]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Take a garment out of the drape, or put it back.",
+  "properties": {
+    "draped": {
+      "description": "False takes it out of the drape: its pieces, seams and placements\nstay, but it is not simulated nor shown on the avatar.",
+      "type": "boolean"
+    },
+    "garment": {
+      "$ref": "#/$defs/GarmentId"
+    }
+  },
+  "required": [
+    "garment",
+    "draped"
+  ],
+  "title": "GarmentSetDraped",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `panel.set_garment`
 
 Move a piece to another garment; its linked mirror copies (and the piece it mirrors) move with it. The piece then drapes in that garment's fabric, colour and layer.

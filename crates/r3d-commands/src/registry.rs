@@ -205,6 +205,7 @@ command_registry! {
     "garment.rename" => GarmentRename,
     "garment.remove" => GarmentRemove,
     "garment.set_layer" => GarmentSetLayer,
+    "garment.set_draped" => GarmentSetDraped,
     "panel.set_garment" => PanelSetGarment,
     "grading.set_sizes" => GradingSetSizes,
     "grading.use_chart" => GradingUseChart,

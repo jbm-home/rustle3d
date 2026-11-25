@@ -1175,6 +1175,15 @@ class LFr extends L {
   String get garmentMoveOut => 'Le porter dessus';
 
   @override
+  String get garmentTakeOut => 'Le sortir du drapé';
+
+  @override
+  String get garmentPutBack => 'Le remettre dans le drapé';
+
+  @override
+  String get garmentOutOfDrape => 'Hors du drapé';
+
+  @override
   String get garmentRemove => 'Supprimer le vêtement et ses pièces';
 
   @override

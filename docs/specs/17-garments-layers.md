@@ -17,6 +17,11 @@ millimetres away), in both solvers, so a garment fits closely over
 another. A shirt worn under trousers is tucked into them; worn over
 them, it hides them (docs/physics.md, "Several garments").
 
+Out of the drape (2026-11-25, test report 2026-11-24): a garment can be
+taken out of the drape and put back (`garment.set_draped`; schema v26,
+`draped`, true when absent); `project.summary` lists it; the garment's
+card in the app has a button for it.
+
 ## User story
 As a designer, I dress the avatar in a shirt and trousers, each in its own
 fabric and colour, and choose whether the shirt is worn over the trousers
@@ -33,6 +38,12 @@ or tucked in.
   an empty project names the project's garment.
 - Moving a piece to another garment moves its linked mirror copies with
   it. Deleting a garment deletes its pieces; a project keeps at least one.
+- A garment can be taken out of the drape and put back. Out of it, it
+  keeps its pieces, seams, trims and placements, is edited and exported
+  as a pattern like the others, but is neither simulated nor shown on
+  the avatar: the other garments drape without it (the drape starts
+  again, carried over, as for any edit). Its layer is kept for when it
+  comes back.
 - The simulation gives each garment its fabric. Each garment starts
   outside the ones under it (a layer's gap further out), and with several
   garments the pieces start just outside the body near their own height,

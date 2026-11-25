@@ -316,3 +316,46 @@ fn a_drawn_piece_joins_the_newest_garment_with_an_allowance() {
     assert_eq!(panel.garment, newest);
     assert_eq!(panel.seam_allowance_mm, 10.0);
 }
+
+#[test]
+fn a_garment_taken_out_of_the_drape_is_left_out_and_comes_back() {
+    let mut s = outfit();
+    let shirt = garment(&s, "Shirt");
+    let form = Form::of_project(s.project()).unwrap().unwrap();
+    let both = build(s.project(), Some(&form), DEFAULT_SPACING_MM).unwrap();
+    run(
+        &mut s,
+        json!({"type": "garment.set_draped", "garment": shirt, "draped": false}),
+    )
+    .unwrap();
+    let p = s.project();
+    // Its pieces keep their placements; the drape leaves them out.
+    assert!(
+        p.panels()
+            .values()
+            .filter(|pn| pn.garment == shirt)
+            .all(|pn| pn.placement.is_some())
+    );
+    let alone = build(p, Some(&form), DEFAULT_SPACING_MM).unwrap();
+    assert_eq!(alone.pieces.len(), 4);
+    assert!(
+        alone
+            .pieces
+            .iter()
+            .all(|piece| p.panel(piece.panel).unwrap().garment != shirt)
+    );
+    assert!(alone.scene.particles.len() < both.scene.particles.len());
+    // The trousers drape on their own.
+    let mut solver = CpuSolver::new(alone.scene);
+    for _ in 0..30 {
+        solver.step(1.0 / 60.0).unwrap();
+    }
+    assert!(solver.positions().iter().all(|v| v.is_finite()));
+    run(
+        &mut s,
+        json!({"type": "garment.set_draped", "garment": shirt, "draped": true}),
+    )
+    .unwrap();
+    let again = build(s.project(), Some(&form), DEFAULT_SPACING_MM).unwrap();
+    assert_eq!(again.scene.particles.len(), both.scene.particles.len());
+}

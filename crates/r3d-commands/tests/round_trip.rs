@@ -144,6 +144,8 @@ fn every_command_round_trips() {
     h.round_trip(json!({"type": "garment.rename", "garment": jacket, "name": "Coat"}));
     h.round_trip(json!({"type": "panel.set_garment", "panel": panel, "garment": jacket}));
     h.round_trip(json!({"type": "garment.set_layer", "garment": jacket, "layer": 0}));
+    h.round_trip(json!({"type": "garment.set_draped", "garment": jacket, "draped": false}));
+    h.round_trip(json!({"type": "garment.set_draped", "garment": jacket, "draped": true}));
     let poly_edge = poly.created[5].to_string();
     let other_edge = rect.created[7].to_string();
     let seam = h.round_trip(json!({"type": "seam.add",

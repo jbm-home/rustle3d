@@ -242,6 +242,7 @@ impl CommandSpec for GarmentAdd {
                 notes: String::new(),
                 print: None,
                 source: None,
+                draped: true,
             },
         );
         Ok(CommandOutput {
@@ -376,6 +377,36 @@ impl CommandSpec for GarmentSetLayer {
             if g.layer != layer {
                 tx.put_garment(gid, Garment { layer, ..g });
             }
+        }
+        Ok(CommandOutput::default())
+    }
+}
+
+/// Take a garment out of the drape, or put it back.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GarmentSetDraped {
+    pub garment: GarmentId,
+    /// False takes it out of the drape: its pieces, seams and placements
+    /// stay, but it is not simulated nor shown on the avatar.
+    pub draped: bool,
+}
+
+impl Described for GarmentSetDraped {
+    const SUMMARY: &'static str = "Take a garment out of the drape (`draped: false`) or put it back (`true`). Out of the drape it keeps its pieces, seams and placements, and is still edited and exported as a pattern, but it is not simulated nor shown on the avatar; the other garments drape without it.";
+}
+
+impl CommandSpec for GarmentSetDraped {
+    fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        let (id, g) = garment(tx, Some(self.garment))?;
+        if g.draped != self.draped {
+            tx.put_garment(
+                id,
+                Garment {
+                    draped: self.draped,
+                    ..g
+                },
+            );
         }
         Ok(CommandOutput::default())
     }
