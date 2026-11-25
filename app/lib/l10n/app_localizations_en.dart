@@ -1795,6 +1795,7 @@ class LEn extends L {
   @override
   String stepName(String step) {
     String _temp0 = intl.Intl.selectLogic(step, {
+      'pattern_add': 'Add pattern',
       'project_rename': 'Rename project',
       'project_set_display_unit': 'Change units',
       'avatar_set': 'Change body',
@@ -3687,4 +3688,102 @@ class LEn extends L {
 
   @override
   String get tpSpacing => 'Spacing (mm)';
+
+  @override
+  String get templateJeans => 'Jeans';
+
+  @override
+  String get templateJeansBlurb =>
+      'Denim, five pockets, a back yoke, a fly and belt loops.';
+
+  @override
+  String get templateShorts => 'Shorts';
+
+  @override
+  String get templateShortsBlurb =>
+      'The trousers\' block, ending a hand above the knee.';
+
+  @override
+  String get libraryOpen => 'From the library…';
+
+  @override
+  String get libraryTitle => 'Pattern library';
+
+  @override
+  String get librarySubtitle =>
+      'Click a pattern to add it to this project, drafted for its body. Save your own garments here from their card.';
+
+  @override
+  String get libraryKindTops => 'Tops';
+
+  @override
+  String get libraryKindBottoms => 'Bottoms';
+
+  @override
+  String get libraryKindDresses => 'Dresses and skirts';
+
+  @override
+  String get libraryKindAccessories => 'Accessories';
+
+  @override
+  String get libraryMine => 'My patterns';
+
+  @override
+  String get libraryMineEmpty =>
+      'None yet: save a garment from its card (the bookmark button) to add it to other projects.';
+
+  @override
+  String get libraryImport => 'Import…';
+
+  @override
+  String get libraryExport => 'Export…';
+
+  @override
+  String get libraryPatternFiles => 'Pattern files';
+
+  @override
+  String libraryDeleteConfirm(String name) {
+    return 'Delete “$name” from the library? Projects it was added to keep their garments.';
+  }
+
+  @override
+  String libraryReplaceConfirm(String name) {
+    return 'The library already has a pattern called “$name”. Replace it?';
+  }
+
+  @override
+  String get libraryReplace => 'Replace';
+
+  @override
+  String get librarySave => 'Save to library';
+
+  @override
+  String get librarySaveTitle => 'Save to the pattern library';
+
+  @override
+  String get librarySaveName => 'Name';
+
+  @override
+  String get librarySaveKind => 'Kind';
+
+  @override
+  String librarySaved(String name) {
+    return 'Saved to the library as “$name”.';
+  }
+
+  @override
+  String get busyLibraryAdd => 'Adding the pattern';
+
+  @override
+  String get errLibraryNone => 'No pattern library is set up.';
+
+  @override
+  String errPatternExists(String name) {
+    return 'The library already has a pattern called “$name”.';
+  }
+
+  @override
+  String errPatternMissing(String name) {
+    return 'The library has no pattern called “$name” any more.';
+  }
 }

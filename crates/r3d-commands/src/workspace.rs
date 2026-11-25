@@ -77,10 +77,10 @@ impl Localizable for WorkspaceError {
             }
             Self::NoLibrary => Message::new("library.none", self.to_string()),
             Self::NotInLibrary { name } => {
-                Message::new("library.missing", self.to_string()).arg("name", name)
+                Message::new("library.pattern_missing", self.to_string()).arg("name", name)
             }
             Self::InLibrary { name } => {
-                Message::new("library.exists", self.to_string()).arg("name", name)
+                Message::new("library.pattern_exists", self.to_string()).arg("name", name)
             }
         }
     }

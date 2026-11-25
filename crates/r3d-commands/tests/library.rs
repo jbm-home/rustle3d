@@ -75,7 +75,7 @@ fn a_skirt_saved_from_one_project_is_added_to_another() {
         &mut a,
         json!({"type": "library.save", "garment": skirt, "name": "flared SKIRT"}),
     );
-    assert_eq!(code(again.unwrap_err()), "library.exists");
+    assert_eq!(code(again.unwrap_err()), "library.pattern_exists");
     run(
         &mut a,
         json!({"type": "library.save", "garment": skirt, "name": "Flared skirt",
@@ -146,7 +146,7 @@ fn a_skirt_saved_from_one_project_is_added_to_another() {
     );
     assert_eq!(names(&mut b), ["Skirt 2"]);
     let missing = step(&mut b, json!({"type": "library.add", "name": "Skirt"}));
-    assert_eq!(code(missing.unwrap_err()), "library.missing");
+    assert_eq!(code(missing.unwrap_err()), "library.pattern_missing");
 }
 
 #[test]

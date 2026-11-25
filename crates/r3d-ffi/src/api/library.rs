@@ -1,12 +1,13 @@
-//! The user's own libraries, shared by every project: body presets and
-//! captured motions. They live in a folder the UI chooses (the app's
-//! support folder).
+//! The user's own libraries, shared by every project: body presets,
+//! captured motions and patterns. They live in a folder the UI chooses
+//! (the app's support folder).
 
 use std::path::Path;
 
 use flutter_rust_bridge::frb;
 use r3d_avatar::motion_library::MotionLibrary;
 use r3d_avatar::presets::{BodyPreset, PresetLibrary};
+use r3d_commands::library::PatternLibrary;
 use r3d_core::Body;
 
 use super::engine::{ApiError, err};
@@ -43,6 +44,54 @@ pub fn rename_library_motion(
 #[frb(sync)]
 pub fn delete_library_motion(library_dir: String, name: String) -> Result<(), ApiError> {
     motions(&library_dir).remove(&name).map_err(err)
+}
+
+fn patterns(library_dir: &str) -> PatternLibrary {
+    PatternLibrary::new(Path::new(library_dir))
+}
+
+/// The user's saved patterns as JSON: `[{name, kind, path, template?}]`,
+/// by name (spec 32). Added to a project with the `library.add` step.
+#[frb(sync)]
+pub fn library_patterns(library_dir: String) -> Result<String, ApiError> {
+    serde_json::to_string(&patterns(&library_dir).list())
+        .map_err(|e| ApiError::new("internal", e.to_string()))
+}
+
+/// Rename a saved pattern; returns its new name.
+#[frb(sync)]
+pub fn rename_library_pattern(
+    library_dir: String,
+    name: String,
+    to: String,
+) -> Result<String, ApiError> {
+    Ok(patterns(&library_dir).rename(&name, &to).map_err(err)?.name)
+}
+
+/// Delete a saved pattern (projects keep the garments added from it).
+#[frb(sync)]
+pub fn delete_library_pattern(library_dir: String, name: String) -> Result<(), ApiError> {
+    patterns(&library_dir).delete(&name).map_err(err)
+}
+
+/// Pack a saved pattern into the zip file `archive`, to share it.
+pub fn export_library_pattern(
+    library_dir: String,
+    name: String,
+    archive: String,
+) -> Result<(), ApiError> {
+    patterns(&library_dir)
+        .export(&name, Path::new(&archive))
+        .map_err(err)
+}
+
+/// Add the pattern packed in the zip file `archive` to the library;
+/// returns its name there.
+pub fn import_library_pattern(library_dir: String, archive: String) -> Result<String, ApiError> {
+    Ok(patterns(&library_dir)
+        .import(Path::new(&archive))
+        .map_err(err)?
+        .name)
 }
 
 fn presets_file(library_dir: &str) -> std::path::PathBuf {

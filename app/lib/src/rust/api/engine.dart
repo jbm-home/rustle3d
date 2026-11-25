@@ -403,6 +403,10 @@ abstract class Engine implements RustOpaqueInterface {
   /// its fabric again.
   void setFitMap({String? map});
 
+  /// Use the user's library folder `library_dir`: `library.*` steps
+  /// (the app's and attached agents') find saved patterns there.
+  Future<void> setLibrary({required String libraryDir});
+
   /// Make the avatar move (`walk`, `turn`, `raise_arms`, `idle`, or a
   /// captured
   /// motion: a BVH file in the project folder, see

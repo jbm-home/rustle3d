@@ -14,8 +14,8 @@ use rayon::prelude::*;
 
 use r3d_core::detail::ELASTIC_RATIO;
 use r3d_core::{
-    AnyId, Around, Avatar, Body, Edge, EdgeCurve, EdgeId, Fabric, Garment, GarmentId, Measure,
-    PanelId, Point, Project, TemplateRef, Transaction,
+    AnyId, Around, Avatar, Body, Edge, EdgeCurve, EdgeId, Fabric, Garment, GarmentId,
+    InternalLineId, Measure, PanelId, Point, Project, TemplateRef, Transaction,
 };
 use r3d_geom::{CubicBez, DVec2};
 use schemars::JsonSchema;
@@ -23,9 +23,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::commands::{
     ButtonAdd, CurveSpec, EdgeSetCurve, EdgeSplit, ElasticAdd, GarmentAdd, GarmentRename,
-    GarmentSetFabric, InterfacingAdd, NotchAdd, PanelCreatePolygon, PanelMirror, PanelPlace,
-    PanelSetGarment, PanelSetSeamAllowance, PinAdd, SeamAdd, SeamSideSpec, TopstitchAdd, ZipperAdd,
-    mirrored_source, waist_height_cm,
+    GarmentSetFabric, InterfacingAdd, InternalLineAdd, NotchAdd, PanelCreatePolygon, PanelMirror,
+    PanelPlace, PanelSetGarment, PanelSetSeamAllowance, PanelUnlink, PinAdd, SeamAdd, SeamSideSpec,
+    SegmentSpec, TopstitchAdd, ZipperAdd, mirrored_source, waist_height_cm,
 };
 use crate::drape::arm_drop;
 use crate::error::{CommandError, positive};
@@ -55,6 +55,11 @@ pub enum Template {
     /// Joggers: the trousers' block in jersey, pulled on: an elastic
     /// waist and elastic ankles, no fly.
     Joggers,
+    /// Jeans: the trousers' block in denim with five pockets, a back
+    /// yoke, a fly and a waistband with belt loops.
+    Jeans,
+    /// Shorts: the trousers' block ending on the thigh.
+    Shorts,
     /// A sleeveless dress: front and back from the neck to the knee,
     /// shaped at the waist, flared at the hem.
     Dress,
@@ -63,12 +68,14 @@ pub enum Template {
 }
 
 impl Template {
-    pub const ALL: [Template; 9] = [
+    pub const ALL: [Template; 11] = [
         Template::TShirt,
         Template::Shirt,
         Template::Trousers,
         Template::Hoodie,
         Template::Joggers,
+        Template::Jeans,
+        Template::Shorts,
         Template::Dress,
         Template::StraightSkirt,
         Template::ALineSkirt,
@@ -86,6 +93,8 @@ impl Template {
             Template::Trousers => "trousers",
             Template::Hoodie => "hoodie",
             Template::Joggers => "joggers",
+            Template::Jeans => "jeans",
+            Template::Shorts => "shorts",
             Template::Dress => "dress",
         }
     }
@@ -94,7 +103,9 @@ impl Template {
     pub fn kind(self) -> PatternKind {
         match self {
             Template::TShirt | Template::Shirt | Template::Hoodie => PatternKind::Tops,
-            Template::Trousers | Template::Joggers => PatternKind::Bottoms,
+            Template::Trousers | Template::Joggers | Template::Jeans | Template::Shorts => {
+                PatternKind::Bottoms
+            }
             Template::Dress | Template::StraightSkirt | Template::ALineSkirt => {
                 PatternKind::DressesAndSkirts
             }
@@ -113,6 +124,8 @@ impl Template {
             Template::Trousers => "Trousers",
             Template::Hoodie => "Hoodie",
             Template::Joggers => "Joggers",
+            Template::Jeans => "Jeans",
+            Template::Shorts => "Shorts",
             Template::Dress => "Dress",
         }
     }
@@ -123,7 +136,9 @@ impl Template {
             Template::StraightSkirt
             | Template::ALineSkirt
             | Template::Trousers
-            | Template::Joggers => &["waist_cm", "hips_cm", "length_cm", "ease_cm"],
+            | Template::Joggers
+            | Template::Jeans
+            | Template::Shorts => &["waist_cm", "hips_cm", "length_cm", "ease_cm"],
             Template::TShirt | Template::Shirt | Template::Hoodie => {
                 &["chest_cm", "length_cm", "sleeve_cm", "ease_cm"]
             }
@@ -264,6 +279,8 @@ const SHORT_SLEEVE: f64 = 0.4;
 const TROUSER_HEM_CM: f64 = 4.0;
 /// Joggers end higher, their elastic cuffs at the ankles (cm).
 const JOGGER_HEM_CM: f64 = 8.0;
+/// Shorts end this far below the crotch by default (cm): above the knee.
+const SHORTS_INSEAM_CM: f64 = 22.0;
 
 impl Sizes {
     /// Every size `template` reads, filled in from `avatar`, whose waist
@@ -276,6 +293,8 @@ impl Sizes {
             Template::ALineSkirt => (0.36 * h, 2.0),
             Template::Trousers => (waist_height_cm - TROUSER_HEM_CM, 4.0),
             Template::Joggers => (waist_height_cm - JOGGER_HEM_CM, 8.0),
+            Template::Jeans => (waist_height_cm - TROUSER_HEM_CM, 4.0),
+            Template::Shorts => (waist_height_cm - CROTCH_HEIGHT * h + SHORTS_INSEAM_CM, 6.0),
             Template::Hoodie => (0.40 * h, 16.0),
             Template::TShirt => (0.39 * h, 10.0),
             Template::Shirt => (0.43 * h, 12.0),
@@ -371,6 +390,12 @@ struct Piece {
 }
 
 impl Piece {
+    /// A point of the board in the draft (mm): [`Piece::board`] undone.
+    fn draft(&self, b: DVec2) -> DVec2 {
+        let x = b.x - self.origin_x;
+        p(if self.mirrored { -x } else { x }, b.y)
+    }
+
     /// A point of the draft (mm) on the board.
     fn board(&self, q: DVec2) -> [f64; 2] {
         let x = if self.mirrored { -q.x } else { q.x };
@@ -675,10 +700,222 @@ impl Draft<'_, '_> {
         self.created.extend(out.created);
         Ok(())
     }
+
+    /// A piece drawn reflected (as the right pieces are) from `points` of
+    /// the left pieces' draft, joined by straight edges: given clockwise,
+    /// it comes counter-clockwise.
+    fn reflected(&mut self, name: &str, points: &[DVec2]) -> Result<Piece, CommandError> {
+        let outline: Vec<_> = points.iter().map(|q| (p(-q.x, q.y), None)).collect();
+        let piece = self.panel(name, &outline)?;
+        Ok(Piece {
+            mirrored: true,
+            ..piece
+        })
+    }
+
+    /// An internal line on `piece` through draft points: from `start`,
+    /// each segment to a point, straight or by its curve's controls.
+    fn line(
+        &mut self,
+        piece: &Piece,
+        start: DVec2,
+        segments: &[(DVec2, Option<[DVec2; 2]>)],
+    ) -> Result<InternalLineId, CommandError> {
+        let out = InternalLineAdd {
+            panel: piece.id,
+            start: piece.board(start),
+            segments: segments
+                .iter()
+                .map(|(to, curve)| match curve {
+                    None => SegmentSpec::Line {
+                        to: piece.board(*to),
+                    },
+                    Some([c1, c2]) => SegmentSpec::Cubic {
+                        c1: piece.board(*c1),
+                        c2: piece.board(*c2),
+                        to: piece.board(*to),
+                    },
+                })
+                .collect(),
+        }
+        .apply(self.tx)?;
+        out.created
+            .iter()
+            .find_map(|a| match a {
+                AnyId::InternalLine(l) => Some(*l),
+                _ => None,
+            })
+            .ok_or_else(|| internal("no line created".into()))
+    }
+
+    /// Edges `ks` of `piece` as one seam side, in their order around it
+    /// (a mirror copy lists its edges as its source's, which run the other
+    /// way round it).
+    fn run(&self, piece: &Piece, ks: &[usize]) -> Result<SeamSideSpec, CommandError> {
+        let mut edges = ks
+            .iter()
+            .map(|k| piece.edge(*k))
+            .collect::<Result<Vec<_>, _>>()?;
+        let p = self.tx.project();
+        let joined = edges.windows(2).all(|w| match w {
+            [a, b] => p
+                .edge(*a)
+                .zip(p.edge(*b))
+                .is_some_and(|(a, b)| a.end == b.start),
+            _ => true,
+        });
+        if !joined {
+            edges.reverse();
+        }
+        Ok(SeamSideSpec {
+            edges,
+            ..SeamSideSpec::default()
+        })
+    }
+
+    /// Where `edge` of `piece` starts and ends, in the draft.
+    fn ends(&self, piece: &Piece, edge: EdgeId) -> Option<(DVec2, DVec2)> {
+        let p = self.tx.project();
+        let e = p.edge(edge)?;
+        Some((
+            piece.draft(p.point(e.start)?.pos),
+            piece.draft(p.point(e.end)?.pos),
+        ))
+    }
+
+    /// Where a seam side of `piece` (whole edges or a whole line) starts
+    /// and ends, in the draft, walked as it says.
+    fn side_ends(&self, piece: &Piece, side: &SeamSideSpec) -> Option<(DVec2, DVec2)> {
+        let p = self.tx.project();
+        let (a, z) = match (side.line, side.edges.first(), side.edges.last()) {
+            (Some(line), _, _) => {
+                let l = p.internal_line(line)?;
+                (l.start, l.segments.last().map_or(l.start, |s| s.end()))
+            }
+            (None, Some(first), Some(last)) => (
+                p.point(p.edge(*first)?.start)?.pos,
+                p.point(p.edge(*last)?.end)?.pos,
+            ),
+            _ => {
+                let e = p.edge(side.edge?)?;
+                (p.point(e.start)?.pos, p.point(e.end)?.pos)
+            }
+        };
+        let (a, z) = (piece.draft(a), piece.draft(z));
+        Some(if side.reversed == Some(true) {
+            (z, a)
+        } else {
+            (a, z)
+        })
+    }
+
+    /// Sew `a` of `a_piece` onto `b` of `b_piece` lying over it (a facing
+    /// under a front, a pocket on a back), both drawn in the same draft:
+    /// `b` walked from the end that lies on `a`'s start.
+    fn overlay(
+        &mut self,
+        a_piece: &Piece,
+        a: SeamSideSpec,
+        b_piece: &Piece,
+        mut b: SeamSideSpec,
+    ) -> Result<(), CommandError> {
+        let (Some((a0, _)), Some((b0, b1))) =
+            (self.side_ends(a_piece, &a), self.side_ends(b_piece, &b))
+        else {
+            return Err(internal("a side without ends".into()));
+        };
+        if a0.distance(b1) < a0.distance(b0) {
+            b.reversed = Some(b.reversed != Some(true));
+        }
+        self.sew_sides(a, b)
+    }
+
+    /// Sew two chains of edges that meet end to end on the body (a front
+    /// and its facing against a back and its yoke), each listed from the
+    /// hem up: stretch by stretch, each chain's length shared out in
+    /// proportion.
+    fn sew_chains(&mut self, a: &[EdgeId], b: &[EdgeId]) -> Result<(), CommandError> {
+        // Each edge's length, and whether it runs up (from the hem).
+        let chain =
+            |d: &Self, edges: &[EdgeId]| -> Result<Vec<(EdgeId, f64, bool)>, CommandError> {
+                edges
+                    .iter()
+                    .map(|e| {
+                        let p = d.tx.project();
+                        let edge = p.edge(*e).ok_or_else(|| internal(format!("no edge {e}")))?;
+                        let y = |pt| p.point(pt).map_or(0.0, |q| q.pos.y);
+                        Ok((
+                            *e,
+                            p.edge_length(*e).unwrap_or_default(),
+                            y(edge.end) > y(edge.start),
+                        ))
+                    })
+                    .collect()
+            };
+        let (a, b) = (chain(self, a)?, chain(self, b)?);
+        let total = |c: &[(EdgeId, f64, bool)]| c.iter().map(|(_, l, _)| l).sum::<f64>();
+        let (ta, tb) = (total(&a), total(&b));
+        if ta <= 0.0 || tb <= 0.0 {
+            return Err(internal("an empty chain".into()));
+        }
+        // Where each chain's edges meet, as shares of its length.
+        let cuts = |c: &[(EdgeId, f64, bool)], t: f64| {
+            c.iter()
+                .scan(0.0, |at, (_, l, _)| {
+                    *at += l;
+                    Some(*at / t)
+                })
+                .collect::<Vec<f64>>()
+        };
+        let mut breaks: Vec<f64> = cuts(&a, ta).into_iter().chain(cuts(&b, tb)).collect();
+        breaks.push(0.0);
+        breaks.sort_by(f64::total_cmp);
+        breaks.dedup_by(|x, y| (*x - *y).abs() < 1e-9);
+        // The stretch of chain `c` between shares `u0` and `u1`, walked up.
+        let stretch_of = |c: &[(EdgeId, f64, bool)], t: f64, u0: f64, u1: f64| {
+            let mid = (u0 + u1) / 2.0 * t;
+            let mut start = 0.0;
+            for (e, l, up) in c {
+                if mid <= start + l {
+                    let (d0, d1) = (u0 * t - start, u1 * t - start);
+                    let (d0, d1) = (d0.clamp(0.0, *l), d1.clamp(0.0, *l));
+                    return Some(if *up {
+                        stretch(*e, Some(d0), Some(d1), false)
+                    } else {
+                        stretch(*e, Some(l - d1), Some(l - d0), true)
+                    });
+                }
+                start += l;
+            }
+            None
+        };
+        for w in breaks.windows(2) {
+            let &[u0, u1] = w else {
+                continue;
+            };
+            if u1 - u0 < 1e-9 {
+                continue;
+            }
+            let (Some(sa), Some(sb)) = (stretch_of(&a, ta, u0, u1), stretch_of(&b, tb, u0, u1))
+            else {
+                return Err(internal("a stretch outside its chain".into()));
+            };
+            self.sew_sides(sa, sb)?;
+        }
+        Ok(())
+    }
 }
 
 fn p(x: f64, y: f64) -> DVec2 {
     DVec2::new(x, y)
+}
+
+/// A whole internal line as a seam side.
+fn line_side(line: InternalLineId) -> SeamSideSpec {
+    SeamSideSpec {
+        line: Some(line),
+        ..SeamSideSpec::default()
+    }
 }
 
 /// A stretch of `edge`, from `from` to `to` mm along it (its ends when
@@ -1124,14 +1361,16 @@ fn draft_in(
         Template::TShirt => t_shirt(&mut d, &sizes, &avatar, false)?,
         Template::Hoodie => t_shirt(&mut d, &sizes, &avatar, true)?,
         Template::Shirt => shirt(&mut d, &sizes, &avatar.body)?,
-        Template::Trousers => trousers(&mut d, &sizes, &avatar, false)?,
-        Template::Joggers => trousers(&mut d, &sizes, &avatar, true)?,
+        Template::Trousers => trousers(&mut d, &sizes, &avatar, Legs::Trousers)?,
+        Template::Joggers => trousers(&mut d, &sizes, &avatar, Legs::Joggers)?,
+        Template::Jeans => trousers(&mut d, &sizes, &avatar, Legs::Jeans)?,
+        Template::Shorts => trousers(&mut d, &sizes, &avatar, Legs::Shorts)?,
         Template::Dress => dress(&mut d, &sizes, &avatar.body)?,
         Template::ToteBag => tote_bag(&mut d, &sizes)?,
     }
     let fabric = match template {
         Template::TShirt | Template::Hoodie | Template::Joggers => Fabric::Jersey,
-        Template::ToteBag | Template::Trousers => Fabric::Denim,
+        Template::ToteBag | Template::Trousers | Template::Jeans => Fabric::Denim,
         _ => Fabric::Cotton,
     };
     let title = template.title().to_owned();
@@ -1756,124 +1995,239 @@ fn shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
     Ok(())
 }
 
+/// The garments drafted on the trousers' block.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Legs {
+    Trousers,
+    Joggers,
+    Jeans,
+    Shorts,
+}
+
+/// Room around the thigh at a pair of shorts' hem (cm).
+const SHORTS_HEM_EASE_CM: f64 = 10.0;
+
+/// The trousers' block for a body: a front and a back per leg, drawn for
+/// the left leg (the crease at x = 0, y up from the hem, mm).
+struct Block {
+    len: f64,
+    rise: f64,
+    y_c: f64,
+    depth: f64,
+    y_h: f64,
+    hem_f: f64,
+    hem_b: f64,
+    ext_f: f64,
+    ext_b: f64,
+    out: f64,
+    side_in: f64,
+    cf: f64,
+    cf_in: f64,
+    cb: f64,
+    cb_in: f64,
+    cb_up: f64,
+    crotch_f: DVec2,
+    crotch_bx: f64,
+    y_cb: f64,
+    slant: f64,
+    /// The body's waist height (cm).
+    waist_top: f64,
+}
+
+impl Block {
+    fn new(d: &Draft, s: &Sizes, avatar: &Avatar, legs: Legs) -> Result<Block, CommandError> {
+        let body = &avatar.body;
+        let waist = mm("waist_cm", s.waist_cm)?;
+        let hips = mm("hips_cm", s.hips_cm)?;
+        let len = mm("length_cm", s.length_cm)?;
+        let ease = s.ease_cm.unwrap_or_default() * 10.0;
+        let h = body.height_cm;
+        let waist_top = waist_height_cm(d.tx.project())?;
+        // The crotch line 1.5 cm below the body's, the hip line at the hips.
+        let rise = ((waist_top - CROTCH_HEIGHT * h) * 10.0 + 15.0).clamp(150.0, 0.6 * len);
+        let y_c = len - rise;
+        let depth = (HIP_DEPTH * h * 10.0).min(0.8 * rise);
+        let y_h = len - depth;
+        // Widths at the hip line, crotch extensions, half hems.
+        let front_hip = (hips + ease) / 4.0 - 10.0;
+        let back_hip = (hips + ease) / 4.0 + 10.0;
+        let (ext_f, ext_b) = (hips / 16.0, hips / 10.0 + 10.0);
+        // The crease (x = 0) halves the front at the crotch line.
+        let side_f = (front_hip + ext_f) / 2.0;
+        // Shorts end on the thigh, with room to move.
+        let hem_f = match legs {
+            Legs::Shorts => {
+                let thigh = (avatar.measure(Measure::Thigh).cm + SHORTS_HEM_EASE_CM) * 10.0;
+                (thigh / 4.0 - 10.0).min(side_f)
+            }
+            _ => 0.1 * hips,
+        };
+        let hem_b = hem_f + 20.0;
+        let out = side_f - hem_f;
+        let cf = side_f - front_hip;
+        let side_b = -(hem_b + out);
+        let cb = side_b + back_hip;
+        // Waist shaping: the centre front comes in 1 cm, the centre back
+        // 2.5 cm and rises 1.5 cm; the side seams take the rest, the waist
+        // fitting the body without ease (the trousers hang from it).
+        // Jeans keep the back's top level for their straight waistband.
+        let (cf_in, cb_in) = (10.0, 25.0);
+        let cb_up = if legs == Legs::Jeans { 0.0 } else { 15.0 };
+        let side_in = if legs == Legs::Joggers {
+            0.0
+        } else {
+            ((front_hip + back_hip - waist / 2.0 - cf_in - cb_in) / 2.0).max(0.0)
+        };
+        let crotch_f = p(cf - ext_f, y_c);
+        let inseam = crotch_f.distance(p(-hem_f, 0.0));
+        let crotch_bx = cb + ext_b;
+        let y_cb = (inseam * inseam - (crotch_bx - hem_b).powi(2))
+            .max(0.0)
+            .sqrt();
+        let slant = cb_in / (len + cb_up - y_h);
+        Ok(Block {
+            len,
+            rise,
+            y_c,
+            depth,
+            y_h,
+            hem_f,
+            hem_b,
+            ext_f,
+            ext_b,
+            out,
+            side_in,
+            cf,
+            cf_in,
+            cb,
+            cb_in,
+            cb_up,
+            crotch_f,
+            crotch_bx,
+            y_cb,
+            slant,
+            waist_top,
+        })
+    }
+
+    /// A side seam from the hem at `hem_x` up to the waist; `sign` +1 on
+    /// the front (side on +x), −1 on the back.
+    fn side(&self, hem_x: f64, sign: f64) -> CubicBez {
+        let hem = p(hem_x, 0.0);
+        let top = p(hem_x + sign * (self.out - self.side_in), self.len);
+        let [c1, c2] = side_curve(hem, p(hem_x + sign * self.out, self.y_h), top, self.depth);
+        CubicBez::new(hem, c1, c2, top)
+    }
+
+    /// The front's side seam, from the hem up.
+    fn front_side(&self) -> CubicBez {
+        self.side(self.hem_f, 1.0)
+    }
+
+    /// The back's side seam, from the hem up.
+    fn back_side(&self) -> CubicBez {
+        self.side(-self.hem_b, -1.0)
+    }
+
+    /// The front's top at the centre front.
+    fn front_cf_top(&self) -> DVec2 {
+        p(self.cf + self.cf_in, self.len)
+    }
+
+    /// The front's centre front, from the waist down to the crotch.
+    fn front_cf(&self) -> CubicBez {
+        CubicBez::new(
+            self.front_cf_top(),
+            p(self.cf, self.y_c + 0.3 * self.rise),
+            p(self.cf - 0.35 * self.ext_f, self.y_c),
+            self.crotch_f,
+        )
+    }
+
+    /// The back's centre back, from the crotch up to its raised top.
+    fn back_cb(&self) -> CubicBez {
+        let y_cb = self.y_cb;
+        CubicBez::new(
+            p(self.crotch_bx, y_cb),
+            p(self.cb + 0.35 * self.ext_b, y_cb),
+            p(
+                self.cb + self.slant * (self.y_h - y_cb - 0.35 * self.rise),
+                y_cb + 0.35 * self.rise,
+            ),
+            p(self.cb - self.cb_in, self.len + self.cb_up),
+        )
+    }
+
+    /// The height of the backs' raised top (cm).
+    fn back_top(&self) -> f64 {
+        self.waist_top + self.cb_up / 10.0
+    }
+
+    /// The height on the body of draft height `y` (cm).
+    fn height(&self, y: f64) -> f64 {
+        self.waist_top - (self.len - y) / 10.0
+    }
+}
+
+/// A cubic's control points, as `Draft::panel` takes an edge's curve.
+fn controls(c: &CubicBez) -> Option<[DVec2; 2]> {
+    Some([c.p1, c.p2])
+}
+
 /// Trousers: for each leg a front and a back, the right leg's a mirror
 /// copy of the left's. A straight-leg block without darts: the waist is
 /// shaped at the side seams and the centre lines; the back is wider, with
 /// a longer crotch extension and a centre back raised and slanted. The
 /// side seams of front and back have the same shape, and the back's
 /// crotch point is lowered until its inseam is as long as the front's,
-/// so every seam matches. As `joggers`, pulled on: the waist is drafted
-/// as wide as the hips and gathered to the body's waist by an elastic,
-/// the hems to the ankles; the centre front is sewn all the way (no
-/// fly).
-fn trousers(d: &mut Draft, s: &Sizes, avatar: &Avatar, joggers: bool) -> Result<(), CommandError> {
-    let body = &avatar.body;
+/// so every seam matches. Joggers pull on: the waist is drafted as wide
+/// as the hips and gathered to the body's waist by an elastic, the hems
+/// to the ankles; the centre front is sewn all the way (no fly). Shorts
+/// end on the thigh, wide enough for it.
+fn trousers(d: &mut Draft, s: &Sizes, avatar: &Avatar, legs: Legs) -> Result<(), CommandError> {
+    let b = Block::new(d, s, avatar, legs)?;
+    if legs == Legs::Jeans {
+        return jeans(d, &b);
+    }
+    let joggers = legs == Legs::Joggers;
     let waist = mm("waist_cm", s.waist_cm)?;
-    let hips = mm("hips_cm", s.hips_cm)?;
-    let len = mm("length_cm", s.length_cm)?;
-    let ease = s.ease_cm.unwrap_or_default() * 10.0;
-    let h = body.height_cm;
-    let waist_top = waist_height_cm(d.tx.project())?;
-    // The crotch line 1.5 cm below the body's, the hip line at the hips.
-    let rise = ((waist_top - CROTCH_HEIGHT * h) * 10.0 + 15.0).clamp(150.0, 0.6 * len);
-    let y_c = len - rise;
-    let depth = (HIP_DEPTH * h * 10.0).min(0.8 * rise);
-    let y_h = len - depth;
-    // Widths at the hip line, crotch extensions, half hems.
-    let front_hip = (hips + ease) / 4.0 - 10.0;
-    let back_hip = (hips + ease) / 4.0 + 10.0;
-    let (ext_f, ext_b) = (hips / 16.0, hips / 10.0 + 10.0);
-    let hem_f = 0.1 * hips;
-    let hem_b = hem_f + 20.0;
-    // The crease (x = 0) halves the front at the crotch line.
-    let side_f = (front_hip + ext_f) / 2.0;
-    let out = side_f - hem_f;
-    let cf = side_f - front_hip;
-    let side_b = -(hem_b + out);
-    let cb = side_b + back_hip;
-    // Waist shaping: the centre front comes in 1 cm, the centre back 2.5
-    // cm and rises 1.5 cm; the side seams take the rest, the waist
-    // fitting the body without ease (the trousers hang from it).
-    let (cf_in, cb_in, cb_up) = (10.0, 25.0, 15.0);
-    let side_in = if joggers {
-        0.0
-    } else {
-        ((front_hip + back_hip - waist / 2.0 - cf_in - cb_in) / 2.0).max(0.0)
-    };
-    let crotch_f = p(cf - ext_f, y_c);
-    let inseam = crotch_f.distance(p(-hem_f, 0.0));
-    let crotch_bx = cb + ext_b;
-    let y_cb = (inseam * inseam - (crotch_bx - hem_b).powi(2))
-        .max(0.0)
-        .sqrt();
-    let side = |hem_x: f64, sign: f64| {
-        side_curve(
-            p(hem_x, 0.0),
-            p(hem_x + sign * out, y_h),
-            p(hem_x + sign * (out - side_in), len),
-            depth,
-        )
-    };
+    let front_side = b.front_side();
+    let back_side = b.back_side().reversed();
     // Front, seen from outside on the left leg: the side seam on +x.
     // Edges: 0 hem, 1 side, 2 waist, 3 centre front (crotch), 4 inseam.
     let front = d.panel(
         "Front left",
         &[
-            (p(-hem_f, 0.0), None),
-            (p(hem_f, 0.0), Some(side(hem_f, 1.0))),
-            (p(side_f - side_in, len), None),
-            (
-                p(cf + cf_in, len),
-                Some([p(cf, y_c + 0.3 * rise), p(cf - 0.35 * ext_f, y_c)]),
-            ),
-            (crotch_f, None),
+            (p(-b.hem_f, 0.0), None),
+            (p(b.hem_f, 0.0), controls(&front_side)),
+            (front_side.p3, None),
+            (b.front_cf_top(), controls(&b.front_cf())),
+            (b.crotch_f, None),
         ],
     )?;
     // Back, seen from outside on the left leg: the side seam on −x.
     // Edges: 0 hem, 1 inseam, 2 centre back (crotch), 3 waist, 4 side.
-    let slant = cb_in / (len + cb_up - y_h);
+    let cb = b.back_cb();
     let back = d.panel(
         "Back left",
         &[
-            (p(-hem_b, 0.0), None),
-            (p(hem_b, 0.0), None),
-            (
-                p(crotch_bx, y_cb),
-                Some([
-                    p(cb + 0.35 * ext_b, y_cb),
-                    p(cb + slant * (y_h - y_cb - 0.35 * rise), y_cb + 0.35 * rise),
-                ]),
-            ),
-            (p(cb - cb_in, len + cb_up), None),
-            (p(side_b + side_in, len), Some(reverse(side(-hem_b, -1.0)))),
+            (p(-b.hem_b, 0.0), None),
+            (p(b.hem_b, 0.0), None),
+            (cb.p0, controls(&cb)),
+            (cb.p3, None),
+            (back_side.p0, controls(&back_side)),
         ],
     )?;
     let front_right = d.mirror(&front, "Front right")?;
     let back_right = d.mirror(&back, "Back right")?;
-    for (f, b) in [(&front, &back), (&front_right, &back_right)] {
-        d.sew(f.edge(1)?, b.edge(4)?)?;
-        d.sew(f.edge(4)?, b.edge(1)?)?;
+    for (f, bk) in [(&front, &back), (&front_right, &back_right)] {
+        d.sew(f.edge(1)?, bk.edge(4)?)?;
+        d.sew(f.edge(4)?, bk.edge(1)?)?;
     }
-    // The fly: a zipper from the waist down the centre front, the crotch
-    // seam closed below it. The left front's centre front runs down from
-    // the waist, its mirror image up to it; both sides of the zipper
-    // start at its bottom stop.
-    let cf_len =
-        d.tx.project()
-            .edge_length(front.edge(3)?)
-            .unwrap_or_default();
     if joggers {
         d.sew(front.edge(3)?, front_right.edge(3)?)?;
     } else {
-        let fly = FLY_MM.min(0.6 * cf_len);
-        d.zip(
-            stretch(front.edge(3)?, None, Some(fly), true),
-            stretch(front_right.edge(3)?, Some(cf_len - fly), None, false),
-        )?;
-        d.sew_sides(
-            stretch(front.edge(3)?, Some(fly), None, false),
-            stretch(front_right.edge(3)?, None, Some(cf_len - fly), true),
-        )?;
+        fly(d, &front, &front_right, 3)?;
     }
     d.sew(back.edge(2)?, back_right.edge(2)?)?;
     if joggers {
@@ -1883,25 +2237,483 @@ fn trousers(d: &mut Draft, s: &Sizes, avatar: &Avatar, joggers: bool) -> Result<
         let top = 2.0 * (len(d, front.edge(2)?) + len(d, back.edge(3)?));
         let ankle = (avatar.measure(Measure::Ankle).cm + 6.0) * 10.0;
         let hem = len(d, front.edge(0)?) + len(d, back.edge(0)?);
-        for (f, b) in [(&front, &back), (&front_right, &back_right)] {
+        for (f, bk) in [(&front, &back), (&front_right, &back_right)] {
             d.elastic(whole(f.edge(2)?), waist / top)?;
-            d.elastic(whole(b.edge(3)?), waist / top)?;
+            d.elastic(whole(bk.edge(3)?), waist / top)?;
             d.elastic(whole(f.edge(0)?), ankle / hem)?;
-            d.elastic(whole(b.edge(0)?), ankle / hem)?;
+            d.elastic(whole(bk.edge(0)?), ankle / hem)?;
         }
     }
     // Each piece's crease goes to the front or the back of its leg; the
     // backs' tops are their raised centres.
-    let back_top = waist_top + cb_up / 10.0;
     for (piece, around, angle, top) in [
-        (&front, Around::LeftLeg, 0.0, waist_top),
-        (&back, Around::LeftLeg, 180.0, back_top),
-        (&front_right, Around::RightLeg, 0.0, waist_top),
-        (&back_right, Around::RightLeg, 180.0, back_top),
+        (&front, Around::LeftLeg, 0.0, b.waist_top),
+        (&back, Around::LeftLeg, 180.0, b.back_top()),
+        (&front_right, Around::RightLeg, 0.0, b.waist_top),
+        (&back_right, Around::RightLeg, 180.0, b.back_top()),
     ] {
-        let crease = piece.origin_x;
-        d.place_at(piece, around, angle, top, 30.0, Some(crease))?;
+        d.place_at(piece, around, angle, top, 30.0, Some(piece.origin_x))?;
     }
+    Ok(())
+}
+
+/// The fly: a zipper from the waist down the centre front (edge `k` of
+/// both fronts), the crotch seam closed below it. The left front's
+/// centre front runs down from the waist, its mirror image up to it;
+/// both sides of the zipper start at its bottom stop.
+fn fly(d: &mut Draft, front: &Piece, front_right: &Piece, k: usize) -> Result<(), CommandError> {
+    let cf_len =
+        d.tx.project()
+            .edge_length(front.edge(k)?)
+            .unwrap_or_default();
+    let fly = FLY_MM.min(0.6 * cf_len);
+    d.zip(
+        stretch(front.edge(k)?, None, Some(fly), true),
+        stretch(front_right.edge(k)?, Some(cf_len - fly), None, false),
+    )?;
+    d.sew_sides(
+        stretch(front.edge(k)?, Some(fly), None, false),
+        stretch(front_right.edge(k)?, None, Some(cf_len - fly), true),
+    )
+}
+
+/// Where the front pocket's mouth meets the side seam, below the waist,
+/// and the waist, from the side (mm).
+const POCKET_SIDE_MM: f64 = 90.0;
+const POCKET_WAIST_MM: f64 = 110.0;
+/// How far the pocket facing reaches below the mouth (mm).
+const POCKET_BAG_MM: f64 = 70.0;
+/// The back yoke's seam below the waist at the side and below the raised
+/// top at the centre back (mm).
+const JEANS_YOKE_SIDE_MM: f64 = 50.0;
+const JEANS_YOKE_CB_MM: f64 = 80.0;
+/// The waistband's height (mm).
+const WAISTBAND_MM: f64 = 40.0;
+/// A belt loop: its width, how far below the waist its lower end is
+/// sewn, and its length, just over the band so that it lies flat (mm).
+const LOOP_W_MM: f64 = 15.0;
+const LOOP_BELOW_MM: f64 = 8.0;
+const LOOP_MM: f64 = WAISTBAND_MM + LOOP_BELOW_MM + 4.0;
+/// The back pockets: width, height at the sides, and the point's depth
+/// below them (mm).
+const BACK_POCKET_W_MM: f64 = 140.0;
+const BACK_POCKET_H_MM: f64 = 150.0;
+const BACK_POCKET_POINT_MM: f64 = 25.0;
+/// The coin pocket (mm).
+const COIN_W_MM: f64 = 60.0;
+const COIN_H_MM: f64 = 55.0;
+
+/// Jeans: the trousers' block in denim, closer at the hips, with five
+/// pockets (two scooped at the front over their facings, a coin pocket on
+/// the right facing, two patch pockets on the back), a yoke cut off the
+/// back, a fly zipper, and a waistband with belt loops.
+fn jeans(d: &mut Draft, b: &Block) -> Result<(), CommandError> {
+    let len = b.len;
+    // The front: its side seam cut where the pocket's mouth meets it.
+    let side = b.front_side();
+    let side_top = side.p3;
+    let (side_low, side_up) = side.split(rising_to(&side, len - POCKET_SIDE_MM));
+    let m1 = side_low.p3;
+    let cf_top = b.front_cf_top();
+    let m2 = p(
+        side_top.x - POCKET_WAIST_MM.min(0.6 * (side_top.x - cf_top.x)),
+        len,
+    );
+    let (w, hgt) = (m1.x - m2.x, len - m1.y);
+    let mouth = [p(m1.x - 0.55 * w, m1.y), p(m2.x, m2.y - 0.55 * hgt)];
+    // The facing's edge under the front, from the waist round below the
+    // mouth to the side seam.
+    let bag = [
+        p(m2.x - 30.0, m1.y - 0.5 * POCKET_BAG_MM),
+        p(m1.x - 0.5 * w, m1.y - POCKET_BAG_MM),
+    ];
+    // Front edges: 0 hem, 1 side, 2 pocket mouth, 3 waist, 4 centre
+    // front, 5 inseam.
+    let front = d.panel(
+        "Front left",
+        &[
+            (p(-b.hem_f, 0.0), None),
+            (p(b.hem_f, 0.0), controls(&side_low)),
+            (m1, Some(mouth)),
+            (m2, None),
+            (cf_top, controls(&b.front_cf())),
+            (b.crotch_f, None),
+        ],
+    )?;
+    // Its lines, drawn before it is mirrored so that the right front has
+    // them too: where the facing is sewn under it, and a belt loop's
+    // lower end.
+    let bag_line = d.line(&front, m2, &[(m1, Some(bag))])?;
+    let front_loop_x = (m2.x - 25.0).max(cf_top.x + 40.0);
+    let front_loop = d.line(
+        &front,
+        p(front_loop_x - LOOP_W_MM / 2.0, len - LOOP_BELOW_MM),
+        &[(p(front_loop_x + LOOP_W_MM / 2.0, len - LOOP_BELOW_MM), None)],
+    )?;
+    // The facing: edges 0 side, 1 waist, 2 under the front.
+    let facing = d.panel(
+        "Pocket facing left",
+        &[(m1, controls(&side_up)), (side_top, None), (m2, Some(bag))],
+    )?;
+
+    // The back, in two: a yoke above a slanted seam, and the back below.
+    let side = b.back_side();
+    let back_side_top = side.p3;
+    let (bside_low, bside_up) = side.split(rising_to(&side, len - JEANS_YOKE_SIDE_MM));
+    let ys = bside_low.p3;
+    let cb = b.back_cb();
+    let cb_top = cb.p3;
+    let (cb_low, cb_up) = cb.split(rising_to(&cb, len + b.cb_up - JEANS_YOKE_CB_MM));
+    let yc = cb_low.p3;
+    // Back edges: 0 hem, 1 inseam, 2 centre back, 3 yoke seam, 4 side.
+    let back = d.panel(
+        "Back left",
+        &[
+            (p(-b.hem_b, 0.0), None),
+            (p(b.hem_b, 0.0), None),
+            (cb_low.p0, controls(&cb_low)),
+            (yc, None),
+            (ys, controls(&bside_low.reversed())),
+        ],
+    )?;
+    // A patch pocket, its point down, between the side and the centre
+    // back below the yoke.
+    let pocket_w = BACK_POCKET_W_MM.min(0.5 * (yc.x - ys.x));
+    let pocket_top = ys.y.min(yc.y) - 25.0;
+    let pocket_x = (ys.x + yc.x) / 2.0 + 10.0;
+    let (pl, pr) = (pocket_x - pocket_w / 2.0, pocket_x + pocket_w / 2.0);
+    let pocket_low = pocket_top - BACK_POCKET_H_MM;
+    let pocket = [
+        p(pl, pocket_low + BACK_POCKET_POINT_MM),
+        p(pocket_x, pocket_low),
+        p(pr, pocket_low + BACK_POCKET_POINT_MM),
+        p(pr, pocket_top),
+        p(pl, pocket_top),
+    ];
+    let [q0, q1, q2, q3, q4] = pocket;
+    let pocket_line = d.line(&back, q4, &[(q0, None), (q1, None), (q2, None), (q3, None)])?;
+    // Yoke edges: 0 seam, 1 centre back, 2 waist, 3 side.
+    let yoke = d.panel(
+        "Yoke left",
+        &[
+            (ys, None),
+            (yc, controls(&cb_up)),
+            (cb_top, None),
+            (back_side_top, controls(&bside_up.reversed())),
+        ],
+    )?;
+    // Two belt loops on the yoke: by the side seam and by the centre back.
+    let on_yoke = |u: f64| back_side_top.lerp(cb_top, u);
+    let yoke_loops = [on_yoke(0.15), on_yoke(0.8)];
+    let loop_line = |d: &mut Draft, at: DVec2| {
+        let y = at.y - LOOP_BELOW_MM;
+        d.line(
+            &yoke,
+            p(at.x - LOOP_W_MM / 2.0, y),
+            &[(p(at.x + LOOP_W_MM / 2.0, y), None)],
+        )
+    };
+    let yoke_lines = [loop_line(d, yoke_loops[0])?, loop_line(d, yoke_loops[1])?];
+    // Pocket edges: 0, 1 the point, 2 right side, 3 top (open), 4 left.
+    let patch = d.panel(
+        "Back pocket left",
+        &[(q0, None), (q1, None), (q2, None), (q3, None), (q4, None)],
+    )?;
+    // The loops, each drawn where it is sewn: edges 0 lower end, 1, 2
+    // upper end, 3.
+    let loop_at = |at: DVec2| {
+        let (l, r, y) = (
+            at.x - LOOP_W_MM / 2.0,
+            at.x + LOOP_W_MM / 2.0,
+            at.y - LOOP_BELOW_MM,
+        );
+        [
+            (p(l, y), None),
+            (p(r, y), None),
+            (p(r, y + LOOP_MM), None),
+            (p(l, y + LOOP_MM), None),
+        ]
+    };
+    let loop_front = d.panel("Belt loop front left", &loop_at(p(front_loop_x, len)))?;
+    let loop_side = d.panel("Belt loop side left", &loop_at(yoke_loops[0]))?;
+    let loop_back = d.panel("Belt loop back left", &loop_at(yoke_loops[1]))?;
+
+    // The waistband in two halves sewn at the centre back and the centre
+    // front, their lower edges in one edge per waist they are sewn to.
+    let edge_len = |d: &Draft, e: EdgeId| d.tx.project().edge_length(e).unwrap_or_default();
+    let (lf, lfa, ly) = (
+        edge_len(d, front.edge(3)?),
+        edge_len(d, facing.edge(1)?),
+        edge_len(d, yoke.edge(2)?),
+    );
+    let half = lf + lfa + ly;
+    let around = 2.0 * half;
+    let wb = WAISTBAND_MM;
+    // Edges: 0 front, 1 facing, 2 yoke, 3 centre back, 4 top, 5 front end.
+    let band_left = d.panel(
+        "Waistband left",
+        &[
+            (p(0.0, 0.0), None),
+            (p(lf, 0.0), None),
+            (p(lf + lfa, 0.0), None),
+            (p(half, 0.0), None),
+            (p(half, wb), None),
+            (p(0.0, wb), None),
+        ],
+    )?;
+    // Edges: 0 yoke, 1 facing, 2 front, 3 front end, 4 top, 5 centre
+    // back.
+    let band_right = d.panel(
+        "Waistband right",
+        &[
+            (p(0.0, 0.0), None),
+            (p(ly, 0.0), None),
+            (p(ly + lfa, 0.0), None),
+            (p(half, 0.0), None),
+            (p(half, wb), None),
+            (p(0.0, wb), None),
+        ],
+    )?;
+
+    let front_right = d.mirror(&front, "Front right")?;
+    let facing_right = d.mirror(&facing, "Pocket facing right")?;
+    let back_right = d.mirror(&back, "Back right")?;
+    let yoke_right = d.mirror(&yoke, "Yoke right")?;
+    let patch_right = d.mirror(&patch, "Back pocket right")?;
+    let loop_front_right = d.mirror(&loop_front, "Belt loop front right")?;
+    let loop_side_right = d.mirror(&loop_side, "Belt loop side right")?;
+    let loop_back_right = d.mirror(&loop_back, "Belt loop back right")?;
+    // The coin pocket on the right facing alone: that facing on its own.
+    PanelUnlink {
+        panel: facing_right.id,
+    }
+    .apply(d.tx)?;
+    let coin_w = COIN_W_MM.min(0.55 * (side_top.x - m2.x));
+    let (cr, ct) = (side_top.x - 15.0, len - 15.0);
+    let (cl, cbm) = (cr - coin_w, ct - COIN_H_MM);
+    let coin_line = d.line(
+        &facing_right,
+        p(cl, ct),
+        &[(p(cl, cbm), None), (p(cr, cbm), None), (p(cr, ct), None)],
+    )?;
+    // Drawn reflected, as the right pieces are: edges 0 bottom, 1, 2 top
+    // (open), 3.
+    let coin = d.reflected(
+        "Coin pocket",
+        &[p(cr, cbm), p(cl, cbm), p(cl, ct), p(cr, ct)],
+    )?;
+
+    // Sewing, each side alike.
+    let lines_of = |d: &Draft, piece: &Piece| -> Vec<r3d_core::InternalLineId> {
+        d.tx.project()
+            .internal_lines()
+            .iter()
+            .filter(|(_, l)| l.panel == piece.id)
+            .map(|(id, _)| *id)
+            .collect()
+    };
+    let front_lines = [bag_line, front_loop];
+    let front_right_lines = lines_of(d, &front_right);
+    let yoke_right_lines = lines_of(d, &yoke_right);
+    let back_right_lines = lines_of(d, &back_right);
+    let line = |lines: &[r3d_core::InternalLineId], k: usize| {
+        lines
+            .get(k)
+            .copied()
+            .ok_or_else(|| internal(format!("no line {k}")))
+    };
+    let sides = [
+        (
+            &front,
+            &facing,
+            &back,
+            &yoke,
+            &patch,
+            [&loop_front, &loop_side, &loop_back],
+            front_lines.to_vec(),
+            yoke_lines.to_vec(),
+            vec![pocket_line],
+        ),
+        (
+            &front_right,
+            &facing_right,
+            &back_right,
+            &yoke_right,
+            &patch_right,
+            [&loop_front_right, &loop_side_right, &loop_back_right],
+            front_right_lines,
+            yoke_right_lines,
+            back_right_lines,
+        ),
+    ];
+    for (f, fa, bk, y, pk, loops, f_lines, y_lines, b_lines) in &sides {
+        // The side seam: the front then its facing, against the back
+        // then its yoke.
+        d.sew_chains(&[f.edge(1)?, fa.edge(0)?], &[bk.edge(4)?, y.edge(3)?])?;
+        d.sew(f.edge(5)?, bk.edge(1)?)?;
+        d.sew(y.edge(0)?, bk.edge(3)?)?;
+        // The facing under the front, the pocket on the back, the loops'
+        // lower ends.
+        d.overlay(fa, whole(fa.edge(2)?), f, line_side(line(f_lines, 0)?))?;
+        let pocket_run = d.run(pk, &[4, 0, 1, 2])?;
+        d.overlay(pk, pocket_run, bk, line_side(line(b_lines, 0)?))?;
+        d.overlay(
+            loops[0],
+            whole(loops[0].edge(0)?),
+            f,
+            line_side(line(f_lines, 1)?),
+        )?;
+        d.overlay(
+            loops[1],
+            whole(loops[1].edge(0)?),
+            y,
+            line_side(line(y_lines, 0)?),
+        )?;
+        d.overlay(
+            loops[2],
+            whole(loops[2].edge(0)?),
+            y,
+            line_side(line(y_lines, 1)?),
+        )?;
+        d.topstitch(f.edge(2)?, 2, 1.5)?;
+        d.topstitch(y.edge(0)?, 2, 1.5)?;
+        d.topstitch(pk.edge(3)?, 2, 1.5)?;
+    }
+    let coin_run = d.run(&coin, &[3, 0, 1])?;
+    d.overlay(&coin, coin_run, &facing_right, line_side(coin_line))?;
+    d.topstitch(coin.edge(2)?, 1, 1.5)?;
+    fly(d, &front, &front_right, 4)?;
+    d.sew(back.edge(2)?, back_right.edge(2)?)?;
+    d.sew(yoke.edge(1)?, yoke_right.edge(1)?)?;
+    // The waistband over each waist, round from the left centre front.
+    for (band, waist) in [
+        (band_left.edge(0)?, front.edge(3)?),
+        (band_left.edge(1)?, facing.edge(1)?),
+        (band_left.edge(2)?, yoke.edge(2)?),
+        (band_right.edge(0)?, yoke_right.edge(2)?),
+        (band_right.edge(1)?, facing_right.edge(1)?),
+        (band_right.edge(2)?, front_right.edge(3)?),
+        (band_left.edge(3)?, band_right.edge(5)?),
+        (band_left.edge(5)?, band_right.edge(3)?),
+    ] {
+        d.sew(band, waist)?;
+    }
+    // The loops' upper ends over the waistband's top: a point's place
+    // round the waist, from the left centre front, on each piece, and on
+    // the band's top (walked from the right).
+    let round_front = |x: f64| x - cf_top.x;
+    let yoke_len = (cb_top - back_side_top).length();
+    let round_yoke =
+        |x: f64| lf + lfa + yoke_len * (x - back_side_top.x) / (cb_top.x - back_side_top.x);
+    let on_band = |s: f64| -> Result<(EdgeId, f64), CommandError> {
+        Ok(if s <= half {
+            (band_left.edge(4)?, half - s)
+        } else {
+            (band_right.edge(4)?, around - s)
+        })
+    };
+    for (loops, mirror) in [
+        ([&loop_front, &loop_side, &loop_back], false),
+        (
+            [&loop_front_right, &loop_side_right, &loop_back_right],
+            true,
+        ),
+    ] {
+        for (k, lp) in loops.into_iter().enumerate() {
+            let Some((a, z)) = d.ends(lp, lp.edge(2)?) else {
+                continue;
+            };
+            let round = |x: f64| {
+                let s = if k == 0 {
+                    round_front(x)
+                } else {
+                    round_yoke(x)
+                };
+                if mirror { around - s } else { s }
+            };
+            let ((top, s0), (_, s1)) = (on_band(round(a.x))?, on_band(round(z.x))?);
+            let side = if s0 <= s1 {
+                stretch(top, Some(s0), Some(s1), false)
+            } else {
+                stretch(top, Some(s1), Some(s0), true)
+            };
+            d.sew_sides(whole(lp.edge(2)?), side)?;
+        }
+    }
+
+    // Each piece where it is worn: the fronts' and backs' creases at the
+    // front and back of their legs, every other piece as drawn on them.
+    let back_low = b.height(ys.y.max(yc.y));
+    let pocket_top_h = b.height(pocket_top);
+    let loop_top = |at: DVec2| b.height(at.y - LOOP_BELOW_MM + LOOP_MM);
+    for (pieces, around_leg) in [
+        (
+            [
+                &front,
+                &facing,
+                &back,
+                &yoke,
+                &patch,
+                &loop_front,
+                &loop_side,
+                &loop_back,
+            ],
+            Around::LeftLeg,
+        ),
+        (
+            [
+                &front_right,
+                &facing_right,
+                &back_right,
+                &yoke_right,
+                &patch_right,
+                &loop_front_right,
+                &loop_side_right,
+                &loop_back_right,
+            ],
+            Around::RightLeg,
+        ),
+    ] {
+        let [f, fa, bk, y, pk, lf, ls, lb] = pieces;
+        for (piece, angle, top, offset) in [
+            (f, 0.0, b.waist_top, 30.0),
+            (fa, 0.0, b.waist_top, 22.0),
+            (bk, 180.0, back_low, 30.0),
+            (y, 180.0, b.back_top(), 30.0),
+            (pk, 180.0, pocket_top_h, 40.0),
+            (lf, 0.0, loop_top(p(front_loop_x, len)), 42.0),
+            (ls, 180.0, loop_top(yoke_loops[0]), 42.0),
+            (lb, 180.0, loop_top(yoke_loops[1]), 42.0),
+        ] {
+            d.place_at(piece, around_leg, angle, top, offset, Some(piece.origin_x))?;
+        }
+    }
+    d.place_at(
+        &coin,
+        Around::RightLeg,
+        0.0,
+        b.height(len - 15.0),
+        26.0,
+        Some(coin.origin_x),
+    )?;
+    // The waistband round the body from the centre back.
+    let band_top = b.waist_top + (b.cb_up / 2.0 + wb) / 10.0;
+    d.place_at(
+        &band_left,
+        Around::Body,
+        180.0,
+        band_top,
+        38.0,
+        Some(band_left.origin_x + half),
+    )?;
+    d.place_at(
+        &band_right,
+        Around::Body,
+        180.0,
+        band_top,
+        38.0,
+        Some(band_right.origin_x),
+    )?;
     Ok(())
 }
 

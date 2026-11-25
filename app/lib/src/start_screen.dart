@@ -27,19 +27,23 @@ const _templates = [
   ('trousers', Icons.accessibility_new_rounded),
   ('hoodie', Icons.checkroom_outlined),
   ('joggers', Icons.directions_run_rounded),
+  ('jeans', Icons.accessibility_rounded),
+  ('shorts', Icons.wb_sunny_outlined),
   ('dress', Icons.dry_cleaning_rounded),
   ('straight_skirt', Icons.straighten_rounded),
   ('a_line_skirt', Icons.change_history_rounded),
   ('tote_bag', Icons.shopping_bag_outlined),
 ];
 
-/// A template's title and blurb.
-(String, String) _templateText(L l, String id) => switch (id) {
+/// A template's title and blurb (also the pattern library's, spec 32).
+(String, String) templateText(L l, String id) => switch (id) {
   't_shirt' => (l.templateTShirt, l.templateTShirtBlurb),
   'shirt' => (l.templateShirt, l.templateShirtBlurb),
   'trousers' => (l.templateTrousers, l.templateTrousersBlurb),
   'hoodie' => (l.templateHoodie, l.templateHoodieBlurb),
   'joggers' => (l.templateJoggers, l.templateJoggersBlurb),
+  'jeans' => (l.templateJeans, l.templateJeansBlurb),
+  'shorts' => (l.templateShorts, l.templateShortsBlurb),
   'dress' => (l.templateDress, l.templateDressBlurb),
   'straight_skirt' => (l.templateStraightSkirt, l.templateStraightSkirtBlurb),
   'a_line_skirt' => (l.templateALineSkirt, l.templateALineSkirtBlurb),
@@ -392,7 +396,7 @@ class _StartScreenState extends State<StartScreen> {
                         runSpacing: Space.l,
                         children: [
                           for (final (id, icon) in _templates)
-                            if (_templateText(l, id) case (
+                            if (templateText(l, id) case (
                               final title,
                               final blurb,
                             ))

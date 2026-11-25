@@ -47,10 +47,9 @@ maintainer's briefs that specs cite as "ROADMAP Mxx" in their
 | M35 | Sketching on the board: the action bar ✅ (2026-11-24) | A half bodice drawn and constrained without the inspector: what fits the selection is offered above the board, one click applies it |
 | M36 | Natural motions ✅ (2026-11-25) | The walk looks human: no hop, a supple trunk, relaxed arms |
 | M37 | Imported avatars in motion, game export checked ✅ (2026-11-25) | A scanned body walks in its garment; the garment and its motion open in a game engine as exported |
-| M38 | Pattern library | In an open project, a jean and a short are added from the library; a skirt saved there from one project is added to another, drafted for its body |
+| M38 | Pattern library ✅ (2026-11-25) | In an open project, a jean and a short are added from the library; a skirt saved there from one project is added to another, drafted for its body |
 
-Next: M38 (added by the maintainer on 2026-11-25); M16's Linux part
-when the work moves to Linux.
+Next: nothing planned; M16's Linux part when the work moves to Linux.
 
 ## Test report 2026-11-24 (open points: to take up next)
 
@@ -80,30 +79,6 @@ used the app.
   - Done: hoodie and joggers templates (spec 11).
   - Done: a garment taken out of the drape and put back
     (`garment.set_draped`, spec 17).
-
-## M38 — Pattern library
-
-Maintainer's brief (2026-11-25): a library of patterns to add to the
-project one is working on (T-shirt, shirt, hoodie, trousers, jeans,
-joggers, shorts, skirt, dress…), where one can also save one's own
-work to reuse it in new projects.
-
-- A library panel in the project: the patterns by kind (tops, bottoms,
-  dresses and skirts, accessories), each with its thumbnail; one click
-  adds it as a new garment drafted for the avatar (and every size of a
-  range), as templates do from the start screen today.
-- More built-in patterns: jeans (five pockets, yoke, fly, waistband
-  with belt loops), shorts, and whatever else the list above lacks.
-- **My patterns**: save a garment (its pieces, seams, construction
-  details, trims, fabric and grading) to a user library on disk,
-  shared by every project, with a name, a kind and a thumbnail; add it
-  to another project. Pieces drafted from measurements (M28 formulas,
-  templates) are drafted again for the new body; the others come as
-  drawn. Rename, delete, and export or import one as a file to share it.
-- The same through commands (CLI and MCP), so an agent can list, add
-  and save library patterns.
-- The library's storage is the one the prints' and fabrics' user
-  libraries (M21 open point, spec 05) will use.
 
 ## M16 — Zero-copy views on Linux (open)
 

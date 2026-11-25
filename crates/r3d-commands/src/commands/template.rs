@@ -13,8 +13,8 @@ use crate::templates::{Sizes, Template, draft};
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct TemplateApply {
-    /// `t_shirt`, `shirt`, `trousers`, `dress`, `straight_skirt`,
-    /// `a_line_skirt` or `tote_bag`.
+    /// `t_shirt`, `shirt`, `trousers`, `hoodie`, `joggers`, `jeans`,
+    /// `shorts`, `dress`, `straight_skirt`, `a_line_skirt` or `tote_bag`.
     pub template: Template,
     /// Sizes in cm; any left out come from the avatar (see template.list).
     #[serde(default)]
@@ -22,7 +22,7 @@ pub struct TemplateApply {
 }
 
 impl Described for TemplateApply {
-    const SUMMARY: &'static str = "Draft a starter garment (t_shirt, shirt, trousers, dress, straight_skirt, a_line_skirt, tote_bag) from sizes in cm, the avatar's measurements filling in any left out: its pieces are drawn, sewn, placed around the body and given a fabric, ready to simulate and edit. In a project without panels its garment takes the template's name (the project keeps its own); in a project with pieces the template becomes a garment of its own, worn over the others (see garment.set_layer). Returns the garment if one was added, then the panels, seams and notches.";
+    const SUMMARY: &'static str = "Draft a starter garment (t_shirt, shirt, trousers, hoodie, joggers, jeans, shorts, dress, straight_skirt, a_line_skirt, tote_bag; library.list gives their kinds) from sizes in cm, the avatar's measurements filling in any left out: its pieces are drawn, sewn, placed around the body and given a fabric, ready to simulate and edit. In a project without panels its garment takes the template's name (the project keeps its own); in a project with pieces the template becomes a garment of its own, worn over the others (see garment.set_layer). Returns the garment if one was added, then the panels, seams and notches.";
 }
 
 impl CommandSpec for TemplateApply {

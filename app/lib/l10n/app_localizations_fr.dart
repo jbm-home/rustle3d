@@ -1810,6 +1810,7 @@ class LFr extends L {
   @override
   String stepName(String step) {
     String _temp0 = intl.Intl.selectLogic(step, {
+      'pattern_add': 'Ajouter un patron',
       'project_rename': 'Renommer le projet',
       'project_set_display_unit': 'Changer d’unité',
       'avatar_set': 'Modifier le corps',
@@ -3716,4 +3717,103 @@ class LFr extends L {
 
   @override
   String get tpSpacing => 'Écart (mm)';
+
+  @override
+  String get templateJeans => 'Jean';
+
+  @override
+  String get templateJeansBlurb =>
+      'En denim, cinq poches, un empiècement dos, une braguette et des passants.';
+
+  @override
+  String get templateShorts => 'Short';
+
+  @override
+  String get templateShortsBlurb =>
+      'La base du pantalon, arrêtée une main au-dessus du genou.';
+
+  @override
+  String get libraryOpen => 'Depuis la bibliothèque…';
+
+  @override
+  String get libraryTitle => 'Bibliothèque de patrons';
+
+  @override
+  String get librarySubtitle =>
+      'Cliquez sur un patron pour l\'ajouter à ce projet, tracé pour son corps. Enregistrez ici vos propres vêtements depuis leur carte.';
+
+  @override
+  String get libraryKindTops => 'Hauts';
+
+  @override
+  String get libraryKindBottoms => 'Bas';
+
+  @override
+  String get libraryKindDresses => 'Robes et jupes';
+
+  @override
+  String get libraryKindAccessories => 'Accessoires';
+
+  @override
+  String get libraryMine => 'Mes patrons';
+
+  @override
+  String get libraryMineEmpty =>
+      'Aucun pour l\'instant : enregistrez un vêtement depuis sa carte (le bouton signet) pour l\'ajouter à d\'autres projets.';
+
+  @override
+  String get libraryImport => 'Importer…';
+
+  @override
+  String get libraryExport => 'Exporter…';
+
+  @override
+  String get libraryPatternFiles => 'Fichiers de patron';
+
+  @override
+  String libraryDeleteConfirm(String name) {
+    return 'Supprimer « $name » de la bibliothèque ? Les projets où il a été ajouté gardent leurs vêtements.';
+  }
+
+  @override
+  String libraryReplaceConfirm(String name) {
+    return 'La bibliothèque a déjà un patron nommé « $name ». Le remplacer ?';
+  }
+
+  @override
+  String get libraryReplace => 'Remplacer';
+
+  @override
+  String get librarySave => 'Enregistrer dans la bibliothèque';
+
+  @override
+  String get librarySaveTitle => 'Enregistrer dans la bibliothèque de patrons';
+
+  @override
+  String get librarySaveName => 'Nom';
+
+  @override
+  String get librarySaveKind => 'Type';
+
+  @override
+  String librarySaved(String name) {
+    return 'Enregistré dans la bibliothèque sous « $name ».';
+  }
+
+  @override
+  String get busyLibraryAdd => 'Ajout du patron';
+
+  @override
+  String get errLibraryNone =>
+      'Aucune bibliothèque de patrons n\'est configurée.';
+
+  @override
+  String errPatternExists(String name) {
+    return 'La bibliothèque a déjà un patron nommé « $name ».';
+  }
+
+  @override
+  String errPatternMissing(String name) {
+    return 'La bibliothèque n\'a plus de patron nommé « $name ».';
+  }
 }

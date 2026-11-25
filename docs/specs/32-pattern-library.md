@@ -15,9 +15,9 @@ a back yoke, a fly, a waistband buttoned over the fly, belt loops).
 
 ## Status
 
-In progress (M38, 2026-11-25).
+Done (M38, 2026-11-25).
 
-- Done: the command layer. `pattern.add` adds the garments of a saved
+- The command layer: `pattern.add` adds the garments of a saved
   pattern (a project document) to a project, drafted again for its
   body; `library.list`, `library.add`, `library.save`,
   `library.rename`, `library.delete`, `library.export`,
@@ -26,8 +26,15 @@ In progress (M38, 2026-11-25).
   built-in pattern's kind. `panel.copy` and `panel.paste` carry
   construction details, buttons, zippers, constraints on notches and
   construction lines, and dimension names since.
-- To do: jeans and shorts; the library panel in the app; the user
-  guide.
+- Jeans and shorts (spec 11).
+- The app: **From the library…** under the garments opens the library
+  (a dialog: My patterns, then the built-in patterns by kind, with
+  their thumbnails); the bookmark button on a garment's card saves it;
+  rename, export and delete on a saved pattern, Import… in the
+  dialog's header.
+- Not done: the jeans' waistband is not buttoned (its two halves are
+  sewn at the centre front over the fly): a lap buttoned over the
+  other end did not close round the body in the drape.
 
 ## User story
 
@@ -92,12 +99,15 @@ another one, drafted for that project's body.
 
 ## UX
 
-- A Library panel in the project: the patterns by kind, each with its
-  thumbnail (the pattern drawn by our renderer); built-in patterns
-  first, then "My patterns". One click adds a pattern.
-- On a garment's card, "Save to library…" asks for a name and a kind.
-- On a saved pattern: rename, delete, export; "Import…" adds a shared
-  pattern file.
+- **From the library…**, below the garments in the inspector (nothing
+  selected), opens the library: My patterns, then the built-in patterns
+  by kind, each a card with its thumbnail (the pattern drawn by our
+  renderer). One click adds a pattern and closes the library; the drape
+  starts again from around the body.
+- On a garment's card, the bookmark button (Save to library) asks for a
+  name and a kind; a name already in the library asks before replacing.
+- On a saved pattern's card, **⋯**: rename, export, delete;
+  **Import…** in the library's header adds a shared pattern file.
 
 ## Acceptance criteria
 

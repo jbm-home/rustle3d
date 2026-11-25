@@ -5328,7 +5328,7 @@ Set how a contour point moves from size to size (its grade rule): either `step`,
 
 ### `template.apply`
 
-Draft a starter garment (t_shirt, shirt, trousers, dress, straight_skirt, a_line_skirt, tote_bag) from sizes in cm, the avatar's measurements filling in any left out: its pieces are drawn, sewn, placed around the body and given a fabric, ready to simulate and edit. In a project without panels its garment takes the template's name (the project keeps its own); in a project with pieces the template becomes a garment of its own, worn over the others (see garment.set_layer). Returns the garment if one was added, then the panels, seams and notches.
+Draft a starter garment (t_shirt, shirt, trousers, hoodie, joggers, jeans, shorts, dress, straight_skirt, a_line_skirt, tote_bag; library.list gives their kinds) from sizes in cm, the avatar's measurements filling in any left out: its pieces are drawn, sewn, placed around the body and given a fabric, ready to simulate and edit. In a project without panels its garment takes the template's name (the project keeps its own); in a project with pieces the template becomes a garment of its own, worn over the others (see garment.set_layer). Returns the garment if one was added, then the panels, seams and notches.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -5437,6 +5437,16 @@ Draft a starter garment (t_shirt, shirt, trousers, dress, straight_skirt, a_line
           "type": "string"
         },
         {
+          "const": "jeans",
+          "description": "Jeans: the trousers' block in denim with five pockets, a back\nyoke, a fly and a waistband with belt loops.",
+          "type": "string"
+        },
+        {
+          "const": "shorts",
+          "description": "Shorts: the trousers' block ending on the thigh.",
+          "type": "string"
+        },
+        {
           "const": "dress",
           "description": "A sleeveless dress: front and back from the neck to the knee,\nshaped at the waist, flared at the hem.",
           "type": "string"
@@ -5460,7 +5470,7 @@ Draft a starter garment (t_shirt, shirt, trousers, dress, straight_skirt, a_line
     },
     "template": {
       "$ref": "#/$defs/Template",
-      "description": "`t_shirt`, `shirt`, `trousers`, `dress`, `straight_skirt`,\n`a_line_skirt` or `tote_bag`."
+      "description": "`t_shirt`, `shirt`, `trousers`, `hoodie`, `joggers`, `jeans`,\n`shorts`, `dress`, `straight_skirt`, `a_line_skirt` or `tote_bag`."
     }
   },
   "required": [

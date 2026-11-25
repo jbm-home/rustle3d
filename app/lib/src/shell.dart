@@ -17,6 +17,7 @@ import 'design/tokens.dart';
 import 'i18n.dart';
 import 'learn.dart';
 import 'motion_library.dart';
+import 'pattern_library.dart';
 import 'photo.dart';
 import 'projector.dart';
 import 'techpack.dart';
@@ -191,6 +192,8 @@ class _ShellState extends State<Shell> {
   void initState() {
     super.initState();
     FocusManager.instance.addListener(_keepKeys);
+    // Saved patterns, for the app's and attached agents' library steps.
+    widget.engine.setLibrary(libraryDir: widget.libraryDir);
     _refresh();
     _agentPoll = Timer.periodic(
       const Duration(milliseconds: 200),
@@ -416,6 +419,7 @@ class _ShellState extends State<Shell> {
   /// every size, fitting a body to new measurements.
   static const _longSteps = {
     'template.apply',
+    'library.add',
     'grading.use_chart',
     'grading.set_sizes',
     'grading.show_size',
@@ -429,6 +433,7 @@ class _ShellState extends State<Shell> {
     final l = context.l;
     final title = switch (step['type']) {
       'template.apply' => l.busyTemplate,
+      'library.add' => l.busyLibraryAdd,
       'avatar.set' => l.busyBodyTitle,
       'garment.redraft' => l.busyRedraft,
       _ => l.busySizesTitle,
@@ -693,6 +698,20 @@ class _ShellState extends State<Shell> {
     context,
     libraryDir: widget.libraryDir,
     onPlay: _useLibraryMotion,
+  );
+
+  /// The pattern library: a pattern added becomes a garment, draped from
+  /// around the body.
+  void _showPatternLibrary() => showPatternLibrary(
+    context,
+    engine: widget.engine,
+    libraryDir: widget.libraryDir,
+    add: (step) async {
+      await _runLong(step);
+      if (!mounted) return;
+      _refresh();
+      await _restart();
+    },
   );
 
   /// Rebuild the simulation from the pattern, keeping it running if it was.
@@ -2923,6 +2942,7 @@ class _ShellState extends State<Shell> {
                             }
                           },
                           query: _run,
+                          onLibrary: _showPatternLibrary,
                           showSizes: widget.engine.showSizes(),
                           onShowSizes: (show) => setState(
                             () => widget.engine.setShowSizes(show_: show),
@@ -3961,10 +3981,14 @@ class _Inspector extends StatelessWidget {
     required this.query,
     required this.showSizes,
     required this.onShowSizes,
+    required this.onLibrary,
   });
 
   /// For the prints' previews and images.
   final Engine engine;
+
+  /// Opens the pattern library.
+  final VoidCallback onLibrary;
   final List<String> selection;
   final List<PickedPoint> points;
 
@@ -4017,6 +4041,7 @@ class _Inspector extends StatelessWidget {
               summary: summary,
               indicators: indicators,
               run: run,
+              onLibrary: onLibrary,
               query: query,
               showSizes: showSizes,
               onShowSizes: onShowSizes,
@@ -4064,6 +4089,7 @@ class _EmptyInspector extends StatelessWidget {
     required this.summary,
     required this.indicators,
     required this.run,
+    required this.onLibrary,
     required this.query,
     required this.showSizes,
     required this.onShowSizes,
@@ -4078,6 +4104,7 @@ class _EmptyInspector extends StatelessWidget {
   /// `production.indicators`' garments: fabric details and totals.
   final List<Map<String, dynamic>> indicators;
   final ValueChanged<Map<String, Object?>> run;
+  final VoidCallback onLibrary;
   final dynamic Function(Map<String, Object?>) query;
   final bool showSizes;
   final ValueChanged<bool> onShowSizes;
@@ -4131,6 +4158,7 @@ class _EmptyInspector extends StatelessWidget {
           garments: (summary['garments'] as List<dynamic>?) ?? const [],
           indicators: indicators,
           run: run,
+          onLibrary: onLibrary,
         ),
         const SizedBox(height: Space.xl),
         Divider(color: p.border, height: 1),
@@ -5277,16 +5305,21 @@ class _SimControls extends StatelessWidget {
 }
 
 /// The project's garments from the body out: each one's fabric, its
-/// layer, and a way to delete it; and a way to add one.
+/// layer, and a way to delete it; and ways to add one, blank or from the
+/// pattern library.
 class _GarmentList extends StatelessWidget {
   const _GarmentList({
     required this.engine,
     required this.garments,
     required this.indicators,
     required this.run,
+    required this.onLibrary,
   });
 
   final Engine engine;
+
+  /// Opens the pattern library.
+  final VoidCallback onLibrary;
 
   /// As `project.summary` lists them, next to the body first.
   final List<dynamic> garments;
@@ -5333,6 +5366,13 @@ class _GarmentList extends StatelessWidget {
           }),
           icon: const Icon(Icons.add_rounded, size: 18),
           label: Text(l.addGarment),
+        ),
+        const SizedBox(height: Space.s),
+        OutlinedButton.icon(
+          key: const ValueKey('openPatternLibrary'),
+          onPressed: onLibrary,
+          icon: const Icon(Icons.collections_bookmark_outlined, size: 18),
+          label: Text(l.libraryOpen),
         ),
       ],
     );
@@ -5405,6 +5445,23 @@ class _GarmentCard extends StatelessWidget {
                       ),
                   ],
                 ),
+              ),
+              _IconAction(
+                key: ValueKey('saveToLibrary:$id'),
+                icon: Icons.bookmark_add_outlined,
+                tip: l.librarySave,
+                onTap: () async {
+                  final said = await saveToLibrary(context, engine, garment);
+                  if (said == null || !context.mounted) return;
+                  ScaffoldMessenger.of(context)
+                    ..hideCurrentSnackBar()
+                    ..showSnackBar(
+                      SnackBar(
+                        content: Text(said),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                },
               ),
               if (count > 1) ...[
                 _IconAction(

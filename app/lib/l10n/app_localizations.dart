@@ -3202,7 +3202,7 @@ abstract class L {
   /// A step of the undo history, by its command name with dots as underscores.
   ///
   /// In en, this message translates to:
-  /// **'{step, select, project_rename{Rename project} project_set_display_unit{Change units} avatar_set{Change body} avatar_remove{Remove body} panel_create_rect{Add rectangle} panel_create_polygon{Add polygon} panel_create_path{Add curved piece} panel_rename{Rename piece} panel_translate{Move piece} panel_rotate{Rotate piece} panel_scale{Scale piece} panel_set_grain{Set grainline} panel_set_seam_allowance{Set seam allowance} panel_mirror{Mirror piece} panel_unlink{Unlink copy} panel_place{Place piece} panel_delete{Delete piece} panel_cut{Cut piece} panel_paste{Paste} point_move{Move point} point_set_distance{Set distance} point_remove{Remove point} edge_set_curve{Bend edge} edge_split{Add point} edge_move{Move edge} notch_add{Add notch} notch_move{Move notch} notch_remove{Remove notch} internal_line_add{Draw line} internal_line_remove{Remove line} seam_add{Sew} seam_remove{Unsew} seam_flip{Flip seam} seam_set_gathered{Gather seam} edge_lengthen{Lengthen} edge_set_length{Set length} seam_take_in{Take in} seam_match_length{Match lengths} pin_add{Pin} pin_remove{Unpin} garment_set_fabric{Change fabric} garment_arrange{Arrange pieces} garment_set_color{Change colour} garment_add{Add garment} garment_rename{Rename garment} garment_remove{Remove garment} garment_set_layer{Change layer} panel_set_garment{Move to garment} grading_set_sizes{Set sizes} grading_use_chart{Use size chart} grading_clear{Remove sizes} grading_show_size{Show size} point_set_grade{Grade point} template_apply{Add template} pattern_import{Import pattern} batch{Several changes} constraint_add{Add constraint} constraint_remove{Remove constraint} constraint_set_value{Change dimension} point_set_smooth{Smooth point} panel_unfold{Unfold piece} guide_add{Add construction line} guide_move{Move construction line} guide_remove{Remove construction line} panel_create_ellipse{Add ellipse} panel_create_sector{Add circle skirt} edge_set_arc{Make arc} constraint_set_formula{Set formula} variable_set{Set variable} variable_remove{Remove variable} seam_set_ease{Set ease} dart_add{Add dart} pleat_add{Add pleat} panel_add_hole{Cut hole} panel_remove_hole{Fill hole} panel_boolean{Join or cut pieces} other{{step}}}'**
+  /// **'{step, select, pattern_add{Add pattern} project_rename{Rename project} project_set_display_unit{Change units} avatar_set{Change body} avatar_remove{Remove body} panel_create_rect{Add rectangle} panel_create_polygon{Add polygon} panel_create_path{Add curved piece} panel_rename{Rename piece} panel_translate{Move piece} panel_rotate{Rotate piece} panel_scale{Scale piece} panel_set_grain{Set grainline} panel_set_seam_allowance{Set seam allowance} panel_mirror{Mirror piece} panel_unlink{Unlink copy} panel_place{Place piece} panel_delete{Delete piece} panel_cut{Cut piece} panel_paste{Paste} point_move{Move point} point_set_distance{Set distance} point_remove{Remove point} edge_set_curve{Bend edge} edge_split{Add point} edge_move{Move edge} notch_add{Add notch} notch_move{Move notch} notch_remove{Remove notch} internal_line_add{Draw line} internal_line_remove{Remove line} seam_add{Sew} seam_remove{Unsew} seam_flip{Flip seam} seam_set_gathered{Gather seam} edge_lengthen{Lengthen} edge_set_length{Set length} seam_take_in{Take in} seam_match_length{Match lengths} pin_add{Pin} pin_remove{Unpin} garment_set_fabric{Change fabric} garment_arrange{Arrange pieces} garment_set_color{Change colour} garment_add{Add garment} garment_rename{Rename garment} garment_remove{Remove garment} garment_set_layer{Change layer} panel_set_garment{Move to garment} grading_set_sizes{Set sizes} grading_use_chart{Use size chart} grading_clear{Remove sizes} grading_show_size{Show size} point_set_grade{Grade point} template_apply{Add template} pattern_import{Import pattern} batch{Several changes} constraint_add{Add constraint} constraint_remove{Remove constraint} constraint_set_value{Change dimension} point_set_smooth{Smooth point} panel_unfold{Unfold piece} guide_add{Add construction line} guide_move{Move construction line} guide_remove{Remove construction line} panel_create_ellipse{Add ellipse} panel_create_sector{Add circle skirt} edge_set_arc{Make arc} constraint_set_formula{Set formula} variable_set{Set variable} variable_remove{Remove variable} seam_set_ease{Set ease} dart_add{Add dart} pleat_add{Add pleat} panel_add_hole{Cut hole} panel_remove_hole{Fill hole} panel_boolean{Join or cut pieces} other{{step}}}'**
   String stepName(String step);
 
   /// No description provided for @undoStep.
@@ -6282,6 +6282,174 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Spacing (mm)'**
   String get tpSpacing;
+
+  /// No description provided for @templateJeans.
+  ///
+  /// In en, this message translates to:
+  /// **'Jeans'**
+  String get templateJeans;
+
+  /// No description provided for @templateJeansBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Denim, five pockets, a back yoke, a fly and belt loops.'**
+  String get templateJeansBlurb;
+
+  /// No description provided for @templateShorts.
+  ///
+  /// In en, this message translates to:
+  /// **'Shorts'**
+  String get templateShorts;
+
+  /// No description provided for @templateShortsBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'The trousers\' block, ending a hand above the knee.'**
+  String get templateShortsBlurb;
+
+  /// No description provided for @libraryOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'From the library…'**
+  String get libraryOpen;
+
+  /// No description provided for @libraryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pattern library'**
+  String get libraryTitle;
+
+  /// No description provided for @librarySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Click a pattern to add it to this project, drafted for its body. Save your own garments here from their card.'**
+  String get librarySubtitle;
+
+  /// No description provided for @libraryKindTops.
+  ///
+  /// In en, this message translates to:
+  /// **'Tops'**
+  String get libraryKindTops;
+
+  /// No description provided for @libraryKindBottoms.
+  ///
+  /// In en, this message translates to:
+  /// **'Bottoms'**
+  String get libraryKindBottoms;
+
+  /// No description provided for @libraryKindDresses.
+  ///
+  /// In en, this message translates to:
+  /// **'Dresses and skirts'**
+  String get libraryKindDresses;
+
+  /// No description provided for @libraryKindAccessories.
+  ///
+  /// In en, this message translates to:
+  /// **'Accessories'**
+  String get libraryKindAccessories;
+
+  /// No description provided for @libraryMine.
+  ///
+  /// In en, this message translates to:
+  /// **'My patterns'**
+  String get libraryMine;
+
+  /// No description provided for @libraryMineEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'None yet: save a garment from its card (the bookmark button) to add it to other projects.'**
+  String get libraryMineEmpty;
+
+  /// No description provided for @libraryImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Import…'**
+  String get libraryImport;
+
+  /// No description provided for @libraryExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export…'**
+  String get libraryExport;
+
+  /// No description provided for @libraryPatternFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Pattern files'**
+  String get libraryPatternFiles;
+
+  /// No description provided for @libraryDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete “{name}” from the library? Projects it was added to keep their garments.'**
+  String libraryDeleteConfirm(String name);
+
+  /// No description provided for @libraryReplaceConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'The library already has a pattern called “{name}”. Replace it?'**
+  String libraryReplaceConfirm(String name);
+
+  /// No description provided for @libraryReplace.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get libraryReplace;
+
+  /// No description provided for @librarySave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save to library'**
+  String get librarySave;
+
+  /// No description provided for @librarySaveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Save to the pattern library'**
+  String get librarySaveTitle;
+
+  /// No description provided for @librarySaveName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get librarySaveName;
+
+  /// No description provided for @librarySaveKind.
+  ///
+  /// In en, this message translates to:
+  /// **'Kind'**
+  String get librarySaveKind;
+
+  /// No description provided for @librarySaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved to the library as “{name}”.'**
+  String librarySaved(String name);
+
+  /// No description provided for @busyLibraryAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Adding the pattern'**
+  String get busyLibraryAdd;
+
+  /// No description provided for @errLibraryNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No pattern library is set up.'**
+  String get errLibraryNone;
+
+  /// No description provided for @errPatternExists.
+  ///
+  /// In en, this message translates to:
+  /// **'The library already has a pattern called “{name}”.'**
+  String errPatternExists(String name);
+
+  /// No description provided for @errPatternMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'The library has no pattern called “{name}” any more.'**
+  String errPatternMissing(String name);
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

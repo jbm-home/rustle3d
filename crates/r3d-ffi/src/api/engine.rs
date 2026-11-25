@@ -1666,6 +1666,14 @@ impl Engine {
             .map_err(err)
     }
 
+    /// Use the user's library folder `library_dir`: `library.*` steps
+    /// (the app's and attached agents') find saved patterns there.
+    pub fn set_library(&self, library_dir: String) -> Result<(), ApiError> {
+        self.workspace()?
+            .set_library(Some(std::path::PathBuf::from(library_dir)));
+        Ok(())
+    }
+
     /// Copy the motion `name` of the user's library (in `library_dir`)
     /// into the project, as [`Engine::import_motion`] does; returns its
     /// path in the project.

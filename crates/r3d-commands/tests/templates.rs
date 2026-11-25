@@ -334,3 +334,46 @@ fn joggers_hang_from_their_elastic_waist() {
     assert!(high > 1.0, "joggers slid down: top at {high}");
     assert!(low > 0.02 && low < 0.1, "hem at {low}");
 }
+
+#[test]
+fn jeans_have_five_pockets_a_yoke_and_a_waistband() {
+    let s = draft("jeans");
+    let p = s.project();
+    assert_eq!(p.garments().values().next().unwrap().name, "Jeans");
+    let named = |name: &str| {
+        p.panels()
+            .values()
+            .filter(|pn| pn.name.contains(name))
+            .count()
+    };
+    assert_eq!(named("Front"), 2);
+    assert_eq!(named("Pocket facing"), 2);
+    assert_eq!(named("Back pocket"), 2);
+    assert_eq!(named("Coin pocket"), 1);
+    assert_eq!(named("Yoke"), 2);
+    assert_eq!(named("Waistband"), 2);
+    assert_eq!(named("Belt loop"), 6);
+    // The fly.
+    assert_eq!(p.zippers().len(), 1);
+    let (low, high) = drape(&s, 180);
+    eprintln!("jeans: {low:.3}..{high:.3}");
+    // The waistband over the waist (1.04 m); the hems a few centimetres
+    // above the floor, held up by it.
+    assert!(high > 1.06, "jeans slid down: top at {high}");
+    assert!(low > 0.02 && low < 0.09, "hem at {low}");
+}
+
+#[test]
+fn shorts_end_above_the_knees() {
+    let s = draft("shorts");
+    let p = s.project();
+    assert_eq!(p.garments().values().next().unwrap().name, "Shorts");
+    assert_eq!(p.panels().len(), 4);
+    assert_eq!(p.zippers().len(), 1);
+    let (low, high) = drape(&s, 180);
+    eprintln!("shorts: {low:.3}..{high:.3}");
+    // The waist at the waist (1.04 m), the hems a hand above the knees
+    // (about 0.48 m on this body).
+    assert!(high > 1.0, "shorts slid down: top at {high}");
+    assert!(low > 0.45 && low < 0.62, "hem at {low}");
+}

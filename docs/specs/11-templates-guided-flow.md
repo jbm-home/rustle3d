@@ -4,8 +4,8 @@ Provenance: maintainer's functional brief (2026-11-14); general garment-making k
 
 ## Status (2026-11-25)
 
-Implemented: T-shirt, shirt, trousers, hoodie, joggers, dress, straight
-skirt, A-line skirt and tote bag as
+Implemented: T-shirt, shirt, trousers, hoodie, joggers, jeans, shorts,
+dress, straight skirt, A-line skirt and tote bag as
 Rust recipes in `r3d_commands::templates` (`template.apply`,
 `template.list`; sizes in cm, filled in from the avatar); the start screen
 with rendered thumbnails and a sizes sheet per body; the Learn panel (task
@@ -34,7 +34,18 @@ head and falls down the back. The joggers are the trousers' block in
 jersey, pulled on: no waist shaping at the sides, no fly (the centre
 front sewn all the way), an elastic along each piece's waist (relaxed
 to the body's waist) and hem (relaxed to the ankle + 6 cm), 8 cm
-shorter than the waist's height. Not yet: sizes on a body silhouette (plain fields for
+shorter than the waist's height. The jeans (M38, spec 32) are the
+trousers' block in denim with a level back waist: the fronts' side
+seams cut by a scooped pocket mouth (9 cm down the side, 11 cm along
+the waist) over a facing sewn under the front, a coin pocket on the
+right facing, a back yoke cut 5 cm below the waist at the side and 8
+cm at the centre back, a patch pocket with a point on each back, the
+fly zipper, a waistband 4 cm high in two halves sewn at the centre back
+and front, six belt loops (at the fronts, by the side seams and by the
+centre back), the yokes, pocket mouths and patch pockets topstitched in
+two rows. The shorts are the trousers' block ending 22 cm below the
+crotch, their hems 10 cm wider than the thigh. Templates have a kind for
+the pattern library (`template.list`, spec 32). Not yet: sizes on a body silhouette (plain fields for
 now). Templates are recipes in code
 rather than data files: the drafts compute curves and lengths (e.g. the
 sleeve cap is solved to the armhole's length).

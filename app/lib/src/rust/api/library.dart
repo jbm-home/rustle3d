@@ -8,7 +8,7 @@ import 'engine.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `load`, `motions`, `presets_file`, `save`
+// These functions are ignored because they are not marked as `pub`: `load`, `motions`, `patterns`, `presets_file`, `save`
 
 /// The captured motions in the user's library, by name, sorted.
 List<String> libraryMotions({required String libraryDir}) =>
@@ -39,6 +39,50 @@ void deleteLibraryMotion({required String libraryDir, required String name}) =>
       libraryDir: libraryDir,
       name: name,
     );
+
+/// The user's saved patterns as JSON: `[{name, kind, path, template?}]`,
+/// by name (spec 32). Added to a project with the `library.add` step.
+String libraryPatterns({required String libraryDir}) =>
+    RustLib.instance.api.crateApiLibraryLibraryPatterns(libraryDir: libraryDir);
+
+/// Rename a saved pattern; returns its new name.
+String renameLibraryPattern({
+  required String libraryDir,
+  required String name,
+  required String to,
+}) => RustLib.instance.api.crateApiLibraryRenameLibraryPattern(
+  libraryDir: libraryDir,
+  name: name,
+  to: to,
+);
+
+/// Delete a saved pattern (projects keep the garments added from it).
+void deleteLibraryPattern({required String libraryDir, required String name}) =>
+    RustLib.instance.api.crateApiLibraryDeleteLibraryPattern(
+      libraryDir: libraryDir,
+      name: name,
+    );
+
+/// Pack a saved pattern into the zip file `archive`, to share it.
+Future<void> exportLibraryPattern({
+  required String libraryDir,
+  required String name,
+  required String archive,
+}) => RustLib.instance.api.crateApiLibraryExportLibraryPattern(
+  libraryDir: libraryDir,
+  name: name,
+  archive: archive,
+);
+
+/// Add the pattern packed in the zip file `archive` to the library;
+/// returns its name there.
+Future<String> importLibraryPattern({
+  required String libraryDir,
+  required String archive,
+}) => RustLib.instance.api.crateApiLibraryImportLibraryPattern(
+  libraryDir: libraryDir,
+  archive: archive,
+);
 
 /// Body presets as JSON: `[{name, body, builtin}]`, standard sizes first,
 /// then the user's own from `library_dir`.
