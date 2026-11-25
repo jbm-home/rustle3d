@@ -23,6 +23,7 @@ pub mod message;
 pub mod model;
 pub mod print;
 pub mod project_dir;
+pub mod remap;
 pub mod seam;
 pub mod trim;
 
@@ -46,4 +47,5 @@ pub use model::{
     Symmetry, TemplateRef,
 };
 pub use print::{BuiltinPrint, Print, PrintPlacement, PrintSource, Texture, UvFrame};
+pub use remap::Remap;
 pub use trim::{Button, Buttonhole, Zipper};

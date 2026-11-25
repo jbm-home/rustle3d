@@ -28,6 +28,7 @@ pub mod error;
 pub mod fit;
 pub mod game;
 pub mod history;
+pub mod library;
 pub mod prints;
 pub mod production;
 pub mod progress;

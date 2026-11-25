@@ -443,10 +443,16 @@ pub fn to_json(project: &Project) -> Result<String, FileError> {
 
 /// Parse, migrate and validate a project file.
 pub fn from_json(text: &str) -> Result<LoadedProject, FileError> {
+    from_value(serde_json::from_str(text).map_err(|e| FileError::Json {
+        detail: e.to_string(),
+    })?)
+}
+
+/// Migrate and validate a project file already parsed.
+pub fn from_value(mut root: Value) -> Result<LoadedProject, FileError> {
     let json_err = |e: serde_json::Error| FileError::Json {
         detail: e.to_string(),
     };
-    let mut root: Value = serde_json::from_str(text).map_err(json_err)?;
     let obj = root.as_object_mut().ok_or(FileError::NotAProject)?;
     if obj.get("format").and_then(Value::as_str) != Some(FORMAT) {
         return Err(FileError::NotAProject);

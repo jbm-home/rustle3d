@@ -27,6 +27,10 @@ use serde_json::{Value, json};
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,
+    /// The user's library folder, where `library.*` steps find saved
+    /// patterns (default: the desktop app's, shared with it).
+    #[arg(long, global = true)]
+    library: Option<PathBuf>,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -550,9 +554,15 @@ fn print_results(results: Vec<Value>, saved: bool) -> Result<(), Failure> {
     print_json(&json!({ "results": results, "saved": saved }))
 }
 
-fn cmd_run(project: &Path, script: &Path, dry_run: bool) -> Result<(), Failure> {
+fn cmd_run(
+    project: &Path,
+    script: &Path,
+    dry_run: bool,
+    library: Option<PathBuf>,
+) -> Result<(), Failure> {
     let script = Script::parse(&read_script(script)?)?;
     let mut ws = Workspace::open(project)?;
+    ws.set_library(library);
     if dry_run {
         // A bare session: actions are refused, nothing touches the disk.
         let mut session = Session::new(ws.session().project().clone());
@@ -977,24 +987,29 @@ fn cmd_schema(name: Option<&str>) -> Result<(), Failure> {
     }
 }
 
-fn cmd_mcp(project: &Path) -> Result<(), Failure> {
-    let ws = if project.exists() {
+fn cmd_mcp(project: &Path, library: Option<PathBuf>) -> Result<(), Failure> {
+    let mut ws = if project.exists() {
         Workspace::open(project)?
     } else {
         Workspace::create(project, &default_name(project))?
     };
+    ws.set_library(library);
     r3d_mcp::serve_stdio(ws).map_err(|e| io_failure("mcp", e.to_string()))
 }
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
+    let library = cli
+        .library
+        .clone()
+        .or_else(r3d_commands::library::default_dir);
     let result = match cli.cmd {
         Cmd::New { path, name } => cmd_new(&path, name),
         Cmd::Run {
             project,
             script,
             dry_run,
-        } => cmd_run(&project, &script, dry_run),
+        } => cmd_run(&project, &script, dry_run, library),
         Cmd::Query { project, query } => cmd_query(&project, &query),
         Cmd::Export {
             project,
@@ -1074,7 +1089,7 @@ fn main() -> ExitCode {
         } => match (project, attach) {
             (_, true) => r3d_mcp::attach::relay(endpoint.as_deref())
                 .map_err(|e| io_failure("mcp", e.to_string())),
-            (Some(project), false) => cmd_mcp(&project),
+            (Some(project), false) => cmd_mcp(&project, library),
             (None, false) => Err(io_failure("mcp", "--project or --attach is needed".into())),
         },
     };

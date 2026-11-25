@@ -222,8 +222,18 @@ pub enum CommandError {
     Pattern(#[from] r3d_io::import::val::ValError),
     #[error("{garment} was not imported from a parametric pattern")]
     NoSource { garment: AnyId },
+    /// A saved pattern (a project document) that cannot be read: the
+    /// file error's message.
+    #[error("{}", .0.text)]
+    File(Message),
     #[error("internal error: {detail}")]
     Internal { detail: String },
+}
+
+impl From<r3d_core::file::FileError> for CommandError {
+    fn from(e: r3d_core::file::FileError) -> Self {
+        CommandError::File(e.message())
+    }
 }
 
 impl CommandError {
@@ -303,6 +313,7 @@ impl Localizable for CommandError {
             Self::Motion(e) => e.message(),
             Self::NoSkeleton => Message::new("export.no_skeleton", text),
             Self::Pattern(e) => e.message(),
+            Self::File(m) => m.clone(),
             Self::NoSource { garment } => {
                 Message::new("pattern.no_source", text).arg("garment", garment)
             }

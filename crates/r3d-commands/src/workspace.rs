@@ -42,6 +42,12 @@ pub enum WorkspaceError {
     NotAProjectArchive,
     #[error("the archive unpacks to more than {limit_mb} MB")]
     ArchiveTooLarge { limit_mb: u64 },
+    #[error("no pattern library: give the library folder (r3d --library <folder>)")]
+    NoLibrary,
+    #[error("the library has no pattern called {name}")]
+    NotInLibrary { name: String },
+    #[error("the library already has a pattern called {name}")]
+    InLibrary { name: String },
 }
 
 impl Localizable for WorkspaceError {
@@ -69,6 +75,13 @@ impl Localizable for WorkspaceError {
             Self::ArchiveTooLarge { limit_mb } => {
                 Message::new("archive.too_large", self.to_string()).arg("limit_mb", limit_mb)
             }
+            Self::NoLibrary => Message::new("library.none", self.to_string()),
+            Self::NotInLibrary { name } => {
+                Message::new("library.missing", self.to_string()).arg("name", name)
+            }
+            Self::InLibrary { name } => {
+                Message::new("library.exists", self.to_string()).arg("name", name)
+            }
         }
     }
 }
@@ -81,6 +94,8 @@ pub struct Workspace {
     /// Set when the file was migrated from an older schema and the original
     /// has not been backed up yet.
     pending_backup: Option<u32>,
+    /// The user's library folder (spec 32), if the front-end gave one.
+    library: Option<PathBuf>,
 }
 
 impl Workspace {
@@ -92,6 +107,7 @@ impl Workspace {
             dir: dir.to_path_buf(),
             session: Session::new(project),
             pending_backup: None,
+            library: None,
         })
     }
 
@@ -104,11 +120,26 @@ impl Workspace {
             dir,
             session: Session::new(loaded.project),
             pending_backup: loaded.migrated_from,
+            library: None,
         })
     }
 
     pub fn dir(&self) -> &Path {
         &self.dir
+    }
+
+    /// Use the user's library folder `dir` (spec 32): the `library.*`
+    /// actions read and write there.
+    pub fn set_library(&mut self, dir: Option<PathBuf>) {
+        self.library = dir;
+    }
+
+    /// The user's pattern library, if a library folder was given.
+    pub fn patterns(&self) -> Result<crate::library::PatternLibrary, WorkspaceError> {
+        self.library
+            .as_deref()
+            .map(crate::library::PatternLibrary::new)
+            .ok_or(WorkspaceError::NoLibrary)
     }
 
     pub fn session(&self) -> &Session {

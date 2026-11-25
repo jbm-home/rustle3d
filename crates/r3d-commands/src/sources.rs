@@ -10,7 +10,8 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use r3d_core::{
-    Body, Edge, EdgeCurve, GarmentId, PathSegment, PatternSource, Point, Project, Transaction,
+    Body, Edge, EdgeCurve, GarmentId, PanelId, PathSegment, PatternSource, Point, Project,
+    Transaction,
 };
 use r3d_geom::{DVec2, polygon};
 use r3d_io::import::ImportedPiece;
@@ -49,7 +50,7 @@ pub(crate) fn report(src: &PatternSource) -> Result<(usize, Vec<String>), Comman
 
 /// One edge of a piece's contour: where it starts, and its curve's
 /// handles.
-type ContourEdge = (DVec2, Option<[DVec2; 2]>);
+pub(crate) type ContourEdge = (DVec2, Option<[DVec2; 2]>);
 
 /// A piece's contour as a panel stores it: counter-clockwise, edge `j`
 /// starting at point `j` (`panel.create_path` turns a clockwise outline
@@ -222,6 +223,118 @@ pub(crate) fn grade(
     Ok(any)
 }
 
+/// Move the points of `panel` as a pattern moves its outline from `a` to
+/// `b` (each edge's start and handles, in outline order, from the same
+/// origin); its curves' handles, internal lines and pins follow. `false`
+/// when the piece is gone or its outline does not match the pattern's.
+pub(crate) fn move_piece(
+    tx: &mut Transaction<'_>,
+    panel: PanelId,
+    a: &[ContourEdge],
+    b: &[ContourEdge],
+) -> bool {
+    let Some(own) = tx.project().panel(panel).map(|p| p.contour.clone()) else {
+        return false;
+    };
+    if a.len() != own.len() || b.len() != own.len() {
+        return false;
+    }
+    let mut moves = Vec::new();
+    for (j, edge_id) in own.iter().enumerate() {
+        let (Some(edge), Some((a0, ah)), Some((b0, bh))) =
+            (tx.project().edge(*edge_id).cloned(), a.get(j), b.get(j))
+        else {
+            continue;
+        };
+        let d = *b0 - *a0;
+        if let Some(point) = tx.project().point(edge.start).cloned() {
+            moves.push((point.pos, d));
+            tx.put_point(
+                edge.start,
+                Point {
+                    pos: point.pos + d,
+                    ..point
+                },
+            );
+        }
+        if let EdgeCurve::Cubic { c1, c2 } = edge.curve {
+            // The handles move as the pattern's do; on an edge curved
+            // here, with its ends.
+            let next = (j + 1) % own.len();
+            let end_d = match (a.get(next), b.get(next)) {
+                (Some((a1, _)), Some((b1, _))) => *b1 - *a1,
+                _ => d,
+            };
+            let (d1, d2) = match (ah, bh) {
+                (Some([a1, a2]), Some([b1, b2])) => (*b1 - *a1, *b2 - *a2),
+                _ => (d, end_d),
+            };
+            tx.put_edge(
+                *edge_id,
+                Edge {
+                    curve: EdgeCurve::Cubic {
+                        c1: c1 + d1,
+                        c2: c2 + d2,
+                    },
+                    ..edge
+                },
+            );
+        }
+    }
+    let lines: Vec<_> = tx
+        .project()
+        .internal_lines()
+        .iter()
+        .filter(|(_, l)| l.panel == panel)
+        .map(|(id, l)| (*id, l.clone()))
+        .collect();
+    for (id, mut l) in lines {
+        l.start = moved(&moves, l.start);
+        for s in &mut l.segments {
+            *s = match s {
+                PathSegment::Line { to } => PathSegment::Line {
+                    to: moved(&moves, *to),
+                },
+                PathSegment::Cubic { c1, c2, to } => PathSegment::Cubic {
+                    c1: moved(&moves, *c1),
+                    c2: moved(&moves, *c2),
+                    to: moved(&moves, *to),
+                },
+            };
+        }
+        tx.put_internal_line(id, l);
+    }
+    let pins: Vec<_> = tx
+        .project()
+        .pins()
+        .iter()
+        .filter(|(_, p)| p.panel == panel)
+        .map(|(id, p)| (*id, *p))
+        .collect();
+    for (id, mut pin) in pins {
+        pin.at = moved(&moves, pin.at);
+        tx.put_pin(id, pin);
+    }
+    // Buttons and buttonholes on the piece follow it too.
+    let buttons: Vec<_> = tx
+        .project()
+        .buttons()
+        .iter()
+        .filter(|(_, b)| b.panel == panel || b.hole.panel == panel)
+        .map(|(id, b)| (*id, b.clone()))
+        .collect();
+    for (id, mut b) in buttons {
+        if b.panel == panel {
+            b.at = moved(&moves, b.at);
+        }
+        if b.hole.panel == panel {
+            b.hole.at = moved(&moves, b.hole.at);
+        }
+        tx.put_button(id, b);
+    }
+    true
+}
+
 /// How far each point of a piece moved; inside the piece, by inverse
 /// squared distance to them (as internal lines follow grades).
 fn moved(moves: &[(DVec2, DVec2)], p: DVec2) -> DVec2 {
@@ -255,95 +368,12 @@ pub(crate) fn redraft(
     let new = run(&src, Some(&body))?;
     let mut skipped = Vec::new();
     for sp in &src.pieces {
-        let Some(own) = tx.project().panel(sp.panel).map(|p| p.contour.clone()) else {
-            continue;
+        let moved = match (old.get(&sp.piece), new.get(&sp.piece)) {
+            (Some(a), Some(b)) => move_piece(tx, sp.panel, &contour(a), &contour(b)),
+            _ => false,
         };
-        let (Some(a), Some(b)) = (
-            old.get(&sp.piece).map(contour),
-            new.get(&sp.piece).map(contour),
-        ) else {
+        if !moved && tx.project().panel(sp.panel).is_some() {
             skipped.push(sp.panel);
-            continue;
-        };
-        if a.len() != own.len() || b.len() != own.len() {
-            skipped.push(sp.panel);
-            continue;
-        }
-        let mut moves = Vec::new();
-        for (j, edge_id) in own.iter().enumerate() {
-            let (Some(edge), Some((a0, ah)), Some((b0, bh))) =
-                (tx.project().edge(*edge_id).cloned(), a.get(j), b.get(j))
-            else {
-                continue;
-            };
-            let d = *b0 - *a0;
-            if let Some(point) = tx.project().point(edge.start).cloned() {
-                moves.push((point.pos, d));
-                tx.put_point(
-                    edge.start,
-                    Point {
-                        pos: point.pos + d,
-                        ..point
-                    },
-                );
-            }
-            if let EdgeCurve::Cubic { c1, c2 } = edge.curve {
-                // The handles move as the pattern's do; on an edge curved
-                // here, with its ends.
-                let next = (j + 1) % own.len();
-                let end_d = match (a.get(next), b.get(next)) {
-                    (Some((a1, _)), Some((b1, _))) => *b1 - *a1,
-                    _ => d,
-                };
-                let (d1, d2) = match (ah, bh) {
-                    (Some([a1, a2]), Some([b1, b2])) => (*b1 - *a1, *b2 - *a2),
-                    _ => (d, end_d),
-                };
-                tx.put_edge(
-                    *edge_id,
-                    Edge {
-                        curve: EdgeCurve::Cubic {
-                            c1: c1 + d1,
-                            c2: c2 + d2,
-                        },
-                        ..edge
-                    },
-                );
-            }
-        }
-        let lines: Vec<_> = tx
-            .project()
-            .internal_lines()
-            .iter()
-            .filter(|(_, l)| l.panel == sp.panel)
-            .map(|(id, l)| (*id, l.clone()))
-            .collect();
-        for (id, mut l) in lines {
-            l.start = moved(&moves, l.start);
-            for s in &mut l.segments {
-                *s = match s {
-                    PathSegment::Line { to } => PathSegment::Line {
-                        to: moved(&moves, *to),
-                    },
-                    PathSegment::Cubic { c1, c2, to } => PathSegment::Cubic {
-                        c1: moved(&moves, *c1),
-                        c2: moved(&moves, *c2),
-                        to: moved(&moves, *to),
-                    },
-                };
-            }
-            tx.put_internal_line(id, l);
-        }
-        let pins: Vec<_> = tx
-            .project()
-            .pins()
-            .iter()
-            .filter(|(_, p)| p.panel == sp.panel)
-            .map(|(id, p)| (*id, *p))
-            .collect();
-        for (id, mut pin) in pins {
-            pin.at = moved(&moves, pin.at);
-            tx.put_pin(id, pin);
         }
     }
     if let Some(g) = tx.project().garments().get(&garment).cloned() {

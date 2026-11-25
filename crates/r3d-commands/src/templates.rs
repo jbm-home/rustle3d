@@ -29,6 +29,7 @@ use crate::commands::{
 };
 use crate::drape::arm_drop;
 use crate::error::{CommandError, positive};
+use crate::library::PatternKind;
 use crate::progress::{Progress, Status};
 use crate::spec::CommandSpec;
 
@@ -89,8 +90,20 @@ impl Template {
         }
     }
 
-    /// Default project name (English; front-ends translate by `id`).
-    fn title(self) -> &'static str {
+    /// Where it sits in the pattern library.
+    pub fn kind(self) -> PatternKind {
+        match self {
+            Template::TShirt | Template::Shirt | Template::Hoodie => PatternKind::Tops,
+            Template::Trousers | Template::Joggers => PatternKind::Bottoms,
+            Template::Dress | Template::StraightSkirt | Template::ALineSkirt => {
+                PatternKind::DressesAndSkirts
+            }
+            Template::ToteBag => PatternKind::Accessories,
+        }
+    }
+
+    /// Default garment name (English; front-ends translate by `id`).
+    pub fn title(self) -> &'static str {
         match self {
             Template::StraightSkirt => "Straight skirt",
             Template::ALineSkirt => "A-line skirt",
@@ -162,7 +175,7 @@ const STANDARD: Body = Body {
 
 /// The avatar templates are drafted for: the project's, or one of the
 /// standard size without one.
-fn avatar_of(p: &Project) -> Avatar {
+pub(crate) fn avatar_of(p: &Project) -> Avatar {
     p.avatar().cloned().unwrap_or(Avatar {
         body: STANDARD,
         preset: None,
@@ -307,6 +320,7 @@ fn round1(x: f64) -> f64 {
 pub struct TemplateInfo {
     pub template: Template,
     pub title: &'static str,
+    pub kind: PatternKind,
     pub sizes: Sizes,
 }
 
@@ -320,6 +334,7 @@ pub fn list(project: &Project) -> Result<Vec<TemplateInfo>, CommandError> {
         .map(|t| TemplateInfo {
             template: t,
             title: t.title(),
+            kind: t.kind(),
             sizes: Sizes::default().resolve(t, &avatar, waist),
         })
         .collect())
@@ -762,21 +777,13 @@ pub fn grade_garment(
     ) else {
         return Ok(false);
     };
-    let panels: Vec<PanelId> = p
-        .panels()
-        .iter()
-        .filter(|(_, pn)| pn.garment == garment)
-        .map(|(id, _)| *id)
-        .collect();
+    let panels = garment_panels(p, garment);
     let graded = panels.iter().any(|id| {
         p.points()
             .values()
             .any(|pt| pt.panel == *id && !pt.grade.is_empty())
     });
-    let template =
-        serde_json::from_value::<Template>(serde_json::Value::String(reference.name.clone()));
-    let sizes = serde_json::to_value(&reference.sizes).and_then(serde_json::from_value::<Sizes>);
-    let (Ok(template), Ok(sizes)) = (template, sizes) else {
+    let Some((template, sizes)) = parse_ref(&reference) else {
         return Ok(false);
     };
     if graded || panels.is_empty() {
@@ -788,6 +795,81 @@ pub fn grade_garment(
         return Ok(false);
     }
     Ok(grade(tx, &panels, &drafts, g.base))
+}
+
+/// The template and sizes a garment remembers.
+fn parse_ref(reference: &TemplateRef) -> Option<(Template, Sizes)> {
+    let template =
+        serde_json::from_value::<Template>(serde_json::Value::String(reference.name.clone()));
+    let sizes = serde_json::to_value(&reference.sizes).and_then(serde_json::from_value::<Sizes>);
+    Some((template.ok()?, sizes.ok()?))
+}
+
+/// The panels of `garment`, in drafting order (the order of their IDs).
+fn garment_panels(p: &Project, garment: GarmentId) -> Vec<PanelId> {
+    p.panels()
+        .iter()
+        .filter(|(_, pn)| pn.garment == garment)
+        .map(|(id, _)| *id)
+        .collect()
+}
+
+/// Draft the pieces of `garment`, drafted from a template for `from`,
+/// again for the project's avatar: each point and curve handle moves as
+/// the template moves it between the two bodies, so the pieces keep what
+/// was done to them; internal lines, pins and buttons follow. The body
+/// measurements the template was given change as the body does; lengths
+/// and ease stay. Returns the panels left as they were (their outline
+/// changed since); all of them when pieces were added or removed.
+pub(crate) fn redraft(
+    tx: &mut Transaction<'_>,
+    garment: GarmentId,
+    from: &Avatar,
+) -> Result<Vec<PanelId>, CommandError> {
+    let p = tx.project();
+    let Some(g) = p.garments().get(&garment).cloned() else {
+        return Err(CommandError::not_found(garment));
+    };
+    let Some((template, sizes)) = g.template.as_ref().and_then(parse_ref) else {
+        return Ok(Vec::new());
+    };
+    let to = avatar_of(p);
+    let panels = garment_panels(p, garment);
+    let new_sizes = Sizes {
+        chest_cm: sizes
+            .chest_cm
+            .map(|v| v + to.body.bust_cm - from.body.bust_cm),
+        waist_cm: sizes
+            .waist_cm
+            .map(|v| v + to.body.waist_cm - from.body.waist_cm),
+        hips_cm: sizes
+            .hips_cm
+            .map(|v| v + to.body.hips_cm - from.body.hips_cm),
+        ..sizes
+    };
+    let old = draft_for(from.clone(), template, sizes)?;
+    let new = draft_for(to, template, new_sizes)?;
+    if old.origins.len() != panels.len() || new.origins.len() != panels.len() {
+        return Ok(panels);
+    }
+    let mut skipped = Vec::new();
+    for (k, panel) in panels.iter().enumerate() {
+        let moved = match (old.contour(k), new.contour(k)) {
+            (Some(a), Some(b)) => crate::sources::move_piece(tx, *panel, &a, &b),
+            _ => false,
+        };
+        if !moved {
+            skipped.push(*panel);
+        }
+    }
+    tx.put_garment(
+        garment,
+        Garment {
+            template: Some(template_ref(template, new_sizes)),
+            ..g
+        },
+    );
+    Ok(skipped)
 }
 
 /// A template drafted in one size, on a project of its own.
@@ -841,6 +923,41 @@ fn every_size(
         .collect()
 }
 
+impl Drafted {
+    /// Piece `k`'s outline (each edge's start and handles) from its
+    /// draft origin.
+    fn contour(&self, k: usize) -> Option<Vec<crate::sources::ContourEdge>> {
+        let (id, origin) = self.origins.iter().nth(k)?;
+        let o = DVec2::new(*origin, 0.0);
+        self.project
+            .panel(*id)?
+            .contour
+            .iter()
+            .map(|e| {
+                let edge = self.project.edge(*e)?;
+                let start = self.project.point(edge.start)?.pos - o;
+                let handles = match edge.curve {
+                    EdgeCurve::Cubic { c1, c2 } => Some([c1 - o, c2 - o]),
+                    EdgeCurve::Line => None,
+                };
+                Some((start, handles))
+            })
+            .collect()
+    }
+}
+
+/// `template` drafted for `avatar`, on a project of its own.
+fn draft_for(avatar: Avatar, template: Template, sizes: Sizes) -> Result<Drafted, CommandError> {
+    let mut project = Project::new("");
+    let mut tx = Transaction::begin(&mut project);
+    tx.set_avatar(Some(avatar));
+    let (_, origins) = draft_in(&mut tx, template, sizes, &[])?;
+    Ok(Drafted {
+        origins,
+        project: tx.project().clone(),
+    })
+}
+
 /// `template` drafted for the body of size `i` of `p`'s range.
 fn draft_size(
     p: &Project,
@@ -859,14 +976,7 @@ fn draft_size(
         hips_cm: sizes.hips_cm.map(|v| v + size.hips_cm),
         ..sizes
     };
-    let mut project = Project::new("");
-    let mut tx = Transaction::begin(&mut project);
-    tx.set_avatar(Some(avatar));
-    let (_, origins) = draft_in(&mut tx, template, sizes, &[])?;
-    Ok(Drafted {
-        origins,
-        project: tx.project().clone(),
-    })
+    draft_for(avatar, template, sizes)
 }
 
 /// The avatar a template is drafted for in size `i`: the project's (or a

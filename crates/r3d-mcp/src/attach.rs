@@ -229,29 +229,10 @@ async fn session(server: Server, shared: Arc<Shared>, token: String, stream: Tcp
 
 /// Where the app writes its endpoint, by platform (its support folder).
 pub fn default_endpoint_files() -> Vec<PathBuf> {
-    let home = std::env::var_os("HOME").map(PathBuf::from);
-    let mut found = Vec::new();
-    if cfg!(target_os = "macos") {
-        if let Some(home) = &home {
-            // Sandboxed builds live in their container.
-            found.push(home.join(
-                "Library/Containers/dev.rustle3d.rustle3d/Data/Library/Application Support/dev.rustle3d.rustle3d",
-            ));
-            found.push(home.join("Library/Application Support/dev.rustle3d.rustle3d"));
-        }
-    } else if cfg!(windows) {
-        if let Some(appdata) = std::env::var_os("APPDATA") {
-            found.push(PathBuf::from(appdata).join("dev.rustle3d").join("rustle3d"));
-        }
-    } else {
-        let data = std::env::var_os("XDG_DATA_HOME")
-            .map(PathBuf::from)
-            .or_else(|| home.as_ref().map(|h| h.join(".local/share")));
-        if let Some(data) = data {
-            found.push(data.join("dev.rustle3d.rustle3d"));
-        }
-    }
-    found.into_iter().map(|d| d.join(ENDPOINT_FILE)).collect()
+    r3d_commands::library::support_dirs()
+        .into_iter()
+        .map(|d| d.join(ENDPOINT_FILE))
+        .collect()
 }
 
 /// The agent's side: connect to the app described in `file` (or the

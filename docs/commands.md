@@ -1365,7 +1365,7 @@ Cut a panel in two along an open path of straight and cubic segments (mm) that c
 
 ### `panel.paste`
 
-Paste pieces copied with panel.copy, under new IDs, with the seams between them, their notches, internal lines, grade rules (when the project has the same number of sizes and base size), pins and mirror links. A piece keeps its place around the body unless a piece of the project already starts there (pasted beside its original): then it is left unplaced, with no pins. Returns the new panels, then the new seams.
+Paste pieces copied with panel.copy, under new IDs, with the seams between them, their notches, internal lines, construction details, buttons, zippers, constraints (a dimension keeps its name unless the project has one by that name), grade rules (when the project has the same number of sizes and base size), pins and mirror links. A piece keeps its place around the body unless a piece of the project already starts there (pasted beside its original): then it is left unplaced, with no pins. Returns the new panels, then the new seams.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -5790,6 +5790,32 @@ Draft a garment imported from a Seamly2D or Valentina pattern again for a body (
 
 </details>
 
+### `pattern.add`
+
+Add the garments of a saved pattern (a project document, as library patterns are kept; library.add reads one from the library) to this project: each one with its pieces, seams, notches, internal lines, pins, construction details, buttons, zippers, constraints and variables (a variable the project already has keeps the project's formula), its fabric, colour, print and notes, worn over the garments already there. Pieces drafted from the body are drafted again for this project's avatar, keeping what was done to them since: from a template (the template's body measurements follow the body; lengths and ease stay), from a Seamly2D/Valentina pattern, and dimensions given by formulas; the others come as drawn. In a size range they are graded. Returns the garments, then the panels and seams.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Add the garments of a saved pattern.",
+  "properties": {
+    "pattern": {
+      "description": "A Rustle3D project document (`{\"format\": \"rustle3d.project\",\n\"schema_version\": N, \"project\": {...}}`, as `project.json` holds\nit), of this version of the app or an older one."
+    }
+  },
+  "required": [
+    "pattern"
+  ],
+  "title": "PatternAdd",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `avatar.use_measurements`
 
 Take the avatar's measurements from a Seamly2D or Valentina measurement file (its text): height, bust, waist and hips (height, bust_circ, waist_circ, hip_circ) become the body, the file's gender its masculinity; its other measurements become variables for formulas (in mm; a custom @name without the @). A multisize file also sets the size range: its sizes along the chest (or its first) dimension, its base size as the base. `import.measurements` reads the file.
@@ -7085,7 +7111,7 @@ Full geometry of a panel: its edges in contour order with point IDs, positions, 
 
 ### `panel.copy`
 
-Copy pieces into a clip (JSON) for panel.paste, in this project or another one: the pieces with their points, curves, notches, internal lines, pins and grade rules, the seams between them and the mirror links among them. Seams and links to pieces left out are not copied.
+Copy pieces into a clip (JSON) for panel.paste, in this project or another one: the pieces with their points, curves, notches, internal lines, pins, grade rules, construction details (elastics, topstitching, interfacing, quilting), buttons and zippers, the seams between them, their constraints with the construction lines these use, and the mirror links among them. Seams, trims and links to pieces left out are not copied.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -8559,6 +8585,230 @@ A length on the cached drape between two points of it (`from`, `to`, m): straigh
     "to"
   ],
   "title": "FitLength",
+  "type": "object"
+}
+```
+
+</details>
+
+### `library.list`
+
+The pattern library: `builtin`, the built-in patterns (each a template: its id, English title and kind; add one with template.apply), and `patterns`, the user's own saved with library.save (name, kind, folder, and the template it was drafted from if any; add one with library.add). Kinds: tops, bottoms, dresses_and_skirts, accessories.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The built-in patterns and the user's own.",
+  "title": "LibraryList",
+  "type": "object"
+}
+```
+
+</details>
+
+### `library.add`
+
+Add a pattern of the user's library (see library.list) to the project as a new garment, worn over the others, drafted again for the avatar (pattern.add: pieces drafted from a template, a Seamly2D/Valentina pattern or formulas follow the body, the others come as drawn; graded in a size range). Its print image is copied into textures/. One undo step. Returns the garment, then the panels and seams.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Add a pattern of the user's library to the project.",
+  "properties": {
+    "name": {
+      "description": "The pattern's name in the library.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "LibraryAdd",
+  "type": "object"
+}
+```
+
+</details>
+
+### `library.save`
+
+Save a garment to the user's pattern library, shared by every project, under a name and a kind (tops, bottoms, dresses_and_skirts, accessories; default tops): its pieces, seams, notches, internal lines, construction details, trims, constraints, fabric, colour, print, notes and grading, with the body it is drafted for. A name already in the library is refused unless `replace`. Returns the pattern as library.list lists it.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "GarmentId": {
+      "description": "Identifier of a garment, e.g. `garment:1`.",
+      "pattern": "^garment:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "PatternKind": {
+      "description": "What a pattern is, to sort the library.",
+      "enum": [
+        "tops",
+        "bottoms",
+        "dresses_and_skirts",
+        "accessories"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Save a garment to the user's library.",
+  "properties": {
+    "garment": {
+      "$ref": "#/$defs/GarmentId"
+    },
+    "kind": {
+      "$ref": "#/$defs/PatternKind",
+      "default": "tops",
+      "description": "What it is, to sort the library."
+    },
+    "name": {
+      "description": "Its name in the library.",
+      "type": "string"
+    },
+    "replace": {
+      "default": false,
+      "description": "Replace the library's pattern of that name, if there is one.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "garment",
+    "name"
+  ],
+  "title": "LibrarySave",
+  "type": "object"
+}
+```
+
+</details>
+
+### `library.rename`
+
+Rename a pattern of the user's library. Returns it as library.list lists it.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Rename a pattern of the user's library.",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "to": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "to"
+  ],
+  "title": "LibraryRename",
+  "type": "object"
+}
+```
+
+</details>
+
+### `library.delete`
+
+Delete a pattern of the user's library (projects it was added to keep their garments). Cannot be undone: requires "confirm": true.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Delete a pattern of the user's library.",
+  "properties": {
+    "confirm": {
+      "default": false,
+      "description": "Must be `true`: it cannot be undone.",
+      "type": "boolean"
+    },
+    "name": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "LibraryDelete",
+  "type": "object"
+}
+```
+
+</details>
+
+### `library.export`
+
+Pack a pattern of the user's library into a zip file in the project folder (default exports/<name>.zip), to share it; library.import adds it to a library. Returns the written path, relative to the project folder.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Pack a pattern of the user's library into a zip file, to share it.",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "path": {
+      "description": "Output path relative to the project folder. Defaults to\n`exports/<name>.zip`.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "LibraryExport",
+  "type": "object"
+}
+```
+
+</details>
+
+### `library.import`
+
+Add a pattern packed with library.export (a zip file in the project folder) to the user's library; it takes a numbered name when its own is taken. Returns it as library.list lists it.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Add a pattern packed with library.export to the user's library.",
+  "properties": {
+    "path": {
+      "description": "The zip file, relative to the project folder.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "path"
+  ],
+  "title": "LibraryImport",
   "type": "object"
 }
 ```

@@ -356,6 +356,11 @@ fn every_command_round_trips() {
     h.round_trip(json!({"type": "panel.boolean", "panel": yoke.created[0],
         "with": patch.created[0], "op": "difference"}));
 
+    // A saved pattern (spec 32): this project's garments added again.
+    let pattern: Value =
+        serde_json::from_str(&r3d_core::file::to_json(h.session.project()).unwrap()).unwrap();
+    h.round_trip(json!({"type": "pattern.add", "pattern": pattern}));
+
     let registered: BTreeSet<_> = Command::registry().iter().map(|i| i.name).collect();
     let missing: Vec<_> = registered.difference(&h.covered).collect();
     assert!(

@@ -392,45 +392,6 @@ impl Constraint {
             c => c.value().map(|_| 1),
         }
     }
-
-    /// The same constraint on other points and edges (`map_point` and
-    /// `map_edge` give each one's replacement), without a name (names are
-    /// unique); `None` when one has none, and for a constraint on a notch
-    /// or a construction line.
-    pub fn remapped(
-        &self,
-        map_point: impl Fn(PointId) -> Option<PointId>,
-        map_edge: impl Fn(EdgeId) -> Option<EdgeId>,
-    ) -> Option<Constraint> {
-        let mut c = self.clone();
-        match &mut c {
-            Constraint::Fixed { point } | Constraint::Tangent { point } => {
-                *point = map_point(*point)?
-            }
-            Constraint::Coincident { a, b } | Constraint::Distance { a, b, .. } => {
-                *a = map_point(*a)?;
-                *b = map_point(*b)?;
-            }
-            Constraint::Horizontal { edge }
-            | Constraint::Vertical { edge }
-            | Constraint::Length { edge, .. } => *edge = map_edge(*edge)?,
-            Constraint::OnEdge { point, edge } => {
-                *point = map_point(*point)?;
-                *edge = map_edge(*edge)?;
-            }
-            Constraint::Parallel { a, b }
-            | Constraint::Perpendicular { a, b }
-            | Constraint::EqualLength { a, b }
-            | Constraint::Angle { a, b, .. } => {
-                *a = map_edge(*a)?;
-                *b = map_edge(*b)?;
-            }
-            Constraint::NotchDistance { .. }
-            | Constraint::OnGuide { .. }
-            | Constraint::GuideDistance { .. } => return None,
-        }
-        c.with_name(None).or(Some(c))
-    }
 }
 
 // A construction line between two board points (mm).

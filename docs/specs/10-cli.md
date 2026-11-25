@@ -14,6 +14,9 @@ scripts, simulate, export and render.
 --dry-run` uses a bare session: actions such as exports are refused and
 nothing is written. Scripts can refer to earlier results
 (`"$3.created[0]"`), see `docs/commands.md`.
+`--library <folder>` (any command) gives the user's library folder,
+where `library.*` steps in scripts and over MCP find saved patterns
+(spec 32); by default the desktop app's, so both share one library.
 - `r3d new <path>`: create an empty project folder (optionally `--template skirt`).
 - `r3d run <project> <script.json|->`: execute a JSON list of commands (same
   format as the MCP batch) and save. Use `--dry-run` to validate only.

@@ -11,6 +11,10 @@ use crate::commands::*;
 use crate::error::CommandError;
 use crate::fit::{FitLength, FitReport, FitTape};
 use crate::game::ExportGame;
+use crate::library::{
+    LibraryAdd, LibraryDelete, LibraryExport, LibraryImport, LibraryList, LibraryRename,
+    LibrarySave,
+};
 use crate::production::*;
 use crate::progress::Progress;
 use crate::queries::*;
@@ -216,6 +220,7 @@ command_registry! {
     "pattern.import" => PatternImport,
     "pattern.import_parametric" => PatternImportParametric,
     "garment.redraft" => GarmentRedraft,
+    "pattern.add" => PatternAdd,
     "avatar.use_measurements" => AvatarUseMeasurements,
     "constraint.add" => ConstraintAdd,
     "constraint.remove" => ConstraintRemove,
@@ -276,4 +281,11 @@ action_registry! {
     "fit.report" => FitReport,
     "fit.tape" => FitTape,
     "fit.length" => FitLength,
+    "library.list" => LibraryList,
+    "library.add" => LibraryAdd,
+    "library.save" => LibrarySave,
+    "library.rename" => LibraryRename,
+    "library.delete" => LibraryDelete,
+    "library.export" => LibraryExport,
+    "library.import" => LibraryImport,
 }
