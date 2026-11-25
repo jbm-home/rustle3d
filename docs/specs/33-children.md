@@ -10,7 +10,7 @@ the crotch, pyjama and jogging sets).
 
 ## Status
 
-In progress (M39, 2026-11-25).
+Done (M39, 2026-11-26).
 
 - Bodies: a child's age on the avatar's body (`age_years`, 0–18; schema
   v27) and on each size of a range; the body model mixes MakeHuman's
