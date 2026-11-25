@@ -7,11 +7,12 @@ use serde::{Deserialize, Serialize};
 use crate::error::{CommandError, Invalid, finite, non_blank, positive};
 use crate::spec::{CommandOutput, CommandSpec, Described};
 
-/// Accepted ranges (cm), generous enough for adults of any build.
-pub const HEIGHT_RANGE: (f64, f64) = (120.0, 220.0);
-pub const BUST_RANGE: (f64, f64) = (60.0, 170.0);
-pub const WAIST_RANGE: (f64, f64) = (45.0, 170.0);
-pub const HIPS_RANGE: (f64, f64) = (60.0, 180.0);
+/// Accepted ranges (cm), generous enough for adults of any build and
+/// babies.
+pub const HEIGHT_RANGE: (f64, f64) = (50.0, 220.0);
+pub const BUST_RANGE: (f64, f64) = (35.0, 170.0);
+pub const WAIST_RANGE: (f64, f64) = (33.0, 170.0);
+pub const HIPS_RANGE: (f64, f64) = (35.0, 180.0);
 
 fn in_range(field: &'static str, value: f64, (min, max): (f64, f64)) -> Result<(), CommandError> {
     finite(field, &[value])?;
@@ -27,7 +28,11 @@ pub(crate) fn validate_body(b: &Body) -> Result<(), CommandError> {
     in_range("height_cm", b.height_cm, HEIGHT_RANGE)?;
     in_range("bust_cm", b.bust_cm, BUST_RANGE)?;
     in_range("waist_cm", b.waist_cm, WAIST_RANGE)?;
-    in_range("hips_cm", b.hips_cm, HIPS_RANGE)
+    in_range("hips_cm", b.hips_cm, HIPS_RANGE)?;
+    match b.age_years {
+        Some(age) => in_range("age_years", age, Body::AGE_RANGE),
+        None => Ok(()),
+    }
 }
 
 /// Set the avatar's measurements.
@@ -42,7 +47,7 @@ pub struct AvatarSet {
 }
 
 impl Described for AvatarSet {
-    const SUMMARY: &'static str = "Set the avatar's body: masculinity (0 feminine – 1 masculine) and height, bust, waist and hips in cm. The 3D body is fitted to these measurements; avatar.get reports what it actually measures.";
+    const SUMMARY: &'static str = "Set the avatar's body: masculinity (0 feminine – 1 masculine), height, bust, waist and hips in cm, and for a child its age_years (0–18; left out: an adult). The 3D body is fitted to these measurements, with a child's proportions at that age; avatar.get reports what it actually measures.";
 }
 
 impl CommandSpec for AvatarSet {

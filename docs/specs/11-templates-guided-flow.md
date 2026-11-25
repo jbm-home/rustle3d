@@ -44,7 +44,14 @@ fly zipper, a waistband 4 cm high in two halves sewn at the centre back
 and front, six belt loops (at the fronts, by the side seams and by the
 centre back), the yokes, pocket mouths and patch pockets topstitched in
 two rows. The shorts are the trousers' block ending 22 cm below the
-crotch, their hems 10 cm wider than the thigh. Templates have a kind for
+crotch (less on a leg shorter than 72 cm, in proportion), their hems 10
+cm wider than the thigh. M39 (spec 33): a sweatshirt (the hoodie
+without its hood), a baby's bodysuit, a pyjama's top and bottoms, and
+the sets pyjama and jogging suit (`template.apply` adds a set's parts as
+garments of their own, bottoms first); on a child's body, tops are
+placed from its neck, sleeves from its shoulders and trousers drafted
+to its crotch as the body model's child has them; a short sleeve keeps
+3 cm of underarm seam below its cap. Templates have a kind for
 the pattern library (`template.list`, spec 32). Not yet: sizes on a body silhouette (plain fields for
 now). Templates are recipes in code
 rather than data files: the drafts compute curves and lengths (e.g. the

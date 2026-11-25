@@ -48,8 +48,27 @@ maintainer's briefs that specs cite as "ROADMAP Mxx" in their
 | M36 | Natural motions ✅ (2026-11-25) | The walk looks human: no hop, a supple trunk, relaxed arms |
 | M37 | Imported avatars in motion, game export checked ✅ (2026-11-25) | A scanned body walks in its garment; the garment and its motion open in a game engine as exported |
 | M38 | Pattern library ✅ (2026-11-25) | In an open project, a jean and a short are added from the library; a skirt saved there from one project is added to another, drafted for its body |
+| M39 | Children (in progress) | A 4-year-old girl's pyjama and a baby's bodysuit, drafted on children's bodies and graded by age |
 
-Next: nothing planned; M16's Linux part when the work moves to Linux.
+Next: M39; M16's Linux part when the work moves to Linux.
+
+## M39 — Children (in progress)
+
+Maintainer's brief (2026-11-25): children's avatars, girls and boys;
+templates and library patterns for a bodysuit, a pyjama and a jogging
+suit, and what else matters for children's clothes. Spec 33.
+
+- Bodies: a child's age (0–18 years) on the avatar's body; the body
+  model mixes MakeHuman's baby (1 year), child (11) and adult (25)
+  targets by age (CC0, same commit). Presets and size charts by age:
+  babies 3–24 months, girls and boys 2–14 years. The other
+  measurements estimated for children from coefficients of their own.
+- Templates (kind "Children" in the library): a baby's bodysuit
+  (envelope neck, snap crotch), a pyjama (top and trousers), a jogging
+  suit (sweatshirt and joggers), a children's T-shirt and dress; the
+  existing ones drafted on a child's body too.
+- The app: an age field and the children's presets in the Body panel,
+  the children's charts in the sizes sheet.
 
 ## Test report 2026-11-24 (open points: to take up next)
 

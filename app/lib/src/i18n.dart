@@ -194,6 +194,9 @@ extension Messages on BuildContext {
     return switch (name.split(' ')) {
       ['Women', final size] => l.presetWomen(size),
       ['Men', final size] => l.presetMen(size),
+      ['Girls', final size] => l.presetGirls(size),
+      ['Boys', final size] => l.presetBoys(size),
+      ['Baby', final months] => l.presetBaby(months.replaceAll('m', '')),
       _ => name,
     };
   }

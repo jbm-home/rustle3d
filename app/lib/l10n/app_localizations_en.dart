@@ -3786,4 +3786,91 @@ class LEn extends L {
   String errPatternMissing(String name) {
     return 'The library has no pattern called “$name” any more.';
   }
+
+  @override
+  String get templateSweatshirt => 'Sweatshirt';
+
+  @override
+  String get templateSweatshirtBlurb =>
+      'The hoodie without its hood: a crew neck, gathered at the wrists and the hem.';
+
+  @override
+  String get templateBodysuit => 'Baby bodysuit';
+
+  @override
+  String get templateBodysuitBlurb =>
+      'Jersey, short sleeves, closed under the crotch, with leg openings.';
+
+  @override
+  String get templatePyjama => 'Pyjama';
+
+  @override
+  String get templatePyjamaBlurb =>
+      'Top and bottoms in jersey: two garments, the top worn over the bottoms.';
+
+  @override
+  String get templatePyjamaTop => 'Pyjama top';
+
+  @override
+  String get templatePyjamaTopBlurb =>
+      'Loose, long sleeves gathered at the wrists.';
+
+  @override
+  String get templatePyjamaBottoms => 'Pyjama bottoms';
+
+  @override
+  String get templatePyjamaBottomsBlurb =>
+      'Loose, pulled on: an elastic waist, open at the ankles.';
+
+  @override
+  String get templateJoggingSuit => 'Jogging suit';
+
+  @override
+  String get templateJoggingSuitBlurb =>
+      'Joggers and a sweatshirt worn over them: two garments.';
+
+  @override
+  String get bodyAdult => 'Adult';
+
+  @override
+  String get bodyChild => 'Child';
+
+  @override
+  String get bodyAge => 'Age';
+
+  @override
+  String get bodyAgeYears => 'years';
+
+  @override
+  String get bodyGirl => 'Girl';
+
+  @override
+  String get bodyBoy => 'Boy';
+
+  @override
+  String get chartGirls => 'Girls';
+
+  @override
+  String get chartBoys => 'Boys';
+
+  @override
+  String get chartBabies => 'Babies';
+
+  @override
+  String get libraryKindChildren => 'Babies and children';
+
+  @override
+  String presetGirls(String size) {
+    return 'Girls $size y';
+  }
+
+  @override
+  String presetBoys(String size) {
+    return 'Boys $size y';
+  }
+
+  @override
+  String presetBaby(String months) {
+    return 'Baby $months months';
+  }
 }

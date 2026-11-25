@@ -6450,6 +6450,156 @@ abstract class L {
   /// In en, this message translates to:
   /// **'The library has no pattern called “{name}” any more.'**
   String errPatternMissing(String name);
+
+  /// No description provided for @templateSweatshirt.
+  ///
+  /// In en, this message translates to:
+  /// **'Sweatshirt'**
+  String get templateSweatshirt;
+
+  /// No description provided for @templateSweatshirtBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'The hoodie without its hood: a crew neck, gathered at the wrists and the hem.'**
+  String get templateSweatshirtBlurb;
+
+  /// No description provided for @templateBodysuit.
+  ///
+  /// In en, this message translates to:
+  /// **'Baby bodysuit'**
+  String get templateBodysuit;
+
+  /// No description provided for @templateBodysuitBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Jersey, short sleeves, closed under the crotch, with leg openings.'**
+  String get templateBodysuitBlurb;
+
+  /// No description provided for @templatePyjama.
+  ///
+  /// In en, this message translates to:
+  /// **'Pyjama'**
+  String get templatePyjama;
+
+  /// No description provided for @templatePyjamaBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Top and bottoms in jersey: two garments, the top worn over the bottoms.'**
+  String get templatePyjamaBlurb;
+
+  /// No description provided for @templatePyjamaTop.
+  ///
+  /// In en, this message translates to:
+  /// **'Pyjama top'**
+  String get templatePyjamaTop;
+
+  /// No description provided for @templatePyjamaTopBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Loose, long sleeves gathered at the wrists.'**
+  String get templatePyjamaTopBlurb;
+
+  /// No description provided for @templatePyjamaBottoms.
+  ///
+  /// In en, this message translates to:
+  /// **'Pyjama bottoms'**
+  String get templatePyjamaBottoms;
+
+  /// No description provided for @templatePyjamaBottomsBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Loose, pulled on: an elastic waist, open at the ankles.'**
+  String get templatePyjamaBottomsBlurb;
+
+  /// No description provided for @templateJoggingSuit.
+  ///
+  /// In en, this message translates to:
+  /// **'Jogging suit'**
+  String get templateJoggingSuit;
+
+  /// No description provided for @templateJoggingSuitBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Joggers and a sweatshirt worn over them: two garments.'**
+  String get templateJoggingSuitBlurb;
+
+  /// No description provided for @bodyAdult.
+  ///
+  /// In en, this message translates to:
+  /// **'Adult'**
+  String get bodyAdult;
+
+  /// No description provided for @bodyChild.
+  ///
+  /// In en, this message translates to:
+  /// **'Child'**
+  String get bodyChild;
+
+  /// No description provided for @bodyAge.
+  ///
+  /// In en, this message translates to:
+  /// **'Age'**
+  String get bodyAge;
+
+  /// No description provided for @bodyAgeYears.
+  ///
+  /// In en, this message translates to:
+  /// **'years'**
+  String get bodyAgeYears;
+
+  /// No description provided for @bodyGirl.
+  ///
+  /// In en, this message translates to:
+  /// **'Girl'**
+  String get bodyGirl;
+
+  /// No description provided for @bodyBoy.
+  ///
+  /// In en, this message translates to:
+  /// **'Boy'**
+  String get bodyBoy;
+
+  /// No description provided for @chartGirls.
+  ///
+  /// In en, this message translates to:
+  /// **'Girls'**
+  String get chartGirls;
+
+  /// No description provided for @chartBoys.
+  ///
+  /// In en, this message translates to:
+  /// **'Boys'**
+  String get chartBoys;
+
+  /// No description provided for @chartBabies.
+  ///
+  /// In en, this message translates to:
+  /// **'Babies'**
+  String get chartBabies;
+
+  /// No description provided for @libraryKindChildren.
+  ///
+  /// In en, this message translates to:
+  /// **'Babies and children'**
+  String get libraryKindChildren;
+
+  /// No description provided for @presetGirls.
+  ///
+  /// In en, this message translates to:
+  /// **'Girls {size} y'**
+  String presetGirls(String size);
+
+  /// No description provided for @presetBoys.
+  ///
+  /// In en, this message translates to:
+  /// **'Boys {size} y'**
+  String presetBoys(String size);
+
+  /// No description provided for @presetBaby.
+  ///
+  /// In en, this message translates to:
+  /// **'Baby {months} months'**
+  String presetBaby(String months);
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

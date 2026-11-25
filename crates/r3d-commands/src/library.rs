@@ -44,6 +44,8 @@ pub enum PatternKind {
     Bottoms,
     DressesAndSkirts,
     Accessories,
+    /// Babies' and children's clothes.
+    Children,
 }
 
 /// A library pattern's own file.
@@ -342,7 +344,7 @@ pub fn support_dirs() -> Vec<PathBuf> {
 pub struct LibraryList {}
 
 impl Described for LibraryList {
-    const SUMMARY: &'static str = "The pattern library: `builtin`, the built-in patterns (each a template: its id, English title and kind; add one with template.apply), and `patterns`, the user's own saved with library.save (name, kind, folder, and the template it was drafted from if any; add one with library.add). Kinds: tops, bottoms, dresses_and_skirts, accessories.";
+    const SUMMARY: &'static str = "The pattern library: `builtin`, the built-in patterns (each a template: its id, English title and kind; add one with template.apply), and `patterns`, the user's own saved with library.save (name, kind, folder, and the template it was drafted from if any; add one with library.add). Kinds: tops, bottoms, dresses_and_skirts, accessories, children.";
 }
 
 impl ActionSpec for LibraryList {

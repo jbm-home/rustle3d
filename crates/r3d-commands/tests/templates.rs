@@ -377,3 +377,102 @@ fn shorts_end_above_the_knees() {
     assert!(high > 1.0, "shorts slid down: top at {high}");
     assert!(low > 0.45 && low < 0.62, "hem at {low}");
 }
+
+/// A child's body of `masculinity`, `age` years, from its chart
+/// measurements, with `template` drafted on it.
+fn child(masculinity: f64, body: [f64; 5], template: &str) -> Session {
+    let [age, height, chest, waist, hips] = body;
+    let mut s = Session::new(Project::new("Untitled"));
+    run(
+        &mut s,
+        json!({"type": "avatar.set", "body": {"masculinity": masculinity,
+            "height_cm": height, "bust_cm": chest, "waist_cm": waist,
+            "hips_cm": hips, "age_years": age}}),
+    );
+    run(
+        &mut s,
+        json!({"type": "template.apply", "template": template}),
+    );
+    let seams = run(&mut s, json!({"type": "seam.list"}));
+    for seam in seams.as_array().unwrap() {
+        assert!(seam["mismatch_mm"].as_f64().unwrap() < 1.0, "{seam}");
+    }
+    s
+}
+
+#[test]
+fn a_babys_bodysuit_closes_under_the_crotch() {
+    // A 24 months baby, 88 cm. (At 12 months the arm rests against the
+    // chest: the cloth cuts 2 cm into the armpit's crease between its
+    // vertices, spec 33.)
+    let s = child(0.5, [2.0, 88.0, 51.0, 49.0, 52.0], "bodysuit");
+    let p = s.project();
+    assert_eq!(p.garments().values().next().unwrap().name, "Bodysuit");
+    // The T-shirt's pieces and seams, and the crotch.
+    assert_eq!(p.panels().len(), 4);
+    assert_eq!(p.seams().len(), 11);
+    let (low, high) = drape(&s, 180);
+    eprintln!("bodysuit: {low:.3}..{high:.3}");
+    // From the shoulders (about 0.7 m) down to under the crotch (0.34
+    // m), the legs free.
+    assert!(high > 0.65 && high < 0.8, "top at {high}");
+    assert!(low > 0.25 && low < 0.38, "crotch at {low}");
+}
+
+#[test]
+fn a_pyjama_is_its_bottoms_and_a_top_worn_over_them() {
+    // A 4-year-old girl, 104 cm.
+    let s = child(0.0, [4.0, 104.0, 56.0, 53.0, 59.0], "pyjama");
+    let p = s.project();
+    let garments: Vec<_> = p.garments().values().collect();
+    let names: Vec<&str> = garments.iter().map(|g| g.name.as_str()).collect();
+    assert_eq!(names, ["Pyjama bottoms", "Pyjama top"]);
+    assert!(garments[1].layer > garments[0].layer);
+    for g in &garments {
+        assert!(g.template.is_some(), "{} keeps its template", g.name);
+    }
+    assert_eq!(p.panels().len(), 8);
+    // An elastic at each piece's waist and at both cuffs.
+    assert_eq!(p.elastics().count(), 6);
+    let (low, high) = drape(&s, 180);
+    eprintln!("pyjama: {low:.3}..{high:.3}");
+    assert!(high > 0.8 && high < 0.95, "top at {high}");
+    // The legs open at the ankles, down on the feet.
+    assert!(low < 0.08, "hems at {low}");
+}
+
+#[test]
+fn a_jogging_suit_is_joggers_and_a_sweatshirt() {
+    let s = child(1.0, [8.0, 128.0, 66.0, 58.0, 67.0], "jogging_suit");
+    let names: Vec<String> = s
+        .project()
+        .garments()
+        .values()
+        .map(|g| g.name.clone())
+        .collect();
+    assert_eq!(names, ["Joggers", "Sweatshirt"]);
+    // Joggers' 8 elastics, the sweatshirt's cuffs and hem.
+    assert_eq!(s.project().elastics().count(), 12);
+}
+
+#[test]
+fn a_childs_range_is_graded_by_age() {
+    let mut s = child(0.0, [4.0, 104.0, 56.0, 53.0, 59.0], "pyjama_top");
+    run(
+        &mut s,
+        json!({"type": "grading.use_chart", "chart": "girls", "from": "2", "to": "6", "base": "4"}),
+    );
+    let p = s.project();
+    let ages: Vec<Option<f64>> = (0..5).map(|i| p.size_body(i).unwrap().age_years).collect();
+    assert_eq!(
+        ages,
+        [Some(2.0), Some(3.0), Some(4.0), Some(5.0), Some(6.0)]
+    );
+    // The top drafted on each size's body: every outline point graded.
+    assert!(p.points().values().all(|pt| pt.grade.len() == 5));
+    // A child is 0 to 18 years old.
+    let too_old = Step::from_value(json!({"type": "avatar.set", "body": {"masculinity": 0,
+        "height_cm": 160, "bust_cm": 80, "waist_cm": 65, "hips_cm": 88, "age_years": 20}}))
+    .unwrap();
+    assert!(s.run_step(&too_old).is_err());
+}

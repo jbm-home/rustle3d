@@ -5,7 +5,10 @@
 //!
 //! The estimates are linear in the four measurements, one set of
 //! coefficients for a feminine body and one for a masculine body, mixed
-//! by the masculinity. The coefficients were fitted (least squares) to
+//! by the masculinity; a child's (spec 33) have sets of their own, linear
+//! in its age too, fitted the same way on 205 girls' and boys' bodies
+//! (the babies', girls' and boys' size charts, and bodies whose height,
+//! bust, waist or hips alone differ). The coefficients were fitted (least squares) to
 //! what the built-in body model measures (`r3d_avatar::tape`) on 96
 //! bodies: the women's and men's size charts at three heights, the
 //! presets, and bodies whose waist, hips or bust alone differ. An
@@ -69,6 +72,8 @@ pub enum MeasureGroup {
 /// Linear estimate (cm): a constant, then per cm of height, bust, waist
 /// and hips.
 type Coefficients = [f64; 5];
+/// A child's: the same, then per year of age.
+type ChildCoefficients = [f64; 6];
 
 impl Measure {
     pub const ALL: [Measure; 15] = [
@@ -145,24 +150,25 @@ impl Measure {
         )
     }
 
-    /// Values accepted (cm), generous enough for adults of any build.
+    /// Values accepted (cm), generous enough for adults of any build and
+    /// for babies.
     pub fn range_cm(self) -> (f64, f64) {
         match self {
-            Measure::Neck => (25.0, 65.0),
-            Measure::ShoulderWidth => (25.0, 60.0),
-            Measure::ShoulderLength => (8.0, 22.0),
-            Measure::ArmLength => (40.0, 85.0),
-            Measure::UpperArm => (18.0, 60.0),
-            Measure::Wrist => (11.0, 25.0),
-            Measure::BackWaistLength => (30.0, 60.0),
-            Measure::FrontWaistLength => (30.0, 65.0),
-            Measure::WaistHeight => (70.0, 140.0),
-            Measure::HipHeight => (55.0, 120.0),
-            Measure::CrotchDepth => (15.0, 40.0),
-            Measure::InsideLeg => (55.0, 100.0),
-            Measure::Thigh => (35.0, 95.0),
-            Measure::Knee => (25.0, 60.0),
-            Measure::Ankle => (15.0, 40.0),
+            Measure::Neck => (18.0, 65.0),
+            Measure::ShoulderWidth => (12.0, 60.0),
+            Measure::ShoulderLength => (3.0, 22.0),
+            Measure::ArmLength => (15.0, 85.0),
+            Measure::UpperArm => (10.0, 60.0),
+            Measure::Wrist => (6.0, 25.0),
+            Measure::BackWaistLength => (9.0, 60.0),
+            Measure::FrontWaistLength => (12.0, 65.0),
+            Measure::WaistHeight => (25.0, 140.0),
+            Measure::HipHeight => (20.0, 120.0),
+            Measure::CrotchDepth => (9.0, 40.0),
+            Measure::InsideLeg => (15.0, 100.0),
+            Measure::Thigh => (16.0, 95.0),
+            Measure::Knee => (11.0, 60.0),
+            Measure::Ankle => (8.0, 40.0),
         }
     }
 
@@ -232,14 +238,91 @@ impl Measure {
         }
     }
 
+    /// Its estimate's coefficients for a girl's and a boy's body: as
+    /// [`Measure::coefficients`], then per year of age.
+    fn child_coefficients(self) -> [ChildCoefficients; 2] {
+        match self {
+            Measure::Neck => [
+                [39.2551, -0.1000, -0.0445, -0.0739, -0.0748, 2.4355],
+                [26.9326, -0.0287, 0.0397, -0.0491, 0.0061, 1.0870],
+            ],
+            Measure::ShoulderWidth => [
+                [11.5714, 0.1001, -0.0188, -0.0133, -0.0075, 0.5773],
+                [13.8374, 0.1148, -0.0653, -0.0060, -0.0445, 1.0330],
+            ],
+            Measure::ShoulderLength => [
+                [-0.6764, 0.0671, 0.0021, 0.0053, 0.0112, -0.1257],
+                [2.6992, 0.0627, -0.0361, 0.0030, -0.0230, 0.3613],
+            ],
+            Measure::BackWaistLength => [
+                [0.8258, 0.1011, 0.3105, -0.1089, -0.0425, 0.1146],
+                [4.3198, 0.1188, 0.2256, -0.1149, -0.0654, 0.6814],
+            ],
+            Measure::FrontWaistLength => [
+                [2.8898, 0.0862, 0.1922, -0.0208, 0.0195, 0.1639],
+                [6.7463, 0.1201, 0.1548, -0.0561, -0.0521, 0.7110],
+            ],
+            Measure::WaistHeight => [
+                [-11.6898, 0.7878, -0.1159, 0.0641, 0.0350, -0.5551],
+                [-14.5790, 0.7552, -0.0651, 0.0768, 0.0911, -1.0561],
+            ],
+            Measure::HipHeight => [
+                [-7.5982, 0.4674, 0.0272, 0.2824, -0.0462, -0.4297],
+                [-10.0772, 0.4262, 0.0427, -0.0232, 0.3403, -0.7564],
+            ],
+            Measure::CrotchDepth => [
+                [5.3024, 0.1482, -0.1255, 0.0544, 0.0300, 0.1286],
+                [3.9535, 0.1359, -0.1208, 0.0790, 0.0549, -0.1865],
+            ],
+            Measure::ArmLength => [
+                [-1.6584, 0.3564, 0.0022, 0.0004, -0.0027, -0.3247],
+                [-3.9296, 0.3359, 0.0498, -0.0039, 0.0378, -0.5298],
+            ],
+            Measure::UpperArm => [
+                [10.5489, 0.0392, 0.0058, -0.0231, 0.0304, 0.4229],
+                [12.6143, 0.0455, -0.0318, 0.0083, -0.0173, 0.7685],
+            ],
+            Measure::Wrist => [
+                [2.3564, 0.0628, 0.0219, -0.0030, 0.0143, -0.2195],
+                [1.9250, 0.0523, 0.0278, 0.0097, 0.0212, -0.1849],
+            ],
+            Measure::InsideLeg => [
+                [-16.9922, 0.6396, 0.0096, 0.0097, 0.0051, -0.6838],
+                [-18.5325, 0.6192, 0.0556, -0.0023, 0.0362, -0.8696],
+            ],
+            Measure::Thigh => [
+                [7.7710, 0.1053, -0.0327, -0.0891, 0.2870, 0.5466],
+                [11.4514, 0.1138, -0.0347, -0.0588, 0.1664, 0.7589],
+            ],
+            Measure::Knee => [
+                [11.2743, 0.0764, -0.0140, -0.0139, 0.0109, 0.5887],
+                [12.8587, 0.0838, -0.0440, 0.0080, -0.0273, 0.7801],
+            ],
+            Measure::Ankle => [
+                [4.1930, 0.1030, 0.0112, -0.0109, 0.0052, -0.1437],
+                [4.7453, 0.1017, 0.0042, -0.0134, 0.0018, -0.0004],
+            ],
+        }
+    }
+
     /// Its estimate for `body` (cm), within its range.
     pub fn estimate(self, body: &Body) -> f64 {
         let linear = |[k, h, b, w, hp]: Coefficients| {
             k + h * body.height_cm + b * body.bust_cm + w * body.waist_cm + hp * body.hips_cm
         };
-        let [feminine, masculine] = self.coefficients();
         let m = body.masculinity.clamp(0.0, 1.0);
-        let v = (1.0 - m) * linear(feminine) + m * linear(masculine);
+        let v = match body.age_years {
+            None => {
+                let [feminine, masculine] = self.coefficients();
+                (1.0 - m) * linear(feminine) + m * linear(masculine)
+            }
+            Some(age) => {
+                let aged =
+                    |[k, h, b, w, hp, a]: ChildCoefficients| linear([k, h, b, w, hp]) + a * age;
+                let [girl, boy] = self.child_coefficients();
+                (1.0 - m) * aged(girl) + m * aged(boy)
+            }
+        };
         let (min, max) = self.range_cm();
         (v * 10.0).round().clamp(min * 10.0, max * 10.0) / 10.0
     }
@@ -307,6 +390,7 @@ mod tests {
             bust_cm: 90.0,
             waist_cm: 73.0,
             hips_cm: 98.0,
+            age_years: None,
         };
         let typed = Measures::from([(Measure::Neck, 40.0)]);
         assert_eq!(

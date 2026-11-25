@@ -96,7 +96,7 @@ Choose the unit used to display lengths (storage is always mm).
 
 ### `avatar.set`
 
-Set the avatar's body: masculinity (0 feminine – 1 masculine) and height, bust, waist and hips in cm. The 3D body is fitted to these measurements; avatar.get reports what it actually measures.
+Set the avatar's body: masculinity (0 feminine – 1 masculine), height, bust, waist and hips in cm, and for a child its age_years (0–18; left out: an adult). The 3D body is fitted to these measurements, with a child's proportions at that age; avatar.get reports what it actually measures.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -107,6 +107,14 @@ Set the avatar's body: masculinity (0 feminine – 1 masculine) and height, bust
       "additionalProperties": false,
       "description": "Body measurements (cm), the input of the avatar fitting.",
       "properties": {
+        "age_years": {
+          "description": "A child's age in years ([`Body::AGE_RANGE`]); absent for an\nadult.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "bust_cm": {
           "format": "double",
           "type": "number"
@@ -5092,6 +5100,12 @@ Set the project's size range: the sizes from smallest to largest, each with how 
       "additionalProperties": false,
       "description": "One size of a range, as commands take it.",
       "properties": {
+        "age_years": {
+          "default": 0.0,
+          "description": "How many years older the size's body is (children's ranges;\ndefault 0).",
+          "format": "double",
+          "type": "number"
+        },
         "bust_cm": {
           "default": 0.0,
           "format": "double",
@@ -5153,7 +5167,7 @@ Set the project's size range: the sizes from smallest to largest, each with how 
 
 ### `grading.use_chart`
 
-Set the project's size range from a built-in European chart (`women` 32–56, `men` 44–60, every second size): the sizes from `from` to `to`, drawn in `base`. Each size's body differs from the avatar as the chart's sizes differ from its base size; without an avatar, the chart's base body becomes the avatar. Garments drafted from a template, before or after, are graded to every size; grade other points with point.set_grade.
+Set the project's size range from a built-in European chart (`women` 32–56, `men` 44–60, every second size; `girls` and `boys` by age 2, 3, 4, 5, 6, 8, 10, 12, 14; `babies` 3m, 6m, 12m, 18m, 24m): the sizes from `from` to `to`, drawn in `base`. Each size's body differs from the avatar as the chart's sizes differ from its base size; without an avatar, the chart's base body becomes the avatar. Garments drafted from a template, before or after, are graded to every size; grade other points with point.set_grade.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -5172,6 +5186,21 @@ Set the project's size range from a built-in European chart (`women` 32–56, `m
           "const": "men",
           "description": "European men's sizes 44 to 60 (chest 88–120 cm).",
           "type": "string"
+        },
+        {
+          "const": "girls",
+          "description": "Girls' sizes by age, 2 to 14 years (height 92–164 cm).",
+          "type": "string"
+        },
+        {
+          "const": "boys",
+          "description": "Boys' sizes by age, 2 to 14 years (height 92–164 cm).",
+          "type": "string"
+        },
+        {
+          "const": "babies",
+          "description": "Babies' sizes by age in months, 3m to 24m (height 62–88 cm).",
+          "type": "string"
         }
       ]
     }
@@ -5186,7 +5215,7 @@ Set the project's size range from a built-in European chart (`women` 32–56, `m
     },
     "chart": {
       "$ref": "#/$defs/SizeChart",
-      "description": "`women` (32–56) or `men` (44–60)."
+      "description": "`women` (32–56), `men` (44–60), `girls` or `boys` (ages 2–14) or\n`babies` (3m–24m)."
     },
     "from": {
       "description": "Smallest size of the range, e.g. \"36\".",
@@ -5328,7 +5357,7 @@ Set how a contour point moves from size to size (its grade rule): either `step`,
 
 ### `template.apply`
 
-Draft a starter garment (t_shirt, shirt, trousers, hoodie, joggers, jeans, shorts, dress, straight_skirt, a_line_skirt, tote_bag; library.list gives their kinds) from sizes in cm, the avatar's measurements filling in any left out: its pieces are drawn, sewn, placed around the body and given a fabric, ready to simulate and edit. In a project without panels its garment takes the template's name (the project keeps its own); in a project with pieces the template becomes a garment of its own, worn over the others (see garment.set_layer). Returns the garment if one was added, then the panels, seams and notches.
+Draft a starter garment (t_shirt, shirt, trousers, hoodie, joggers, jeans, shorts, dress, straight_skirt, a_line_skirt, tote_bag, sweatshirt, and for babies and children bodysuit, pyjama_top, pyjama_bottoms, and the sets pyjama and jogging_suit (joggers and a sweatshirt), which add their bottoms and then their top worn over them as two garments, the given length and ease being the top's; library.list gives their kinds) from sizes in cm, the avatar's measurements filling in any left out: its pieces are drawn, sewn, placed around the body and given a fabric, ready to simulate and edit. In a project without panels its garment takes the template's name (the project keeps its own); in a project with pieces the template becomes a garment of its own, worn over the others (see garment.set_layer). Returns the garment if one was added, then the panels, seams and notches.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -5348,7 +5377,7 @@ Draft a starter garment (t_shirt, shirt, trousers, hoodie, joggers, jeans, short
           ]
         },
         "ease_cm": {
-          "description": "Room added to the body measurements (hips for skirts and trousers,\nchest for tops).",
+          "description": "Room added to the body measurements (hips for skirts and trousers,\nchest for tops and a set's top).",
           "format": "double",
           "type": [
             "number",
@@ -5364,7 +5393,7 @@ Draft a starter garment (t_shirt, shirt, trousers, hoodie, joggers, jeans, short
           ]
         },
         "length_cm": {
-          "description": "Garment length: waist to hem for skirts and trousers, neck to hem\nfor tops.",
+          "description": "Garment length: waist to hem for skirts and trousers, neck to hem\nfor tops (a set's top; a bodysuit's to its crotch).",
           "format": "double",
           "type": [
             "number",
@@ -5455,6 +5484,36 @@ Draft a starter garment (t_shirt, shirt, trousers, hoodie, joggers, jeans, short
           "const": "tote_bag",
           "description": "A tote bag: two rectangles with handles, hanging from two pins.",
           "type": "string"
+        },
+        {
+          "const": "sweatshirt",
+          "description": "A sweatshirt: the hoodie without its hood.",
+          "type": "string"
+        },
+        {
+          "const": "bodysuit",
+          "description": "A baby's bodysuit in jersey: the T-shirt's block going on under\nthe crotch, where front and back close, with leg openings.",
+          "type": "string"
+        },
+        {
+          "const": "pyjama",
+          "description": "A pyjama: its bottoms, and its top worn over them (a set: two\ngarments).",
+          "type": "string"
+        },
+        {
+          "const": "pyjama_top",
+          "description": "A pyjama's top in jersey: loose, long sleeves gathered at the\nwrists.",
+          "type": "string"
+        },
+        {
+          "const": "pyjama_bottoms",
+          "description": "A pyjama's bottoms in jersey: the joggers' block, looser, pulled\non by an elastic waist, open at the ankles.",
+          "type": "string"
+        },
+        {
+          "const": "jogging_suit",
+          "description": "A jogging suit: joggers, and a sweatshirt worn over them (a set:\ntwo garments).",
+          "type": "string"
         }
       ]
     }
@@ -5470,7 +5529,7 @@ Draft a starter garment (t_shirt, shirt, trousers, hoodie, joggers, jeans, short
     },
     "template": {
       "$ref": "#/$defs/Template",
-      "description": "`t_shirt`, `shirt`, `trousers`, `hoodie`, `joggers`, `jeans`,\n`shorts`, `dress`, `straight_skirt`, `a_line_skirt` or `tote_bag`."
+      "description": "`t_shirt`, `shirt`, `trousers`, `hoodie`, `joggers`, `jeans`,\n`shorts`, `dress`, `straight_skirt`, `a_line_skirt`, `tote_bag`,\n`sweatshirt`, `bodysuit`, `pyjama`, `pyjama_top`, `pyjama_bottoms`\nor `jogging_suit`."
     }
   },
   "required": [
@@ -5734,6 +5793,14 @@ Draft a garment imported from a Seamly2D or Valentina pattern again for a body (
       "additionalProperties": false,
       "description": "Body measurements (cm), the input of the avatar fitting.",
       "properties": {
+        "age_years": {
+          "description": "A child's age in years ([`Body::AGE_RANGE`]); absent for an\nadult.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "bust_cm": {
           "format": "double",
           "type": "number"
@@ -8603,7 +8670,7 @@ A length on the cached drape between two points of it (`from`, `to`, m): straigh
 
 ### `library.list`
 
-The pattern library: `builtin`, the built-in patterns (each a template: its id, English title and kind; add one with template.apply), and `patterns`, the user's own saved with library.save (name, kind, folder, and the template it was drafted from if any; add one with library.add). Kinds: tops, bottoms, dresses_and_skirts, accessories.
+The pattern library: `builtin`, the built-in patterns (each a template: its id, English title and kind; add one with template.apply), and `patterns`, the user's own saved with library.save (name, kind, folder, and the template it was drafted from if any; add one with library.add). Kinds: tops, bottoms, dresses_and_skirts, accessories, children.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -8662,13 +8729,22 @@ Save a garment to the user's pattern library, shared by every project, under a n
     },
     "PatternKind": {
       "description": "What a pattern is, to sort the library.",
-      "enum": [
-        "tops",
-        "bottoms",
-        "dresses_and_skirts",
-        "accessories"
-      ],
-      "type": "string"
+      "oneOf": [
+        {
+          "enum": [
+            "tops",
+            "bottoms",
+            "dresses_and_skirts",
+            "accessories"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "children",
+          "description": "Babies' and children's clothes.",
+          "type": "string"
+        }
+      ]
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",

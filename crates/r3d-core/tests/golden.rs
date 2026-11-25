@@ -162,6 +162,8 @@ fn sample() -> Project {
                     bust_cm: 88.0,
                     waist_cm: 70.0,
                     hips_cm: 96.0,
+                    // A child's body (v27).
+                    age_years: Some(10.0),
                 }),
                 pieces: vec![SourcePiece { panel, piece: 200 }],
             }),
@@ -270,6 +272,7 @@ fn sample() -> Project {
             bust_cm: 90.0,
             waist_cm: 73.0,
             hips_cm: 98.0,
+            age_years: None,
         },
         preset: Some("Women M".into()),
         // An imported body (v18): a scan in centimetres, Z up, facing -Z.
@@ -300,6 +303,8 @@ fn sample() -> Project {
         bust_cm,
         waist_cm: bust_cm,
         hips_cm: bust_cm,
+        // Each size a year older (v27).
+        age_years: bust_cm / 4.0,
     };
     tx.set_grading(Some(Grading {
         sizes: vec![size("38", -4.0), size("40", 0.0), size("42", 4.0)],

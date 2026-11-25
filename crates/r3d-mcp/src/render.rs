@@ -270,6 +270,13 @@ struct Dressed {
 }
 
 impl Dressed {
+    /// How tall the avatar stands (m); 0 without one.
+    fn body_height(&self) -> f32 {
+        self.avatar
+            .as_ref()
+            .map_or(0.0, |a| a.positions.iter().map(|p| p.y).fold(0.0, f32::max))
+    }
+
     /// The latest drape, its pieces coloured by `fit_map` if given.
     fn of(ws: &Workspace, fit_map: Option<FitMap>) -> Result<Self, RenderError> {
         let project = ws.session().project();
@@ -566,7 +573,8 @@ pub fn render(
         }
         View::Garment(fit_map) => {
             let dressed = Dressed::of(ws, fit_map)?;
-            let png = garment_png(gpu, &dressed, &OrbitCamera::default(), width, height)?;
+            let camera = OrbitCamera::default().for_height(dressed.body_height());
+            let png = garment_png(gpu, &dressed, &camera, width, height)?;
             let mut facts = json!({ "view": "3d", "drape": dressed.state, "pieces": dressed.pieces.len(), "avatar": dressed.avatar.is_some() });
             if let Some(fit) = &dressed.fit {
                 facts["fit_map"] = fit.clone();
@@ -594,7 +602,7 @@ pub fn render(
             let camera = if options.close_up {
                 garment_camera(&dressed, options.angle)
             } else {
-                OrbitCamera::facing(options.angle.yaw())
+                OrbitCamera::facing(options.angle.yaw()).for_height(dressed.body_height())
             };
             let png = photo::render_png(gpu, &scene, &camera, options.settings, width, height)
                 .map_err(|e| match e {

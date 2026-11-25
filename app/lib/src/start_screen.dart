@@ -33,7 +33,19 @@ const _templates = [
   ('straight_skirt', Icons.straighten_rounded),
   ('a_line_skirt', Icons.change_history_rounded),
   ('tote_bag', Icons.shopping_bag_outlined),
+  ('bodysuit', Icons.child_care_rounded),
+  ('pyjama', Icons.bedtime_outlined),
+  ('jogging_suit', Icons.directions_run_outlined),
 ];
+
+/// The body preset a template starts on, when not the standard one.
+const _startPreset = {
+  'bodysuit': 'Baby 12m',
+  'pyjama': 'Girls 6',
+  'pyjama_top': 'Girls 6',
+  'pyjama_bottoms': 'Girls 6',
+  'jogging_suit': 'Boys 8',
+};
 
 /// A template's title and blurb (also the pattern library's, spec 32).
 (String, String) templateText(L l, String id) => switch (id) {
@@ -48,6 +60,12 @@ const _templates = [
   'straight_skirt' => (l.templateStraightSkirt, l.templateStraightSkirtBlurb),
   'a_line_skirt' => (l.templateALineSkirt, l.templateALineSkirtBlurb),
   'tote_bag' => (l.templateToteBag, l.templateToteBagBlurb),
+  'sweatshirt' => (l.templateSweatshirt, l.templateSweatshirtBlurb),
+  'bodysuit' => (l.templateBodysuit, l.templateBodysuitBlurb),
+  'pyjama' => (l.templatePyjama, l.templatePyjamaBlurb),
+  'pyjama_top' => (l.templatePyjamaTop, l.templatePyjamaTopBlurb),
+  'pyjama_bottoms' => (l.templatePyjamaBottoms, l.templatePyjamaBottomsBlurb),
+  'jogging_suit' => (l.templateJoggingSuit, l.templateJoggingSuitBlurb),
   _ => (id, ''),
 };
 
@@ -1213,7 +1231,11 @@ class _NewGarmentDialogState extends State<_NewGarmentDialog> {
   late final List<Map<String, dynamic>> _presets = (jsonDecode(
     bodyPresets(libraryDir: widget.store.libraryDir),
   ) as List).cast<Map<String, dynamic>>();
-  late Map<String, dynamic> _body = widget.store.standardBody();
+  late Map<String, dynamic> _body =
+      _presets
+          .where((p) => p['name'] == _startPreset[widget.template])
+          .firstOrNull ??
+      widget.store.standardBody();
   final Map<String, TextEditingController> _sizes = {};
   String? _error;
 

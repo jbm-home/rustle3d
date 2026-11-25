@@ -524,6 +524,7 @@ pub fn measure(p: &Placed, points: &BTreeMap<BodyPoint, [f64; 3]>) -> (Body, Vec
         bust_cm,
         waist_cm,
         hips_cm,
+        age_years: None,
     };
     (body, clamped)
 }

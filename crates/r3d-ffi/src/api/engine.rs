@@ -2048,6 +2048,17 @@ impl Engine {
                 uvs: Vec::new(),
             };
             mesh.recompute_normals();
+            // A body of another height (a child's after an adult's) is
+            // framed as the last one was.
+            let (old, new) = (
+                g.avatar
+                    .as_ref()
+                    .map_or(OrbitCamera::FRAMED_HEIGHT_M, |(_, m)| top(m)),
+                top(&mesh),
+            );
+            if old > 0.0 && new > 0.0 && (new / old - 1.0).abs() > 0.02 {
+                g.camera = g.camera.scaled(new / old);
+            }
             g.avatar = Some((id, mesh));
         }
         Ok(())
@@ -3906,7 +3917,8 @@ impl Engine {
             CameraSide::Right => -FRAC_PI_2,
         };
         if let Some(g) = self.graphics()?.as_mut() {
-            g.camera = OrbitCamera::facing(yaw);
+            let height = g.avatar.as_ref().map_or(0.0, |(_, m)| top(m));
+            g.camera = OrbitCamera::facing(yaw).for_height(height);
         }
         Ok(())
     }
@@ -3938,6 +3950,11 @@ impl Engine {
     pub fn selection(&self) -> Result<Vec<String>, ApiError> {
         Ok(self.selected()?.iter().map(ToString::to_string).collect())
     }
+}
+
+/// How tall a standing body's mesh is (m, feet at y = 0).
+fn top(mesh: &Mesh) -> f32 {
+    mesh.positions.iter().map(|p| p.y).fold(0.0, f32::max)
 }
 
 #[cfg(test)]

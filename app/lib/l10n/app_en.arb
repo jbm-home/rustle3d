@@ -1923,5 +1923,51 @@
         "type": "String"
       }
     }
+  },
+  "templateSweatshirt": "Sweatshirt",
+  "templateSweatshirtBlurb": "The hoodie without its hood: a crew neck, gathered at the wrists and the hem.",
+  "templateBodysuit": "Baby bodysuit",
+  "templateBodysuitBlurb": "Jersey, short sleeves, closed under the crotch, with leg openings.",
+  "templatePyjama": "Pyjama",
+  "templatePyjamaBlurb": "Top and bottoms in jersey: two garments, the top worn over the bottoms.",
+  "templatePyjamaTop": "Pyjama top",
+  "templatePyjamaTopBlurb": "Loose, long sleeves gathered at the wrists.",
+  "templatePyjamaBottoms": "Pyjama bottoms",
+  "templatePyjamaBottomsBlurb": "Loose, pulled on: an elastic waist, open at the ankles.",
+  "templateJoggingSuit": "Jogging suit",
+  "templateJoggingSuitBlurb": "Joggers and a sweatshirt worn over them: two garments.",
+  "bodyAdult": "Adult",
+  "bodyChild": "Child",
+  "bodyAge": "Age",
+  "bodyAgeYears": "years",
+  "bodyGirl": "Girl",
+  "bodyBoy": "Boy",
+  "chartGirls": "Girls",
+  "chartBoys": "Boys",
+  "chartBabies": "Babies",
+  "libraryKindChildren": "Babies and children",
+  "presetGirls": "Girls {size} y",
+  "@presetGirls": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "presetBoys": "Boys {size} y",
+  "@presetBoys": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "presetBaby": "Baby {months} months",
+  "@presetBaby": {
+    "placeholders": {
+      "months": {
+        "type": "String"
+      }
+    }
   }
 }

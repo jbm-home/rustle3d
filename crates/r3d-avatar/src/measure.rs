@@ -20,10 +20,14 @@ pub struct Measurements {
 }
 
 /// Bands of the torso, as fractions of the stature, where the waist
-/// (smallest) and hips (largest) girths are searched.
+/// (smallest) and hips (largest) girths are searched, in [`SAMPLES`]
+/// sections; the hips also in [`HIPS_BELOW`] more sections below theirs,
+/// down to 0.40: a baby's hips are lower (0.46), an adult's torso parts
+/// into the legs above 0.45.
 const WAIST_BAND: (f32, f32) = (0.57, 0.66);
 const HIPS_BAND: (f32, f32) = (0.47, 0.56);
 const SAMPLES: usize = 20;
+const HIPS_BELOW: usize = 15;
 
 /// Torso girth (cm) at height `y`: the tape length around the section
 /// loop that surrounds the body's vertical axis (arms and hands are
@@ -95,11 +99,13 @@ fn extreme_girth(
     triangles: &[[u32; 3]],
     height: f32,
     band: (f32, f32),
+    below: usize,
     largest: bool,
 ) -> (f32, f32) {
     // (girth, height) of the extreme section.
-    let girths = (0..SAMPLES).filter_map(|i| {
-        let y = (band.0 + (band.1 - band.0) * i as f32 / (SAMPLES - 1) as f32) * height;
+    let girths = (0..SAMPLES + below).filter_map(|k| {
+        let i = k as f32 - below as f32;
+        let y = (band.0 + (band.1 - band.0) * i / (SAMPLES - 1) as f32) * height;
         girth_at(positions, triangles, y, 0.0).map(|g| (g, y))
     });
     if largest {
@@ -129,7 +135,7 @@ const THIGHS: f32 = 0.35;
 /// y = 0).
 pub fn heights(positions: &[Vec3], triangles: &[[u32; 3]]) -> Heights {
     let height = positions.iter().map(|p| p.y).fold(0.0, f32::max);
-    let hips = extreme_girth(positions, triangles, height, HIPS_BAND, true).1;
+    let hips = extreme_girth(positions, triangles, height, HIPS_BAND, HIPS_BELOW, true).1;
     let torso = |y: f32| girth_at(positions, triangles, y, 0.0).is_some();
     let (mut apart, mut joined) = (THIGHS * height, hips);
     let crotch = (!torso(apart) && torso(joined)).then(|| {
@@ -182,6 +188,34 @@ impl Landmarks {
     }
 }
 
+/// A section this much smaller than the one just above it marks where
+/// the arms parted from the torso.
+const ARMS_DROP: f32 = 0.15;
+/// How far below the bust apex the arms are looked for, as a fraction of
+/// the stature, in steps of [`ARMS_STEP`].
+const ARMS_SEARCH: f32 = 0.05;
+const ARMS_STEP: f32 = 0.005;
+
+/// The bust girth (cm) at the apex height `y`. On a baby the apexes are
+/// level with the armpits: the section there takes the arms in, and the
+/// chest is measured just below them, where the section first drops
+/// ([`ARMS_DROP`]). On older bodies no section drops so much.
+fn bust_girth(positions: &[Vec3], triangles: &[[u32; 3]], y: f32, height: f32) -> f32 {
+    let at = |y: f32| girth_at(positions, triangles, y, 0.0);
+    let mut above = at(y).unwrap_or_default();
+    let steps = (ARMS_SEARCH / ARMS_STEP).round() as usize;
+    for k in 1..=steps {
+        let Some(g) = at(y - ARMS_STEP * k as f32 * height) else {
+            break;
+        };
+        if g < (1.0 - ARMS_DROP) * above {
+            return g;
+        }
+        above = g;
+    }
+    at(y).unwrap_or_default()
+}
+
 /// Measure a body (positions in metres, feet at y = 0). The bust is taken
 /// over the bust apex, like a tailor's tape.
 pub fn measure(positions: &[Vec3], triangles: &[[u32; 3]], landmarks: &Landmarks) -> Measurements {
@@ -193,12 +227,12 @@ pub fn measure(positions: &[Vec3], triangles: &[[u32; 3]], landmarks: &Landmarks
         .map(|p| p.y)
         .sum::<f32>()
         / 2.0;
-    let waist = extreme_girth(positions, triangles, height, WAIST_BAND, false);
+    let waist = extreme_girth(positions, triangles, height, WAIST_BAND, 0, false);
     Measurements {
         height_cm: height * 100.0,
-        bust_cm: girth_at(positions, triangles, bust_y, 0.0).unwrap_or_default(),
+        bust_cm: bust_girth(positions, triangles, bust_y, height),
         waist_cm: waist.0,
-        hips_cm: extreme_girth(positions, triangles, height, HIPS_BAND, true).0,
+        hips_cm: extreme_girth(positions, triangles, height, HIPS_BAND, HIPS_BELOW, true).0,
         waist_height_cm: waist.1 * 100.0,
     }
 }

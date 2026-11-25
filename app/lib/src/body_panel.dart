@@ -15,11 +15,14 @@ import 'rust/api/library.dart';
 
 /// Ranges accepted by the `avatar.set` command (cm).
 const _ranges = {
-  'height_cm': (120.0, 220.0),
-  'bust_cm': (60.0, 170.0),
-  'waist_cm': (45.0, 170.0),
-  'hips_cm': (60.0, 180.0),
+  'height_cm': (50.0, 220.0),
+  'bust_cm': (35.0, 170.0),
+  'waist_cm': (33.0, 170.0),
+  'hips_cm': (35.0, 180.0),
 };
+
+/// A child's age accepted by `avatar.set` (years).
+const _ages = (0.0, 18.0);
 
 String _label(L l, String key) => switch (key) {
   'height_cm' => l.measHeight,
@@ -73,6 +76,10 @@ class _BodyPanelState extends State<_BodyPanel> {
   String? _preset;
   double _masculinity = 0;
   final _fields = {for (final k in _ranges.keys) k: TextEditingController()};
+
+  /// A child's body (`age_years` set), and its age.
+  bool _child = false;
+  final _age = TextEditingController();
   Map<String, dynamic>? _achieved;
   List<Map<String, dynamic>> _measures = const [];
   String? _error;
@@ -139,6 +146,7 @@ class _BodyPanelState extends State<_BodyPanel> {
       c.dispose();
     }
     _name.dispose();
+    _age.dispose();
     super.dispose();
   }
 
@@ -151,6 +159,11 @@ class _BodyPanelState extends State<_BodyPanel> {
     _masculinity = (body['masculinity'] as num).toDouble();
     for (final e in _fields.entries) {
       e.value.text = (body[e.key] as num).toStringAsFixed(0);
+    }
+    final age = body['age_years'] as num?;
+    _child = age != null;
+    if (age != null) {
+      _age.text = age % 1 == 0 ? age.toStringAsFixed(0) : '$age';
     }
   }
 
@@ -170,6 +183,21 @@ class _BodyPanelState extends State<_BodyPanel> {
         return null;
       }
       body[e.key] = v;
+    }
+    if (_child) {
+      final v = double.tryParse(_age.text.replaceAll(',', '.'));
+      final (min, max) = _ages;
+      if (v == null || v < min || v > max) {
+        setState(
+          () => _error = context.l.measBetween(
+            context.l.bodyAge,
+            min.round(),
+            max.round(),
+          ),
+        );
+        return null;
+      }
+      body['age_years'] = v;
     }
     return body;
   }
@@ -319,16 +347,61 @@ class _BodyPanelState extends State<_BodyPanel> {
             onChanged: _choosePreset,
           ),
           const SizedBox(height: Space.l),
-          SegmentedButton<double>(
-            segments: [
-              ButtonSegment(value: 0, label: Text(l.bodyFeminine)),
-              ButtonSegment(value: 1, label: Text(l.bodyMasculine)),
+          Wrap(
+            spacing: Space.m,
+            runSpacing: Space.m,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              SegmentedButton<bool>(
+                segments: [
+                  ButtonSegment(value: false, label: Text(l.bodyAdult)),
+                  ButtonSegment(value: true, label: Text(l.bodyChild)),
+                ],
+                selected: {_child},
+                onSelectionChanged: (s) => setState(() {
+                  _child = s.first;
+                  if (_child && _age.text.isEmpty) _age.text = '6';
+                  _preset = null;
+                }),
+              ),
+              SegmentedButton<double>(
+                segments: [
+                  ButtonSegment(
+                    value: 0,
+                    label: Text(_child ? l.bodyGirl : l.bodyFeminine),
+                  ),
+                  ButtonSegment(
+                    value: 1,
+                    label: Text(_child ? l.bodyBoy : l.bodyMasculine),
+                  ),
+                ],
+                selected: {_masculinity < 0.5 ? 0 : 1},
+                onSelectionChanged: (s) => setState(() {
+                  _masculinity = s.first;
+                  _preset = null;
+                }),
+              ),
+              if (_child)
+                SizedBox(
+                  width: 120,
+                  child: TextField(
+                    controller: _age,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                    ],
+                    onChanged: (_) => setState(() => _preset = null),
+                    onSubmitted: (_) => _apply(),
+                    decoration: InputDecoration(
+                      labelText: l.bodyAge,
+                      suffixText: l.bodyAgeYears,
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ),
             ],
-            selected: {_masculinity < 0.5 ? 0 : 1},
-            onSelectionChanged: (s) => setState(() {
-              _masculinity = s.first;
-              _preset = null;
-            }),
           ),
           const SizedBox(height: Space.l),
           Wrap(

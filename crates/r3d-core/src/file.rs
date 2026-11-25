@@ -20,7 +20,7 @@ use crate::model::Project;
 /// Identifies a Rustle3D project file.
 pub const FORMAT: &str = "rustle3d.project";
 /// Version written by this build.
-pub const SCHEMA_VERSION: u32 = 26;
+pub const SCHEMA_VERSION: u32 = 27;
 
 type Migration = fn(Value) -> Result<Value, FileError>;
 
@@ -51,6 +51,7 @@ const MIGRATIONS: &[Migration] = &[
     migrate_v23_to_v24,
     migrate_v24_to_v25,
     migrate_v25_to_v26,
+    migrate_v26_to_v27,
 ];
 
 fn object<'a>(
@@ -60,6 +61,13 @@ fn object<'a>(
     value.as_object_mut().ok_or_else(|| FileError::Json {
         detail: format!("{what} is not an object"),
     })
+}
+
+/// v27 adds a child's age to the avatar's body and to each size of a
+/// range (`age_years`, absent: an adult, no difference). Nothing to
+/// convert.
+fn migrate_v26_to_v27(project: Value) -> Result<Value, FileError> {
+    Ok(project)
 }
 
 /// v26 lets a garment be taken out of the drape (`draped`, true when

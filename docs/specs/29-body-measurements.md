@@ -41,7 +41,8 @@ from `arm_length` lengthens, and every size of the range follows.
 - **Estimated until typed.** Creating a project asks for nothing more.
   Each measurement not typed is estimated from height, bust, waist, hips
   and the masculinity: linear formulas fitted to what the built-in body
-  measures, so an estimate is what the avatar measures (within 2.5 cm).
+  measures, so an estimate is what the avatar measures (within 2.5 cm);
+  a child's have formulas of their own, linear in its age too (spec 33).
   A typed value is kept (in the project, `avatar.measures`) until it is
   reset to the estimate. Changing the four (or the preset) keeps the
   typed ones; removing the avatar drops them.

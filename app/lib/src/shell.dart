@@ -7122,7 +7122,7 @@ class _SizeChartDialogState extends State<_SizeChartDialog> {
     return AlertDialog(
       title: Text(l.sizes),
       content: SizedBox(
-        width: 320,
+        width: 440,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -7130,9 +7130,13 @@ class _SizeChartDialogState extends State<_SizeChartDialog> {
             Text(l.sizeChart, style: ts(fontSize: 12.5, color: p.textMuted)),
             const SizedBox(height: Space.xs),
             SegmentedButton<String>(
+              showSelectedIcon: false,
               segments: [
                 ButtonSegment(value: 'women', label: Text(l.chartWomen)),
                 ButtonSegment(value: 'men', label: Text(l.chartMen)),
+                ButtonSegment(value: 'girls', label: Text(l.chartGirls)),
+                ButtonSegment(value: 'boys', label: Text(l.chartBoys)),
+                ButtonSegment(value: 'babies', label: Text(l.chartBabies)),
               ],
               selected: {_chart},
               onSelectionChanged: (s) => setState(() => _choose(s.first)),

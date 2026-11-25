@@ -59,6 +59,31 @@ pub struct BodyShape {
     /// Adjustments of the measurements of [`FOLLOWED`], in its order,
     /// -1..1 (up to [`MAX_EXTRAPOLATION`]).
     pub followed: [f32; FOLLOWED.len()],
+    /// A child's age in years ([`AGES`]); `None` is an adult.
+    pub age_years: Option<f32>,
+}
+
+/// The ages the model has bodies for (years): a baby's, a child's and an
+/// adult's (MakeHuman's "baby", "child" and "young"), each with the
+/// suffix of its targets' names. A body between two of them mixes their
+/// targets linearly in age, as MakeHuman's age modifier does.
+pub const AGES: [(f32, &str); 3] = [(1.0, "-baby"), (11.0, "-child"), (25.0, "")];
+
+/// The targets' suffixes for `age` (`None`: adult), each with its weight.
+fn age_mix(age: Option<f32>) -> Vec<(&'static str, f32)> {
+    let Some(a) = age else {
+        return vec![("", 1.0)];
+    };
+    let a = a.clamp(AGES[0].0, AGES[2].0);
+    for pair in AGES.windows(2) {
+        if let [(lo, young), (hi, old)] = *pair
+            && a <= hi
+        {
+            let t = (a - lo) / (hi - lo);
+            return vec![(young, 1.0 - t), (old, t)];
+        }
+    }
+    vec![("", 1.0)]
 }
 
 /// Targets are linear, so they can be pushed past their authored range to
@@ -97,11 +122,14 @@ impl BodyModel {
     }
 
     pub fn from_pack(pack: BodyPack) -> Result<Self, PackError> {
-        let mut required = vec!["gender-female".to_owned(), "gender-male".to_owned()];
+        let mut required = Vec::new();
         for sex in ["female", "male"] {
-            for end in ["min", "max"] {
-                required.push(format!("weight-{sex}-{end}"));
-                required.push(format!("height-{sex}-{end}"));
+            for (_, age) in AGES {
+                required.push(format!("gender-{sex}{age}"));
+                for end in ["min", "max"] {
+                    required.push(format!("weight-{sex}{age}-{end}"));
+                    required.push(format!("height-{sex}{age}-{end}"));
+                }
             }
         }
         for g in Girth::ALL {
@@ -198,12 +226,21 @@ impl BodyModel {
     fn weighted_targets(&self, shape: &BodyShape) -> Vec<(&Target, f32)> {
         let m = shape.masculinity.clamp(0.0, 1.0);
         let mut list = Vec::new();
-        for (sex, w) in [("female", 1.0 - m), ("male", m)] {
-            list.extend(self.get(&format!("gender-{sex}")).map(|t| (t, w)));
-            let weight = self.signed(&format!("weight-{sex}-min"), &format!("weight-{sex}-max"));
-            list.extend(pick(weight, shape.weight, w));
-            let stature = self.signed(&format!("height-{sex}-min"), &format!("height-{sex}-max"));
-            list.extend(pick(stature, shape.stature, w));
+        for (sex, s) in [("female", 1.0 - m), ("male", m)] {
+            for (age, a) in age_mix(shape.age_years) {
+                let w = s * a;
+                list.extend(self.get(&format!("gender-{sex}{age}")).map(|t| (t, w)));
+                let weight = self.signed(
+                    &format!("weight-{sex}{age}-min"),
+                    &format!("weight-{sex}{age}-max"),
+                );
+                list.extend(pick(weight, shape.weight, w));
+                let stature = self.signed(
+                    &format!("height-{sex}{age}-min"),
+                    &format!("height-{sex}{age}-max"),
+                );
+                list.extend(pick(stature, shape.stature, w));
+            }
         }
         for (g, value) in Girth::ALL.iter().zip(shape.girths) {
             let stem = g.target_stem();

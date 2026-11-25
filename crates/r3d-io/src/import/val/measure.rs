@@ -506,6 +506,7 @@ mod tests {
             bust_cm: bust,
             waist_cm: waist,
             hips_cm: hips,
+            age_years: None,
         }
     }
 

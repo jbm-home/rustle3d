@@ -18,13 +18,20 @@ import 'rust/api/templates.dart';
 import 'start_screen.dart' show templateText;
 
 /// The kinds the library sorts patterns by, in order.
-const _kinds = ['tops', 'bottoms', 'dresses_and_skirts', 'accessories'];
+const _kinds = [
+  'tops',
+  'bottoms',
+  'dresses_and_skirts',
+  'accessories',
+  'children',
+];
 
 String _kindName(L l, String kind) => switch (kind) {
   'tops' => l.libraryKindTops,
   'bottoms' => l.libraryKindBottoms,
   'dresses_and_skirts' => l.libraryKindDresses,
   'accessories' => l.libraryKindAccessories,
+  'children' => l.libraryKindChildren,
   _ => kind,
 };
 

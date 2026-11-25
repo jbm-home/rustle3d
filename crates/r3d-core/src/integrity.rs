@@ -232,8 +232,10 @@ impl Project {
         if let Some(a) = &self.avatar {
             let b = a.body;
             let sizes = [b.height_cm, b.bust_cm, b.waist_cm, b.hips_cm];
+            let (young, old) = crate::model::Body::AGE_RANGE;
             if !(0.0..=1.0).contains(&b.masculinity)
                 || sizes.iter().any(|v| !(v.is_finite() && *v > 0.0))
+                || b.age_years.is_some_and(|a| !(young..=old).contains(&a))
                 || a.mesh.as_ref().is_some_and(|m| !m.valid())
             {
                 return Err(E::BadAvatar);

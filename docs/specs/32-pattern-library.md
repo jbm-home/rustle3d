@@ -48,7 +48,8 @@ another one, drafted for that project's body.
   patterns are the templates (spec 11), each with its kind: T-shirt,
   shirt, hoodie (tops); trousers, jeans, joggers, shorts (bottoms);
   dress, straight and A-line skirts (dresses and skirts); tote bag
-  (accessories).
+  (accessories); M39 (spec 33): sweatshirt (tops), bodysuit, pyjama,
+  pyjama top, pyjama bottoms, jogging suit (babies and children).
 - **Adding** a pattern makes a new garment in the open project, worn
   over the garments there (on an empty board, the project's own
   garment becomes it), drafted for the avatar and every size of the

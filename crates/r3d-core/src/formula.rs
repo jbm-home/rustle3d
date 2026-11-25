@@ -512,6 +512,7 @@ mod tests {
                 bust_cm: 90.0,
                 waist_cm: 72.0,
                 hips_cm: 98.0,
+                age_years: None,
             },
             preset: None,
             mesh: None,

@@ -385,40 +385,45 @@ pub fn run(root: &Path) -> Result<(), String> {
         "rigs/default.mhskel".to_owned(),
         "rigs/default_weights.mhw".to_owned(),
     ];
+    // The adult (MakeHuman's "young", 25 years) targets keep their names;
+    // a child's (11 years) and a baby's (1 year) take the age as a suffix.
     for sex in ["female", "male"] {
-        let ethnic: Vec<_> = ["african", "asian", "caucasian"]
-            .iter()
-            .map(|e| {
-                let path = format!("macrodetails/{e}-{sex}-young.target");
+        for (age, suffix) in [("young", ""), ("child", "-child"), ("baby", "-baby")] {
+            let ethnic: Vec<_> = ["african", "asian", "caucasian"]
+                .iter()
+                .map(|e| {
+                    let path = format!("macrodetails/{e}-{sex}-{age}.target");
+                    files.push(format!("targets/{path}"));
+                    get(&path)
+                })
+                .collect::<Result<_, _>>()?;
+            targets.push(to_target(
+                &format!("gender-{sex}{suffix}"),
+                &average(&ethnic),
+                &base,
+                &rig,
+            ));
+            for w in ["min", "max"] {
+                let path =
+                    format!("macrodetails/universal-{sex}-{age}-averagemuscle-{w}weight.target");
+                targets.push(to_target(
+                    &format!("weight-{sex}{suffix}-{w}"),
+                    &get(&path)?,
+                    &base,
+                    &rig,
+                ));
                 files.push(format!("targets/{path}"));
-                get(&path)
-            })
-            .collect::<Result<_, _>>()?;
-        targets.push(to_target(
-            &format!("gender-{sex}"),
-            &average(&ethnic),
-            &base,
-            &rig,
-        ));
-        for w in ["min", "max"] {
-            let path = format!("macrodetails/universal-{sex}-young-averagemuscle-{w}weight.target");
-            targets.push(to_target(
-                &format!("weight-{sex}-{w}"),
-                &get(&path)?,
-                &base,
-                &rig,
-            ));
-            files.push(format!("targets/{path}"));
-            let path = format!(
-                "macrodetails/height/{sex}-young-averagemuscle-averageweight-{w}height.target"
-            );
-            targets.push(to_target(
-                &format!("height-{sex}-{w}"),
-                &get(&path)?,
-                &base,
-                &rig,
-            ));
-            files.push(format!("targets/{path}"));
+                let path = format!(
+                    "macrodetails/height/{sex}-{age}-averagemuscle-averageweight-{w}height.target"
+                );
+                targets.push(to_target(
+                    &format!("height-{sex}{suffix}-{w}"),
+                    &get(&path)?,
+                    &base,
+                    &rig,
+                ));
+                files.push(format!("targets/{path}"));
+            }
         }
     }
     for m in MEASURES {
@@ -433,7 +438,7 @@ pub fn run(root: &Path) -> Result<(), String> {
         provenance: format!(
             "MakeHuman assets, CC0 1.0 Universal (https://github.com/makehumancommunity/makehuman, \
              commit {COMMIT}). Body only, metres, feet at y = 0; gender targets are the average of \
-             the african/asian/caucasian young targets; the default skeleton reduced to {} bones \
+             the african/asian/caucasian targets of each age (young, child, baby); the default skeleton reduced to {} bones \
              (fingers, toes, face and twist bones merged into the bone they hang from), four skin \
              weights per vertex. Files: {}",
             rig.bones.len(),

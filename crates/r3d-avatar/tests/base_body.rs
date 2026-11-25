@@ -37,6 +37,7 @@ fn fitting_reaches_typical_measurements() {
             bust_cm: 92.0,
             waist_cm: 74.0,
             hips_cm: 100.0,
+            age_years: None,
         },
         Body {
             masculinity: 0.0,
@@ -44,6 +45,7 @@ fn fitting_reaches_typical_measurements() {
             bust_cm: 84.0,
             waist_cm: 66.0,
             hips_cm: 92.0,
+            age_years: None,
         },
         Body {
             masculinity: 1.0,
@@ -51,6 +53,7 @@ fn fitting_reaches_typical_measurements() {
             bust_cm: 100.0,
             waist_cm: 86.0,
             hips_cm: 100.0,
+            age_years: None,
         },
     ];
     for spec in specs {
@@ -67,5 +70,40 @@ fn fitting_reaches_typical_measurements() {
         assert!(off(a.bust_cm, spec.bust_cm) < 1.5, "bust");
         assert!(off(a.waist_cm, spec.waist_cm) < 1.5, "waist");
         assert!(off(a.hips_cm, spec.hips_cm) < 1.5, "hips");
+    }
+}
+
+#[test]
+fn a_childs_head_is_larger_and_its_body_fits_its_chart() {
+    use r3d_avatar::fit::{fit, proportions};
+    use r3d_avatar::presets::Children;
+    let model = BodyModel::builtin().unwrap();
+    for m in [0.0, 1.0] {
+        let adult = proportions(&model, m, None).unwrap();
+        let mut last = proportions(&model, m, Some(1.0)).unwrap();
+        // Neck, shoulders and crotch rise on the stature as the child
+        // grows, up to the adult's.
+        for age in [3.0, 6.0, 11.0, 25.0] {
+            let p = proportions(&model, m, Some(age)).unwrap();
+            assert!(
+                p.neck >= last.neck && p.crotch >= last.crotch,
+                "{age}: {p:?}"
+            );
+            last = p;
+        }
+        assert!((last.neck - adult.neck).abs() < 1e-4);
+    }
+    // Every girl's size is reached within half a centimetre.
+    for (name, body) in Children::Girls.sizes() {
+        let f = fit(&model, &body);
+        let a = f.achieved;
+        for (got, want) in [
+            (a.height_cm, body.height_cm),
+            (a.bust_cm, body.bust_cm),
+            (a.waist_cm, body.waist_cm),
+            (a.hips_cm, body.hips_cm),
+        ] {
+            assert!((f64::from(got) - want).abs() < 0.5, "{name}: {a:?}");
+        }
     }
 }

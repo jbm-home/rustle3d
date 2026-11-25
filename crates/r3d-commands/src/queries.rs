@@ -992,7 +992,7 @@ impl Described for GradingCharts {
 impl QuerySpec for GradingCharts {
     fn run(&self, _: &Project) -> Result<Value, CommandError> {
         use crate::commands::SizeChart;
-        let charts: Vec<Value> = [SizeChart::Women, SizeChart::Men]
+        let charts: Vec<Value> = SizeChart::ALL
             .into_iter()
             .map(|c| {
                 let sizes: Vec<Value> = c

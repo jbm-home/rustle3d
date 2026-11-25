@@ -3816,4 +3816,91 @@ class LFr extends L {
   String errPatternMissing(String name) {
     return 'La bibliothèque n\'a plus de patron nommé « $name ».';
   }
+
+  @override
+  String get templateSweatshirt => 'Sweat';
+
+  @override
+  String get templateSweatshirtBlurb =>
+      'Le sweat à capuche sans sa capuche : col rond, froncé aux poignets et en bas.';
+
+  @override
+  String get templateBodysuit => 'Body bébé';
+
+  @override
+  String get templateBodysuitBlurb =>
+      'En jersey, manches courtes, fermé sous l’entrejambe, avec ses tours de cuisse.';
+
+  @override
+  String get templatePyjama => 'Pyjama';
+
+  @override
+  String get templatePyjamaBlurb =>
+      'Haut et bas en jersey : deux vêtements, le haut porté sur le bas.';
+
+  @override
+  String get templatePyjamaTop => 'Haut de pyjama';
+
+  @override
+  String get templatePyjamaTopBlurb =>
+      'Ample, manches longues froncées aux poignets.';
+
+  @override
+  String get templatePyjamaBottoms => 'Bas de pyjama';
+
+  @override
+  String get templatePyjamaBottomsBlurb =>
+      'Ample, à enfiler : taille élastique, ouvert aux chevilles.';
+
+  @override
+  String get templateJoggingSuit => 'Ensemble de jogging';
+
+  @override
+  String get templateJoggingSuitBlurb =>
+      'Un jogging et un sweat porté par-dessus : deux vêtements.';
+
+  @override
+  String get bodyAdult => 'Adulte';
+
+  @override
+  String get bodyChild => 'Enfant';
+
+  @override
+  String get bodyAge => 'Âge';
+
+  @override
+  String get bodyAgeYears => 'ans';
+
+  @override
+  String get bodyGirl => 'Fille';
+
+  @override
+  String get bodyBoy => 'Garçon';
+
+  @override
+  String get chartGirls => 'Fille';
+
+  @override
+  String get chartBoys => 'Garçon';
+
+  @override
+  String get chartBabies => 'Bébé';
+
+  @override
+  String get libraryKindChildren => 'Bébés et enfants';
+
+  @override
+  String presetGirls(String size) {
+    return 'Fille $size ans';
+  }
+
+  @override
+  String presetBoys(String size) {
+    return 'Garçon $size ans';
+  }
+
+  @override
+  String presetBaby(String months) {
+    return 'Bébé $months mois';
+  }
 }

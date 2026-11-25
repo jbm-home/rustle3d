@@ -48,6 +48,9 @@ use crate::queries::{body_model, fitted};
 
 /// Default distance between cloth vertices (mm): interactive on a laptop.
 pub const DEFAULT_SPACING_MM: f64 = 25.0;
+/// On a body shorter than this (cm), a child's, the cloth's vertices come
+/// closer in proportion: a baby's arm is only a few spacings round.
+const FINE_BELOW_CM: f64 = 150.0;
 /// Grid step of the avatar's distance field (m).
 const BODY_VOXEL: f32 = 0.005;
 /// Stature assumed when there is no avatar (m).
@@ -1718,7 +1721,10 @@ pub fn build(
 ) -> Result<Drape, CommandError> {
     let shown = project.as_shown();
     let project = &*draped_only(&shown);
-    let spacing = spacing_mm.max(2.0);
+    let small = project
+        .avatar()
+        .map_or(1.0, |a| (a.body.height_cm / FINE_BELOW_CM).clamp(0.3, 1.0));
+    let spacing = (spacing_mm * small).max(2.0);
     let samples = sample_tracks(project, spacing);
     // One fabric per garment, and the garments simulated (those with a
     // placed panel) in their layers.

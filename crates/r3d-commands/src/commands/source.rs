@@ -235,6 +235,8 @@ impl CommandSpec for AvatarUseMeasurements {
             bust_cm: cm(&values, "bust_circ")?,
             waist_cm: cm(&values, "waist_circ")?,
             hips_cm: cm(&values, "hip_circ")?,
+            // The file says nothing of it: a child's project stays one.
+            age_years: tx.project().avatar().and_then(|a| a.body.age_years),
         };
         AvatarSet { body, preset: None }.apply(tx)?;
         for (name, v) in &values {
@@ -270,6 +272,7 @@ impl CommandSpec for AvatarUseMeasurements {
                         bust_cm: d("bust_circ")?,
                         waist_cm: d("waist_circ")?,
                         hips_cm: d("hip_circ")?,
+                        age_years: 0.0,
                     })
                 })
                 .collect::<Result<Vec<_>, CommandError>>()?;

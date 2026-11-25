@@ -10,6 +10,8 @@ use r3d_geom::DVec2;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use r3d_avatar::presets::Children;
+
 use super::avatar::validate_body;
 use super::{Vec2, v};
 use crate::error::{CommandError, Invalid, finite, non_blank};
@@ -31,6 +33,10 @@ pub struct SizeSpec {
     pub waist_cm: f64,
     #[serde(default)]
     pub hips_cm: f64,
+    /// How many years older the size's body is (children's ranges;
+    /// default 0).
+    #[serde(default)]
+    pub age_years: f64,
 }
 
 /// A built-in size chart.
@@ -41,9 +47,23 @@ pub enum SizeChart {
     Women,
     /// European men's sizes 44 to 60 (chest 88–120 cm).
     Men,
+    /// Girls' sizes by age, 2 to 14 years (height 92–164 cm).
+    Girls,
+    /// Boys' sizes by age, 2 to 14 years (height 92–164 cm).
+    Boys,
+    /// Babies' sizes by age in months, 3m to 24m (height 62–88 cm).
+    Babies,
 }
 
 impl SizeChart {
+    pub const ALL: [SizeChart; 5] = [
+        SizeChart::Women,
+        SizeChart::Men,
+        SizeChart::Girls,
+        SizeChart::Boys,
+        SizeChart::Babies,
+    ];
+
     /// Name and body of every size. Approximate values from common
     /// European size charts (general garment-making knowledge): women's
     /// sizes grow by 4 cm of bust up to 46, then 6; men's size is half the
@@ -64,6 +84,7 @@ impl SizeChart {
                             bust_cm: bust,
                             waist_cm: bust - 18.0,
                             hips_cm: bust + 8.0,
+                            age_years: None,
                         },
                     )
                 })
@@ -80,10 +101,14 @@ impl SizeChart {
                             bust_cm: chest,
                             waist_cm: chest - 12.0,
                             hips_cm: chest + 4.0,
+                            age_years: None,
                         },
                     )
                 })
                 .collect(),
+            SizeChart::Girls => Children::Girls.sizes(),
+            SizeChart::Boys => Children::Boys.sizes(),
+            SizeChart::Babies => Children::Babies.sizes(),
         }
     }
 }
@@ -203,7 +228,10 @@ pub(crate) fn set_sizes(
         if !names.insert(s.name.trim()) {
             return Err(CommandError::invalid("sizes", Invalid::DuplicateName));
         }
-        finite("sizes", &[s.height_cm, s.bust_cm, s.waist_cm, s.hips_cm])?;
+        finite(
+            "sizes",
+            &[s.height_cm, s.bust_cm, s.waist_cm, s.hips_cm, s.age_years],
+        )?;
     }
     let (base_index, zero) = sizes
         .iter()
@@ -219,6 +247,7 @@ pub(crate) fn set_sizes(
             bust_cm: s.bust_cm - zero.bust_cm,
             waist_cm: s.waist_cm - zero.waist_cm,
             hips_cm: s.hips_cm - zero.hips_cm,
+            age_years: s.age_years - zero.age_years,
         })
         .collect();
     // Redraw the pattern in the new base size, then carry each point's
@@ -354,7 +383,8 @@ impl CommandSpec for GradingSetSizes {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct GradingUseChart {
-    /// `women` (32–56) or `men` (44–60).
+    /// `women` (32–56), `men` (44–60), `girls` or `boys` (ages 2–14) or
+    /// `babies` (3m–24m).
     pub chart: SizeChart,
     /// Smallest size of the range, e.g. "36".
     pub from: String,
@@ -365,7 +395,7 @@ pub struct GradingUseChart {
 }
 
 impl Described for GradingUseChart {
-    const SUMMARY: &'static str = "Set the project's size range from a built-in European chart (`women` 32–56, `men` 44–60, every second size): the sizes from `from` to `to`, drawn in `base`. Each size's body differs from the avatar as the chart's sizes differ from its base size; without an avatar, the chart's base body becomes the avatar. Garments drafted from a template, before or after, are graded to every size; grade other points with point.set_grade.";
+    const SUMMARY: &'static str = "Set the project's size range from a built-in European chart (`women` 32–56, `men` 44–60, every second size; `girls` and `boys` by age 2, 3, 4, 5, 6, 8, 10, 12, 14; `babies` 3m, 6m, 12m, 18m, 24m): the sizes from `from` to `to`, drawn in `base`. Each size's body differs from the avatar as the chart's sizes differ from its base size; without an avatar, the chart's base body becomes the avatar. Garments drafted from a template, before or after, are graded to every size; grade other points with point.set_grade.";
 }
 
 impl CommandSpec for GradingUseChart {
@@ -417,6 +447,8 @@ impl CommandSpec for GradingUseChart {
                 bust_cm: b.bust_cm - base_body.bust_cm,
                 waist_cm: b.waist_cm - base_body.waist_cm,
                 hips_cm: b.hips_cm - base_body.hips_cm,
+                age_years: b.age_years.unwrap_or_default()
+                    - base_body.age_years.unwrap_or_default(),
             })
             .collect();
         set_sizes(tx, &sizes, base_name, progress)
@@ -582,9 +614,14 @@ mod tests {
 
     #[test]
     fn charts_grow_with_the_size() {
-        for chart in [SizeChart::Women, SizeChart::Men] {
+        for chart in SizeChart::ALL {
             let sizes = chart.sizes();
             assert!(sizes.windows(2).all(|w| w[1].1.bust_cm > w[0].1.bust_cm));
+            assert!(
+                sizes
+                    .windows(2)
+                    .all(|w| w[1].1.height_cm >= w[0].1.height_cm)
+            );
             for (_, b) in &sizes {
                 validate_body(b).unwrap();
             }

@@ -19,6 +19,7 @@ fn women_m() -> Body {
         bust_cm: 90.0,
         waist_cm: 73.0,
         hips_cm: 98.0,
+        age_years: None,
     }
 }
 

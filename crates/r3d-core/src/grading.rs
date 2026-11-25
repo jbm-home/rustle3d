@@ -65,6 +65,7 @@ impl Project {
             bust_cm: at_least(body.bust_cm + size.bust_cm),
             waist_cm: at_least(body.waist_cm + size.waist_cm),
             hips_cm: at_least(body.hips_cm + size.hips_cm),
+            age_years: body.aged(size.age_years),
         })
     }
 

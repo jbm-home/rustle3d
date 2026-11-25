@@ -206,12 +206,7 @@ impl Taping<'_> {
     /// The left shoulder's tip, out from its joint at the shoulder's top.
     fn shoulder_tip(&self) -> Option<Vec3> {
         let (joint, _) = self.bone("upper_arm_l")?;
-        let top = self
-            .p
-            .iter()
-            .filter(|v| (v.x - joint.x).abs() < 0.015 && (v.z - joint.z).abs() < 0.04)
-            .map(|v| v.y)
-            .fold(joint.y, f32::max);
+        let top = crate::fit::shoulder_top(self.p, joint, self.bone("neck")?.0.y);
         Some(Vec3::new(joint.x + JOINT_TO_TIP_M, top, joint.z))
     }
 

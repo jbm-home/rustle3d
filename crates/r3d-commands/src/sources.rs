@@ -93,6 +93,7 @@ fn reference_body(p: &Project, src: &PatternSource) -> Option<Body> {
         bust_cm: b?,
         waist_cm: w?,
         hips_cm: hp?,
+        age_years: None,
     })
 }
 

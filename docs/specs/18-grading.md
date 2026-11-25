@@ -38,9 +38,11 @@ the seams still match in every size, and print or send the graded nest.
   knowledge, approximate): women 32–56 (bust 76–134 cm, +4 cm per size
   up to 46, then +6; waist = bust − 18, hips = bust + 8), men 44–60
   (chest = 2 × size, waist = chest − 12, hips = chest + 4), every second
-  size. A chart's sizes differ from the avatar as they differ from the
-  chart's base size, so a custom avatar keeps its own proportions;
-  without an avatar the chart's base body becomes it.
+  size; girls, boys (by age, 2–14 years) and babies (3–24 months), spec
+  33, where each size also differs in age. A chart's sizes differ from
+  the avatar as they differ from the chart's base size, so a custom
+  avatar keeps its own proportions; without an avatar the chart's base
+  body becomes it.
 - **Grade rules.** Each contour point may have a grade: its offset from
   its base position in each size (mm), as in a grade rule table. A point
   without one is the same in every size. A rule is set as one step
@@ -97,7 +99,8 @@ the seams still match in every size, and print or send the graded nest.
 
 ## UX
 - With nothing selected, the inspector's **Sizes** section offers **Add a
-  size range**: a dialog with the chart (women or men), the smallest and
+  size range**: a dialog with the chart (women, men, girls, boys or
+  babies), the smallest and
   largest sizes and the base size. Once set: the sizes as chips (the base
   one marked), **Shown in 3D** (a menu of the sizes), **Change** (the
   same dialog) and a delete button.

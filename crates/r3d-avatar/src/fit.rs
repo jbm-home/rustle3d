@@ -187,6 +187,7 @@ fn fit_with(model: &BodyModel, spec: &Body, followed: [f32; FOLLOWED.len()]) -> 
     // Stature proportions: interpolate between the short and tall targets.
     let neutral = BodyShape {
         masculinity: (spec.masculinity as f32).clamp(0.0, 1.0),
+        age_years: spec.age_years.map(|a| a as f32),
         followed,
         ..BodyShape::default()
     };
@@ -318,6 +319,17 @@ pub struct UpperBody {
     pub neutral_bust_cm: f32,
 }
 
+/// The top of the shoulder over its joint (m): the highest vertex above
+/// the joint, below the neck's base `neck_y` (a small child's head is
+/// wide enough for its ear to stand over the shoulder joint).
+pub(crate) fn shoulder_top(positions: &[Vec3], joint: Vec3, neck_y: f32) -> f32 {
+    positions
+        .iter()
+        .filter(|v| (v.x - joint.x).abs() < 0.015 && (v.z - joint.z).abs() < 0.04 && v.y < neck_y)
+        .map(|v| v.y)
+        .fold(joint.y, f32::max)
+}
+
 /// A girth this much smaller than the one just above marks where the arm
 /// parted from the torso (the section loop around the body stops taking
 /// the arm in).
@@ -336,11 +348,7 @@ pub fn upper_body(model: &BodyModel, fit: &Fit) -> Option<UpperBody> {
     };
     let (joint, neck) = (head("upper_arm_l")?, head("neck")?);
     let (p, t) = (&shaped.positions, model.triangles());
-    let shoulder_top = p
-        .iter()
-        .filter(|v| (v.x - joint.x).abs() < 0.015 && (v.z - joint.z).abs() < 0.04)
-        .map(|v| v.y)
-        .fold(joint.y, f32::max);
+    let shoulder_top = shoulder_top(p, joint, neck.y);
     // Down from the joint every 5 mm until the girth drops.
     let girth = |y: f32| crate::measure::girth_at(p, t, y, 0.0);
     let mut armpit = None;
@@ -367,5 +375,44 @@ pub fn upper_body(model: &BodyModel, fit: &Fit) -> Option<UpperBody> {
         neck_base_cm: neck.y * 100.0,
         neck_cm: girth(neck.y)?,
         neutral_bust_cm: m.bust_cm,
+    })
+}
+
+/// Heights of a body's neutral shape as fractions of its stature: where
+/// garments are placed from.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Proportions {
+    /// The base of the neck (the neck's joint).
+    pub neck: f32,
+    /// The shoulder joint.
+    pub shoulder: f32,
+    /// The crotch.
+    pub crotch: f32,
+}
+
+/// The [`Proportions`] of the model's neutral body of `masculinity` at
+/// `age_years` (`None`: an adult). A child's head is larger: its neck,
+/// shoulders and crotch sit lower on its stature.
+pub fn proportions(
+    model: &BodyModel,
+    masculinity: f32,
+    age_years: Option<f32>,
+) -> Option<Proportions> {
+    let shaped = model.shaped(&BodyShape {
+        masculinity,
+        age_years,
+        ..BodyShape::default()
+    });
+    let height = shaped.positions.iter().map(|p| p.y).fold(0.0, f32::max);
+    if height <= 0.0 {
+        return None;
+    }
+    let skeleton = crate::skeleton::Skeleton::new(model, &shaped);
+    let joint = |name: &str| Some(skeleton.bones.get(skeleton.find(name)?)?.head.y / height);
+    let crotch = crate::measure::heights(&shaped.positions, model.triangles()).crotch?;
+    Some(Proportions {
+        neck: joint("neck")?,
+        shoulder: joint("upper_arm_l")?,
+        crotch: crotch / height,
     })
 }

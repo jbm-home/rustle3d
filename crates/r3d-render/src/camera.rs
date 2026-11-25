@@ -18,7 +18,7 @@ pub struct OrbitCamera {
 impl Default for OrbitCamera {
     fn default() -> Self {
         Self {
-            // Frames a standing adult (about 1.8 m) from head to toe.
+            // Frames a standing adult (FRAMED_HEIGHT_M) from head to toe.
             target: Vec3::new(0.0, 0.9, 0.0),
             yaw: 0.5,
             pitch: 0.08,
@@ -29,6 +29,9 @@ impl Default for OrbitCamera {
 }
 
 impl OrbitCamera {
+    /// The height of the body the default framing is made for (m).
+    pub const FRAMED_HEIGHT_M: f32 = 1.8;
+
     /// The default framing, looking at the body from `yaw` (radians: 0 =
     /// from the front, π/2 = from its left side, π = from the back).
     pub fn facing(yaw: f32) -> Self {
@@ -36,6 +39,27 @@ impl OrbitCamera {
             yaw,
             pitch: 0.05,
             ..Self::default()
+        }
+    }
+
+    /// The same view of a body `k` times as tall (both standing on the
+    /// floor at the origin).
+    pub fn scaled(self, k: f32) -> Self {
+        let k = k.max(0.05);
+        Self {
+            target: self.target * k,
+            distance: (self.distance * k).clamp(0.3, 20.0),
+            ..self
+        }
+    }
+
+    /// This framing of a standing adult made for a body `height_m` tall (a
+    /// child's comes closer and lower).
+    pub fn for_height(self, height_m: f32) -> Self {
+        if height_m > 0.0 {
+            self.scaled(height_m / Self::FRAMED_HEIGHT_M)
+        } else {
+            self
         }
     }
 

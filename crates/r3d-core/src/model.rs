@@ -426,6 +426,10 @@ pub struct Size {
     pub bust_cm: f64,
     pub waist_cm: f64,
     pub hips_cm: f64,
+    /// How many years older the size's body is (children's ranges; 0 in
+    /// adults' ones).
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub age_years: f64,
 }
 
 /// Body measurements (cm), the input of the avatar fitting.
@@ -438,6 +442,22 @@ pub struct Body {
     pub bust_cm: f64,
     pub waist_cm: f64,
     pub hips_cm: f64,
+    /// A child's age in years ([`Body::AGE_RANGE`]); absent for an
+    /// adult.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub age_years: Option<f64>,
+}
+
+impl Body {
+    /// The ages a child's body can have (years).
+    pub const AGE_RANGE: (f64, f64) = (0.0, 18.0);
+
+    /// The age of a body `years` older (a size of a range), within
+    /// [`Body::AGE_RANGE`]; an adult stays one.
+    pub fn aged(&self, years: f64) -> Option<f64> {
+        let (min, max) = Self::AGE_RANGE;
+        self.age_years.map(|a| (a + years).clamp(min, max))
+    }
 }
 
 /// The avatar of a project: measurements, the preset they came from, and
