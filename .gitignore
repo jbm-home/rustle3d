@@ -5,3 +5,7 @@
 /scratch/
 *.r3d/exports/
 /dist/
+# Claude Code: personal settings and agent worktrees
+/.claude/settings.local.json
+/.claude/worktrees/
+/release-local.ps1
