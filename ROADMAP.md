@@ -49,8 +49,44 @@ maintainer's briefs that specs cite as "ROADMAP Mxx" in their
 | M37 | Imported avatars in motion, game export checked ✅ (2026-11-25) | A scanned body walks in its garment; the garment and its motion open in a game engine as exported |
 | M38 | Pattern library ✅ (2026-11-25) | In an open project, a jean and a short are added from the library; a skirt saved there from one project is added to another, drafted for its body |
 | M39 | Children ✅ (2026-11-26) | A 4-year-old girl's pyjama and a baby's bodysuit, drafted on children's bodies and graded by age |
+| M40 | Body scans in PLY and STL | A body scan saved as PLY or STL is imported, checked and draped like an OBJ |
+| M41 | Diagnostic report | An agent marks the faces where a drape goes wrong and reads why: stretch, contacts, seam gaps |
+| M42 | The user's own HDRI | A photo render lit by an environment the user brings (`.hdr`) |
+| M43 | Fabric relief: normal and roughness maps | A denim's weave and a satin's sheen show in the 3D view and the photo |
+| M44 | Fabric presets from open measurements | Presets whose weights and thicknesses come from a published dataset, each value with its source |
+| M45 | Self-collision by contacts | A folded skirt's layers lie on each other, without the puffy ~8 mm gap |
 
-Next: nothing planned; M16's Linux part when the work moves to Linux.
+Next: M40, M41, M42 (in this order); M16's Linux part when the work
+moves to Linux.
+
+## Planned milestones (proposed 2026-11-26)
+
+- **M40 — Body scans in PLY and STL**: PLY (ASCII and binary) and STL
+  (ASCII and binary) read like OBJ (spec 27): the up axis detected,
+  colours and normals ignored. No FBX: it is a closed format whose
+  readers come from reverse engineering (CLAUDE.md §1); the user guide
+  explains how to convert one to GLB with Blender.
+- **M41 — Diagnostic report**: a command (CLI and MCP) that reports on
+  the marked faces of a drape, or the worst ones: stretch and area per
+  face, nearby contacts, seam gaps, the most strained faces, with the
+  project and its drape state for replay.
+- **M42 — The user's own HDRI**: an environment map in Radiance `.hdr`
+  lights the photo render (spec 14), next to the three built-in
+  studios; a default set under CC0 (e.g. Poly Haven). OpenEXR later.
+- **M43 — Fabric relief**: normal and roughness maps for fabrics,
+  alongside the colour texture (spec 25), in the 3D view, the photo
+  render and the glTF export; a default set under CC0 (e.g. ambientCG,
+  Poly Haven).
+- **M44 — Fabric presets from open measurements**: weights and
+  thicknesses from published fabric datasets (e.g. the MIT Fabric
+  Properties Dataset, Bouman et al., ICCV 2013), each value with its
+  source. First check that the data's licence allows commercial use;
+  without it, the milestone is dropped.
+- **M45 — Self-collision by contacts** (Offset Geometric Contact, Chen
+  et al., SIGGRAPH 2025): point–triangle and edge–edge contacts with a
+  no-crossing guarantee, instead of the particle spheres whose layers
+  stay up to ~8 mm apart (physics.md §5), on the CPU and the GPU.
+  Reimplemented from the paper.
 
 ## Test report 2026-11-24 (open points: to take up next)
 
@@ -225,34 +261,9 @@ hanging over an edge for bending, a weight and a ruler for stretch; a
 community fabric library under CC0; only data whose licence allows
 commercial use) · turntable video of the photo render (a runway walk) ·
 step-by-step sewing instructions generated from the seams (needs a
-sewing order) · OpenUSD export · finer cloth mesh with a strain limit
+sewing order) · OpenUSD export, and bodies imported from OpenUSD
+(`.usda`; `.usdc`/`.usdz` need a binary reader) · finer cloth mesh with a strain limit
 (smaller folds; physics.md §7), finer where the cloth folds (near
 seams, gathers, pleats), sized per the physics-inspired estimate of
 Zhang et al., SIGGRAPH 2025 · picking points and notches in 3D ·
 signed packages.
-
-Proposed 2026-11-26:
-- **Bodies in more open formats**: OpenUSD (`.usda`/`.usdc`/`.usdz`),
-  PLY and STL (body scans). No FBX: it is a closed format whose readers
-  come from reverse engineering (CLAUDE.md §1); the user guide explains
-  how to convert one to GLB with Blender.
-- **Contacts for self-collision** (Offset Geometric Contact, Chen et
-  al., SIGGRAPH 2025): point–triangle and edge–edge contacts with a
-  no-crossing guarantee, instead of the particle spheres whose layers
-  stay up to ~8 mm apart (physics.md §5, puffy folds). Reimplemented
-  from the paper.
-- **Fabric presets from open measurements**: weights and thicknesses
-  taken from published fabric datasets (e.g. the MIT Fabric Properties
-  Dataset, Bouman et al., ICCV 2013), each value with its source; only
-  data whose licence allows commercial use (to be checked first).
-- **Normal and roughness maps** for fabrics: the weave's relief and
-  sheen in the 3D view and the photo render, alongside the colour
-  texture (spec 25); a default set under CC0 (e.g. ambientCG, Poly
-  Haven).
-- **The user's own HDRI** for the photo render, in Radiance `.hdr` or
-  OpenEXR, next to the three built-in studios (spec 14); a default set
-  under CC0 (e.g. Poly Haven).
-- **Diagnostic report** as a command (CLI and MCP): mark the faces
-  where a drape goes wrong and get a report an agent can read: stretch
-  and area per face, nearby contacts, seam gaps, the most strained
-  faces, with the project and its drape state for replay.
