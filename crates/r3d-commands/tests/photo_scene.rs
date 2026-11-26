@@ -63,6 +63,7 @@ fn scenes_are_checked() {
             "invalid.format",
         ),
         (with("brightness", json!(30)), "invalid.range"),
+        (with("place_size_m", json!(1)), "invalid.range"),
         (with("size", json!([8, 100])), "invalid.range"),
         (with("size", json!([4096, 4096])), "invalid.range"),
         (camera("focal_mm", json!(5)), "invalid.range"),

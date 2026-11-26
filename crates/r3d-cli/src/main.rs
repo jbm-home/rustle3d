@@ -248,6 +248,10 @@ struct PhotoArgs {
     /// else 1).
     #[arg(long)]
     brightness: Option<f64>,
+    /// Photo: an environment's radius around the model, in metres
+    /// (3-100; default: the photo scene's, else 6).
+    #[arg(long)]
+    place_size: Option<f64>,
 }
 
 impl PhotoArgs {
@@ -302,6 +306,9 @@ impl PhotoArgs {
         }
         if let Some(b) = self.brightness {
             args.insert("brightness".into(), b.into());
+        }
+        if let Some(r) = self.place_size {
+            args.insert("place_size_m".into(), r.into());
         }
         Ok(render::PhotoOptions::from_args(&args, scene)?)
     }

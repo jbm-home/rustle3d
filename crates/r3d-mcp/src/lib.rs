@@ -286,6 +286,7 @@ fn catalog() -> (Vec<Tool>, BTreeMap<String, Target>) {
                 },
                 "turn_deg": { "type": "number", "default": 0, "description": "Turn of the light around the model in degrees, counter-clockwise seen from above: the studio's lights, or the environment (at 0 its centre is behind the model)" },
                 "brightness": { "type": "number", "minimum": photo::BRIGHTNESS.start(), "maximum": photo::BRIGHTNESS.end(), "default": 1, "description": "Factor on the light: the studio's, or the environment's automatic exposure" },
+                "place_size_m": { "type": "number", "minimum": photo::PLACE_SIZE.start(), "maximum": photo::PLACE_SIZE.end(), "default": photo::PLACE_SIZE_DEFAULT, "description": "With an environment: its radius around the model in metres (a room about 6, outdoors 30 or more); its floor ends there and the rest of the picture stands around it" },
                 "samples": { "type": "integer", "minimum": 1, "maximum": photo::MAX_SAMPLES, "description": "Overrides the quality's samples per pixel" },
                 "bounces": { "type": "integer", "minimum": 0, "maximum": photo::MAX_BOUNCES, "description": "Overrides the quality's light bounces" },
                 "denoise": { "type": "boolean", "default": true }
@@ -300,7 +301,7 @@ fn catalog() -> (Vec<Tool>, BTreeMap<String, Target>) {
          otherwise the panels where the simulation starts. Takes seconds (quick) to minutes \
          (best) depending on the GPU and the size; the text result gives the time taken. \
          When the project has a photo scene (`photo.set_scene`, set in the app), its light, \
-         turn, brightness, camera and size are used for what the arguments leave out; \
+         turn, brightness, place size, camera and size are used for what the arguments leave out; \
          `camera` or `frame` replace its camera."
             .into(),
         photo_schema,

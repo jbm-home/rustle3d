@@ -5751,6 +5751,7 @@ impl SseDecode for crate::api::engine::PhotoRequest {
         let mut var_environment = <Option<String>>::sse_decode(deserializer);
         let mut var_turnDeg = <f64>::sse_decode(deserializer);
         let mut var_brightness = <f64>::sse_decode(deserializer);
+        let mut var_placeSizeM = <f64>::sse_decode(deserializer);
         return crate::api::engine::PhotoRequest {
             quality: var_quality,
             lighting: var_lighting,
@@ -5762,6 +5763,7 @@ impl SseDecode for crate::api::engine::PhotoRequest {
             environment: var_environment,
             turn_deg: var_turnDeg,
             brightness: var_brightness,
+            place_size_m: var_placeSizeM,
         };
     }
 }
@@ -5818,6 +5820,7 @@ impl SseDecode for crate::api::engine::SceneSettings {
         let mut var_environment = <String>::sse_decode(deserializer);
         let mut var_turnDeg = <f64>::sse_decode(deserializer);
         let mut var_brightness = <f64>::sse_decode(deserializer);
+        let mut var_placeSizeM = <f64>::sse_decode(deserializer);
         let mut var_focalMm = <f64>::sse_decode(deserializer);
         let mut var_width = <u32>::sse_decode(deserializer);
         let mut var_height = <u32>::sse_decode(deserializer);
@@ -5826,6 +5829,7 @@ impl SseDecode for crate::api::engine::SceneSettings {
             environment: var_environment,
             turn_deg: var_turnDeg,
             brightness: var_brightness,
+            place_size_m: var_placeSizeM,
             focal_mm: var_focalMm,
             width: var_width,
             height: var_height,
@@ -6473,6 +6477,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::engine::PhotoRequest {
             self.environment.into_into_dart().into_dart(),
             self.turn_deg.into_into_dart().into_dart(),
             self.brightness.into_into_dart().into_dart(),
+            self.place_size_m.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -6544,6 +6549,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::engine::SceneSettings {
             self.environment.into_into_dart().into_dart(),
             self.turn_deg.into_into_dart().into_dart(),
             self.brightness.into_into_dart().into_dart(),
+            self.place_size_m.into_into_dart().into_dart(),
             self.focal_mm.into_into_dart().into_dart(),
             self.width.into_into_dart().into_dart(),
             self.height.into_into_dart().into_dart(),
@@ -7148,6 +7154,7 @@ impl SseEncode for crate::api::engine::PhotoRequest {
         <Option<String>>::sse_encode(self.environment, serializer);
         <f64>::sse_encode(self.turn_deg, serializer);
         <f64>::sse_encode(self.brightness, serializer);
+        <f64>::sse_encode(self.place_size_m, serializer);
     }
 }
 
@@ -7188,6 +7195,7 @@ impl SseEncode for crate::api::engine::SceneSettings {
         <String>::sse_encode(self.environment, serializer);
         <f64>::sse_encode(self.turn_deg, serializer);
         <f64>::sse_encode(self.brightness, serializer);
+        <f64>::sse_encode(self.place_size_m, serializer);
         <f64>::sse_encode(self.focal_mm, serializer);
         <u32>::sse_encode(self.width, serializer);
         <u32>::sse_encode(self.height, serializer);

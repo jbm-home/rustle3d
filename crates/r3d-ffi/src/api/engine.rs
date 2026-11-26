@@ -457,6 +457,8 @@ pub struct PhotoRequest {
     pub turn_deg: f64,
     /// Factor on its exposure (0.05–20).
     pub brightness: f64,
+    /// Its radius around the model (3–100 m).
+    pub place_size_m: f64,
 }
 
 /// The photo scene's settings (spec 35), as its panel shows them.
@@ -471,6 +473,8 @@ pub struct SceneSettings {
     pub turn_deg: f64,
     /// Factor on the light (0.05–20).
     pub brightness: f64,
+    /// An environment's radius around the model (3–100 m).
+    pub place_size_m: f64,
     /// Focal length on a 24 × 36 mm frame (10–300 mm).
     pub focal_mm: f64,
     /// Image size in pixels; 0: the 3D view's.
@@ -487,6 +491,10 @@ impl SceneSettings {
         let (b, f) = (r3d_core::photo::BRIGHTNESS, r3d_core::photo::FOCAL_MM);
         if !self.brightness.is_finite() || !b.contains(&self.brightness) {
             return Err(invalid("brightness", *b.start(), *b.end()));
+        }
+        let p = r3d_core::photo::PLACE_SIZE_M;
+        if !self.place_size_m.is_finite() || !p.contains(&self.place_size_m) {
+            return Err(invalid("place_size_m", *p.start(), *p.end()));
         }
         if !self.focal_mm.is_finite() || !f.contains(&self.focal_mm) {
             return Err(invalid("focal_mm", *f.start(), *f.end()));
@@ -517,6 +525,7 @@ impl SceneSettings {
             camera,
             turn_deg: self.turn_deg as f32,
             brightness: self.brightness as f32,
+            place_size_m: self.place_size_m as f32,
             width,
             height,
         }
@@ -2675,6 +2684,7 @@ impl Engine {
         settings.denoise = request.denoise;
         settings.turn_deg = request.turn_deg as f32;
         settings.brightness = request.brightness as f32;
+        settings.place_size_m = request.place_size_m as f32;
         self.save_scene()?;
         // The previous photo goes first (its thread lets go of the GPU).
         self.photo.lock().map_err(|_| poisoned())?.take();
@@ -2735,6 +2745,7 @@ impl Engine {
                 environment,
                 turn_deg: s.turn_deg,
                 brightness: s.brightness,
+                place_size_m: s.place_size_m,
                 focal_mm: s.camera.focal_mm,
                 width,
                 height,
@@ -2752,6 +2763,7 @@ impl Engine {
             environment: String::new(),
             turn_deg: 0.0,
             brightness: 1.0,
+            place_size_m: f64::from(r3d_render::photo::PLACE_SIZE_DEFAULT),
             focal_mm: focal_mm.round(),
             width: 0,
             height: 0,
@@ -2861,6 +2873,7 @@ impl Engine {
             light,
             turn_deg: settings.turn_deg,
             brightness: settings.brightness,
+            place_size_m: settings.place_size_m,
             camera: r3d_core::PhotoCamera {
                 focal_mm: settings.focal_mm,
                 ..camera.to_photo()

@@ -924,6 +924,9 @@ class PhotoRequest {
   /// Factor on its exposure (0.05–20).
   final double brightness;
 
+  /// Its radius around the model (3–100 m).
+  final double placeSizeM;
+
   const PhotoRequest({
     required this.quality,
     required this.lighting,
@@ -935,6 +938,7 @@ class PhotoRequest {
     this.environment,
     required this.turnDeg,
     required this.brightness,
+    required this.placeSizeM,
   });
 
   @override
@@ -948,7 +952,8 @@ class PhotoRequest {
       denoise.hashCode ^
       environment.hashCode ^
       turnDeg.hashCode ^
-      brightness.hashCode;
+      brightness.hashCode ^
+      placeSizeM.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -964,7 +969,8 @@ class PhotoRequest {
           denoise == other.denoise &&
           environment == other.environment &&
           turnDeg == other.turnDeg &&
-          brightness == other.brightness;
+          brightness == other.brightness &&
+          placeSizeM == other.placeSizeM;
 }
 
 /// How far a photo has come.
@@ -1051,6 +1057,9 @@ class SceneSettings {
   /// Factor on the light (0.05–20).
   final double brightness;
 
+  /// An environment's radius around the model (3–100 m).
+  final double placeSizeM;
+
   /// Focal length on a 24 × 36 mm frame (10–300 mm).
   final double focalMm;
 
@@ -1063,6 +1072,7 @@ class SceneSettings {
     required this.environment,
     required this.turnDeg,
     required this.brightness,
+    required this.placeSizeM,
     required this.focalMm,
     required this.width,
     required this.height,
@@ -1074,6 +1084,7 @@ class SceneSettings {
       environment.hashCode ^
       turnDeg.hashCode ^
       brightness.hashCode ^
+      placeSizeM.hashCode ^
       focalMm.hashCode ^
       width.hashCode ^
       height.hashCode;
@@ -1087,6 +1098,7 @@ class SceneSettings {
           environment == other.environment &&
           turnDeg == other.turnDeg &&
           brightness == other.brightness &&
+          placeSizeM == other.placeSizeM &&
           focalMm == other.focalMm &&
           width == other.width &&
           height == other.height;

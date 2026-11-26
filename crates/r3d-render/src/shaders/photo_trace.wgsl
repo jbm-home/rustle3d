@@ -61,6 +61,8 @@ struct Params {
     env_grid: vec4<u32>,
     env_turn: vec4<f32>,
     env_floor: vec4<f32>,
+    // The dome's radius around where the picture was taken.
+    env_dome: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> params: Params;
@@ -242,6 +244,29 @@ fn sky(d: vec3<f32>) -> vec3<f32> {
 
 fn has_environment() -> bool {
     return params.env_grid.z == 1u;
+}
+
+// Where the environment's picture was taken: above the subject.
+fn env_taken() -> vec3<f32> {
+    return vec3<f32>(params.env_floor.y, params.env_turn.w + params.env_floor.z, params.env_floor.w);
+}
+
+// Where a camera ray from `o` (inside the dome) meets the place: its
+// floor within the dome (y = 1) or the dome (y = 0), at x along `d`. The
+// picture lies on a sphere around where it was taken, cut by the floor
+// (a ground-projected environment), so walls stand at the place's size.
+fn place_hit(o: vec3<f32>, d: vec3<f32>) -> vec2<f32> {
+    let oc = o - env_taken();
+    let b = dot(oc, d);
+    let c = dot(oc, oc) - params.env_dome.x * params.env_dome.x;
+    let t_dome = -b + sqrt(max(b * b - c, 0.0));
+    if d.y < 0.0 {
+        let t_floor = (params.env_turn.w - o.y) / d.y;
+        if t_floor > 0.0 && t_floor < t_dome {
+            return vec2<f32>(t_floor, 1.0);
+        }
+    }
+    return vec2<f32>(t_dome, 0.0);
 }
 
 // World direction into the environment's frame and back (a turn about y).
@@ -637,16 +662,15 @@ fn trace(@builtin(global_invocation_id) id: vec3<u32>) {
         // picture's ground seen from where it was taken (so it lies under
         // the subject in perspective and meets the horizon far away),
         // dimmed by the share of the floor's light the scene hides.
-        if has_environment() && bounce == 0u && d.y < 0.0 {
-            let t_floor = (params.env_turn.w - o.y) / d.y;
-            if t_floor > 0.0 && t_floor < hit.t {
+        var place = vec2<f32>(FAR, 0.0);
+        if has_environment() && bounce == 0u {
+            place = place_hit(o, d);
+        }
+        if place.y > 0.5 {
+            let t_floor = place.x;
+            if t_floor < hit.t {
                 let q = o + d * t_floor + vec3<f32>(0.0, EPS, 0.0);
-                let taken = vec3<f32>(
-                    params.env_floor.y,
-                    params.env_turn.w + params.env_floor.z,
-                    params.env_floor.w,
-                );
-                let behind = environment(normalize(q - taken));
+                let behind = environment(normalize(q - env_taken()));
                 let s = env_sample();
                 var lit = 0.0;
                 if s.w > 0.0 && s.y > 0.0 && intersect(q, s.xyz, FAR, true).tri == NONE {
@@ -662,13 +686,16 @@ fn trace(@builtin(global_invocation_id) id: vec3<u32>) {
         }
         if hit.tri == NONE {
             if has_environment() {
-                let light = environment(d);
                 if bounce == 0u {
-                    // The denoiser keeps the picture sharp.
+                    // The dome, seen from where the picture was taken;
+                    // the denoiser keeps it sharp.
+                    let q = o + d * place.x;
+                    let light = environment(normalize(q - env_taken()));
                     first_albedo = light;
                     radiance += light;
                     break;
                 }
+                let light = environment(d);
                 var w = 1.0;
                 if last_pdf > 0.0 {
                     w = power_heuristic(last_pdf, env_pdf(d));

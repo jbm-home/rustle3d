@@ -121,6 +121,7 @@ void main() {
         denoise: false,
         turnDeg: 0,
         brightness: 1,
+        placeSizeM: 6,
       ),
     );
     expect((fixed.width, fixed.height, fixed.total), (64, 48, 2));
@@ -138,6 +139,7 @@ void main() {
           denoise: true,
           turnDeg: 0,
           brightness: 1,
+          placeSizeM: 6,
         ),
       ),
       throwsA(isA<ApiError>().having((e) => e.code, 'code', 'photo_too_large')),
@@ -157,6 +159,7 @@ void main() {
         environment: 'neon',
         turnDeg: 45,
         brightness: 1.5,
+        placeSizeM: 10,
       ),
     );
     expect(lit.total, 1);
@@ -175,6 +178,7 @@ void main() {
           environment: 'sunset',
           turnDeg: 0,
           brightness: 1,
+          placeSizeM: 6,
         ),
       ),
       throwsA(isA<ApiError>()),

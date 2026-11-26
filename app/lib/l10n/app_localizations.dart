@@ -2839,10 +2839,16 @@ abstract class L {
   /// **'Lens'**
   String get photoFocal;
 
+  /// No description provided for @photoPlaceSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Place size'**
+  String get photoPlaceSize;
+
   /// No description provided for @photoSceneHint.
   ///
   /// In en, this message translates to:
-  /// **'A short lens shows more of the place around, a long one less, with a flatter look.'**
+  /// **'A short lens shows more of the place around, a long one less, with a flatter look. With a place, its size is how far its walls stand from the model: about 6 m for a room, more outdoors.'**
   String get photoSceneHint;
 
   /// No description provided for @photoSceneCloseTip.

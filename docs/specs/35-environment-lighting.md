@@ -17,7 +17,9 @@ brightness were set blind, before the render; a zoom was missing; set
 the scene with the result shown in the 3D view, the image left in view
 while setting it; the scene saved with the project and used by the
 studios too); focal lengths on a 24 × 36 mm frame (general photography
-knowledge).
+knowledge); the place size from the maintainer's report of the lower
+half torn over the floor (2026-11-26), a ground-projected environment
+(a dome cut by a floor; plain ray–sphere and ray–plane geometry).
 
 ## Status (2026-11-26, M42, photo scene in M42b)
 
@@ -49,11 +51,17 @@ shadow on the ground.
     project folder and name it.
 - The environment, like the studio, is part of the project's **photo
   scene** (below), saved in the project document.
-- **What the photo shows**: the environment behind the model, sharp (as
-  the camera sees it), and a floor at the model's feet (height 0) that
-  shows the picture's ground as seen from 1.6 m above the model (so the
-  model stands on it, and it meets the horizon far away) and catches
-  the shadows: it darkens where the model and the garment hide the
+- **What the photo shows**: the environment around the model, sharp, as
+  a place of a given **size** (its radius around the model, 3–100 m,
+  default 6 m, a room): the picture lies on a dome of that radius
+  centred 1.6 m above the model, cut by a floor at the model's feet
+  (height 0). Camera rays look the picture up from that centre where
+  they reach the floor or the dome (a ground-projected environment), so
+  the model stands on the picture's ground and its walls stand up at
+  the place's size; an infinite floor (M42) flattened the whole lower
+  half of the picture onto the ground. The camera always stays inside
+  the dome (its radius grows to the camera's distance plus 0.5 m). The
+  floor catches the shadows: it darkens where the model and the garment hide the
   light from it. The floor shows nothing else (no reflection, no colour
   bleeding) and is invisible to everything but the camera. The
   environment lights everything: the garment, the avatar, the shadows,
@@ -69,6 +77,8 @@ shadow on the ground.
   pictures and dim rooms come out exposed alike; then multiplied by the
   **brightness** (0.05–20, default 1). The brightness scales a studio's
   soft boxes and sky the same way.
+- The place's size only changes what the camera sees; the light on the
+  model comes from the picture as from infinitely far.
 - Pictures wider than 4096 pixels are halved (averaging 2 × 2 texels)
   until they fit, for the GPU's memory.
 
@@ -76,7 +86,7 @@ shadow on the ground.
 - The project keeps how its photos are taken (`photo` in the document,
   schema v28; absent until set): the **light** (`studio`, `soft`,
   `dramatic`, or an `environment` by name), its **turn** and
-  **brightness**, the **camera** (the point it looks at in mm, its turn
+  **brightness**, an environment's **place size** (3–100 m), the **camera** (the point it looks at in mm, its turn
   and height angle in degrees, its distance in mm, its **focal length**
   in mm on a 24 × 36 mm frame whose 24 mm side lies along the image's
   shorter side, 10–300 mm) and the image **size** (16–4096 pixels a
@@ -105,8 +115,9 @@ shadow on the ground.
 - The panel: **Lighting** (Studio, Soft, Dramatic, Place; Place shows a
   list of the built-in environments and the project's `.hdr` files, and
   an **Add .hdr…** button: a file dialog, copied into `environments/`),
-  **Turn** (−180° to 180°), **Brightness** (×0.25 to ×4), **Lens** (18
-  to 200 mm, on a log scale), **Size**, **Quality** and the advanced
+  **Turn** (−180° to 180°), **Brightness** (×0.25 to ×4), **Place size**
+  (with Place: 3 to 100 m, on a log scale), **Lens** (18 to 200 mm, on a
+  log scale), **Size**, **Quality** and the advanced
   settings, and **Render**.
 - The scene opens with the project's settings and camera; without them,
   a studio through the 3D view's own lens (about 38 mm). Closing the
@@ -119,7 +130,8 @@ shadow on the ground.
 
 ## Commands and tools
 - MCP `render_photo` and `r3d render --view photo` take `environment`
-  (a built-in name or a project path), `turn_deg` and `brightness`. With
+  (a built-in name or a project path), `turn_deg`, `brightness` and
+  `place_size_m` (`--place-size`). With
   `environment`, `lighting` is ignored. The text result names the
   environment or the lighting, the turn, the brightness, the camera
   (an angle, or `scene`) and the size.
@@ -146,6 +158,8 @@ shadow on the ground.
 - The importance-sampling densities integrate to 1 over the sphere, and
   a uniform environment's density is 1 / 4π everywhere (tests).
 - Turning the environment by 360° gives the same image.
+- The place's size changes the image under an environment, and the same
+  size gives the same image (test).
 - A photo whose renderer is aimed again (camera, turn, brightness) and
   resized gives the same image, bit for bit, as one rendered there
   from the start, under a studio and under an environment; a camera

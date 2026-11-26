@@ -310,6 +310,7 @@ fn aiming_again_gives_the_photo_taken_from_there() {
     let turned = Settings {
         turn_deg: 40.0,
         brightness: 1.5,
+        place_size_m: 12.0,
         ..settings
     };
     for scene in [
@@ -319,11 +320,32 @@ fn aiming_again_gives_the_photo_taken_from_there() {
         let direct = photo::render_png(&gpu, &scene, &to, turned, 96, 72).unwrap();
         let mut photo = PhotoRenderer::new(&gpu, &scene, &from, settings, 64, 64).unwrap();
         finish(&gpu, &mut photo);
-        assert!(photo.aim(&to, 40.0, 1.5));
+        assert!(photo.aim(&to, 40.0, 1.5, 12.0));
         photo.resize(&gpu, 96, 72).unwrap();
         assert_eq!(photo.samples_done(), 0);
         assert_eq!(finish(&gpu, &mut photo), direct);
     }
+}
+
+#[test]
+fn the_place_size_moves_the_walls() {
+    let Some(gpu) = gpu() else { return };
+    let settings = Settings {
+        samples: 2,
+        ..Settings::new(Quality::Quick, Lighting::Studio)
+    };
+    let scene = skirt_scene(Fabric::Cotton).with_environment(builtin_environment("pav"));
+    let camera = OrbitCamera::facing(0.3);
+    let shoot = |place_size_m| {
+        let s = Settings {
+            place_size_m,
+            ..settings
+        };
+        photo::render_png(&gpu, &scene, &camera, s, 96, 72).unwrap()
+    };
+    let room = shoot(6.0);
+    assert_eq!(room, shoot(6.0));
+    assert_ne!(room, shoot(40.0));
 }
 
 #[test]
@@ -337,11 +359,11 @@ fn the_camera_stays_inside_the_studio() {
     };
     let mut photo =
         PhotoRenderer::new(&gpu, &skirt_scene(Fabric::Cotton), &near, settings, 32, 32).unwrap();
-    assert!(!photo.aim(&far, 0.0, 1.0));
+    assert!(!photo.aim(&far, 0.0, 1.0, 6.0));
     // Under an environment there is no backdrop to leave.
     let scene = skirt_scene(Fabric::Cotton).with_environment(builtin_environment("pav"));
     let mut photo = PhotoRenderer::new(&gpu, &scene, &near, settings, 32, 32).unwrap();
-    assert!(photo.aim(&far, 0.0, 1.0));
+    assert!(photo.aim(&far, 0.0, 1.0, 6.0));
 }
 
 #[test]

@@ -158,10 +158,16 @@ soft boxes and no cyclorama then.
   direction is `p(u, v) / (2π² sin θ)`. Next event estimation samples
   it at every hit, and a BSDF ray that escapes is weighted against it
   with the power heuristic (MIS as above).
+- **Ground-projected place** (M42b): camera rays look the picture up
+  from a point 1.6 m above the subject, where they leave a dome of the
+  place's radius (3–100 m, the user's) centred there, or where they
+  reach the floor inside it. The subject stands on the picture's ground
+  and its walls stand up at the place's size; an infinite floor
+  flattened the whole lower half of the picture onto the ground. The
+  radius grows to keep the camera 0.5 m inside. Light reaching the
+  scene still comes from the picture as from infinitely far.
 - **Shadow catcher**: an invisible floor at the feet that camera rays
-  alone see. It shows the picture's ground as seen from 1.6 m above the
-  subject (a projection of the lower half on the plane, so the subject
-  stands on it and the floor meets the horizon far away), times the
+  alone see, within the dome. It shows the picture's ground as above, times the
   share of the floor's light the scene leaves: one environment sample
   per pixel, `L(ω) cos θ V(ω) / p(ω)`, divided by the floor's
   unoccluded irradiance computed on the CPU. The denoiser takes the

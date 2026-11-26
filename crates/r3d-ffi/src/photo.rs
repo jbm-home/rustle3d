@@ -51,6 +51,7 @@ pub(crate) struct Look {
     pub camera: OrbitCamera,
     pub turn_deg: f32,
     pub brightness: f32,
+    pub place_size_m: f32,
     pub width: u32,
     pub height: u32,
 }
@@ -151,6 +152,7 @@ impl PhotoJob {
             camera: subject.camera,
             turn_deg: settings.turn_deg,
             brightness: settings.brightness,
+            place_size_m: settings.place_size_m,
             width,
             height,
         };
@@ -324,6 +326,7 @@ fn run_live(
         let settings = Settings {
             turn_deg: look.turn_deg,
             brightness: look.brightness,
+            place_size_m: look.place_size_m,
             ..settings
         };
         PhotoRenderer::new(gpu, scene, &look.camera, settings, w, h).map_err(|e| e.to_string())
@@ -353,7 +356,12 @@ fn run_live(
             None
         };
         if let Some((w, h)) = size {
-            if photo.aim(&wanted.camera, wanted.turn_deg, wanted.brightness) {
+            if photo.aim(
+                &wanted.camera,
+                wanted.turn_deg,
+                wanted.brightness,
+                wanted.place_size_m,
+            ) {
                 photo.resize(gpu, w, h).map_err(|e| e.to_string())?;
             } else {
                 // The camera left the studio: build it again around it.

@@ -345,6 +345,7 @@ fn sample() -> Project {
         },
         turn_deg: 45.0,
         brightness: 1.5,
+        place_size_m: 12.0,
         camera: PhotoCamera {
             target_mm: [0.0, 900.0, 0.0],
             yaw_deg: 30.0,

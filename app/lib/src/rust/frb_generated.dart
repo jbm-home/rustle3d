@@ -4750,8 +4750,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   PhotoRequest dco_decode_photo_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 10)
-      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
+    if (arr.length != 11)
+      throw Exception('unexpected arr length: expect 11 but see ${arr.length}');
     return PhotoRequest(
       quality: dco_decode_String(arr[0]),
       lighting: dco_decode_String(arr[1]),
@@ -4763,6 +4763,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       environment: dco_decode_opt_String(arr[7]),
       turnDeg: dco_decode_f_64(arr[8]),
       brightness: dco_decode_f_64(arr[9]),
+      placeSizeM: dco_decode_f_64(arr[10]),
     );
   }
 
@@ -4810,16 +4811,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   SceneSettings dco_decode_scene_settings(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 7)
-      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
     return SceneSettings(
       light: dco_decode_String(arr[0]),
       environment: dco_decode_String(arr[1]),
       turnDeg: dco_decode_f_64(arr[2]),
       brightness: dco_decode_f_64(arr[3]),
-      focalMm: dco_decode_f_64(arr[4]),
-      width: dco_decode_u_32(arr[5]),
-      height: dco_decode_u_32(arr[6]),
+      placeSizeM: dco_decode_f_64(arr[4]),
+      focalMm: dco_decode_f_64(arr[5]),
+      width: dco_decode_u_32(arr[6]),
+      height: dco_decode_u_32(arr[7]),
     );
   }
 
@@ -5543,6 +5545,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_environment = sse_decode_opt_String(deserializer);
     var var_turnDeg = sse_decode_f_64(deserializer);
     var var_brightness = sse_decode_f_64(deserializer);
+    var var_placeSizeM = sse_decode_f_64(deserializer);
     return PhotoRequest(
       quality: var_quality,
       lighting: var_lighting,
@@ -5554,6 +5557,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       environment: var_environment,
       turnDeg: var_turnDeg,
       brightness: var_brightness,
+      placeSizeM: var_placeSizeM,
     );
   }
 
@@ -5604,6 +5608,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_environment = sse_decode_String(deserializer);
     var var_turnDeg = sse_decode_f_64(deserializer);
     var var_brightness = sse_decode_f_64(deserializer);
+    var var_placeSizeM = sse_decode_f_64(deserializer);
     var var_focalMm = sse_decode_f_64(deserializer);
     var var_width = sse_decode_u_32(deserializer);
     var var_height = sse_decode_u_32(deserializer);
@@ -5612,6 +5617,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       environment: var_environment,
       turnDeg: var_turnDeg,
       brightness: var_brightness,
+      placeSizeM: var_placeSizeM,
       focalMm: var_focalMm,
       width: var_width,
       height: var_height,
@@ -6329,6 +6335,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_String(self.environment, serializer);
     sse_encode_f_64(self.turnDeg, serializer);
     sse_encode_f_64(self.brightness, serializer);
+    sse_encode_f_64(self.placeSizeM, serializer);
   }
 
   @protected
@@ -6368,6 +6375,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.environment, serializer);
     sse_encode_f_64(self.turnDeg, serializer);
     sse_encode_f_64(self.brightness, serializer);
+    sse_encode_f_64(self.placeSizeM, serializer);
     sse_encode_f_64(self.focalMm, serializer);
     sse_encode_u_32(self.width, serializer);
     sse_encode_u_32(self.height, serializer);

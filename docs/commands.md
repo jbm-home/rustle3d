@@ -4768,7 +4768,7 @@ Shift (mm) and turn (degrees) the garment's print on one piece, e.g. to centre a
 
 ### `photo.set_scene`
 
-Set how the project's photos are taken: the light (a studio, or an environment by built-in name or `.hdr` path in the project), its turn and brightness, the camera (the point it looks at, its turn, height angle, distance and focal length) and the image size. The app's photo scene saves it; `render_photo` and `r3d render --view photo` use it unless their arguments say otherwise. `null` forgets it.
+Set how the project's photos are taken: the light (a studio, or an environment by built-in name or `.hdr` path in the project), its turn and brightness, an environment's size (its radius around the model: the floor ends there and the rest of the picture stands around it), the camera (the point it looks at, its turn, height angle, distance and focal length) and the image size. The app's photo scene saves it; `render_photo` and `r3d render --view photo` use it unless their arguments say otherwise. `null` forgets it.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -4899,6 +4899,12 @@ Set how the project's photos are taken: the light (a studio, or an environment b
         },
         "light": {
           "$ref": "#/$defs/PhotoLight"
+        },
+        "place_size_m": {
+          "default": 6.0,
+          "description": "An environment's radius around the model (m, 3–100; 6: a room):\nits floor ends there and the rest of its picture stands around it.",
+          "format": "double",
+          "type": "number"
         },
         "size": {
           "description": "Image size in pixels (16–4096 a side); omitted: the 3D view's size\nin the app, the command's own elsewhere.",

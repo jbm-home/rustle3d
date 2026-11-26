@@ -151,7 +151,16 @@ pub struct Settings {
     pub turn_deg: f32,
     /// Factor on the light (see [`BRIGHTNESS`]).
     pub brightness: f32,
+    /// An environment's radius around where its picture was taken (m,
+    /// see [`PLACE_SIZE`]): its floor ends there and the rest of the
+    /// picture stands on a dome.
+    pub place_size_m: f32,
 }
+
+/// The place's radius range (as `r3d_core::photo::PLACE_SIZE_M`) and its
+/// usual value.
+pub const PLACE_SIZE: std::ops::RangeInclusive<f32> = 3.0..=100.0;
+pub const PLACE_SIZE_DEFAULT: f32 = 6.0;
 
 impl Settings {
     pub fn new(quality: Quality, lighting: Lighting) -> Self {
@@ -162,6 +171,7 @@ impl Settings {
             denoise: true,
             turn_deg: 0.0,
             brightness: 1.0,
+            place_size_m: PLACE_SIZE_DEFAULT,
         }
     }
 }
@@ -463,6 +473,8 @@ struct TraceParams {
     /// 1 / the floor's unoccluded luminance (scaled), then where the
     /// picture was taken: x, height above the floor, z.
     env_floor: [f32; 4],
+    /// The dome's radius around where the picture was taken.
+    env_dome: [f32; 4],
 }
 
 #[repr(C)]
@@ -821,6 +833,7 @@ impl PhotoRenderer {
             env_grid: [0; 4],
             env_turn: [0.0; 4],
             env_floor: [0.0; 4],
+            env_dome: [0.0; 4],
         };
 
         let device = &gpu.device;
@@ -1053,6 +1066,18 @@ impl PhotoRenderer {
                     environment::CAMERA_HEIGHT,
                     stage.centre.z,
                 ];
+                // The camera stays inside the dome.
+                let taken = Vec3::new(
+                    stage.centre.x,
+                    stage.floor_y + environment::CAMERA_HEIGHT,
+                    stage.centre.z,
+                );
+                let size = if s.place_size_m.is_finite() {
+                    s.place_size_m.clamp(*PLACE_SIZE.start(), *PLACE_SIZE.end())
+                } else {
+                    PLACE_SIZE_DEFAULT
+                };
+                p.env_dome = [size.max(eye.distance(taken) + 0.5), 0.0, 0.0, 0.0];
             }
         }
     }
@@ -1061,7 +1086,13 @@ impl PhotoRenderer {
     /// `brightness`, and start refining over. `false` (nothing changed)
     /// when the camera would leave the studio's backdrop: the scene must
     /// be built again around it.
-    pub fn aim(&mut self, camera: &OrbitCamera, turn_deg: f32, brightness: f32) -> bool {
+    pub fn aim(
+        &mut self,
+        camera: &OrbitCamera,
+        turn_deg: f32,
+        brightness: f32,
+        place_size_m: f32,
+    ) -> bool {
         if let Some((radius, height)) = self.stage.backdrop {
             let eye = camera.eye();
             if Vec3::new(eye.x, 0.0, eye.z).length() > radius - BACKDROP_MARGIN
@@ -1073,6 +1104,7 @@ impl PhotoRenderer {
         self.camera = *camera;
         self.settings.turn_deg = turn_deg;
         self.settings.brightness = brightness;
+        self.settings.place_size_m = place_size_m;
         self.place_lights();
         self.done = 0;
         true

@@ -26,6 +26,10 @@ const photoSizes = [
 const _focalMin = 18.0;
 const _focalMax = 200.0;
 
+/// A place's radius around the model (m).
+const _placeMin = 3.0;
+const _placeMax = 100.0;
+
 /// How long to refine a photo, as last chosen (the scene itself is the
 /// project's).
 class PhotoChoice {
@@ -58,6 +62,7 @@ class PhotoChoice {
       environment: lit ? scene.environment : null,
       turnDeg: scene.turnDeg,
       brightness: scene.brightness,
+      placeSizeM: scene.placeSizeM,
     );
   }
 }
@@ -68,6 +73,7 @@ SceneSettings _with(
   String? environment,
   double? turnDeg,
   double? brightness,
+  double? placeSizeM,
   double? focalMm,
   (int, int)? size,
 }) => SceneSettings(
@@ -75,6 +81,7 @@ SceneSettings _with(
   environment: environment ?? s.environment,
   turnDeg: turnDeg ?? s.turnDeg,
   brightness: brightness ?? s.brightness,
+  placeSizeM: placeSizeM ?? s.placeSizeM,
   focalMm: focalMm ?? s.focalMm,
   width: size?.$1 ?? s.width,
   height: size?.$2 ?? s.height,
@@ -228,6 +235,11 @@ class _ScenePanelState extends State<ScenePanel> {
     // The lens on a log scale: as many steps from 18 to 35 mm as from 100
     // to 200 mm.
     final focalSpan = math.log(_focalMax / _focalMin);
+    // The place's size on a log scale too.
+    final placeSpan = math.log(_placeMax / _placeMin);
+    final placeAt =
+        math.log(s.placeSizeM.clamp(_placeMin, _placeMax) / _placeMin) /
+        placeSpan;
     final focalAt =
         math.log(s.focalMm.clamp(_focalMin, _focalMax) / _focalMin) / focalSpan;
     // A Material, for the ink of the folded section's tile.
@@ -352,6 +364,23 @@ class _ScenePanelState extends State<ScenePanel> {
                       text: '× ${context.number(s.brightness, 2)}',
                       onChanged: (v) => _scene(_with(s, brightness: v)),
                     ),
+                    if (s.light == 'environment')
+                      _SliderRow(
+                        key: const ValueKey('photoPlaceSize'),
+                        label: l.photoPlaceSize,
+                        value: placeAt,
+                        min: 0,
+                        max: 1,
+                        divisions: 100,
+                        text: '${s.placeSizeM.round()} m',
+                        onChanged: (t) => _scene(
+                          _with(
+                            s,
+                            placeSizeM: (_placeMin * math.exp(t * placeSpan))
+                                .roundToDouble(),
+                          ),
+                        ),
+                      ),
                     _SliderRow(
                       key: const ValueKey('photoFocal'),
                       label: l.photoFocal,

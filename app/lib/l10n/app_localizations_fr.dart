@@ -1607,8 +1607,11 @@ class LFr extends L {
   String get photoFocal => 'Focale';
 
   @override
+  String get photoPlaceSize => 'Taille du lieu';
+
+  @override
   String get photoSceneHint =>
-      'Une focale courte montre plus du lieu autour, une longue moins, avec un rendu plus plat.';
+      'Une focale courte montre plus du lieu autour, une longue moins, avec un rendu plus plat. Avec un lieu, sa taille est la distance de ses murs au modèle : environ 6 m pour une pièce, plus en extérieur.';
 
   @override
   String get photoSceneCloseTip =>

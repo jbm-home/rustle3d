@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 
 /// The brightness factor's range.
 pub const BRIGHTNESS: std::ops::RangeInclusive<f64> = 0.05..=20.0;
+/// An environment's radius around where its picture was taken (m).
+pub const PLACE_SIZE_M: std::ops::RangeInclusive<f64> = 3.0..=100.0;
 /// The focal length's range (mm, on a 24 × 36 mm frame).
 pub const FOCAL_MM: std::ops::RangeInclusive<f64> = 10.0..=300.0;
 /// The camera's distance from the point it looks at (mm).
@@ -80,6 +82,10 @@ pub struct PhotoSetup {
     /// Factor on the light (0.05–20; 1: the usual exposure).
     #[serde(default = "one")]
     pub brightness: f64,
+    /// An environment's radius around the model (m, 3–100; 6: a room):
+    /// its floor ends there and the rest of its picture stands around it.
+    #[serde(default = "room")]
+    pub place_size_m: f64,
     pub camera: PhotoCamera,
     /// Image size in pixels (16–4096 a side); omitted: the 3D view's size
     /// in the app, the command's own elsewhere.
@@ -89,6 +95,10 @@ pub struct PhotoSetup {
 
 fn one() -> f64 {
     1.0
+}
+
+fn room() -> f64 {
+    6.0
 }
 
 /// Why a photo setup is refused: the field and what is wrong with it.
@@ -140,6 +150,7 @@ impl PhotoSetup {
         };
         within("turn_deg", self.turn_deg, -360_000.0..=360_000.0)?;
         within("brightness", self.brightness, BRIGHTNESS)?;
+        within("place_size_m", self.place_size_m, PLACE_SIZE_M)?;
         let c = &self.camera;
         for v in c.target_mm {
             within("camera.target_mm", v, -100_000.0..=100_000.0)?;
@@ -169,6 +180,7 @@ mod tests {
             light: PhotoLight::Studio,
             turn_deg: 0.0,
             brightness: 1.0,
+            place_size_m: 6.0,
             camera: PhotoCamera {
                 target_mm: [0.0, 900.0, 0.0],
                 yaw_deg: 30.0,
@@ -207,6 +219,9 @@ mod tests {
         let mut s = setup();
         s.brightness = f64::NAN;
         assert_eq!(s.check(&[]), Err(SetupProblem::Range("brightness")));
+        let mut s = setup();
+        s.place_size_m = 1.0;
+        assert_eq!(s.check(&[]), Err(SetupProblem::Range("place_size_m")));
         let mut s = setup();
         s.size = Some([4096, 4096]);
         assert_eq!(s.check(&[]), Err(SetupProblem::Pixels));

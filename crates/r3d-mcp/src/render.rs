@@ -226,6 +226,11 @@ impl PhotoOptions {
             photo::BRIGHTNESS,
             scene.map_or(1.0, |s| s.brightness as f32),
         )?;
+        settings.place_size_m = number(
+            "place_size_m",
+            photo::PLACE_SIZE,
+            scene.map_or(photo::PLACE_SIZE_DEFAULT, |s| s.place_size_m as f32),
+        )?;
         let camera = match (angle, close_up, scene) {
             (None, None, Some(s)) => PhotoCamera::Scene(OrbitCamera::from_photo(&s.camera)),
             _ => PhotoCamera::Angle {
@@ -241,7 +246,7 @@ impl PhotoOptions {
     }
 
     /// Keys [`Self::from_args`] reads.
-    pub const KEYS: [&'static str; 10] = [
+    pub const KEYS: [&'static str; 11] = [
         "quality",
         "lighting",
         "camera",
@@ -252,6 +257,7 @@ impl PhotoOptions {
         "environment",
         "turn_deg",
         "brightness",
+        "place_size_m",
     ];
 }
 
@@ -762,6 +768,9 @@ pub fn render(
             facts["size"] = json!([width, height]);
             facts["turn_deg"] = json!(s.turn_deg);
             facts["brightness"] = json!(s.brightness);
+            if options.environment.is_some() {
+                facts["place_size_m"] = json!(s.place_size_m);
+            }
             facts["camera"] = json!(match options.camera {
                 PhotoCamera::Angle { angle, .. } => angle.name(),
                 PhotoCamera::Scene(_) => "scene",

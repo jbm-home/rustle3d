@@ -1593,8 +1593,11 @@ class LEn extends L {
   String get photoFocal => 'Lens';
 
   @override
+  String get photoPlaceSize => 'Place size';
+
+  @override
   String get photoSceneHint =>
-      'A short lens shows more of the place around, a long one less, with a flatter look.';
+      'A short lens shows more of the place around, a long one less, with a flatter look. With a place, its size is how far its walls stand from the model: about 6 m for a room, more outdoors.';
 
   @override
   String get photoSceneCloseTip =>
