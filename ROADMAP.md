@@ -226,5 +226,33 @@ community fabric library under CC0; only data whose licence allows
 commercial use) · turntable video of the photo render (a runway walk) ·
 step-by-step sewing instructions generated from the seams (needs a
 sewing order) · OpenUSD export · finer cloth mesh with a strain limit
-(smaller folds; physics.md §7) · picking points and notches in 3D ·
+(smaller folds; physics.md §7), finer where the cloth folds (near
+seams, gathers, pleats), sized per the physics-inspired estimate of
+Zhang et al., SIGGRAPH 2025 · picking points and notches in 3D ·
 signed packages.
+
+Proposed 2026-11-26:
+- **Bodies in more open formats**: OpenUSD (`.usda`/`.usdc`/`.usdz`),
+  PLY and STL (body scans). No FBX: it is a closed format whose readers
+  come from reverse engineering (CLAUDE.md §1); the user guide explains
+  how to convert one to GLB with Blender.
+- **Contacts for self-collision** (Offset Geometric Contact, Chen et
+  al., SIGGRAPH 2025): point–triangle and edge–edge contacts with a
+  no-crossing guarantee, instead of the particle spheres whose layers
+  stay up to ~8 mm apart (physics.md §5, puffy folds). Reimplemented
+  from the paper.
+- **Fabric presets from open measurements**: weights and thicknesses
+  taken from published fabric datasets (e.g. the MIT Fabric Properties
+  Dataset, Bouman et al., ICCV 2013), each value with its source; only
+  data whose licence allows commercial use (to be checked first).
+- **Normal and roughness maps** for fabrics: the weave's relief and
+  sheen in the 3D view and the photo render, alongside the colour
+  texture (spec 25); a default set under CC0 (e.g. ambientCG, Poly
+  Haven).
+- **The user's own HDRI** for the photo render, in Radiance `.hdr` or
+  OpenEXR, next to the three built-in studios (spec 14); a default set
+  under CC0 (e.g. Poly Haven).
+- **Diagnostic report** as a command (CLI and MCP): mark the faces
+  where a drape goes wrong and get a report an agent can read: stretch
+  and area per face, nearby contacts, seam gaps, the most strained
+  faces, with the project and its drape state for replay.
