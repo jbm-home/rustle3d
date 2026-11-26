@@ -1237,12 +1237,17 @@ class _NewGarmentDialogState extends State<_NewGarmentDialog> {
           .firstOrNull ??
       widget.store.standardBody();
   final Map<String, TextEditingController> _sizes = {};
+
+  /// Whether the sizes for the body are known.
+  bool _loaded = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _loadSizes();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadSizes(_body);
+    });
   }
 
   @override
@@ -1254,26 +1259,46 @@ class _NewGarmentDialogState extends State<_NewGarmentDialog> {
     super.dispose();
   }
 
-  /// The template's default sizes for the chosen body.
-  void _loadSizes() {
-    final list = jsonDecode(templateList(bodyJson: jsonEncode(_body['body'])));
-    final entry = (list as List).firstWhere(
+  /// Choose [body] and show the template's default sizes for it. The body
+  /// is fitted first (a second or more): off the UI thread, with a card.
+  Future<void> _loadSizes(Map<String, dynamic> body) async {
+    final l = context.l;
+    final String out;
+    try {
+      out = await runBusy(
+        context,
+        null,
+        l.busyBodyTitle,
+        () => templateList(bodyJson: jsonEncode(body['body'])),
+        step: l.busyBodyFit,
+      );
+    } on ApiError catch (e) {
+      if (mounted) setState(() => _error = context.error(e));
+      return;
+    }
+    if (!mounted) return;
+    final entry = (jsonDecode(out) as List).firstWhere(
       (t) => t['template'] == widget.template,
     );
     final sizes = (entry['sizes'] as Map<String, dynamic>);
-    for (final c in _sizes.values) {
-      c.dispose();
-    }
-    _sizes
-      ..clear()
-      ..addAll({
-        for (final e in sizes.entries)
-          e.key: TextEditingController(
-            text: (e.value as num).toStringAsFixed(
-              (e.value as num) % 1 == 0 ? 0 : 1,
+    setState(() {
+      _body = body;
+      _loaded = true;
+      _error = null;
+      for (final c in _sizes.values) {
+        c.dispose();
+      }
+      _sizes
+        ..clear()
+        ..addAll({
+          for (final e in sizes.entries)
+            e.key: TextEditingController(
+              text: (e.value as num).toStringAsFixed(
+                (e.value as num) % 1 == 0 ? 0 : 1,
+              ),
             ),
-          ),
-      });
+        });
+    });
   }
 
   Future<void> _create() async {
@@ -1367,10 +1392,8 @@ class _NewGarmentDialogState extends State<_NewGarmentDialog> {
                       child: Text(context.presetName(x)),
                     ),
                 ],
-                onChanged: (name) => setState(() {
-                  _body = _presets.firstWhere((x) => x['name'] == name);
-                  _loadSizes();
-                }),
+                onChanged: (name) =>
+                    _loadSizes(_presets.firstWhere((x) => x['name'] == name)),
               ),
               const SizedBox(height: Space.l),
               Wrap(
@@ -1417,7 +1440,8 @@ class _NewGarmentDialogState extends State<_NewGarmentDialog> {
                   ),
                   const SizedBox(width: Space.s),
                   FilledButton.icon(
-                    onPressed: _create,
+                    // Not before the sizes for the body are known.
+                    onPressed: _loaded ? _create : null,
                     icon: const Icon(Icons.auto_awesome_rounded, size: 18),
                     label: Text(l.create),
                   ),

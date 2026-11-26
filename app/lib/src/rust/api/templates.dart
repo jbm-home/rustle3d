@@ -14,8 +14,9 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 String appVersion() => RustLib.instance.api.crateApiTemplatesAppVersion();
 
 /// The templates and their default sizes for `body_json` (a `Body`), as
-/// the `template.list` query returns them.
-String templateList({required String bodyJson}) =>
+/// the `template.list` query returns them. Fitting the body takes a
+/// second or more (a child's longer): asynchronous for the UI.
+Future<String> templateList({required String bodyJson}) =>
     RustLib.instance.api.crateApiTemplatesTemplateList(bodyJson: bodyJson);
 
 /// A PNG picture of `template`'s pattern pieces at default sizes for a

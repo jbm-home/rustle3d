@@ -19,20 +19,27 @@ const _pollEvery = Duration(milliseconds: 100);
 /// Run [job] (a call into the engine that may take seconds) and return its
 /// result; past a moment, a modal card titled [title] shows its progress.
 /// With [cancellable], the card has a Stop button: the step then fails
-/// with the `cancelled` code and changes nothing.
+/// with the `cancelled` code and changes nothing. Without an [engine]
+/// (no project open yet), the card says [step] under an indeterminate
+/// bar.
 Future<T> runBusy<T>(
   BuildContext context,
-  Engine engine,
+  Engine? engine,
   String title,
   Future<T> Function() job, {
   bool cancellable = false,
+  String? step,
 }) async {
   OverlayEntry? card;
   final overlay = Overlay.of(context, rootOverlay: true);
   final timer = Timer(_showAfter, () {
     card = OverlayEntry(
-      builder: (_) =>
-          _BusyCard(engine: engine, title: title, cancellable: cancellable),
+      builder: (_) => _BusyCard(
+        engine: engine,
+        title: title,
+        step: step,
+        cancellable: cancellable && engine != null,
+      ),
     );
     overlay.insert(card!);
   });
@@ -48,11 +55,13 @@ class _BusyCard extends StatefulWidget {
   const _BusyCard({
     required this.engine,
     required this.title,
+    required this.step,
     required this.cancellable,
   });
 
-  final Engine engine;
+  final Engine? engine;
   final String title;
+  final String? step;
   final bool cancellable;
 
   @override
@@ -62,18 +71,20 @@ class _BusyCard extends StatefulWidget {
 class _BusyCardState extends State<_BusyCard> {
   StepProgress? _progress;
   bool _stopping = false;
-  late final Timer _poll;
+  Timer? _poll;
 
   @override
   void initState() {
     super.initState();
-    _read();
-    _poll = Timer.periodic(_pollEvery, (_) => _read());
+    final engine = widget.engine;
+    if (engine == null) return;
+    _read(engine);
+    _poll = Timer.periodic(_pollEvery, (_) => _read(engine));
   }
 
-  void _read() {
+  void _read(Engine engine) {
     try {
-      final now = widget.engine.progress();
+      final now = engine.progress();
       if (mounted) setState(() => _progress = now);
     } on ApiError {
       // The step reports its own errors when it ends.
@@ -82,7 +93,7 @@ class _BusyCardState extends State<_BusyCard> {
 
   @override
   void dispose() {
-    _poll.cancel();
+    _poll?.cancel();
     super.dispose();
   }
 
@@ -97,7 +108,7 @@ class _BusyCardState extends State<_BusyCard> {
       'drape.prepare' => l.busyDrape,
       'export' => l.busyExport,
       'import' => l.busyImport,
-      _ => l.busyStep,
+      _ => widget.step ?? l.busyStep,
     };
   }
 
@@ -162,7 +173,7 @@ class _BusyCardState extends State<_BusyCard> {
                               ? null
                               : () {
                                   setState(() => _stopping = true);
-                                  widget.engine.cancel();
+                                  widget.engine?.cancel();
                                 },
                           child: Text(context.l.busyStop),
                         ),

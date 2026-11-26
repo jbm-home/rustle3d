@@ -565,7 +565,7 @@ abstract class RustLibApi extends BaseApi {
 
   void crateApiEngineSetUiAdapter({required PlatformInt64 luid});
 
-  String crateApiTemplatesTemplateList({required String bodyJson});
+  Future<String> crateApiTemplatesTemplateList({required String bodyJson});
 
   Future<Uint8List> crateApiTemplatesTemplateThumbnail({
     required String template,
@@ -4012,17 +4012,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "set_ui_adapter", argNames: ["luid"]);
 
   @override
-  String crateApiTemplatesTemplateList({required String bodyJson}) {
-    return handler.executeSync(
-      SyncTask(
-        callFfi: () {
+  Future<String> crateApiTemplatesTemplateList({required String bodyJson}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(bodyJson, serializer);
-          return pdeCallFfi(
+          pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
             funcId: 105,
-          )!;
+            port: port_,
+          );
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,

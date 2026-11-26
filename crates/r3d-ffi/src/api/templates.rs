@@ -32,8 +32,8 @@ pub fn app_version() -> String {
 }
 
 /// The templates and their default sizes for `body_json` (a `Body`), as
-/// the `template.list` query returns them.
-#[frb(sync)]
+/// the `template.list` query returns them. Fitting the body takes a
+/// second or more (a child's longer): asynchronous for the UI.
 pub fn template_list(body_json: String) -> Result<String, ApiError> {
     let s = session_for(body_of(&body_json)?)?;
     let list = s
