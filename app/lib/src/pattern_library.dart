@@ -36,12 +36,14 @@ String _kindName(L l, String kind) => switch (kind) {
 };
 
 /// Show the library; [add] runs the step that adds a pattern
-/// (`template.apply` or `library.add`).
+/// (`template.apply` or `library.add`). Without a project (the start
+/// screen: no [engine] nor [add]), only the user's patterns, to rename,
+/// export, delete or import.
 Future<void> showPatternLibrary(
   BuildContext context, {
-  required Engine engine,
+  Engine? engine,
   required String libraryDir,
-  required Future<void> Function(Map<String, Object?> step) add,
+  Future<void> Function(Map<String, Object?> step)? add,
 }) {
   return showDialog<void>(
     context: context,
@@ -68,9 +70,9 @@ class _PatternLibrary extends StatefulWidget {
     required this.add,
   });
 
-  final Engine engine;
+  final Engine? engine;
   final String libraryDir;
-  final Future<void> Function(Map<String, Object?> step) add;
+  final Future<void> Function(Map<String, Object?> step)? add;
 
   @override
   State<_PatternLibrary> createState() => _PatternLibraryState();
@@ -89,9 +91,12 @@ class _PatternLibraryState extends State<_PatternLibrary> {
   void initState() {
     super.initState();
     try {
-      _builtin = (jsonDecode(
-        widget.engine.run(stepJson: jsonEncode({'type': 'template.list'})),
-      ) as List).cast<Map<String, dynamic>>();
+      final engine = widget.engine;
+      _builtin = engine == null || widget.add == null
+          ? const []
+          : (jsonDecode(
+              engine.run(stepJson: jsonEncode({'type': 'template.list'})),
+            ) as List).cast<Map<String, dynamic>>();
     } on ApiError {
       _builtin = const [];
     }
@@ -119,9 +124,14 @@ class _PatternLibraryState extends State<_PatternLibrary> {
   Future<Uint8List> _thumb(String key, Future<Uint8List> Function() draw) =>
       _thumbs.putIfAbsent(key, draw);
 
-  Future<void> _add(Map<String, Object?> step) async {
-    Navigator.pop(context);
-    await widget.add(step);
+  /// Adding needs a project: `null` without one.
+  VoidCallback? _adder(Map<String, Object?> step) {
+    final add = widget.add;
+    if (add == null) return null;
+    return () async {
+      Navigator.pop(context);
+      await add(step);
+    };
   }
 
   Future<void> _import() async {
@@ -209,7 +219,7 @@ class _PatternLibraryState extends State<_PatternLibrary> {
     required Key key,
     required String title,
     required Future<Uint8List> picture,
-    required VoidCallback onAdd,
+    required VoidCallback? onAdd,
     Widget? menu,
   }) {
     final p = Tokens.of(context);
@@ -278,7 +288,7 @@ class _PatternLibraryState extends State<_PatternLibrary> {
           colors: _colors,
         ),
       ),
-      onAdd: () => _add({'type': 'template.apply', 'template': id}),
+      onAdd: _adder({'type': 'template.apply', 'template': id}),
     );
   }
 
@@ -299,7 +309,7 @@ class _PatternLibraryState extends State<_PatternLibrary> {
           colors: _colors,
         ),
       ),
-      onAdd: () => _add({'type': 'library.add', 'name': name}),
+      onAdd: _adder({'type': 'library.add', 'name': name}),
       menu: PopupMenuButton<String>(
         key: ValueKey('libraryMenu:$name'),
         icon: const Icon(Icons.more_vert_rounded, size: 18),
@@ -380,7 +390,7 @@ class _PatternLibraryState extends State<_PatternLibrary> {
             ],
           ),
           Text(
-            l.librarySubtitle,
+            widget.add == null ? l.libraryManageSubtitle : l.librarySubtitle,
             style: ts(fontSize: 13, color: p.textMuted, height: 1.4),
           ),
           if (_error != null) ...[

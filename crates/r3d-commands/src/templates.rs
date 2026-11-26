@@ -319,7 +319,26 @@ const BOARD_GAP: f64 = 80.0;
 /// the avatar (or the standard body without one): proportions of the
 /// chest made a size 52's shoulders 26 cm wide each side for 19 on the
 /// body, and its neckline as wide.
-struct Upper(r3d_avatar::fit::UpperBody);
+struct Upper {
+    body: r3d_avatar::fit::UpperBody,
+    /// What the adult eases and allowances below are multiplied by
+    /// ([`ease_scale`]).
+    scale: f64,
+}
+
+/// The chest the adult eases below were set for (cm).
+const ADULT_CHEST_CM: f64 = 90.0;
+
+/// The eases and allowances of an upper-body pattern, set in mm for an
+/// adult, scale with a child's chest: an adult's 7 cm under the arm and
+/// 6 cm across the sleeve made a baby's bodysuit boxy, its armholes deep
+/// and its sleeves puffed. An adult's are kept as they are.
+fn ease_scale(body: &Body) -> f64 {
+    match body.age_years {
+        Some(_) => (body.bust_cm / ADULT_CHEST_CM).clamp(0.3, 1.0),
+        None => 1.0,
+    }
+}
 
 /// From the shoulder joint to the shoulder's tip (mm).
 const JOINT_TO_TIP_MM: f64 = 20.0;
@@ -328,6 +347,8 @@ const JOINT_TO_TIP_MM: f64 = 20.0;
 const SHOULDER_EASE_MM: f64 = 10.0;
 const NECK_EASE_MM: f64 = 10.0;
 const ARMHOLE_EASE_MM: f64 = 70.0;
+/// From the neck point down to the shoulder's tip (mm).
+const SHOULDER_DROP_MM: f64 = 40.0;
 /// The body model's shoulders do not widen with its weight; a size chart
 /// widens them by about 0.4 cm per size (4 cm of chest): each shoulder
 /// takes this many mm per mm of chest over the body's at neutral weight.
@@ -341,28 +362,36 @@ impl Upper {
         let avatar = avatar_of(p);
         let fit = crate::queries::fitted(&avatar.body, &avatar.measures)?;
         r3d_avatar::fit::upper_body(crate::queries::body_model()?, &fit)
-            .map(Self)
+            .map(|body| Self {
+                body,
+                scale: ease_scale(&avatar.body),
+            })
             .ok_or_else(|| internal("the body's shoulders and neck were not found".into()))
     }
 
     /// From the centre line to the shoulder's tip, for a pattern of chest
     /// `chest` (mm).
     fn shoulder_half(&self, chest: f64) -> f64 {
-        let u = &self.0;
+        let u = &self.body;
         f64::from(u.shoulder_joint_cm) * 10.0
-            + JOINT_TO_TIP_MM
-            + SHOULDER_EASE_MM
+            + (JOINT_TO_TIP_MM + SHOULDER_EASE_MM) * self.scale
             + SHOULDER_PER_CHEST * (chest - f64::from(u.neutral_bust_cm) * 10.0).max(0.0)
     }
 
     /// Half the neckline's width at the base of the neck.
     fn neck_half(&self) -> f64 {
-        f64::from(self.0.neck_cm) * 10.0 / std::f64::consts::TAU + NECK_EASE_MM
+        f64::from(self.body.neck_cm) * 10.0 / std::f64::consts::TAU + NECK_EASE_MM * self.scale
     }
 
     /// From the shoulder's tip down to the bottom of the armhole.
     fn armhole_depth(&self) -> f64 {
-        f64::from(self.0.shoulder_top_cm - self.0.armpit_cm) * 10.0 + ARMHOLE_EASE_MM
+        f64::from(self.body.shoulder_top_cm - self.body.armpit_cm) * 10.0
+            + ARMHOLE_EASE_MM * self.scale
+    }
+
+    /// How far the shoulder's tip lies below the neck point.
+    fn shoulder_drop(&self) -> f64 {
+        SHOULDER_DROP_MM * self.scale
     }
 }
 
@@ -1716,7 +1745,7 @@ fn t_shirt(
     let upper = Upper::of(d.tx.project())?;
     let shoulder = upper.shoulder_half(chest);
     let neck = upper.neck_half();
-    let y_s = len - 40.0;
+    let y_s = len - upper.shoulder_drop();
     let y_a = y_s - upper.armhole_depth();
     let h = body.height_cm;
     let stature = Stature::of(body);
@@ -1764,12 +1793,12 @@ fn t_shirt(
     // Edge `k` of a T-shirt's bodice is edge `k + o` of a bodysuit's.
     let o = usize::from(top == Top::Bodysuit);
     let hole_len = armhole_length(d, &front, &back, 2 + o)?;
-    let half = (0.33 * chest + 60.0) / 2.0;
+    let half = (0.33 * chest + 60.0 * upper.scale) / 2.0;
     // A long sleeve narrows to the shirt's cuff.
     let sleeve_hem = if top.long_sleeves() {
-        (0.12 * chest + 150.0) / 2.0
+        (0.12 * chest + 150.0 * upper.scale) / 2.0
     } else {
-        half - 15.0
+        half - 15.0 * upper.scale
     };
     let left = sleeve_piece(d, "Sleeve left", hole_len, half, sleeve_hem, sleeve)?;
     let right = d.mirror(&left, "Sleeve right")?;
@@ -2030,7 +2059,7 @@ fn shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
     let upper = Upper::of(d.tx.project())?;
     let shoulder = upper.shoulder_half(chest);
     let neck = upper.neck_half();
-    let y_s = len - 40.0;
+    let y_s = len - upper.shoulder_drop();
     let y_a = y_s - upper.armhole_depth();
     // The hem takes the hips with the same ease, the side seam flaring
     // from the armhole: drafted on the chest alone, a women's 52 shirt
@@ -2102,8 +2131,8 @@ fn shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
     // The back's armhole, below the yoke then on it.
     let (hole_low, hole_high) = (edge_len(back.edge(2)?), edge_len(yoke.edge(1)?));
     let hole_len = edge_len(front.edge(2)?).max(hole_low + hole_high);
-    let cuff = 0.12 * chest + 150.0;
-    let half = (0.33 * chest + 70.0) / 2.0;
+    let cuff = 0.12 * chest + 150.0 * upper.scale;
+    let half = (0.33 * chest + 70.0 * upper.scale) / 2.0;
     let mut left = sleeve_piece(d, "Sleeve left", hole_len, half, cuff / 2.0, sleeve)?;
     // Its back cap in two, where the yoke meets the armhole: edges 0 hem,
     // 1 right underarm seam, 2 back cap below the yoke, 3 on it, 4 front
@@ -2987,7 +3016,7 @@ fn dress(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
     let upper = Upper::of(d.tx.project())?;
     let shoulder = upper.shoulder_half(chest);
     let neck = upper.neck_half();
-    let y_s = len - 40.0;
+    let y_s = len - upper.shoulder_drop();
     let y_a = y_s - upper.armhole_depth();
     // Neck to waist on the body, then waist to hips.
     let y_w = (len - (neck_height - waist_height_cm(d.tx.project())?) * 10.0).max(0.4 * len);

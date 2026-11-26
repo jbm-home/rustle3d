@@ -3707,6 +3707,13 @@ class LEn extends L {
   String get libraryOpen => 'From the library…';
 
   @override
+  String get libraryManage => 'Library';
+
+  @override
+  String get libraryManageSubtitle =>
+      'Your own patterns: rename, export or delete them, or import one. Save a garment here from its card in a project, and add a pattern to a project from there.';
+
+  @override
   String get libraryTitle => 'Pattern library';
 
   @override

@@ -1038,6 +1038,8 @@
   "templateShorts": "Short",
   "templateShortsBlurb": "La base du pantalon, arrêtée une main au-dessus du genou.",
   "libraryOpen": "Depuis la bibliothèque…",
+  "libraryManage": "Bibliothèque",
+  "libraryManageSubtitle": "Vos propres patrons : renommez-les, exportez-les, supprimez-les ou importez-en un. Enregistrez un vêtement ici depuis sa carte dans un projet, et ajoutez un patron à un projet depuis celui-ci.",
   "libraryTitle": "Bibliothèque de patrons",
   "librarySubtitle": "Cliquez sur un patron pour l'ajouter à ce projet, tracé pour son corps. Enregistrez ici vos propres vêtements depuis leur carte.",
   "libraryKindTops": "Hauts",

@@ -1866,6 +1866,8 @@
   "templateShorts": "Shorts",
   "templateShortsBlurb": "The trousers' block, ending a hand above the knee.",
   "libraryOpen": "From the library…",
+  "libraryManage": "Library",
+  "libraryManageSubtitle": "Your own patterns: rename, export or delete them, or import one. Save a garment here from its card in a project, and add a pattern to a project from there.",
   "libraryTitle": "Pattern library",
   "librarySubtitle": "Click a pattern to add it to this project, drafted for its body. Save your own garments here from their card.",
   "libraryKindTops": "Tops",

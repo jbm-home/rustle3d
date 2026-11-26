@@ -2555,6 +2555,7 @@ class _ShellState extends State<Shell> {
                   _ => _openProjector(),
                 },
                 onImport: _importPattern,
+                onLibrary: _showPatternLibrary,
                 agent: _agent,
                 onAgents: () => showAgents(
                   context,
@@ -3012,6 +3013,7 @@ class _TopBar extends StatelessWidget {
     required this.onExport,
     required this.onProduction,
     required this.onImport,
+    required this.onLibrary,
     required this.agent,
     required this.onAgents,
     required this.bodyKey,
@@ -3053,6 +3055,9 @@ class _TopBar extends StatelessWidget {
 
   /// Import a pattern drawn elsewhere.
   final VoidCallback onImport;
+
+  /// The pattern library: add a pattern, manage the user's own.
+  final VoidCallback onLibrary;
 
   /// AI agents: allowed or not, connected or not.
   final AgentStatus agent;
@@ -3108,6 +3113,12 @@ class _TopBar extends StatelessWidget {
               onPressed: onLearn,
               icon: const Icon(Icons.school_outlined, size: 18),
               label: Text(l.learn),
+            ),
+            TextButton.icon(
+              key: const ValueKey('libraryButton'),
+              onPressed: onLibrary,
+              icon: const Icon(Icons.collections_bookmark_outlined, size: 18),
+              label: Text(l.libraryManage),
             ),
             _BodyMenu(
               key: bodyKey,
@@ -5419,33 +5430,28 @@ class _GarmentCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          // The name and the layer on their own lines: beside the
+          // buttons, a narrow inspector left them a letter per line.
+          Text(
+            garment['name'] as String,
+            style: ts(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w600,
+              color: p.text,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (count > 1)
+            Text(
+              !draped
+                  ? l.garmentOutOfDrape
+                  : layer == 0
+                  ? l.garmentNextToBody
+                  : l.garmentOver,
+              style: ts(fontSize: 12, color: p.textMuted),
+            ),
+          Wrap(
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      garment['name'] as String,
-                      style: ts(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w600,
-                        color: p.text,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (count > 1)
-                      Text(
-                        !draped
-                            ? l.garmentOutOfDrape
-                            : layer == 0
-                            ? l.garmentNextToBody
-                            : l.garmentOver,
-                        style: ts(fontSize: 12, color: p.textMuted),
-                      ),
-                  ],
-                ),
-              ),
               _IconAction(
                 key: ValueKey('saveToLibrary:$id'),
                 icon: Icons.bookmark_add_outlined,

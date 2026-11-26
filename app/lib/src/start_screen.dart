@@ -13,6 +13,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'design/tokens.dart';
 import 'i18n.dart';
 import 'busy.dart';
+import 'pattern_library.dart' show showPatternLibrary;
 import 'projects.dart';
 import 'rust/api/engine.dart';
 import 'rust/api/library.dart';
@@ -408,11 +409,28 @@ class _StartScreenState extends State<StartScreen> {
                           onOpen: widget.onOpen,
                           onChanged: _refresh,
                         ),
-                      _SectionTitle(l.sectionNew),
+                      _SectionTitle(
+                        l.sectionNew,
+                        actions: [
+                          TextButton.icon(
+                            key: const ValueKey('libraryButton'),
+                            onPressed: () => showPatternLibrary(
+                              context,
+                              libraryDir: widget.store.libraryDir,
+                            ),
+                            icon: const Icon(
+                              Icons.collections_bookmark_outlined,
+                              size: 18,
+                            ),
+                            label: Text(l.libraryManage),
+                          ),
+                        ],
+                      ),
                       Wrap(
                         spacing: Space.l,
                         runSpacing: Space.l,
                         children: [
+                          _BlankCard(onTap: _blank),
                           for (final (id, icon) in _templates)
                             if (templateText(l, id) case (
                               final title,
@@ -425,7 +443,6 @@ class _StartScreenState extends State<StartScreen> {
                                 picture: _thumbs.template(id, widget.dark),
                                 onTap: () => _newGarment(id, title),
                               ),
-                          _BlankCard(onTap: _blank),
                         ],
                       ),
                       _SectionTitle('Rustle3D'),

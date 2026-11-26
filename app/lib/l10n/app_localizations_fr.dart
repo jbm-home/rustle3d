@@ -3736,6 +3736,13 @@ class LFr extends L {
   String get libraryOpen => 'Depuis la bibliothèque…';
 
   @override
+  String get libraryManage => 'Bibliothèque';
+
+  @override
+  String get libraryManageSubtitle =>
+      'Vos propres patrons : renommez-les, exportez-les, supprimez-les ou importez-en un. Enregistrez un vêtement ici depuis sa carte dans un projet, et ajoutez un patron à un projet depuis celui-ci.';
+
+  @override
   String get libraryTitle => 'Bibliothèque de patrons';
 
   @override

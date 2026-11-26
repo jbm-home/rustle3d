@@ -57,7 +57,11 @@ library, drafted for that body, and grade it from 2 to 14 years.
   its neck and sleeves from its shoulders, and draft trousers' rise to
   its crotch, as the body model's child of that age has them (the adult
   fractions scaled by the child's own); a hood follows the head; shorts
-  end in proportion to a short leg.
+  end in proportion to a short leg. The eases of tops (under the arm,
+  across the sleeve, at the shoulder and the neck, the shoulder's
+  slope), set in mm for an adult, scale with a child's chest (chest /
+  90 cm): a baby's bodysuit is no longer boxy, its armholes deep and
+  its sleeves puffed.
 - **Templates** (kind "Babies and children" in the library, spec 32):
   - **Bodysuit** (jersey): the T-shirt's block with short sleeves, going
     on below the hips into leg openings that curve in to a crotch 1/7
@@ -105,5 +109,8 @@ library, drafted for that body, and grade it from 2 to 14 years.
 - An envelope neckline on the bodysuit (lapped shoulders), snaps as a
   trim, binding on the leg openings.
 - A child's own motions (the walk is an adult's, scaled).
+- A 6-month-old's armpit is a tight crease: the cloth catches in it
+  (up to 8 mm inside on the GPU) and the sleeve's underarm seam stays
+  up to 2 cm open; fine from 12 months (2026-11-26).
 - Children's bodies older than 14 are mixed with the adult's (MakeHuman
   has no teenager); a baby's hip height wanders between belly and hips.

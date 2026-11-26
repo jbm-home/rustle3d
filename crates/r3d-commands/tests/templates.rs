@@ -420,6 +420,24 @@ fn a_babys_bodysuit_closes_under_the_crotch() {
 }
 
 #[test]
+fn a_babys_bodysuit_takes_a_babys_eases() {
+    // A 12 months baby, 76 cm, 47 cm chest, 14.8 cm round the upper arm.
+    // An adult's eases (7 cm under the arm, 6 cm across the sleeve) made
+    // its sleeves 21.5 cm wide and its armholes 15 cm deep.
+    let s = child(0.5, [1.0, 76.0, 47.0, 46.0, 48.0], "bodysuit");
+    let p = s.project();
+    let width = |name: &str| {
+        let (id, _) = p.panels().iter().find(|(_, pn)| pn.name == name).unwrap();
+        let b = p.panel_bounding_box(*id).unwrap();
+        (b.max.x - b.min.x, b.max.y - b.min.y)
+    };
+    let (sleeve, _) = width("Sleeve left");
+    assert!(sleeve > 165.0 && sleeve < 195.0, "sleeve {sleeve} mm wide");
+    let (front, _) = width("Front");
+    assert!(front < 280.0, "front {front} mm wide");
+}
+
+#[test]
 fn a_pyjama_is_its_bottoms_and_a_top_worn_over_them() {
     // A 4-year-old girl, 104 cm.
     let s = child(0.0, [4.0, 104.0, 56.0, 53.0, 59.0], "pyjama");

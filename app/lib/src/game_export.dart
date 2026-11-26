@@ -18,10 +18,7 @@ const _mapSizes = [0, 512, 1024, 2048, 4096];
 
 /// Pick the engine and the options, then where to save the `.glb`.
 class _GameExportDialog extends StatefulWidget {
-  const _GameExportDialog({
-    required this.engine,
-    required this.name,
-  });
+  const _GameExportDialog({required this.engine, required this.name});
 
   final Engine engine;
 

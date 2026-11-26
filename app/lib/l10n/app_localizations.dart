@@ -6313,6 +6313,18 @@ abstract class L {
   /// **'From the library…'**
   String get libraryOpen;
 
+  /// No description provided for @libraryManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Library'**
+  String get libraryManage;
+
+  /// No description provided for @libraryManageSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your own patterns: rename, export or delete them, or import one. Save a garment here from its card in a project, and add a pattern to a project from there.'**
+  String get libraryManageSubtitle;
+
   /// No description provided for @libraryTitle.
   ///
   /// In en, this message translates to:

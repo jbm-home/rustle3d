@@ -130,4 +130,29 @@ void main() {
     }
     expect(garments().map((g) => g['name']), contains('Jeans'));
   });
+
+  testWidgets('the start screen opens the library to manage it', (
+    tester,
+  ) async {
+    final dir = Directory.systemTemp.createTempSync('r3d').path;
+    File('$dir/tour-seen').createSync();
+    Directory('$dir/projects').createSync();
+    await tester.pumpWidget(
+      Rustle3dApp(
+        store: ProjectStore(projectsDir: '$dir/projects', libraryDir: dir),
+      ),
+    );
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.tap(find.byKey(const ValueKey('libraryButton')));
+    for (var i = 0; i < 12; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    // The user's patterns and Import; no built-in ones to add, with no
+    // project open.
+    expect(find.byKey(const ValueKey('libraryImport')), findsOneWidget);
+    expect(find.byKey(const ValueKey('libraryBuiltin:jeans')), findsNothing);
+    expect(find.textContaining('rename, export or delete'), findsOneWidget);
+  });
 }
