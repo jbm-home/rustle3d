@@ -3128,7 +3128,8 @@ mod child_sleeves {
                 r#"{"type":"template.apply","template":"bodysuit"}"#.to_owned(),
             ] {
                 let value = serde_json::from_str(&step).unwrap();
-                s.run_step(&crate::Step::from_value(value).unwrap()).unwrap();
+                s.run_step(&crate::Step::from_value(value).unwrap())
+                    .unwrap();
             }
             let form = Form::of_project(s.project()).unwrap().unwrap();
             let joints = arm_joints(&form.rig.as_ref().unwrap().skeleton).unwrap();

@@ -7,6 +7,8 @@
 //!   fans) of the default scene, with its nodes' transforms. Buffers in
 //!   separate files and compressed geometry (Draco, meshopt) are refused
 //!   with a message saying so.
+//! - **PLY** (Stanford), ASCII or binary, and **STL**, binary or ASCII:
+//!   body scans ([`ply`], [`stl`]).
 //!
 //! Coordinates are returned as written (file units, file axes); the
 //! caller decides the scale and the up axis.
@@ -14,6 +16,9 @@
 use glam::{DMat4, DQuat, DVec3};
 use r3d_core::{Localizable, Message};
 use serde_json::Value;
+
+mod ply;
+mod stl;
 
 /// Most triangles a model may have.
 pub const MAX_TRIANGLES: usize = 2_000_000;
@@ -26,6 +31,8 @@ pub enum ModelFormat {
     Gltf,
     /// glTF binary.
     Glb,
+    Ply,
+    Stl,
 }
 
 impl ModelFormat {
@@ -36,6 +43,8 @@ impl ModelFormat {
             "obj" => Some(Self::Obj),
             "gltf" => Some(Self::Gltf),
             "glb" => Some(Self::Glb),
+            "ply" => Some(Self::Ply),
+            "stl" => Some(Self::Stl),
             _ => None,
         }
     }
@@ -44,6 +53,8 @@ impl ModelFormat {
         match self {
             Self::Obj => "OBJ",
             Self::Gltf | Self::Glb => "glTF",
+            Self::Ply => "PLY",
+            Self::Stl => "STL",
         }
     }
 }
@@ -128,6 +139,8 @@ pub fn read(bytes: &[u8], format: ModelFormat) -> Result<Model, ModelError> {
             let (json, bin) = glb_chunks(bytes)?;
             read_gltf(&json, bin)?
         }
+        ModelFormat::Ply => ply::read(bytes)?,
+        ModelFormat::Stl => stl::read(bytes)?,
     };
     if model.triangles.is_empty() {
         return Err(ModelError::Empty);

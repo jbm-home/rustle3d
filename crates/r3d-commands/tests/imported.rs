@@ -59,6 +59,44 @@ fn glb(positions: &[Vec3], triangles: &[[u32; 3]], to_file: impl Fn(Vec3) -> Vec
     })
 }
 
+/// A binary little-endian PLY, as written.
+fn ply(positions: &[Vec3], triangles: &[[u32; 3]]) -> Vec<u8> {
+    let mut b = format!(
+        "ply\nformat binary_little_endian 1.0\nelement vertex {}\nproperty float x\nproperty float y\nproperty float z\nelement face {}\nproperty list uchar int vertex_indices\nend_header\n",
+        positions.len(),
+        triangles.len()
+    )
+    .into_bytes();
+    for p in positions {
+        for v in p.to_array() {
+            b.extend(v.to_le_bytes());
+        }
+    }
+    for t in triangles {
+        b.push(3);
+        for i in t {
+            b.extend((*i as i32).to_le_bytes());
+        }
+    }
+    b
+}
+
+/// A binary STL: each triangle with its own corners.
+fn stl(positions: &[Vec3], triangles: &[[u32; 3]], to_file: impl Fn(Vec3) -> Vec3) -> Vec<u8> {
+    let mut b = vec![0u8; 80];
+    b.extend((triangles.len() as u32).to_le_bytes());
+    for t in triangles {
+        b.extend([0u8; 12]);
+        for i in t {
+            for v in to_file(positions[*i as usize]).to_array() {
+                b.extend(v.to_le_bytes());
+            }
+        }
+        b.extend([0u8; 2]);
+    }
+    b
+}
+
 fn run(ws: &mut Workspace, v: Value) -> Value {
     ws.run_step(&Step::from_value(v).unwrap()).unwrap()
 }
@@ -146,6 +184,47 @@ fn a_body_in_other_units_axes_and_facings_comes_back_the_same() {
         .map(|(a, b)| a.distance(*b))
         .fold(0.0f32, f32::max);
     assert!(apart < 0.001, "{apart} m apart");
+
+    // A scan in binary PLY (metres, Y up): the same body, vertex for vertex.
+    let file = write(&ws, "scan.ply", &ply(&positions, &triangles));
+    let out = run(&mut ws, json!({"type": "avatar.import", "path": file}));
+    assert_eq!(out["check"]["ready"], true);
+    let ply_form = Form::of_project(ws.session().project()).unwrap().unwrap();
+    let apart = first
+        .positions
+        .iter()
+        .zip(&ply_form.positions)
+        .map(|(a, b)| a.distance(*b))
+        .fold(0.0f32, f32::max);
+    assert!(apart < 0.001, "{apart} m apart");
+
+    // In binary STL (millimetres, Z up): loose triangles welded back into
+    // one closed surface, so no warning, and the same extent.
+    let mm_z = |p: Vec3| Vec3::new(p.x, -p.z, p.y) * 1000.0;
+    let file = write(&ws, "scan.stl", &stl(&positions, &triangles, mm_z));
+    let out = run(&mut ws, json!({"type": "avatar.import", "path": file}));
+    let check = &out["check"];
+    assert_eq!(check["ready"], true);
+    assert_eq!(check["scale"], 0.001);
+    assert_eq!(check["up"], "z");
+    let warnings: Vec<&Value> = check["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|i| i["severity"] != "info")
+        .collect();
+    assert!(warnings.is_empty(), "{warnings:?}");
+    let stl_form = Form::of_project(ws.session().project()).unwrap().unwrap();
+    let extent = |f: &Form| {
+        f.positions
+            .iter()
+            .fold((Vec3::MAX, Vec3::MIN), |(lo, hi), p| {
+                (lo.min(*p), hi.max(*p))
+            })
+    };
+    let ((lo_a, hi_a), (lo_b, hi_b)) = (extent(&first), extent(&stl_form));
+    assert!(lo_a.distance(lo_b) < 0.001 && hi_a.distance(hi_b) < 0.001);
+    assert_eq!(stl_form.triangles.len(), first.triangles.len());
 
     // Corrected by hand, then back to the detected values.
     run(&mut ws, json!({"type": "avatar.orient", "turn_deg": 90}));

@@ -3086,7 +3086,7 @@ class LEn extends L {
   String get bodyMenuBuiltin => 'Use the built-in body';
 
   @override
-  String get bodyFiles => '3D bodies (OBJ, glTF, GLB)';
+  String get bodyFiles => '3D bodies (OBJ, glTF, GLB, PLY, STL)';
 
   @override
   String get bodyImported => 'Body imported: check it before draping.';

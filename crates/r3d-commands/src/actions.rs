@@ -292,13 +292,13 @@ impl ActionSpec for Simulate {
     }
 }
 
-/// Drape on a body imported from an OBJ, glTF or GLB file.
+/// Drape on a body imported from an OBJ, glTF, GLB, PLY or STL file.
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AvatarImport {
     /// The file, relative to the project folder (`r3d avatar import` and
     /// the app copy files into `avatars/`): `.obj`, `.gltf` (buffers
-    /// embedded) or `.glb`.
+    /// embedded), `.glb`, `.ply` or `.stl`.
     pub path: String,
     /// Metres per file unit; detected when omitted.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -314,7 +314,7 @@ pub struct AvatarImport {
 }
 
 impl Described for AvatarImport {
-    const SUMMARY: &'static str = "Drape on a body imported from an OBJ, glTF or GLB file inside the project folder (a scan, a game character; you own its licence). Units, up axis and facing are detected unless given (correct them with avatar.orient); the arrangement points are guessed (move them with avatar.set_point) and the measurements taken on the body. One undo step (`avatar.import_mesh`). Returns the measurements and the check (as avatar.check). Imported bodies do not move.";
+    const SUMMARY: &'static str = "Drape on a body imported from an OBJ, glTF, GLB, PLY or STL file inside the project folder (a scan, a game character; you own its licence). Units, up axis and facing are detected unless given (correct them with avatar.orient); the arrangement points are guessed (move them with avatar.set_point) and the measurements taken on the body. One undo step (`avatar.import_mesh`). Returns the measurements and the check (as avatar.check). Imported bodies move with the motions.";
 }
 
 impl ActionSpec for AvatarImport {

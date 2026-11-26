@@ -8237,7 +8237,7 @@ Read a Seamly2D or Valentina measurement file inside the project folder (.vit, .
 
 ### `avatar.import`
 
-Drape on a body imported from an OBJ, glTF or GLB file inside the project folder (a scan, a game character; you own its licence). Units, up axis and facing are detected unless given (correct them with avatar.orient); the arrangement points are guessed (move them with avatar.set_point) and the measurements taken on the body. One undo step (`avatar.import_mesh`). Returns the measurements and the check (as avatar.check). Imported bodies do not move.
+Drape on a body imported from an OBJ, glTF, GLB, PLY or STL file inside the project folder (a scan, a game character; you own its licence). Units, up axis and facing are detected unless given (correct them with avatar.orient); the arrangement points are guessed (move them with avatar.set_point) and the measurements taken on the body. One undo step (`avatar.import_mesh`). Returns the measurements and the check (as avatar.check). Imported bodies move with the motions.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -8259,10 +8259,10 @@ Drape on a body imported from an OBJ, glTF or GLB file inside the project folder
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "Drape on a body imported from an OBJ, glTF or GLB file.",
+  "description": "Drape on a body imported from an OBJ, glTF, GLB, PLY or STL file.",
   "properties": {
     "path": {
-      "description": "The file, relative to the project folder (`r3d avatar import` and\nthe app copy files into `avatars/`): `.obj`, `.gltf` (buffers\nembedded) or `.glb`.",
+      "description": "The file, relative to the project folder (`r3d avatar import` and\nthe app copy files into `avatars/`): `.obj`, `.gltf` (buffers\nembedded), `.glb`, `.ply` or `.stl`.",
       "type": "string"
     },
     "scale": {

@@ -6431,7 +6431,7 @@ class EngineImpl extends RustOpaque implements Engine {
   FitLegend? fitLegend() =>
       RustLib.instance.api.crateApiEngineEngineFitLegend(that: this);
 
-  /// Drape on a body the user chose (anywhere; OBJ, glTF or GLB): copied
+  /// Drape on a body the user chose (anywhere; OBJ, glTF, GLB, PLY or STL): copied
   /// into the project's `avatars/` folder, read, its units, up axis and
   /// facing detected, its arrangement points guessed (`avatar.import`,
   /// one undo step). Returns that action's JSON result: `body` (the

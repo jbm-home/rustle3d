@@ -49,14 +49,14 @@ maintainer's briefs that specs cite as "ROADMAP Mxx" in their
 | M37 | Imported avatars in motion, game export checked ✅ (2026-11-25) | A scanned body walks in its garment; the garment and its motion open in a game engine as exported |
 | M38 | Pattern library ✅ (2026-11-25) | In an open project, a jean and a short are added from the library; a skirt saved there from one project is added to another, drafted for its body |
 | M39 | Children ✅ (2026-11-26) | A 4-year-old girl's pyjama and a baby's bodysuit, drafted on children's bodies and graded by age |
-| M40 | Body scans in PLY and STL | A body scan saved as PLY or STL is imported, checked and draped like an OBJ |
+| M40 | Body scans in PLY and STL ✅ (2026-11-26) | A body scan saved as PLY or STL is imported, checked and draped like an OBJ |
 | M41 | Diagnostic report | An agent marks the faces where a drape goes wrong and reads why: stretch, contacts, seam gaps |
 | M42 | The user's own HDRI | A photo render lit by an environment the user brings (`.hdr`) |
 | M43 | Fabric relief: normal and roughness maps | A denim's weave and a satin's sheen show in the 3D view and the photo |
 | M44 | Fabric presets from open measurements | Presets whose weights and thicknesses come from a published dataset, each value with its source |
 | M45 | Self-collision by contacts | A folded skirt's layers lie on each other, without the puffy ~8 mm gap |
 
-Next: M40, M41, M42 (in this order); M16's Linux part when the work
+Next: M41, M42 (in this order); M16's Linux part when the work
 moves to Linux.
 
 ## Planned milestones (proposed 2026-11-26)

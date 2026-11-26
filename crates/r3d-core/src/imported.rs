@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// A body mesh imported from an OBJ, glTF or GLB file inside the project
+/// A body mesh imported from an OBJ, glTF, GLB, PLY or STL file inside the project
 /// folder, draped instead of the built-in body.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -120,7 +120,7 @@ impl BodyPoint {
 }
 
 /// Whether `path` can name an imported body: relative, forward slashes,
-/// inside the folder, an `.obj`, `.gltf` or `.glb` file.
+/// inside the folder, an `.obj`, `.gltf`, `.glb`, `.ply` or `.stl` file.
 pub fn model_path_ok(path: &str) -> bool {
     let p = std::path::Path::new(path);
     let inside = !path.is_empty()
@@ -132,7 +132,7 @@ pub fn model_path_ok(path: &str) -> bool {
         .extension()
         .and_then(|e| e.to_str())
         .map(str::to_ascii_lowercase);
-    inside && matches!(ext.as_deref(), Some("obj" | "gltf" | "glb"))
+    inside && matches!(ext.as_deref(), Some("obj" | "gltf" | "glb" | "ply" | "stl"))
 }
 
 impl AvatarMesh {

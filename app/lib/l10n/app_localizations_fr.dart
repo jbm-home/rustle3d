@@ -3113,7 +3113,7 @@ class LFr extends L {
   String get bodyMenuBuiltin => 'Revenir au corps intégré';
 
   @override
-  String get bodyFiles => 'Corps 3D (OBJ, glTF, GLB)';
+  String get bodyFiles => 'Corps 3D (OBJ, glTF, GLB, PLY, STL)';
 
   @override
   String get bodyImported => 'Corps importé : vérifiez-le avant de draper.';

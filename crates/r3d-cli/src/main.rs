@@ -111,13 +111,13 @@ enum TechPackPaperArg {
 
 #[derive(Subcommand)]
 enum AvatarCmd {
-    /// Import a body from an OBJ, glTF (buffers embedded) or GLB file,
+    /// Import a body from an OBJ, glTF (buffers embedded), GLB, PLY or STL file,
     /// then save: the file is copied into the project's `avatars/`
     /// folder; units, up axis and facing are detected unless given;
     /// prints the measurements taken on it and its check.
     Import {
         project: PathBuf,
-        /// The .obj, .gltf or .glb file.
+        /// The .obj, .gltf, .glb, .ply or .stl file.
         file: PathBuf,
         /// Metres per file unit (0.01 for centimetres).
         #[arg(long)]

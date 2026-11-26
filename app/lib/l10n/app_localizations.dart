@@ -5254,7 +5254,7 @@ abstract class L {
   /// No description provided for @bodyFiles.
   ///
   /// In en, this message translates to:
-  /// **'3D bodies (OBJ, glTF, GLB)'**
+  /// **'3D bodies (OBJ, glTF, GLB, PLY, STL)'**
   String get bodyFiles;
 
   /// No description provided for @bodyImported.

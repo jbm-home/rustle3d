@@ -8,8 +8,8 @@ take out my draped garment and my patterns to use in other tools or to
 print and cut.
 
 ## Behavior
-- **Import avatar** (M31, spec 27): OBJ, glTF with embedded buffers, or
-  GLB. Units, up axis and facing are detected and can be corrected; the
+- **Import avatar** (M31, M40, spec 27): OBJ, glTF with embedded buffers,
+  GLB, PLY or STL. Units, up axis and facing are detected and can be corrected; the
   mesh stands on the ground, centred, and is checked (holes and
   non-manifold edges produce a warning, not a refusal).
 - **Export garment**: OBJ or glTF/GLB of the draped mesh (or the arranged

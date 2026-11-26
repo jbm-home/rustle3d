@@ -303,14 +303,14 @@ class _ShellState extends State<Shell> {
     }
   }
 
-  /// Ask for a body file (OBJ, glTF, GLB), import it, show its check.
+  /// Ask for a body file (OBJ, glTF, GLB, PLY, STL), import it, show its check.
   Future<void> _importBody() async {
     final l = context.l;
     final file = await openFile(
       acceptedTypeGroups: [
         XTypeGroup(
           label: l.bodyFiles,
-          extensions: const ['obj', 'gltf', 'glb'],
+          extensions: const ['obj', 'gltf', 'glb', 'ply', 'stl'],
         ),
       ],
     );

@@ -1437,7 +1437,7 @@
   "bodyMenuCheck": "Check body…",
   "bodyMenuPoints": "Show arrangement points",
   "bodyMenuBuiltin": "Use the built-in body",
-  "bodyFiles": "3D bodies (OBJ, glTF, GLB)",
+  "bodyFiles": "3D bodies (OBJ, glTF, GLB, PLY, STL)",
   "bodyImported": "Body imported: check it before draping.",
   "bodyBuiltinBack": "Back to the built-in body.",
   "bodyCheckTitle": "Check body",

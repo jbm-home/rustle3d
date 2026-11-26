@@ -1,8 +1,8 @@
 # 27 — Imported avatars
 
-Provenance: maintainer's functional brief (ROADMAP M31: import a body in OBJ, glTF or GLB, the user owning its licence; check the collision mesh before draping; arrangement points placed with help and checked; motions only with a usable skeleton); open standards (Wavefront OBJ, glTF 2.0); public papers: generalized winding numbers (Jacobson, Kavan & Sorkine-Hornung 2013) and their fast hierarchical evaluation (Barill, Dickson, Schmidt, Levin & Jacobson 2018) for the sign of the distance field of open meshes, the solid angle of a triangle (Van Oosterom & Strackee 1983), angle-weighted pseudo-normals (Bærentzen & Aanæs 2005, already used for the built-in body); general tailoring knowledge (girths taken as a tape around the body, body proportions as fractions of stature); motions (maintainer's brief 2026-11-23, ROADMAP M37: an imported body moves, its own skeleton mapped onto ours when it has one, otherwise our skeleton fitted to it and skin weights computed): the glTF 2.0 specification (skins, inverse bind matrices, `JOINTS_0`/`WEIGHTS_0`), closest-point skin weight transfer (Abdrashitov et al., SIGGRAPH Asia 2023 Technical Communications, as in spec 15), our own placement of the skeleton.
+Provenance: maintainer's functional brief (ROADMAP M31: import a body in OBJ, glTF or GLB, the user owning its licence; check the collision mesh before draping; arrangement points placed with help and checked; motions only with a usable skeleton); open standards (Wavefront OBJ, glTF 2.0; PLY and STL, for body scans: maintainer's brief 2026-11-26, ROADMAP M40); public papers: generalized winding numbers (Jacobson, Kavan & Sorkine-Hornung 2013) and their fast hierarchical evaluation (Barill, Dickson, Schmidt, Levin & Jacobson 2018) for the sign of the distance field of open meshes, the solid angle of a triangle (Van Oosterom & Strackee 1983), angle-weighted pseudo-normals (Bærentzen & Aanæs 2005, already used for the built-in body); general tailoring knowledge (girths taken as a tape around the body, body proportions as fractions of stature); motions (maintainer's brief 2026-11-23, ROADMAP M37: an imported body moves, its own skeleton mapped onto ours when it has one, otherwise our skeleton fitted to it and skin weights computed): the glTF 2.0 specification (skins, inverse bind matrices, `JOINTS_0`/`WEIGHTS_0`), closest-point skin weight transfer (Abdrashitov et al., SIGGRAPH Asia 2023 Technical Communications, as in spec 15), our own placement of the skeleton.
 
-## Status (2026-11-25, M37)
+## Status (2026-11-26, M40)
 
 Implemented: import of OBJ, glTF and GLB bodies into the project's
 `avatars/` folder (schema v18); detection of the units, the up axis and
@@ -19,6 +19,9 @@ names, otherwise by the arrangement points; the skin follows the file's
 weights, or weights carried from the built-in body; every motion
 (built-in and captured) plays on it, on the CPU and the GPU, and the
 game export skins it.
+
+2026-11-26 (M40): bodies in PLY and STL, the formats of most body
+scanners.
 
 Not yet: an imported body in other sizes than its own (every size
 drapes on the same body), automatic fit of the arrangement points as the
@@ -44,6 +47,15 @@ can, I check where the arms and legs are, and I drape a shirt on it.
   is read, with its nodes' transforms. Files whose buffers are separate
   `.bin` files, or compressed with an extension (Draco, meshopt), are
   refused with a message saying so (save as GLB without compression).
+  **PLY**, ASCII or binary (either byte order): the `x`, `y`, `z` of the
+  `vertex` element and the `vertex_indices` (or `vertex_index`) lists of
+  the `face` element, polygons split into triangles; other elements and
+  properties (colours, normals) are ignored; a point cloud without faces
+  is refused (`model.empty`). **STL**, binary or ASCII (a binary file is
+  told by its size, even when its header starts with `solid`): corners
+  with the same coordinates are welded into one vertex, so a closed scan
+  checks as closed; facet normals are ignored. FBX is not read: it is a
+  closed format (convert it to GLB, user guide).
 - The file is copied into the project's `avatars/` folder and referenced
   by its relative path, with a fingerprint of its content (FNV-1a 64):
   the drape's cache follows the file, and a file changed by hand is
@@ -207,7 +219,8 @@ file has it (an A or a T pose, its own proportions). So:
 ## UX
 - The top bar's **Body** button opens a menu: Measurements…, Import
   body…, Check body…, Show arrangement points, Use the built-in body.
-- **Import body…** asks for an `.obj`, `.gltf` or `.glb` file, then
+- **Import body…** asks for an `.obj`, `.gltf`, `.glb`, `.ply` or `.stl`
+  file, then
   shows the check.
 - **Check body** is a dialog: the counts and the height, the units, up
   axis and turn with fields to correct them, and each item of the report

@@ -52,7 +52,7 @@ where `library.*` steps in scripts and over MCP find saved patterns
   project's `textures/` folder, a built-in is drawn in the garment's
   colour; runs `garment.set_print`, saves, and prints the garments.
 - `r3d avatar import <project> <file> [--scale k] [--up y|z|x|-y|-z|-x]
-  [--turn DEG]`: copy an OBJ, glTF or GLB body into the project's
+  [--turn DEG]`: copy an OBJ, glTF, GLB, PLY or STL body into the project's
   `avatars/` folder, drape on it (the `avatar.import` action, one undo
   step; units, up axis and facing detected unless given), save, and
   print the measurements taken on it with its check (spec 27).

@@ -201,7 +201,7 @@ abstract class Engine implements RustOpaqueInterface {
   /// tightest value on the cloth now, with its piece.
   FitLegend? fitLegend();
 
-  /// Drape on a body the user chose (anywhere; OBJ, glTF or GLB): copied
+  /// Drape on a body the user chose (anywhere; OBJ, glTF, GLB, PLY or STL): copied
   /// into the project's `avatars/` folder, read, its units, up axis and
   /// facing detected, its arrangement points guessed (`avatar.import`,
   /// one undo step). Returns that action's JSON result: `body` (the

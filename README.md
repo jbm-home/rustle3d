@@ -60,7 +60,7 @@ The 3D view needs a graphics card with Metal (macOS), Direct3D 12
 | **Patterns (2D)** | Start from templates drafted to the body's measurements (T-shirt, shirt, dress, skirts, trousers, tote bag) or draw pieces with polygon, curve and cut tools. Constraints, dimensions, formulas (`waist / 4 + 10 mm`), darts, pleats, holes, symmetric half pieces, notches and internal lines. |
 | **Sewing** | Sew edges together, see direction and length mismatches, gather, add ease, match both sides in one click. Buttons and zippers close the garment. Construction details: elastic and shirring, topstitching, interfacing, quilting over a padding. |
 | **Drape (3D)** | Real-time XPBD cloth simulation on the GPU, with collisions, self-collision, pins and pulling the cloth with the mouse. Several garments in layers. Fabric presets (cotton, denim, jersey, silk, wool) and prints that follow the grainline. |
-| **Avatars** | A parametric body set by its measurements, imported scans and characters (OBJ, glTF), walking motions and captured motions (BVH). |
+| **Avatars** | A parametric body set by its measurements, imported scans and characters (OBJ, glTF, PLY, STL), walking motions and captured motions (BVH). |
 | **Sizes and fit** | Grading over a size range, each size draped on a matching body; fit maps and a virtual tape measure. |
 | **Production** | Markers with yardage and cost, a tech pack PDF, a projector mode for cutting on the table. |
 | **Images** | Path-traced studio photos of the draped garment. |

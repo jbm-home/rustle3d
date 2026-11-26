@@ -859,7 +859,7 @@
   "bodyMenuCheck": "Vérifier le corps…",
   "bodyMenuPoints": "Afficher les points de placement",
   "bodyMenuBuiltin": "Revenir au corps intégré",
-  "bodyFiles": "Corps 3D (OBJ, glTF, GLB)",
+  "bodyFiles": "Corps 3D (OBJ, glTF, GLB, PLY, STL)",
   "bodyImported": "Corps importé : vérifiez-le avant de draper.",
   "bodyBuiltinBack": "Retour au corps intégré.",
   "bodyCheckTitle": "Vérifier le corps",
