@@ -829,6 +829,9 @@ pub(crate) fn settle_constraints(tx: &mut Transaction<'_>) -> Result<(), Command
     let unsolvable = |e: r3d_core::constraints::Unsolvable| CommandError::Unsolvable {
         constraints: e.constraints.into_iter().map(AnyId::from).collect(),
     };
+    if !r3d_core::constraints::regrade_needed(tx.project(), tx.changes()) {
+        return Ok(());
+    }
     let grades = formula_grades(tx.project()).map_err(unsolvable)?;
     for (id, grade) in grades.points {
         if let Some(pt) = tx.project().point(id).cloned()

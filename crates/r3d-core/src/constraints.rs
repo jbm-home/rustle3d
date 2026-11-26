@@ -21,6 +21,7 @@ use glam::DVec2;
 use r3d_geom::CubicBez;
 use r3d_geom::solve::{Options, System, solve};
 
+use crate::edit::Change;
 use crate::formula::{FormulaError, Scope};
 use crate::id::{ConstraintId, EdgeId, NotchId, PointId};
 use crate::model::{Along, Constraint, EdgeCurve, EdgeEnd, Project};
@@ -830,6 +831,59 @@ pub fn formula_graded_points(project: &Project) -> BTreeSet<PointId> {
         out.extend(points.difference(&fixed).copied());
     }
     out
+}
+
+/// Whether `changes` (a step's, on `project` as it now is) may change
+/// what [`formula_grades`] gives: the body, the size range, the
+/// variables, a constraint, guide or notch, or a point or an edge of a
+/// group a body formula drives. Other steps (a name, a colour, a seam, a
+/// piece elsewhere) keep the grades as they are: computing them drafts
+/// every size again.
+pub fn regrade_needed(project: &Project, changes: &[Change]) -> bool {
+    if project.grading().is_none() || project.avatar().is_none() {
+        // Nothing for the formulas to grade, unless that just changed.
+        return changes
+            .iter()
+            .any(|c| matches!(c, Change::Avatar { .. } | Change::Grading { .. }));
+    }
+    // The groups' points and edges, found at the first point or edge.
+    let found = || {
+        let mut points = BTreeSet::new();
+        let mut edges = BTreeSet::new();
+        for (_, p, e) in parametric_groups(project) {
+            points.extend(p);
+            edges.extend(e);
+        }
+        (points, edges)
+    };
+    let mut members: Option<(BTreeSet<PointId>, BTreeSet<EdgeId>)> = None;
+    for c in changes {
+        let regrade = match c {
+            Change::Point(c) => members.get_or_insert_with(found).0.contains(&c.id),
+            Change::Edge(c) => members.get_or_insert_with(found).1.contains(&c.id),
+            Change::Avatar { .. }
+            | Change::Grading { .. }
+            | Change::Variables { .. }
+            | Change::Constraint(_)
+            | Change::Guide(_)
+            | Change::Notch(_) => true,
+            Change::Garment(_)
+            | Change::Panel(_)
+            | Change::InternalLine(_)
+            | Change::Seam(_)
+            | Change::Pin(_)
+            | Change::Button(_)
+            | Change::Zipper(_)
+            | Change::Detail(_)
+            | Change::Name { .. }
+            | Change::DisplayUnit { .. }
+            | Change::Photo { .. } => false,
+        };
+        if regrade {
+            return true;
+        }
+    }
+    false
 }
 
 /// Grades computed from the formulas: in each size of the range, every

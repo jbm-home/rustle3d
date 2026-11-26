@@ -60,7 +60,11 @@ pub enum FormulaError {
     NoBody { name: String },
     #[error("`{name}` is computed from itself")]
     Cycle { name: String },
-    #[error("the units do not match: {found} where {expected} is needed")]
+    #[error(
+        "the units do not match: {} where {} is needed",
+        unit_prose(found),
+        unit_prose(expected)
+    )]
     Unit {
         expected: &'static str,
         found: &'static str,
@@ -103,12 +107,25 @@ pub struct Quantity {
     pub power: i32,
 }
 
-/// What a dimension's power is called in messages.
-pub fn unit_name(power: i32) -> &'static str {
+/// A stable code for a dimension's power, as `formula.unit` names
+/// what it expected and what it found (`area_or_number`: what a square
+/// root takes).
+fn unit_code(power: i32) -> &'static str {
     match power {
-        0 => "a plain number",
-        1 => "a length",
-        2 => "an area",
+        0 => "number",
+        1 => "length",
+        2 => "area",
+        _ => "other",
+    }
+}
+
+/// [`unit_code`] in the English fallback message.
+fn unit_prose(code: &str) -> &'static str {
+    match code {
+        "number" => "a plain number",
+        "length" => "a length",
+        "area" => "an area",
+        "area_or_number" => "an area or a plain number",
         _ => "another unit",
     }
 }
@@ -413,8 +430,8 @@ impl<'a> Scope<'a> {
                 Ok(())
             } else {
                 Err(FormulaError::Unit {
-                    expected: unit_name(a.power),
-                    found: unit_name(b.power),
+                    expected: unit_code(a.power),
+                    found: unit_code(b.power),
                 })
             }
         };
@@ -486,8 +503,8 @@ impl<'a> Scope<'a> {
                                 FormulaError::Domain
                             } else {
                                 FormulaError::Unit {
-                                    expected: "an area or a plain number",
-                                    found: unit_name(q.power),
+                                    expected: "area_or_number",
+                                    found: unit_code(q.power),
                                 }
                             });
                         }
@@ -518,8 +535,8 @@ impl<'a> Scope<'a> {
         let q = self.eval(text)?;
         if q.power != power {
             return Err(FormulaError::Unit {
-                expected: unit_name(power),
-                found: unit_name(q.power),
+                expected: unit_code(power),
+                found: unit_code(q.power),
             });
         }
         Ok(q.value)
