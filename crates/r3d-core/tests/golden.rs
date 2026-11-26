@@ -14,8 +14,9 @@ use r3d_core::file::{self, SCHEMA_VERSION};
 use r3d_core::{
     Along, Around, Avatar, AvatarMesh, Body, BodyPoint, Button, Buttonhole, Constraint, Edge,
     EdgeCurve, EdgeEnd, Fabric, FabricDetails, Garment, Grading, Guide, InternalLine, Notch, Panel,
-    PathSegment, PatternSource, Pin, Placement, Point, Print, PrintPlacement, PrintSource, Project,
-    Seam, SeamSide, Size, SourcePiece, Symmetry, TemplateRef, Transaction, UpAxis, Zipper,
+    PathSegment, PatternSource, PhotoCamera, PhotoLight, PhotoSetup, Pin, Placement, Point, Print,
+    PrintPlacement, PrintSource, Project, Seam, SeamSide, Size, SourcePiece, Symmetry, TemplateRef,
+    Transaction, UpAxis, Zipper,
 };
 use r3d_core::{
     Detail, Elastic, Interfacing, InterfacingArea, InterfacingFabric, InterfacingWeight,
@@ -337,6 +338,22 @@ fn sample() -> Project {
         tx.put_constraint(id, c);
     }
     tx.set_variables([("ease".to_owned(), "5 cm".to_owned())].into());
+    // How the photos are taken (v28).
+    tx.set_photo(Some(PhotoSetup {
+        light: PhotoLight::Environment {
+            name: "environments/loft.hdr".into(),
+        },
+        turn_deg: 45.0,
+        brightness: 1.5,
+        camera: PhotoCamera {
+            target_mm: [0.0, 900.0, 0.0],
+            yaw_deg: 30.0,
+            pitch_deg: 5.0,
+            distance_mm: 3200.0,
+            focal_mm: 50.0,
+        },
+        size: Some([1080, 1350]),
+    }));
     let guide = tx.new_guide_id();
     tx.put_guide(
         guide,

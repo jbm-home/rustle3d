@@ -7,9 +7,9 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `cloth_hit`, `corner_at`, `corner_landing`, `dressed_now`, `edge_spot`, `edited`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `forget_missing`, `form_now`, `form_soon`, `frozen_board`, `gpu_solver`, `graphics`, `import_from`, `live_body`, `long`, `marker_spec`, `marks_of`, `moving_avatar`, `new`, `new`, `offset_along`, `parse_track`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `prints_of`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `selected`, `set_busy`, `sim`, `solver`, `stroke_hit`, `to_theme`, `top`, `workspace`
+// These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `check`, `cloth_hit`, `corner_at`, `corner_landing`, `dressed_now`, `edge_spot`, `edited`, `environment`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `field_of_view`, `forget_missing`, `form_now`, `form_soon`, `frozen_board`, `garment_view_size`, `gpu_solver`, `graphics`, `import_from`, `live_body`, `long`, `look`, `marker_spec`, `marks_of`, `moving_avatar`, `new`, `new`, `offset_along`, `parse_track`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `prints_of`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `save_scene`, `selected`, `set_busy`, `sim`, `solver`, `start_scene_photo`, `stroke_hit`, `subject`, `to_theme`, `top`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`
 
 /// The GPU adapter the UI composites on (Windows: its LUID), so the views
 /// render on it and share their textures without a copy. Call it before
@@ -105,8 +105,13 @@ abstract class Engine implements RustOpaqueInterface {
     required bool extend,
   });
 
-  /// Put the photo away: the 3D view shows the live garment again.
+  /// Put the photo away: the 3D view shows the live garment again, or
+  /// in the photo scene the scene's live photo.
   void closePhoto();
+
+  /// Close the photo scene: save it in the project (one step to undo)
+  /// and give the 3D view its own camera back.
+  void closeScene();
 
   /// The point of the cloth under pixel (`x`, `y`) of a 3D view, in
   /// metres (x, y, z), for [`Engine::length_between`]; `None` when no
@@ -271,6 +276,16 @@ abstract class Engine implements RustOpaqueInterface {
   static Engine open({required String path}) =>
       RustLib.instance.api.crateApiEngineEngineOpen(path: path);
 
+  /// Open the photo scene: the 3D view looks through the photo's camera
+  /// (the project's, else its own) and shows the photo as it will be,
+  /// refining again at each change of `settings`, of the camera or of
+  /// the view's size.
+  void openScene({required SceneSettings settings});
+
+  /// The project's photo scene (spec 35), for the scene panel; without
+  /// one, a studio seen through the 3D view's lens.
+  SceneSettings photoScene();
+
   /// How the photo is coming along; `None` when the 3D view shows the
   /// live garment.
   PhotoStatus? photoStatus();
@@ -425,6 +440,9 @@ abstract class Engine implements RustOpaqueInterface {
   /// garment is not loaded yet (see [`Engine::reset_simulation`]).
   Future<SimStatus> setMotion({String? motion});
 
+  /// Change the photo scene's settings.
+  void setScene({required SceneSettings settings});
+
   /// Whether the board shows the other sizes' outlines around each piece
   /// (a view setting, not saved in the project).
   void setShowSizes({required bool show_});
@@ -469,7 +487,8 @@ abstract class Engine implements RustOpaqueInterface {
 
   /// Start a photo of the garment as the 3D view shows it now (camera,
   /// drape), replacing any other; the 3D view shows it while it
-  /// refines. A size of 0 takes the 3D view's size.
+  /// refines. A size of 0 takes the 3D view's size. In the photo scene,
+  /// the scene is saved in the project first.
   PhotoStatus startPhoto({required PhotoRequest request});
 
   /// Stop refining the photo; it keeps the samples taken so far.
@@ -1015,6 +1034,62 @@ class PickedPoint {
           id == other.id &&
           xMm == other.xMm &&
           yMm == other.yMm;
+}
+
+/// The photo scene's settings (spec 35), as its panel shows them.
+class SceneSettings {
+  /// `studio`, `soft`, `dramatic`, or `environment` (lit by
+  /// `environment`).
+  final String light;
+
+  /// A built-in environment's name or a `.hdr` file in the project.
+  final String environment;
+
+  /// Turn of the light (degrees, counter-clockwise seen from above).
+  final double turnDeg;
+
+  /// Factor on the light (0.05–20).
+  final double brightness;
+
+  /// Focal length on a 24 × 36 mm frame (10–300 mm).
+  final double focalMm;
+
+  /// Image size in pixels; 0: the 3D view's.
+  final int width;
+  final int height;
+
+  const SceneSettings({
+    required this.light,
+    required this.environment,
+    required this.turnDeg,
+    required this.brightness,
+    required this.focalMm,
+    required this.width,
+    required this.height,
+  });
+
+  @override
+  int get hashCode =>
+      light.hashCode ^
+      environment.hashCode ^
+      turnDeg.hashCode ^
+      brightness.hashCode ^
+      focalMm.hashCode ^
+      width.hashCode ^
+      height.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SceneSettings &&
+          runtimeType == other.runtimeType &&
+          light == other.light &&
+          environment == other.environment &&
+          turnDeg == other.turnDeg &&
+          brightness == other.brightness &&
+          focalMm == other.focalMm &&
+          width == other.width &&
+          height == other.height;
 }
 
 /// A place on something a seam can run along (the Sew tool): an outline

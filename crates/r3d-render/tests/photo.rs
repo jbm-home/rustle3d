@@ -263,10 +263,12 @@ fn environment_photos_are_deterministic_and_turn_by_whole_turns() {
         samples: 4,
         ..Settings::new(Quality::Quick, Lighting::Studio)
     };
+    let scene = skirt_scene(Fabric::Silk).with_environment(builtin_environment("ferndale"));
     let shoot = |turn_deg| {
-        let mut env = builtin_environment("ferndale");
-        env.turn_deg = turn_deg;
-        let scene = skirt_scene(Fabric::Silk).with_environment(env);
+        let settings = Settings {
+            turn_deg,
+            ..settings
+        };
         photo::render_png(&gpu, &scene, &camera, settings, 96, 72).unwrap()
     };
     let a = shoot(30.0);
@@ -284,6 +286,62 @@ fn environment_photos_are_deterministic_and_turn_by_whole_turns() {
     // A half turn: another picture.
     let (_, _, pc) = pixels(&shoot(210.0));
     assert_ne!(pa, pc);
+}
+
+/// A photo of `scene` refined to the end, as PNG bytes.
+fn finish(gpu: &Gpu, photo: &mut PhotoRenderer) -> Vec<u8> {
+    while !photo.is_done() {
+        photo.sample(gpu, 4);
+    }
+    photo.resolve(gpu);
+    photo.png(gpu).unwrap()
+}
+
+#[test]
+fn aiming_again_gives_the_photo_taken_from_there() {
+    let Some(gpu) = gpu() else { return };
+    let settings = Settings {
+        samples: 4,
+        ..Settings::new(Quality::Quick, Lighting::Studio)
+    };
+    let from = OrbitCamera::facing(0.3);
+    let mut to = OrbitCamera::facing(1.2);
+    to.fov_y = 20f32.to_radians();
+    let turned = Settings {
+        turn_deg: 40.0,
+        brightness: 1.5,
+        ..settings
+    };
+    for scene in [
+        skirt_scene(Fabric::Cotton),
+        skirt_scene(Fabric::Cotton).with_environment(builtin_environment("pav")),
+    ] {
+        let direct = photo::render_png(&gpu, &scene, &to, turned, 96, 72).unwrap();
+        let mut photo = PhotoRenderer::new(&gpu, &scene, &from, settings, 64, 64).unwrap();
+        finish(&gpu, &mut photo);
+        assert!(photo.aim(&to, 40.0, 1.5));
+        photo.resize(&gpu, 96, 72).unwrap();
+        assert_eq!(photo.samples_done(), 0);
+        assert_eq!(finish(&gpu, &mut photo), direct);
+    }
+}
+
+#[test]
+fn the_camera_stays_inside_the_studio() {
+    let Some(gpu) = gpu() else { return };
+    let settings = Settings::new(Quality::Quick, Lighting::Studio);
+    let near = OrbitCamera::default();
+    let far = OrbitCamera {
+        distance: 15.0,
+        ..near
+    };
+    let mut photo =
+        PhotoRenderer::new(&gpu, &skirt_scene(Fabric::Cotton), &near, settings, 32, 32).unwrap();
+    assert!(!photo.aim(&far, 0.0, 1.0));
+    // Under an environment there is no backdrop to leave.
+    let scene = skirt_scene(Fabric::Cotton).with_environment(builtin_environment("pav"));
+    let mut photo = PhotoRenderer::new(&gpu, &scene, &near, settings, 32, 32).unwrap();
+    assert!(photo.aim(&far, 0.0, 1.0));
 }
 
 #[test]

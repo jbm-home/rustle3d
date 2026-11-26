@@ -18,6 +18,7 @@ use crate::model::{
     Avatar, Constraint, DisplayUnit, Edge, Garment, Grading, Guide, IdMap, InternalLine, Notch,
     Panel, Pin, Point, Project, Seam,
 };
+use crate::photo::PhotoSetup;
 use crate::trim::{Button, Zipper};
 
 /// Before/after values of one entity. `None` means "absent".
@@ -64,6 +65,10 @@ pub enum Change {
     Variables {
         before: BTreeMap<String, String>,
         after: BTreeMap<String, String>,
+    },
+    Photo {
+        before: Option<Box<PhotoSetup>>,
+        after: Option<Box<PhotoSetup>>,
     },
 }
 
@@ -114,6 +119,9 @@ impl Change {
             Change::Variables { before, after } => {
                 p.variables = if forward { after } else { before }.clone();
             }
+            Change::Photo { before, after } => {
+                p.photo = if forward { after } else { before }.as_deref().cloned();
+            }
         }
     }
 
@@ -147,6 +155,7 @@ impl Change {
             (Change::Variables { after, .. }, Change::Variables { after: b, .. }) => {
                 *after = b.clone()
             }
+            (Change::Photo { after, .. }, Change::Photo { after: b, .. }) => *after = b.clone(),
             _ => return false,
         }
         true
@@ -237,7 +246,8 @@ impl ChangeSet {
                 | Change::Name { .. }
                 | Change::DisplayUnit { .. }
                 | Change::Grading { .. }
-                | Change::Variables { .. } => {}
+                | Change::Variables { .. }
+                | Change::Photo { .. } => {}
             }
         }
         out
@@ -484,6 +494,14 @@ impl<'a> Transaction<'a> {
         self.changes.push(Change::Variables {
             before,
             after: variables,
+        });
+    }
+
+    pub fn set_photo(&mut self, photo: Option<PhotoSetup>) {
+        let before = mem::replace(&mut self.project.photo, photo.clone());
+        self.changes.push(Change::Photo {
+            before: before.map(Box::new),
+            after: photo.map(Box::new),
         });
     }
 

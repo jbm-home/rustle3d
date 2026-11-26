@@ -24,7 +24,7 @@ use crate::cloth::{
     PICK_PX, RESYNC_EVERY, SEAM_END, SNAP_PX, STROKE_STEP_MM, Sync, Tool, ray_triangle,
 };
 use crate::forms::{FormKey, Forms};
-use crate::photo::{PhotoJob, Subject};
+use crate::photo::{Look, OpenScene, PhotoJob, SCENE_SAMPLES, Subject};
 use crate::sim::SimThread;
 use r3d_core::seam::Track;
 use r3d_core::{
@@ -459,6 +459,70 @@ pub struct PhotoRequest {
     pub brightness: f64,
 }
 
+/// The photo scene's settings (spec 35), as its panel shows them.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SceneSettings {
+    /// `studio`, `soft`, `dramatic`, or `environment` (lit by
+    /// `environment`).
+    pub light: String,
+    /// A built-in environment's name or a `.hdr` file in the project.
+    pub environment: String,
+    /// Turn of the light (degrees, counter-clockwise seen from above).
+    pub turn_deg: f64,
+    /// Factor on the light (0.05–20).
+    pub brightness: f64,
+    /// Focal length on a 24 × 36 mm frame (10–300 mm).
+    pub focal_mm: f64,
+    /// Image size in pixels; 0: the 3D view's.
+    pub width: u32,
+    pub height: u32,
+}
+
+impl SceneSettings {
+    fn check(&self) -> Result<(), ApiError> {
+        let invalid = |name: &'static str, lo: f64, hi: f64| {
+            let range = r3d_commands::error::Invalid::Range(lo, hi);
+            ApiError::from(r3d_commands::CommandError::invalid(name, range).message())
+        };
+        let (b, f) = (r3d_core::photo::BRIGHTNESS, r3d_core::photo::FOCAL_MM);
+        if !self.brightness.is_finite() || !b.contains(&self.brightness) {
+            return Err(invalid("brightness", *b.start(), *b.end()));
+        }
+        if !self.focal_mm.is_finite() || !f.contains(&self.focal_mm) {
+            return Err(invalid("focal_mm", *f.start(), *f.end()));
+        }
+        if !self.turn_deg.is_finite() {
+            return Err(invalid("turn_deg", -180.0, 180.0));
+        }
+        Ok(())
+    }
+
+    /// The field of view of [`Self::focal_mm`] along the shorter side.
+    fn field_of_view(&self) -> f32 {
+        r3d_core::PhotoCamera {
+            target_mm: [0.0; 3],
+            yaw_deg: 0.0,
+            pitch_deg: 0.0,
+            distance_mm: 1000.0,
+            focal_mm: self.focal_mm,
+        }
+        .field_of_view() as f32
+    }
+
+    /// The live photo's look through `camera` in a view of `view` pixels.
+    fn look(&self, camera: OrbitCamera, view: (u32, u32)) -> Look {
+        let format = (self.width > 0 && self.height > 0).then_some((self.width, self.height));
+        let (width, height) = crate::photo::fitted(view, format);
+        Look {
+            camera,
+            turn_deg: self.turn_deg as f32,
+            brightness: self.brightness as f32,
+            width,
+            height,
+        }
+    }
+}
+
 /// How far a photo has come.
 #[derive(Debug, Clone)]
 pub struct PhotoStatus {
@@ -555,6 +619,8 @@ pub struct Engine {
     stroke: Mutex<Option<(PanelId, Vec<r3d_geom::DVec2>)>>,
     /// The photo shown in the 3D view instead of the live garment.
     photo: Mutex<Option<PhotoJob>>,
+    /// The photo scene, while open.
+    scene: Mutex<Option<OpenScene>>,
     /// The fit map the 3D view colours the cloth by, if any.
     fit_map: Mutex<Option<FitMap>>,
     /// The last tape measure taken on the drape (a loop or the way
@@ -691,6 +757,7 @@ impl Engine {
             held: Mutex::new(None),
             stroke: Mutex::new(None),
             photo: Mutex::new(None),
+            scene: Mutex::new(None),
             fit_map: Mutex::new(None),
             tape: Mutex::new(None),
             prints: Mutex::new(Prints::default()),
@@ -2008,6 +2075,13 @@ impl Engine {
             }
             ViewKind::Garment => {
                 let photo = self.photo.lock().map_err(|_| poisoned())?;
+                if let Some(job) = photo.as_ref().filter(|j| j.is_live()) {
+                    // The scene's photo follows the camera and the view.
+                    let scene = self.scene.lock().map_err(|_| poisoned())?;
+                    if let Some(open) = scene.as_ref() {
+                        job.aim(open.settings.look(g.camera, (v.width, v.height)));
+                    }
+                }
                 if let Some(image) = photo.as_ref().and_then(PhotoJob::image) {
                     let blit = g.blit.get_or_insert_with(|| {
                         ImageBlit::new(&g.gpu, wgpu::TextureFormat::Bgra8Unorm)
@@ -2512,79 +2586,15 @@ impl Engine {
         Ok(())
     }
 
-    /// Start a photo of the garment as the 3D view shows it now (camera,
-    /// drape), replacing any other; the 3D view shows it while it
-    /// refines. A size of 0 takes the 3D view's size.
-    #[frb(sync)]
-    pub fn start_photo(&self, request: PhotoRequest) -> Result<PhotoStatus, ApiError> {
-        let malformed = |name: &str, detail: &str| {
-            ApiError::from(
-                Message::new("malformed", format!("malformed `{name}`: {detail}"))
-                    .arg("name", name)
-                    .arg("detail", detail),
-            )
-        };
-        let quality = Quality::from_name(&request.quality)
-            .ok_or_else(|| malformed("quality", "expected quick, good or best"))?;
-        let lighting = Lighting::from_name(&request.lighting)
-            .ok_or_else(|| malformed("lighting", "expected studio, soft or dramatic"))?;
-        let mut settings = Settings::new(quality, lighting);
-        if let Some(n) = request.samples {
-            settings.samples = n.clamp(1, r3d_render::photo::MAX_SAMPLES);
-        }
-        if let Some(n) = request.bounces {
-            settings.bounces = n.min(r3d_render::photo::MAX_BOUNCES);
-        }
-        settings.denoise = request.denoise;
-        // The previous photo goes first (its thread lets go of the GPU).
-        self.photo.lock().map_err(|_| poisoned())?.take();
-
-        let ws = self.workspace()?;
+    /// What a photo shows now: the drape as the 3D view shows it, through
+    /// the 3D view's camera, lit by `environment` if given.
+    fn subject(
+        &self,
+        g: &mut Graphics,
+        ws: &Workspace,
+        environment: Option<r3d_render::photo::Environment>,
+    ) -> Result<Subject, ApiError> {
         let project = ws.session().project();
-        let environment = match &request.environment {
-            None => None,
-            Some(name) => {
-                let choice = r3d_mcp::render::EnvironmentChoice {
-                    name: name.clone(),
-                    turn_deg: request.turn_deg as f32,
-                    brightness: request.brightness as f32,
-                };
-                Some(
-                    r3d_mcp::render::environment(&ws, &choice)
-                        .map_err(|e| ApiError::from(e.message()))?,
-                )
-            }
-        };
-        let mut slot = self.graphics()?;
-        let g = slot
-            .as_mut()
-            .ok_or_else(|| ApiError::new("no_view", "no view attached"))?;
-        let (vw, vh) = g
-            .views
-            .values()
-            .filter(|v| v.kind == ViewKind::Garment)
-            .map(|v| (v.width, v.height))
-            .max_by_key(|(w, h)| u64::from(*w) * u64::from(*h))
-            .ok_or_else(|| ApiError::new("no_view", "no 3D view attached"))?;
-        let (width, height) = if request.width == 0 || request.height == 0 {
-            (vw, vh)
-        } else {
-            (request.width, request.height)
-        };
-        let pixels = u64::from(width) * u64::from(height);
-        if width > r3d_render::photo::MAX_SIDE
-            || height > r3d_render::photo::MAX_SIDE
-            || pixels > r3d_render::photo::MAX_PIXELS
-        {
-            return Err(ApiError::from(
-                Message::new(
-                    "photo_too_large",
-                    format!("a photo of {width} × {height} pixels is too large"),
-                )
-                .arg("width", width)
-                .arg("height", height),
-            ));
-        }
         self.refresh_avatar(g, project)?;
         let prints = self.prints_of(project, ws.dir())?;
         let published = self
@@ -2614,7 +2624,7 @@ impl Engine {
             Some(moving) => Some(moving),
             None => g.avatar.as_ref().map(|(_, m)| m.clone()),
         };
-        let subject = Subject {
+        Ok(Subject {
             trims: trims
                 .into_iter()
                 .map(|(mesh, material)| (mesh, r3d_render::photo::Surface::plain(material.base)))
@@ -2629,12 +2639,273 @@ impl Engine {
             body,
             camera: g.camera,
             environment,
+        })
+    }
+
+    /// The environment called `name` (a built-in one or a `.hdr` file in
+    /// the project).
+    fn environment(ws: &Workspace, name: &str) -> Result<r3d_render::photo::Environment, ApiError> {
+        r3d_mcp::render::environment(ws, name).map_err(|e| ApiError::from(e.message()))
+    }
+
+    /// Start a photo of the garment as the 3D view shows it now (camera,
+    /// drape), replacing any other; the 3D view shows it while it
+    /// refines. A size of 0 takes the 3D view's size. In the photo scene,
+    /// the scene is saved in the project first.
+    #[frb(sync)]
+    pub fn start_photo(&self, request: PhotoRequest) -> Result<PhotoStatus, ApiError> {
+        let malformed = |name: &str, detail: &str| {
+            ApiError::from(
+                Message::new("malformed", format!("malformed `{name}`: {detail}"))
+                    .arg("name", name)
+                    .arg("detail", detail),
+            )
         };
+        let quality = Quality::from_name(&request.quality)
+            .ok_or_else(|| malformed("quality", "expected quick, good or best"))?;
+        let lighting = Lighting::from_name(&request.lighting)
+            .ok_or_else(|| malformed("lighting", "expected studio, soft or dramatic"))?;
+        let mut settings = Settings::new(quality, lighting);
+        if let Some(n) = request.samples {
+            settings.samples = n.clamp(1, r3d_render::photo::MAX_SAMPLES);
+        }
+        if let Some(n) = request.bounces {
+            settings.bounces = n.min(r3d_render::photo::MAX_BOUNCES);
+        }
+        settings.denoise = request.denoise;
+        settings.turn_deg = request.turn_deg as f32;
+        settings.brightness = request.brightness as f32;
+        self.save_scene()?;
+        // The previous photo goes first (its thread lets go of the GPU).
+        self.photo.lock().map_err(|_| poisoned())?.take();
+
+        let ws = self.workspace()?;
+        let environment = request
+            .environment
+            .as_deref()
+            .map(|name| Self::environment(&ws, name))
+            .transpose()?;
+        let mut slot = self.graphics()?;
+        let g = slot
+            .as_mut()
+            .ok_or_else(|| ApiError::new("no_view", "no view attached"))?;
+        let (vw, vh) = garment_view_size(g)?;
+        let (width, height) = if request.width == 0 || request.height == 0 {
+            (vw, vh)
+        } else {
+            (request.width, request.height)
+        };
+        let pixels = u64::from(width) * u64::from(height);
+        if width > r3d_render::photo::MAX_SIDE
+            || height > r3d_render::photo::MAX_SIDE
+            || pixels > r3d_render::photo::MAX_PIXELS
+        {
+            return Err(ApiError::from(
+                Message::new(
+                    "photo_too_large",
+                    format!("a photo of {width} × {height} pixels is too large"),
+                )
+                .arg("width", width)
+                .arg("height", height),
+            ));
+        }
+        let subject = self.subject(g, &ws, environment)?;
         let job = PhotoJob::start(g.gpu.clone(), subject, settings, width, height)
             .map_err(|e| ApiError::new("internal", e.to_string()))?;
         let status = PhotoStatus::from(job.progress());
         *self.photo.lock().map_err(|_| poisoned())? = Some(job);
         Ok(status)
+    }
+
+    /// The project's photo scene (spec 35), for the scene panel; without
+    /// one, a studio seen through the 3D view's lens.
+    #[frb(sync)]
+    pub fn photo_scene(&self) -> Result<SceneSettings, ApiError> {
+        let ws = self.workspace()?;
+        if let Some(s) = ws.session().project().photo() {
+            let (light, environment) = match &s.light {
+                r3d_core::PhotoLight::Studio => ("studio", String::new()),
+                r3d_core::PhotoLight::Soft => ("soft", String::new()),
+                r3d_core::PhotoLight::Dramatic => ("dramatic", String::new()),
+                r3d_core::PhotoLight::Environment { name } => ("environment", name.clone()),
+            };
+            let [width, height] = s.size.unwrap_or([0, 0]);
+            return Ok(SceneSettings {
+                light: light.into(),
+                environment,
+                turn_deg: s.turn_deg,
+                brightness: s.brightness,
+                focal_mm: s.camera.focal_mm,
+                width,
+                height,
+            });
+        }
+        drop(ws);
+        let focal_mm = self
+            .graphics()?
+            .as_ref()
+            .map_or(OrbitCamera::default(), |g| g.camera)
+            .to_photo()
+            .focal_mm;
+        Ok(SceneSettings {
+            light: "studio".into(),
+            environment: String::new(),
+            turn_deg: 0.0,
+            brightness: 1.0,
+            focal_mm: focal_mm.round(),
+            width: 0,
+            height: 0,
+        })
+    }
+
+    /// Open the photo scene: the 3D view looks through the photo's camera
+    /// (the project's, else its own) and shows the photo as it will be,
+    /// refining again at each change of `settings`, of the camera or of
+    /// the view's size.
+    #[frb(sync)]
+    pub fn open_scene(&self, settings: SceneSettings) -> Result<(), ApiError> {
+        settings.check()?;
+        let saved = self
+            .workspace()?
+            .session()
+            .project()
+            .photo()
+            .map(|s| s.camera);
+        {
+            let mut slot = self.graphics()?;
+            let g = slot
+                .as_mut()
+                .ok_or_else(|| ApiError::new("no_view", "no view attached"))?;
+            let before = g.camera;
+            if let Some(camera) = saved {
+                g.camera = OrbitCamera::from_photo(&camera);
+            }
+            g.camera.fov_y = settings.field_of_view();
+            *self.scene.lock().map_err(|_| poisoned())? = Some(OpenScene { settings, before });
+        }
+        self.start_scene_photo()
+    }
+
+    /// Change the photo scene's settings.
+    #[frb(sync)]
+    pub fn set_scene(&self, settings: SceneSettings) -> Result<(), ApiError> {
+        settings.check()?;
+        let relit = {
+            let mut scene = self.scene.lock().map_err(|_| poisoned())?;
+            let Some(open) = scene.as_mut() else {
+                return Err(ApiError::new("no_scene", "the photo scene is not open"));
+            };
+            let relit = open.settings.light != settings.light
+                || open.settings.environment != settings.environment;
+            open.settings = settings.clone();
+            relit
+        };
+        if let Some(g) = self.graphics()?.as_mut() {
+            g.camera.fov_y = settings.field_of_view();
+        }
+        // A new light makes a new scene; the rest follows the view.
+        let live = self
+            .photo
+            .lock()
+            .map_err(|_| poisoned())?
+            .as_ref()
+            .is_some_and(PhotoJob::is_live);
+        if relit && live {
+            self.start_scene_photo()?;
+        }
+        Ok(())
+    }
+
+    /// Close the photo scene: save it in the project (one step to undo)
+    /// and give the 3D view its own camera back.
+    #[frb(sync)]
+    pub fn close_scene(&self) -> Result<(), ApiError> {
+        let saved = self.save_scene();
+        let open = self.scene.lock().map_err(|_| poisoned())?.take();
+        {
+            let mut photo = self.photo.lock().map_err(|_| poisoned())?;
+            if photo.as_ref().is_some_and(PhotoJob::is_live) {
+                photo.take();
+            }
+        }
+        if let (Some(open), Some(g)) = (open, self.graphics()?.as_mut()) {
+            g.camera = open.before;
+        }
+        saved
+    }
+
+    /// Save the open photo scene in the project when it changed.
+    fn save_scene(&self) -> Result<(), ApiError> {
+        let Some(settings) = self
+            .scene
+            .lock()
+            .map_err(|_| poisoned())?
+            .as_ref()
+            .map(|s| s.settings.clone())
+        else {
+            return Ok(());
+        };
+        let camera = self
+            .graphics()?
+            .as_ref()
+            .map_or(OrbitCamera::default(), |g| g.camera);
+        let light = match settings.light.as_str() {
+            "soft" => r3d_core::PhotoLight::Soft,
+            "dramatic" => r3d_core::PhotoLight::Dramatic,
+            "environment" => r3d_core::PhotoLight::Environment {
+                name: settings.environment.clone(),
+            },
+            _ => r3d_core::PhotoLight::Studio,
+        };
+        let setup = r3d_core::PhotoSetup {
+            light,
+            turn_deg: settings.turn_deg,
+            brightness: settings.brightness,
+            camera: r3d_core::PhotoCamera {
+                focal_mm: settings.focal_mm,
+                ..camera.to_photo()
+            },
+            size: (settings.width > 0 && settings.height > 0)
+                .then_some([settings.width, settings.height]),
+        };
+        if self.workspace()?.session().project().photo() == Some(&setup) {
+            return Ok(());
+        }
+        let step = serde_json::json!({ "type": "photo.set_scene", "scene": setup });
+        self.run(step.to_string()).map(drop)
+    }
+
+    /// Start the photo scene's live photo, replacing any other photo.
+    fn start_scene_photo(&self) -> Result<(), ApiError> {
+        let Some(settings) = self
+            .scene
+            .lock()
+            .map_err(|_| poisoned())?
+            .as_ref()
+            .map(|s| s.settings.clone())
+        else {
+            return Ok(());
+        };
+        self.photo.lock().map_err(|_| poisoned())?.take();
+        let ws = self.workspace()?;
+        let environment = (settings.light == "environment")
+            .then(|| Self::environment(&ws, &settings.environment))
+            .transpose()?;
+        let lighting = Lighting::from_name(&settings.light).unwrap_or_default();
+        let mut slot = self.graphics()?;
+        let g = slot
+            .as_mut()
+            .ok_or_else(|| ApiError::new("no_view", "no view attached"))?;
+        let look = settings.look(g.camera, garment_view_size(g)?);
+        let subject = self.subject(g, &ws, environment)?;
+        let preview = Settings {
+            samples: SCENE_SAMPLES,
+            ..Settings::new(Quality::Good, lighting)
+        };
+        let job = PhotoJob::live(g.gpu.clone(), subject, preview, look)
+            .map_err(|e| ApiError::new("internal", e.to_string()))?;
+        *self.photo.lock().map_err(|_| poisoned())? = Some(job);
+        Ok(())
     }
 
     /// How the photo is coming along; `None` when the 3D view shows the
@@ -2654,11 +2925,12 @@ impl Engine {
         Ok(())
     }
 
-    /// Put the photo away: the 3D view shows the live garment again.
+    /// Put the photo away: the 3D view shows the live garment again, or
+    /// in the photo scene the scene's live photo.
     #[frb(sync)]
     pub fn close_photo(&self) -> Result<(), ApiError> {
         self.photo.lock().map_err(|_| poisoned())?.take();
-        Ok(())
+        self.start_scene_photo()
     }
 
     /// Save the photo as it is now as a PNG file at `path` (anywhere the
@@ -3994,6 +4266,16 @@ impl Engine {
 }
 
 /// How tall a standing body's mesh is (m, feet at y = 0).
+/// The size of the largest 3D view.
+fn garment_view_size(g: &Graphics) -> Result<(u32, u32), ApiError> {
+    g.views
+        .values()
+        .filter(|v| v.kind == ViewKind::Garment)
+        .map(|v| (v.width, v.height))
+        .max_by_key(|(w, h)| u64::from(*w) * u64::from(*h))
+        .ok_or_else(|| ApiError::new("no_view", "no 3D view attached"))
+}
+
 fn top(mesh: &Mesh) -> f32 {
     mesh.positions.iter().map(|p| p.y).fold(0.0, f32::max)
 }

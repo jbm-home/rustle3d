@@ -77,32 +77,34 @@ impl CameraAngle {
     }
 }
 
-/// The environment that lights a photo instead of the studio (spec 35).
-#[derive(Clone, Debug, PartialEq)]
-pub struct EnvironmentChoice {
-    /// A built-in name or a `.hdr` file in the project folder.
-    pub name: String,
-    /// Degrees, counter-clockwise seen from above.
-    pub turn_deg: f32,
-    pub brightness: f32,
+/// Where a photo's camera stands.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum PhotoCamera {
+    /// From one side, framing the garment (`close_up`) or the whole body.
+    Angle { angle: CameraAngle, close_up: bool },
+    /// Where the project's photo scene put it.
+    Scene(OrbitCamera),
 }
 
 /// How to take a photo.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PhotoOptions {
+    /// Samples, bounces, the studio, the light's turn and brightness.
     pub settings: Settings,
-    pub angle: CameraAngle,
-    /// Frame the garment (true) or the whole body.
-    pub close_up: bool,
-    pub environment: Option<EnvironmentChoice>,
+    pub camera: PhotoCamera,
+    /// The environment that lights the photo instead of the studio (spec
+    /// 35): a built-in name or a `.hdr` file in the project folder.
+    pub environment: Option<String>,
 }
 
 impl Default for PhotoOptions {
     fn default() -> Self {
         Self {
             settings: Settings::new(Quality::Good, Lighting::Studio),
-            angle: CameraAngle::default(),
-            close_up: true,
+            camera: PhotoCamera::Angle {
+                angle: CameraAngle::default(),
+                close_up: true,
+            },
             environment: None,
         }
     }
@@ -110,10 +112,15 @@ impl Default for PhotoOptions {
 
 impl PhotoOptions {
     /// Options from a tool's arguments: `quality`, `lighting`, `camera`,
-    /// `frame`, `environment` with `turn_deg` and `brightness`, and the
-    /// advanced `samples`, `bounces`, `denoise`.
+    /// `frame`, `environment`, `turn_deg` and `brightness`, and the
+    /// advanced `samples`, `bounces`, `denoise`. What they leave out comes
+    /// from the project's photo `scene` when it has one (spec 35): its
+    /// light, turn, brightness and camera.
     /// Unknown keys are left to the caller.
-    pub fn from_args(args: &serde_json::Map<String, Value>) -> Result<Self, CommandError> {
+    pub fn from_args(
+        args: &serde_json::Map<String, Value>,
+        scene: Option<&r3d_core::PhotoSetup>,
+    ) -> Result<Self, CommandError> {
         let malformed = |name: &str, detail: String| CommandError::Malformed {
             name: name.into(),
             detail,
@@ -136,19 +143,37 @@ impl PhotoOptions {
                 .ok_or_else(|| choice("quality", &Quality::ALL.map(Quality::name)))?,
         };
         let lighting = match text("lighting")? {
-            None => Lighting::Studio,
-            Some(l) => Lighting::from_name(l)
-                .ok_or_else(|| choice("lighting", &Lighting::ALL.map(Lighting::name)))?,
+            None => None,
+            Some(l) => Some(
+                Lighting::from_name(l)
+                    .ok_or_else(|| choice("lighting", &Lighting::ALL.map(Lighting::name)))?,
+            ),
         };
         let angle = match text("camera")? {
-            None => CameraAngle::default(),
-            Some(a) => CameraAngle::from_name(a)
-                .ok_or_else(|| choice("camera", &CameraAngle::ALL.map(CameraAngle::name)))?,
+            None => None,
+            Some(a) => Some(
+                CameraAngle::from_name(a)
+                    .ok_or_else(|| choice("camera", &CameraAngle::ALL.map(CameraAngle::name)))?,
+            ),
         };
         let close_up = match text("frame")? {
-            None | Some("garment") => true,
-            Some("body") => false,
+            None => None,
+            Some("garment") => Some(true),
+            Some("body") => Some(false),
             Some(_) => return Err(choice("frame", &["garment", "body"])),
+        };
+        // The scene's light, unless the arguments name one.
+        let (lighting, environment) = match (text("environment")?, lighting) {
+            (Some(name), _) => (Lighting::Studio, Some(name.to_owned())),
+            (None, Some(l)) => (l, None),
+            (None, None) => match scene.map(|s| &s.light) {
+                Some(r3d_core::PhotoLight::Soft) => (Lighting::Soft, None),
+                Some(r3d_core::PhotoLight::Dramatic) => (Lighting::Dramatic, None),
+                Some(r3d_core::PhotoLight::Environment { name }) => {
+                    (Lighting::Studio, Some(name.clone()))
+                }
+                Some(r3d_core::PhotoLight::Studio) | None => (Lighting::Studio, None),
+            },
         };
         let mut settings = Settings::new(quality, lighting);
         let count = |key: &str, max: u32| -> Result<Option<u32>, CommandError> {
@@ -191,18 +216,26 @@ impl PhotoOptions {
                         )
                     }),
             };
-        let environment = match text("environment")? {
-            None => None,
-            Some(name) => Some(EnvironmentChoice {
-                name: name.to_owned(),
-                turn_deg: number("turn_deg", -360_000.0..=360_000.0, 0.0)?,
-                brightness: number("brightness", photo::BRIGHTNESS, 1.0)?,
-            }),
+        settings.turn_deg = number(
+            "turn_deg",
+            -360_000.0..=360_000.0,
+            scene.map_or(0.0, |s| s.turn_deg as f32),
+        )?;
+        settings.brightness = number(
+            "brightness",
+            photo::BRIGHTNESS,
+            scene.map_or(1.0, |s| s.brightness as f32),
+        )?;
+        let camera = match (angle, close_up, scene) {
+            (None, None, Some(s)) => PhotoCamera::Scene(OrbitCamera::from_photo(&s.camera)),
+            _ => PhotoCamera::Angle {
+                angle: angle.unwrap_or_default(),
+                close_up: close_up.unwrap_or(true),
+            },
         };
         Ok(Self {
             settings,
-            angle,
-            close_up,
+            camera,
             environment,
         })
     }
@@ -222,28 +255,39 @@ impl PhotoOptions {
     ];
 }
 
-/// The environment `choice` names, from the built-in set or the
-/// project folder, turned and scaled as it says.
-pub fn environment(
-    ws: &Workspace,
-    choice: &EnvironmentChoice,
-) -> Result<photo::Environment, RenderError> {
-    let hdr = ws.environment(&choice.name)?;
-    let mut env = photo::Environment::new(hdr.width, hdr.height, |i| {
+/// The size of a photo: the one asked for, else the project's photo
+/// scene's, else `default`.
+pub fn photo_size(ws: &Workspace, asked: Option<(u32, u32)>, default: (u32, u32)) -> (u32, u32) {
+    asked
+        .or_else(|| {
+            ws.session()
+                .project()
+                .photo()
+                .and_then(|s| s.size)
+                .map(|[w, h]| (w, h))
+        })
+        .unwrap_or(default)
+}
+
+/// The environment called `name`, from the built-in set or the project
+/// folder.
+pub fn environment(ws: &Workspace, name: &str) -> Result<photo::Environment, RenderError> {
+    let hdr = ws.environment(name)?;
+    photo::Environment::new(hdr.width, hdr.height, |i| {
         hdr.rgbe
             .get(i)
             .map_or([0.0; 3], |t| r3d_commands::environments::texel_rgb(*t))
     })
-    .ok_or_else(|| CommandError::Malformed {
-        name: "environment".into(),
-        detail: "an empty picture".into(),
-    })?;
-    env.turn_deg = choice.turn_deg;
-    env.brightness = choice.brightness;
-    Ok(env)
+    .ok_or_else(|| {
+        CommandError::Malformed {
+            name: "environment".into(),
+            detail: "an empty picture".into(),
+        }
+        .into()
+    })
 }
 
-/// Width of style lines drawn on the garment, and their lift off the
+// Width of style lines drawn on the garment, and their lift off the
 /// cloth (m), as in the app.
 const LINE_WIDTH_M: f32 = 0.003;
 const LINE_LIFT_M: f32 = 0.0015;
@@ -585,8 +629,10 @@ pub fn techpack_views(
             .map(|(angle, caption)| {
                 let options = PhotoOptions {
                     settings: Settings::new(Quality::Quick, Lighting::Studio),
-                    angle: *angle,
-                    close_up: true,
+                    camera: PhotoCamera::Angle {
+                        angle: *angle,
+                        close_up: true,
+                    },
                     environment: None,
                 };
                 Ok((render(gpu, ws, View::Photo(options), w, h)?.0, *caption))
@@ -673,13 +719,18 @@ pub fn render(
                 .map(|(mesh, material)| (mesh, Surface::plain(material.base)))
                 .collect();
             let mut scene = PhotoScene::new(&cloth, &extras, dressed.avatar.as_ref());
-            if let Some(choice) = &options.environment {
-                scene = scene.with_environment(environment(ws, choice)?);
+            if let Some(name) = &options.environment {
+                scene = scene.with_environment(environment(ws, name)?);
             }
-            let camera = if options.close_up {
-                garment_camera(&dressed, options.angle)
-            } else {
-                OrbitCamera::facing(options.angle.yaw()).for_height(dressed.body_height())
+            let camera = match options.camera {
+                PhotoCamera::Angle {
+                    angle,
+                    close_up: true,
+                } => garment_camera(&dressed, angle),
+                PhotoCamera::Angle { angle, .. } => {
+                    OrbitCamera::facing(angle.yaw()).for_height(dressed.body_height())
+                }
+                PhotoCamera::Scene(camera) => camera,
             };
             let png = photo::render_png(gpu, &scene, &camera, options.settings, width, height)
                 .map_err(|e| match e {
@@ -705,13 +756,16 @@ pub fn render(
                 "seconds": (start.elapsed().as_secs_f64() * 10.0).round() / 10.0,
             });
             match &options.environment {
-                Some(e) => {
-                    facts["environment"] = json!(e.name);
-                    facts["turn_deg"] = json!(e.turn_deg);
-                    facts["brightness"] = json!(e.brightness);
-                }
+                Some(name) => facts["environment"] = json!(name),
                 None => facts["lighting"] = json!(s.lighting.name()),
             }
+            facts["size"] = json!([width, height]);
+            facts["turn_deg"] = json!(s.turn_deg);
+            facts["brightness"] = json!(s.brightness);
+            facts["camera"] = json!(match options.camera {
+                PhotoCamera::Angle { angle, .. } => angle.name(),
+                PhotoCamera::Scene(_) => "scene",
+            });
             Ok((png, facts))
         }
     }

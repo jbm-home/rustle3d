@@ -51,7 +51,10 @@ use crate::offscreen;
 use crate::print::Printed;
 use r3d_core::Fabric;
 
-pub use environment::{BRIGHTNESS, Environment};
+pub use environment::Environment;
+
+/// The brightness factor's range (as `r3d_core::photo::BRIGHTNESS`).
+pub const BRIGHTNESS: std::ops::RangeInclusive<f32> = 0.05..=20.0;
 
 /// How long to refine: samples per pixel and light bounces.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -143,6 +146,11 @@ pub struct Settings {
     pub bounces: u32,
     pub lighting: Lighting,
     pub denoise: bool,
+    /// Turn of the light around the subject (degrees, counter-clockwise
+    /// seen from above): the studio's soft boxes or the environment.
+    pub turn_deg: f32,
+    /// Factor on the light (see [`BRIGHTNESS`]).
+    pub brightness: f32,
 }
 
 impl Settings {
@@ -152,6 +160,8 @@ impl Settings {
             bounces: quality.bounces(),
             lighting,
             denoise: true,
+            turn_deg: 0.0,
+            brightness: 1.0,
         }
     }
 }
@@ -477,24 +487,152 @@ const GROUP: u32 = 8;
 /// The format of the finished image.
 pub const PHOTO_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 
+/// How the light stands around the subject: what aiming the camera again
+/// needs.
+#[derive(Clone, Copy, Debug)]
+struct Stage {
+    centre: Vec3,
+    /// The floor's height under an environment.
+    floor_y: f32,
+    /// The studio backdrop's radius and height, which the camera must
+    /// stay inside; `None` under an environment.
+    backdrop: Option<(f32, f32)>,
+    /// The environment's exposure and its floor's unoccluded luminance
+    /// (unscaled).
+    environment: Option<(f32, f32)>,
+}
+
+/// Closest the camera may come to the backdrop (m).
+const BACKDROP_MARGIN: f32 = 0.5;
+
+/// Pipelines, layouts and the scene's buffers: what stays when the
+/// image's size changes.
+struct Bindings {
+    params_buffer: wgpu::Buffer,
+    filter_buffer: wgpu::Buffer,
+    nodes: wgpu::Buffer,
+    tris: wgpu::Buffer,
+    surfaces: wgpu::Buffer,
+    lut: wgpu::Buffer,
+    trace: wgpu::ComputePipeline,
+    trace_layout: wgpu::BindGroupLayout,
+    prepare: wgpu::ComputePipeline,
+    atrous: wgpu::ComputePipeline,
+    filter_layout: wgpu::BindGroupLayout,
+    present: wgpu::RenderPipeline,
+    present_layout: wgpu::BindGroupLayout,
+}
+
+/// The per-pixel buffers' bind groups and the finished image.
+struct Pixels {
+    trace_group: wgpu::BindGroup,
+    /// Bind groups reading the ping buffer then the pong buffer.
+    filter_groups: [wgpu::BindGroup; 2],
+    present_groups: [wgpu::BindGroup; 2],
+    image: wgpu::Texture,
+}
+
+impl Pixels {
+    fn new(gpu: &Gpu, b: &Bindings, width: u32, height: u32) -> Self {
+        let device = &gpu.device;
+        let pixels = u64::from(width) * u64::from(height);
+        let make = |label| {
+            device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some(label),
+                // One vec4<f32> per pixel.
+                size: pixels * 16,
+                usage: wgpu::BufferUsages::STORAGE,
+                mapped_at_creation: false,
+            })
+        };
+        // Sums over the samples: colour and luminance²; albedo and depth
+        // at the first hit; its normal and whether something was hit.
+        let color = make("photo colour");
+        let albedo = make("photo albedo");
+        let normal = make("photo normal");
+        let ping = make("filter ping");
+        let pong = make("filter pong");
+        let trace_group = group(
+            gpu,
+            &b.trace_layout,
+            &[
+                b.params_buffer.as_entire_binding(),
+                b.nodes.as_entire_binding(),
+                b.tris.as_entire_binding(),
+                b.surfaces.as_entire_binding(),
+                b.lut.as_entire_binding(),
+                color.as_entire_binding(),
+                albedo.as_entire_binding(),
+                normal.as_entire_binding(),
+            ],
+        );
+        let filter_size = std::mem::size_of::<FilterParams>();
+        // (src, dst): the prepare pass writes ping; passes alternate.
+        let filter_groups = [(&ping, &pong), (&pong, &ping)].map(|(src, dst)| {
+            group(
+                gpu,
+                &b.filter_layout,
+                &[
+                    slot(&b.filter_buffer, filter_size),
+                    color.as_entire_binding(),
+                    albedo.as_entire_binding(),
+                    normal.as_entire_binding(),
+                    src.as_entire_binding(),
+                    dst.as_entire_binding(),
+                ],
+            )
+        });
+        // After an odd number of filter passes the result is in pong.
+        let filtered = if FILTER_PASSES % 2 == 1 { &pong } else { &ping };
+        let present_groups = [filtered, &ping].map(|src| {
+            group(
+                gpu,
+                &b.present_layout,
+                &[
+                    slot(&b.filter_buffer, filter_size),
+                    albedo.as_entire_binding(),
+                    src.as_entire_binding(),
+                ],
+            )
+        });
+        let image = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("photo"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: PHOTO_FORMAT,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                | wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[],
+        });
+        Self {
+            trace_group,
+            filter_groups,
+            present_groups,
+            image,
+        }
+    }
+}
+
 /// A photo being refined: add samples, then resolve into [`Self::image`].
+/// The camera, the light's turn and brightness, and the size may change
+/// on the way ([`Self::aim`], [`Self::resize`]): refining starts over.
 pub struct PhotoRenderer {
     width: u32,
     height: u32,
     settings: Settings,
+    camera: OrbitCamera,
+    stage: Stage,
     done: u32,
     params: TraceParams,
-    params_buffer: wgpu::Buffer,
-    filter_buffer: wgpu::Buffer,
-    trace: wgpu::ComputePipeline,
-    trace_group: wgpu::BindGroup,
-    prepare: wgpu::ComputePipeline,
-    atrous: wgpu::ComputePipeline,
-    /// Bind groups reading the ping buffer then the pong buffer.
-    filter_groups: [wgpu::BindGroup; 2],
-    present: wgpu::RenderPipeline,
-    present_groups: [wgpu::BindGroup; 2],
-    image: wgpu::Texture,
+    bindings: Bindings,
+    pixels: Pixels,
 }
 
 impl std::fmt::Debug for PhotoRenderer {
@@ -577,6 +715,19 @@ fn slot(buffer: &wgpu::Buffer, size: usize) -> wgpu::BindingResource<'_> {
     })
 }
 
+/// A photo size within [`MAX_SIDE`] and [`MAX_PIXELS`].
+fn check_size(width: u32, height: u32) -> Result<(), RenderError> {
+    if width == 0
+        || height == 0
+        || width > MAX_SIDE
+        || height > MAX_SIDE
+        || u64::from(width) * u64::from(height) > MAX_PIXELS
+    {
+        return Err(RenderError::TooLarge { width, height });
+    }
+    Ok(())
+}
+
 impl PhotoRenderer {
     /// Start a photo of `scene` seen by `camera`, `width × height` pixels
     /// (at most [`MAX_SIDE`] a side and [`MAX_PIXELS`] in all). Adds the
@@ -590,14 +741,7 @@ impl PhotoRenderer {
         width: u32,
         height: u32,
     ) -> Result<Self, RenderError> {
-        if width == 0
-            || height == 0
-            || width > MAX_SIDE
-            || height > MAX_SIDE
-            || u64::from(width) * u64::from(height) > MAX_PIXELS
-        {
-            return Err(RenderError::TooLarge { width, height });
-        }
+        check_size(width, height)?;
         let settings = Settings {
             samples: settings.samples.clamp(1, MAX_SAMPLES),
             bounces: settings.bounces.min(MAX_BOUNCES),
@@ -608,11 +752,9 @@ impl PhotoRenderer {
             .bounds()
             .unwrap_or((Vec3::new(-0.3, 0.0, -0.3), Vec3::new(0.3, 1.8, 0.3)));
         let centre = (lo + hi) * 0.5;
-        let mut studio = studio::Studio::new(settings.lighting, centre, eye);
         let environment = scene.environment.as_ref();
-        if environment.is_some() {
-            studio.lights.clear();
-        }
+        let backdrop_albedo =
+            studio::Studio::new(settings.lighting, centre, eye, 0.0, 1.0).backdrop;
 
         // The backdrop wraps the camera and the subject.
         let reach = Vec3::new(eye.x, 0.0, eye.z)
@@ -632,7 +774,7 @@ impl PhotoRenderer {
         triangles.extend(backdrop.into_iter().map(|(p, n)| (p, n, [[0.0; 2]; 3])));
         let mut surfaces = scene.surfaces.clone();
         if let Some(b) = surfaces.first_mut() {
-            *b = Surface::backdrop(studio.backdrop);
+            *b = Surface::backdrop(backdrop_albedo);
         }
 
         let positions: Vec<[Vec3; 3]> = triangles.iter().map(|(p, _, _)| *p).collect();
@@ -663,32 +805,18 @@ impl PhotoRenderer {
             }
         }
 
-        let total_power: f32 = studio.lights.iter().map(studio::AreaLight::power).sum();
-        let mut lights = [GpuLight::default(); MAX_LIGHTS];
-        for (slot, l) in lights.iter_mut().zip(&studio.lights) {
-            *slot = GpuLight {
-                corner: l.corner.extend(l.area()).to_array(),
-                edge_u: l.edge_u.extend(0.0).to_array(),
-                edge_v: l.edge_v.extend(0.0).to_array(),
-                radiance: l
-                    .radiance
-                    .extend(l.power() / total_power.max(1e-9))
-                    .to_array(),
-            };
-        }
-        let aspect = width as f32 / height as f32;
         let mut params = TraceParams {
-            inv_view_proj: camera.view_proj(aspect).inverse().to_cols_array_2d(),
-            eye: eye.extend(1.0).to_array(),
-            sky_top: studio.sky_top.extend(0.0).to_array(),
-            sky_horizon: studio.sky_horizon.extend(0.0).to_array(),
+            inv_view_proj: [[0.0; 4]; 4],
+            eye: [0.0; 4],
+            sky_top: [0.0; 4],
+            sky_horizon: [0.0; 4],
             size: [width, height],
             sample_index: 0,
             bounces: settings.bounces,
-            light_count: studio.lights.len().min(MAX_LIGHTS) as u32,
+            light_count: 0,
             clamp: CLAMP,
             _pad: [0; 2],
-            lights,
+            lights: [GpuLight::default(); MAX_LIGHTS],
             env_at: [0; 4],
             env_grid: [0; 4],
             env_turn: [0.0; 4],
@@ -722,45 +850,8 @@ impl PhotoRenderer {
             lut.extend(env.rgbe());
             lut.extend(tables.iter().map(|v| v.to_bits()));
             params.env_grid = [nu, nv, 1, 0];
-            // At turn 0 the picture's centre (its −z) is behind the
-            // subject seen from the camera.
-            let toward = Vec3::new(eye.x - centre.x, 0.0, eye.z - centre.z)
-                .try_normalize()
-                .unwrap_or(Vec3::Z);
-            let turn = if env.turn_deg.is_finite() {
-                env.turn_deg.to_radians()
-            } else {
-                0.0
-            };
-            let angle = toward.x.atan2(toward.z) + turn;
-            let scale = env.scale();
-            params.env_turn = [angle.cos(), angle.sin(), scale, lo.y.min(0.0)];
-            let floor = env.floor_irradiance() * scale;
-            params.env_floor = [
-                if floor > 1e-12 { 1.0 / floor } else { 0.0 },
-                centre.x,
-                environment::CAMERA_HEIGHT,
-                centre.z,
-            ];
         }
         let lut = storage(gpu, "sheen and prints", bytemuck::cast_slice(&lut), none);
-        let pixels = u64::from(width) * u64::from(height);
-        let make = |label| {
-            device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some(label),
-                // One vec4<f32> per pixel.
-                size: pixels * 16,
-                usage: wgpu::BufferUsages::STORAGE,
-                mapped_at_creation: false,
-            })
-        };
-        // Sums over the samples: colour and luminance²; albedo and depth
-        // at the first hit; its normal and whether something was hit.
-        let color = make("photo colour");
-        let albedo = make("photo albedo");
-        let normal = make("photo normal");
-        let ping = make("filter ping");
-        let pong = make("filter pong");
         let filter_buffer = gpu.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("filter params"),
             size: SLOT * u64::from(FILTER_PASSES + 2),
@@ -810,20 +901,6 @@ impl PhotoRenderer {
                 })
             };
         let trace = compute("photo trace", &trace_shader, "trace", &trace_layout);
-        let trace_group = group(
-            gpu,
-            &trace_layout,
-            &[
-                params_buffer.as_entire_binding(),
-                nodes.as_entire_binding(),
-                tris.as_entire_binding(),
-                surfaces.as_entire_binding(),
-                lut.as_entire_binding(),
-                color.as_entire_binding(),
-                albedo.as_entire_binding(),
-                normal.as_entire_binding(),
-            ],
-        );
 
         let filter_shader =
             device.create_shader_module(wgpu::include_wgsl!("../shaders/photo_filter.wgsl"));
@@ -840,22 +917,6 @@ impl PhotoRenderer {
         });
         let prepare = compute("photo prepare", &filter_shader, "prepare", &filter_layout);
         let atrous = compute("photo atrous", &filter_shader, "atrous", &filter_layout);
-        let filter_size = std::mem::size_of::<FilterParams>();
-        // (src, dst): the prepare pass writes ping; passes alternate.
-        let filter_groups = [(&ping, &pong), (&pong, &ping)].map(|(src, dst)| {
-            group(
-                gpu,
-                &filter_layout,
-                &[
-                    slot(&filter_buffer, filter_size),
-                    color.as_entire_binding(),
-                    albedo.as_entire_binding(),
-                    normal.as_entire_binding(),
-                    src.as_entire_binding(),
-                    dst.as_entire_binding(),
-                ],
-            )
-        });
 
         let present_shader =
             device.create_shader_module(wgpu::include_wgsl!("../shaders/photo_present.wgsl"));
@@ -897,52 +958,142 @@ impl PhotoRenderer {
             multiview_mask: None,
             cache: None,
         });
-        // After an odd number of filter passes the result is in pong.
-        let filtered = if FILTER_PASSES % 2 == 1 { &pong } else { &ping };
-        let present_groups = [filtered, &ping].map(|src| {
-            group(
-                gpu,
-                &present_layout,
-                &[
-                    slot(&filter_buffer, filter_size),
-                    albedo.as_entire_binding(),
-                    src.as_entire_binding(),
-                ],
-            )
-        });
-        let image = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("photo"),
-            size: wgpu::Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: PHOTO_FORMAT,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-                | wgpu::TextureUsages::TEXTURE_BINDING
-                | wgpu::TextureUsages::COPY_SRC,
-            view_formats: &[],
-        });
-        Ok(Self {
+        let bindings = Bindings {
+            params_buffer,
+            filter_buffer,
+            nodes,
+            tris,
+            surfaces,
+            lut,
+            trace,
+            trace_layout,
+            prepare,
+            atrous,
+            filter_layout,
+            present,
+            present_layout,
+        };
+        let pixels = Pixels::new(gpu, &bindings, width, height);
+        let stage = Stage {
+            centre,
+            floor_y: lo.y.min(0.0),
+            backdrop: environment.is_none().then_some((radius, height_m)),
+            environment: environment.map(|e| (e.exposure(), e.floor_irradiance())),
+        };
+        let mut photo = Self {
             width,
             height,
             settings,
+            camera: *camera,
+            stage,
             done: 0,
             params,
-            params_buffer,
-            filter_buffer,
-            trace,
-            trace_group,
-            prepare,
-            atrous,
-            filter_groups,
-            present,
-            present_groups,
-            image,
-        })
+            bindings,
+            pixels,
+        };
+        photo.place_lights();
+        Ok(photo)
+    }
+
+    /// Fill the parameters that follow the camera, the size and the
+    /// light's turn and brightness.
+    fn place_lights(&mut self) {
+        let s = self.settings;
+        let stage = self.stage;
+        let eye = self.camera.eye();
+        let turn = if s.turn_deg.is_finite() {
+            s.turn_deg.to_radians()
+        } else {
+            0.0
+        };
+        let brightness = if s.brightness.is_finite() {
+            s.brightness.clamp(*BRIGHTNESS.start(), *BRIGHTNESS.end())
+        } else {
+            1.0
+        };
+        let aspect = self.width as f32 / self.height as f32;
+        let p = &mut self.params;
+        p.inv_view_proj = self.camera.view_proj(aspect).inverse().to_cols_array_2d();
+        p.eye = eye.extend(1.0).to_array();
+        p.size = [self.width, self.height];
+        p.lights = [GpuLight::default(); MAX_LIGHTS];
+        match stage.environment {
+            None => {
+                let studio = studio::Studio::new(s.lighting, stage.centre, eye, turn, brightness);
+                let total_power: f32 = studio.lights.iter().map(studio::AreaLight::power).sum();
+                for (slot, l) in p.lights.iter_mut().zip(&studio.lights) {
+                    *slot = GpuLight {
+                        corner: l.corner.extend(l.area()).to_array(),
+                        edge_u: l.edge_u.extend(0.0).to_array(),
+                        edge_v: l.edge_v.extend(0.0).to_array(),
+                        radiance: l
+                            .radiance
+                            .extend(l.power() / total_power.max(1e-9))
+                            .to_array(),
+                    };
+                }
+                p.light_count = studio.lights.len().min(MAX_LIGHTS) as u32;
+                p.sky_top = studio.sky_top.extend(0.0).to_array();
+                p.sky_horizon = studio.sky_horizon.extend(0.0).to_array();
+            }
+            Some((exposure, floor)) => {
+                p.light_count = 0;
+                // At turn 0 the picture's centre (its −z) is behind the
+                // subject seen from the camera.
+                let toward = Vec3::new(eye.x - stage.centre.x, 0.0, eye.z - stage.centre.z)
+                    .try_normalize()
+                    .unwrap_or(Vec3::Z);
+                let angle = toward.x.atan2(toward.z) + turn;
+                let scale = exposure * brightness;
+                p.env_turn = [angle.cos(), angle.sin(), scale, stage.floor_y];
+                let floor = floor * scale;
+                p.env_floor = [
+                    if floor > 1e-12 { 1.0 / floor } else { 0.0 },
+                    stage.centre.x,
+                    environment::CAMERA_HEIGHT,
+                    stage.centre.z,
+                ];
+            }
+        }
+    }
+
+    /// See through `camera`, the light turned by `turn_deg` and scaled by
+    /// `brightness`, and start refining over. `false` (nothing changed)
+    /// when the camera would leave the studio's backdrop: the scene must
+    /// be built again around it.
+    pub fn aim(&mut self, camera: &OrbitCamera, turn_deg: f32, brightness: f32) -> bool {
+        if let Some((radius, height)) = self.stage.backdrop {
+            let eye = camera.eye();
+            if Vec3::new(eye.x, 0.0, eye.z).length() > radius - BACKDROP_MARGIN
+                || eye.y > height - BACKDROP_MARGIN
+            {
+                return false;
+            }
+        }
+        self.camera = *camera;
+        self.settings.turn_deg = turn_deg;
+        self.settings.brightness = brightness;
+        self.place_lights();
+        self.done = 0;
+        true
+    }
+
+    /// Change the image's size and start refining over.
+    pub fn resize(&mut self, gpu: &Gpu, width: u32, height: u32) -> Result<(), RenderError> {
+        check_size(width, height)?;
+        if (width, height) != (self.width, self.height) {
+            self.width = width;
+            self.height = height;
+            self.pixels = Pixels::new(gpu, &self.bindings, width, height);
+            self.place_lights();
+        }
+        self.done = 0;
+        Ok(())
+    }
+
+    /// The image's size.
+    pub fn size(&self) -> (u32, u32) {
+        (self.width, self.height)
     }
 
     /// Samples per pixel taken so far.
@@ -960,8 +1111,11 @@ impl PhotoRenderer {
         let count = count.min(self.settings.samples.saturating_sub(self.done));
         for _ in 0..count {
             self.params.sample_index = self.done;
-            gpu.queue
-                .write_buffer(&self.params_buffer, 0, bytemuck::bytes_of(&self.params));
+            gpu.queue.write_buffer(
+                &self.bindings.params_buffer,
+                0,
+                bytemuck::bytes_of(&self.params),
+            );
             let mut encoder = gpu
                 .device
                 .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -972,8 +1126,8 @@ impl PhotoRenderer {
                     label: Some("photo trace"),
                     timestamp_writes: None,
                 });
-                pass.set_pipeline(&self.trace);
-                pass.set_bind_group(0, &self.trace_group, &[]);
+                pass.set_pipeline(&self.bindings.trace);
+                pass.set_bind_group(0, &self.pixels.trace_group, &[]);
                 pass.dispatch_workgroups(
                     self.width.div_ceil(GROUP),
                     self.height.div_ceil(GROUP),
@@ -1005,7 +1159,8 @@ impl PhotoRenderer {
             bytes[at..at + std::mem::size_of::<FilterParams>()]
                 .copy_from_slice(bytemuck::bytes_of(&p));
         }
-        gpu.queue.write_buffer(&self.filter_buffer, 0, &bytes);
+        let b = &self.bindings;
+        gpu.queue.write_buffer(&b.filter_buffer, 0, &bytes);
         let mut encoder = gpu
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -1018,22 +1173,23 @@ impl PhotoRenderer {
                 label: Some("photo filter"),
                 timestamp_writes: None,
             });
-            pass.set_pipeline(&self.prepare);
+            pass.set_pipeline(&b.prepare);
             // The prepare pass writes the ping buffer (its `dst` in the
             // second group).
-            pass.set_bind_group(0, &self.filter_groups[1], &[0]);
+            pass.set_bind_group(0, &self.pixels.filter_groups[1], &[0]);
             pass.dispatch_workgroups(groups.0, groups.1, 1);
             if filtering {
-                pass.set_pipeline(&self.atrous);
+                pass.set_pipeline(&b.atrous);
                 for i in 0..FILTER_PASSES as usize {
                     let offset = ((i + 1) as u64 * SLOT) as u32;
-                    pass.set_bind_group(0, &self.filter_groups[i % 2], &[offset]);
+                    pass.set_bind_group(0, &self.pixels.filter_groups[i % 2], &[offset]);
                     pass.dispatch_workgroups(groups.0, groups.1, 1);
                 }
             }
         }
         {
             let view = self
+                .pixels
                 .image
                 .create_view(&wgpu::TextureViewDescriptor::default());
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -1052,9 +1208,9 @@ impl PhotoRenderer {
                 occlusion_query_set: None,
                 multiview_mask: None,
             });
-            pass.set_pipeline(&self.present);
+            pass.set_pipeline(&b.present);
             let src = usize::from(!filtering);
-            pass.set_bind_group(0, &self.present_groups[src], &[0]);
+            pass.set_bind_group(0, &self.pixels.present_groups[src], &[0]);
             pass.draw(0..3, 0..1);
         }
         gpu.queue.submit([encoder.finish()]);
@@ -1062,12 +1218,12 @@ impl PhotoRenderer {
 
     /// The finished image ([`PHOTO_FORMAT`], as big as the photo).
     pub fn image(&self) -> &wgpu::Texture {
-        &self.image
+        &self.pixels.image
     }
 
     /// The image as PNG bytes (waits for the GPU).
     pub fn png(&self, gpu: &Gpu) -> Result<Vec<u8>, RenderError> {
-        let pixels = offscreen::read_pixels(gpu, &self.image)?;
+        let pixels = offscreen::read_pixels(gpu, &self.pixels.image)?;
         offscreen::encode_png(self.width, self.height, &pixels)
     }
 }

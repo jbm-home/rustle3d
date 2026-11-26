@@ -226,6 +226,42 @@ fn agents_simulate_and_look_at_the_garment() {
     assert!(err);
     assert_eq!(body["error"]["code"], "read_failed", "{body}");
 
+    // The project's photo scene fills in what the arguments leave out.
+    let (err, body) = call(
+        &s,
+        "photo_set_scene",
+        json!({ "scene": {
+            "light": { "kind": "environment", "name": "pav" },
+            "turn_deg": 30, "brightness": 2,
+            "camera": { "target_mm": [0, 900, 0], "yaw_deg": 45, "pitch_deg": 5,
+                "distance_mm": 3000, "focal_mm": 50 },
+            "size": [40, 30] } }),
+    );
+    assert!(!err, "{body}");
+    let photo_info = |args: Value| {
+        let Value::Object(args) = args else {
+            unreachable!()
+        };
+        let photo = serde_json::to_value(s.call("render_photo", Some(args))).unwrap();
+        assert_eq!(photo["content"][0]["type"], "image", "{photo}");
+        serde_json::from_str::<Value>(photo["content"][1]["text"].as_str().unwrap()).unwrap()
+    };
+    let info = photo_info(json!({ "samples": 1 }));
+    assert_eq!(info["environment"], "pav");
+    assert_eq!(info["camera"], "scene");
+    assert_eq!(info["size"], json!([40, 30]));
+    assert_eq!(
+        (info["turn_deg"].clone(), info["brightness"].clone()),
+        (json!(30.0), json!(2.0))
+    );
+    let info = photo_info(
+        json!({ "samples": 1, "lighting": "dramatic", "camera": "front", "brightness": 1, "width": 32 }),
+    );
+    assert_eq!(info["lighting"], "dramatic");
+    assert_eq!(info["camera"], "front");
+    assert_eq!(info["turn_deg"], 30.0);
+    assert_eq!(info["size"], json!([32, 768]));
+
     // The tech pack opens with the front and back of the drape.
     let (err, out) = call(
         &s,

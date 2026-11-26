@@ -4766,6 +4766,191 @@ Shift (mm) and turn (degrees) the garment's print on one piece, e.g. to centre a
 
 </details>
 
+### `photo.set_scene`
+
+Set how the project's photos are taken: the light (a studio, or an environment by built-in name or `.hdr` path in the project), its turn and brightness, the camera (the point it looks at, its turn, height angle, distance and focal length) and the image size. The app's photo scene saves it; `render_photo` and `r3d render --view photo` use it unless their arguments say otherwise. `null` forgets it.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "PhotoCamera": {
+      "additionalProperties": false,
+      "description": "Where the photo's camera stands: it turns around the point it looks\nat. Metres in the simulation are millimetres here (Y up).",
+      "properties": {
+        "distance_mm": {
+          "description": "Distance from the point looked at (mm, 300–20 000).",
+          "format": "double",
+          "type": "number"
+        },
+        "focal_mm": {
+          "description": "Focal length on a 24 × 36 mm frame (mm, 10–300): its 24 mm side\nlies along the image's shorter side.",
+          "format": "double",
+          "type": "number"
+        },
+        "pitch_deg": {
+          "description": "Height angle (degrees, −80 to 80; positive: from above).",
+          "format": "double",
+          "type": "number"
+        },
+        "target_mm": {
+          "description": "The point looked at (mm).",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "yaw_deg": {
+          "description": "Turn around the vertical (degrees; 0: from the front, 90: from the\nbody's left side).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "target_mm",
+        "yaw_deg",
+        "pitch_deg",
+        "distance_mm",
+        "focal_mm"
+      ],
+      "type": "object"
+    },
+    "PhotoLight": {
+      "description": "What lights a photo.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A key, a fill and a rim light on a light grey backdrop.",
+          "properties": {
+            "kind": {
+              "const": "studio",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Large soft boxes on a white backdrop, few shadows.",
+          "properties": {
+            "kind": {
+              "const": "soft",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "One hard key and a rim on a dark backdrop.",
+          "properties": {
+            "kind": {
+              "const": "dramatic",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A picture of the light all around: a built-in environment's name\n(`ferndale`, `neon`, `pav`, `kontrast`, `wooden`) or a `.hdr` file\nin the project folder (relative, forward slashes).",
+          "properties": {
+            "kind": {
+              "const": "environment",
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "name"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PhotoSetup": {
+      "additionalProperties": false,
+      "description": "How the project's photos are taken.",
+      "properties": {
+        "brightness": {
+          "default": 1.0,
+          "description": "Factor on the light (0.05–20; 1: the usual exposure).",
+          "format": "double",
+          "type": "number"
+        },
+        "camera": {
+          "$ref": "#/$defs/PhotoCamera"
+        },
+        "light": {
+          "$ref": "#/$defs/PhotoLight"
+        },
+        "size": {
+          "description": "Image size in pixels (16–4096 a side); omitted: the 3D view's size\nin the app, the command's own elsewhere.",
+          "items": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "turn_deg": {
+          "default": 0.0,
+          "description": "Turn of the light around the model (degrees, counter-clockwise\nseen from above); at 0 an environment's centre is behind the model\nand the studio's key light on the camera's left.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "light",
+        "camera"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Set how the project's photos are taken, or forget it.",
+  "properties": {
+    "scene": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PhotoSetup"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The light, its turn and brightness, the camera and the image size;\n`null` forgets them (photos go back to their defaults)."
+    }
+  },
+  "title": "PhotoSetScene",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `garment.arrange`
 
 Place every panel around the body for the simulation, side by side in the order the seams join them (a panel's right side continues into the next panel; each takes a share of the turn in proportion to its width), tops at the avatar's waist (its narrowest girth) unless top_cm is given. Panels placed on an arm (sleeves) or flat keep their placement. Re-run it after adding panels or seams.

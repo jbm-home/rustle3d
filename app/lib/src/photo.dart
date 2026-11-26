@@ -1,5 +1,9 @@
-// Photos: the dialog that chooses how to render one, and the bar over the
-// 3D view while it refines (docs/specs/14-photoreal-rendering.md).
+// Photos: the photo scene's panel beside the 3D view, which shows the
+// photo as it will be while it is set, and the bar over the 3D view while
+// the photo refines (docs/specs/14-photoreal-rendering.md,
+// docs/specs/35-environment-lighting.md).
+
+import 'dart:math' as math;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
@@ -18,96 +22,97 @@ const photoSizes = [
   (3840, 2160),
 ];
 
-/// How to render a photo, as last chosen.
+/// The focal lengths offered (mm on a 24 × 36 frame).
+const _focalMin = 18.0;
+const _focalMax = 200.0;
+
+/// How long to refine a photo, as last chosen (the scene itself is the
+/// project's).
 class PhotoChoice {
   const PhotoChoice({
     this.quality = 'good',
-    this.lighting = 'studio',
-    this.size = 0,
     this.samples,
     this.bounces,
     this.denoise = true,
-    this.environment = 'ferndale',
-    this.turnDeg = 0,
-    this.brightness = 1,
   });
 
   /// `quick`, `good` or `best`.
   final String quality;
-
-  /// `studio`, `soft`, `dramatic`, or `environment` (lit by
-  /// [environment], spec 35).
-  final String lighting;
-
-  /// A built-in environment's name or a `.hdr` file in the project.
-  final String environment;
-
-  /// The environment's turn (degrees) and brightness factor.
-  final double turnDeg;
-  final double brightness;
-
-  /// Index into [photoSizes].
-  final int size;
 
   /// Instead of the quality's (advanced).
   final int? samples;
   final int? bounces;
   final bool denoise;
 
-  PhotoRequest get request {
-    final (width, height) = photoSizes[size.clamp(0, photoSizes.length - 1)];
-    final lit = lighting == 'environment';
+  /// The photo of `scene` refined this way.
+  PhotoRequest request(SceneSettings scene) {
+    final lit = scene.light == 'environment';
     return PhotoRequest(
       quality: quality,
-      lighting: lit ? 'studio' : lighting,
-      width: width,
-      height: height,
+      lighting: lit ? 'studio' : scene.light,
+      width: scene.width,
+      height: scene.height,
       samples: samples,
       bounces: bounces,
       denoise: denoise,
-      environment: lit ? environment : null,
-      turnDeg: turnDeg,
-      brightness: brightness,
+      environment: lit ? scene.environment : null,
+      turnDeg: scene.turnDeg,
+      brightness: scene.brightness,
     );
   }
 }
 
-/// Ask how to render a photo; `null` when cancelled.
-Future<PhotoChoice?> askPhoto(
-  BuildContext context,
-  Engine engine,
-  PhotoChoice initial,
-) {
-  return showDialog<PhotoChoice>(
-    context: context,
-    builder: (_) => _PhotoDialog(engine: engine, initial: initial),
-  );
-}
+SceneSettings _with(
+  SceneSettings s, {
+  String? light,
+  String? environment,
+  double? turnDeg,
+  double? brightness,
+  double? focalMm,
+  (int, int)? size,
+}) => SceneSettings(
+  light: light ?? s.light,
+  environment: environment ?? s.environment,
+  turnDeg: turnDeg ?? s.turnDeg,
+  brightness: brightness ?? s.brightness,
+  focalMm: focalMm ?? s.focalMm,
+  width: size?.$1 ?? s.width,
+  height: size?.$2 ?? s.height,
+);
 
-class _PhotoDialog extends StatefulWidget {
-  const _PhotoDialog({required this.engine, required this.initial});
+/// The photo scene's settings beside the 3D view: every change shows in
+/// the view at once; [onShoot] renders the photo with [choice].
+class ScenePanel extends StatefulWidget {
+  const ScenePanel({
+    super.key,
+    required this.engine,
+    required this.scene,
+    required this.choice,
+    required this.onScene,
+    required this.onChoice,
+    required this.onShoot,
+    required this.onClose,
+  });
 
   final Engine engine;
-  final PhotoChoice initial;
+  final SceneSettings scene;
+  final PhotoChoice choice;
+  final ValueChanged<SceneSettings> onScene;
+  final ValueChanged<PhotoChoice> onChoice;
+  final VoidCallback onShoot;
+  final VoidCallback onClose;
 
   @override
-  State<_PhotoDialog> createState() => _PhotoDialogState();
+  State<ScenePanel> createState() => _ScenePanelState();
 }
 
-class _PhotoDialogState extends State<_PhotoDialog> {
-  late String _quality = widget.initial.quality;
-  late String _lighting = widget.initial.lighting;
-  late int _size = widget.initial.size;
-  late bool _denoise = widget.initial.denoise;
-  late String _environment = widget.initial.environment;
-  late double _turn = widget.initial.turnDeg;
-  late double _brightness = widget.initial.brightness;
+class _ScenePanelState extends State<ScenePanel> {
   late List<String> _environments = _listEnvironments();
   late final _samples = TextEditingController(
-    text: widget.initial.samples?.toString() ?? '',
+    text: widget.choice.samples?.toString() ?? '',
   );
   late final _bounces = TextEditingController(
-    text: widget.initial.bounces?.toString() ?? '',
+    text: widget.choice.bounces?.toString() ?? '',
   );
 
   @override
@@ -131,6 +136,25 @@ class _PhotoDialogState extends State<_PhotoDialog> {
     return id.isEmpty ? id : id[0].toUpperCase() + id.substring(1);
   }
 
+  void _scene(SceneSettings s) => widget.onScene(s);
+
+  void _choice({String? quality, bool? denoise}) => widget.onChoice(
+    PhotoChoice(
+      quality: quality ?? widget.choice.quality,
+      samples: int.tryParse(_samples.text),
+      bounces: int.tryParse(_bounces.text),
+      denoise: denoise ?? widget.choice.denoise,
+    ),
+  );
+
+  void _light(String light) {
+    final s = widget.scene;
+    final environment = light == 'environment' && s.environment.isEmpty
+        ? (_environments.isEmpty ? '' : _environments.first)
+        : s.environment;
+    _scene(_with(s, light: light, environment: environment));
+  }
+
   Future<void> _addEnvironment() async {
     final l = context.l;
     final messenger = ScaffoldMessenger.of(context);
@@ -143,10 +167,8 @@ class _PhotoDialogState extends State<_PhotoDialog> {
     try {
       final path = await widget.engine.adoptEnvironment(path: file.path);
       if (!mounted) return;
-      setState(() {
-        _environments = _listEnvironments();
-        _environment = path;
-      });
+      setState(() => _environments = _listEnvironments());
+      _scene(_with(widget.scene, light: 'environment', environment: path));
     } on ApiError catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(
@@ -158,27 +180,12 @@ class _PhotoDialogState extends State<_PhotoDialog> {
     }
   }
 
-  void _render() {
-    Navigator.pop(
-      context,
-      PhotoChoice(
-        quality: _quality,
-        lighting: _lighting,
-        size: _size,
-        samples: int.tryParse(_samples.text),
-        bounces: int.tryParse(_bounces.text),
-        denoise: _denoise,
-        environment: _environment,
-        turnDeg: _turn,
-        brightness: _brightness,
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final l = context.l;
     final p = Tokens.of(context);
+    final s = widget.scene;
+    final c = widget.choice;
     final qualities = [
       ('quick', l.photoQuick, l.photoQuickHint, '16'),
       ('good', l.photoGood, l.photoGoodHint, '128'),
@@ -205,150 +212,239 @@ class _PhotoDialogState extends State<_PhotoDialog> {
       padding: const EdgeInsets.only(top: 6),
       child: Text(text, style: ts(fontSize: 12, color: p.textMuted)),
     );
-    final quality = qualities.firstWhere((q) => q.$1 == _quality);
-    final lighting = lightings.firstWhere((x) => x.$1 == _lighting);
-    return AlertDialog(
-      title: Text(l.photoTitle),
-      content: SizedBox(
-        width: 440,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(l.photoIntro, style: ts(fontSize: 13, color: p.text)),
-              label(l.photoQuality),
-              SegmentedButton<String>(
-                key: const ValueKey('photoQuality'),
-                segments: [
-                  for (final (id, name, _, _) in qualities)
-                    ButtonSegment(value: id, label: Text(name)),
-                ],
-                selected: {_quality},
-                onSelectionChanged: (s) => setState(() => _quality = s.first),
-              ),
-              hint(quality.$3),
-              label(l.photoLighting),
-              SegmentedButton<String>(
-                key: const ValueKey('photoLighting'),
-                segments: [
-                  for (final (id, name, _) in lightings)
-                    ButtonSegment(value: id, label: Text(name)),
-                ],
-                selected: {_lighting},
-                onSelectionChanged: (s) => setState(() => _lighting = s.first),
-              ),
-              hint(lighting.$3),
-              if (_lighting == 'environment') ...[
-                const SizedBox(height: Space.s),
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButton<String>(
-                        key: const ValueKey('photoEnvironment'),
-                        isExpanded: true,
-                        value: _environments.contains(_environment)
-                            ? _environment
-                            : null,
-                        items: [
-                          for (final id in _environments)
-                            DropdownMenuItem(
-                              value: id,
-                              child: Text(_environmentName(id)),
-                            ),
-                        ],
-                        onChanged: (id) =>
-                            setState(() => _environment = id ?? _environment),
+    final quality = qualities.firstWhere(
+      (q) => q.$1 == c.quality,
+      orElse: () => qualities[1],
+    );
+    final lighting = lightings.firstWhere(
+      (x) => x.$1 == s.light,
+      orElse: () => lightings.first,
+    );
+    // A size set elsewhere (by an agent) is offered too.
+    final sizes = [
+      ...photoSizes,
+      if (!photoSizes.contains((s.width, s.height))) (s.width, s.height),
+    ];
+    // The lens on a log scale: as many steps from 18 to 35 mm as from 100
+    // to 200 mm.
+    final focalSpan = math.log(_focalMax / _focalMin);
+    final focalAt =
+        math.log(s.focalMm.clamp(_focalMin, _focalMax) / _focalMin) / focalSpan;
+    // A Material, for the ink of the folded section's tile.
+    return Material(
+      color: p.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Tokens.radius(context)),
+        side: BorderSide(color: p.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: SizedBox(
+        width: 320,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(Space.l, Space.s, Space.s, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l.photoTitle,
+                      style: ts(fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  Tooltip(
+                    message: l.photoSceneCloseTip,
+                    child: IconButton(
+                      key: const ValueKey('sceneClose'),
+                      onPressed: widget.onClose,
+                      icon: Icon(
+                        Icons.close_rounded,
+                        size: 19,
+                        color: p.textMuted,
                       ),
                     ),
-                    const SizedBox(width: Space.s),
-                    TextButton(
-                      onPressed: _addEnvironment,
-                      child: Text(l.photoEnvironmentAdd),
-                    ),
-                  ],
-                ),
-                _SliderRow(
-                  label: l.photoTurn,
-                  value: _turn,
-                  min: -180,
-                  max: 180,
-                  divisions: 72,
-                  text: '${_turn.round()}°',
-                  onChanged: (v) => setState(() => _turn = v),
-                ),
-                _SliderRow(
-                  label: l.photoBrightness,
-                  value: _brightness,
-                  min: 0.25,
-                  max: 4,
-                  divisions: 15,
-                  text: '× ${context.number(_brightness, 2)}',
-                  onChanged: (v) => setState(() => _brightness = v),
-                ),
-              ],
-              label(l.photoSize),
-              DropdownButton<int>(
-                isExpanded: true,
-                value: _size,
-                items: [
-                  for (final (i, (w, h)) in photoSizes.indexed)
-                    DropdownMenuItem(
-                      value: i,
-                      child: Text(i == 0 ? l.photoSizeView : '$w × $h'),
-                    ),
+                  ),
                 ],
-                onChanged: (i) => setState(() => _size = i ?? 0),
               ),
-              Theme(
-                // No divider lines around the folded section.
-                data: Theme.of(context)
-                    .copyWith(dividerColor: Colors.transparent),
-                child: ExpansionTile(
-                  tilePadding: EdgeInsets.zero,
-                  childrenPadding: EdgeInsets.zero,
-                  title: Text(l.photoAdvanced, style: ts(fontSize: 13)),
+            ),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(
+                  Space.l,
+                  0,
+                  Space.l,
+                  Space.l,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _CountRow(
-                      label: l.photoSamples,
-                      controller: _samples,
-                      placeholder: quality.$4,
+                    Text(
+                      l.photoIntro,
+                      style: ts(fontSize: 12.5, color: p.text),
                     ),
-                    _CountRow(
-                      label: l.photoBounces,
-                      controller: _bounces,
-                      placeholder: switch (_quality) {
-                        'quick' => '4',
-                        'good' => '6',
-                        _ => '10',
+                    label(l.photoLighting),
+                    Wrap(
+                      key: const ValueKey('photoLighting'),
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        for (final (id, name, _) in lightings)
+                          ChoiceChip(
+                            label: Text(name),
+                            selected: s.light == id,
+                            onSelected: (_) => _light(id),
+                          ),
+                      ],
+                    ),
+                    hint(lighting.$3),
+                    if (s.light == 'environment') ...[
+                      const SizedBox(height: Space.s),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButton<String>(
+                              key: const ValueKey('photoEnvironment'),
+                              isExpanded: true,
+                              value: _environments.contains(s.environment)
+                                  ? s.environment
+                                  : null,
+                              items: [
+                                for (final id in _environments)
+                                  DropdownMenuItem(
+                                    value: id,
+                                    child: Text(_environmentName(id)),
+                                  ),
+                              ],
+                              onChanged: (id) {
+                                if (id != null) {
+                                  _scene(_with(s, environment: id));
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: Space.s),
+                          TextButton(
+                            onPressed: _addEnvironment,
+                            child: Text(l.photoEnvironmentAdd),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: Space.s),
+                    _SliderRow(
+                      key: const ValueKey('photoTurn'),
+                      label: l.photoTurn,
+                      value: s.turnDeg,
+                      min: -180,
+                      max: 180,
+                      divisions: 72,
+                      text: '${s.turnDeg.round()}°',
+                      onChanged: (v) => _scene(_with(s, turnDeg: v)),
+                    ),
+                    _SliderRow(
+                      key: const ValueKey('photoBrightness'),
+                      label: l.photoBrightness,
+                      value: s.brightness,
+                      min: 0.25,
+                      max: 4,
+                      divisions: 15,
+                      text: '× ${context.number(s.brightness, 2)}',
+                      onChanged: (v) => _scene(_with(s, brightness: v)),
+                    ),
+                    _SliderRow(
+                      key: const ValueKey('photoFocal'),
+                      label: l.photoFocal,
+                      value: focalAt,
+                      min: 0,
+                      max: 1,
+                      divisions: 100,
+                      text: '${s.focalMm.round()} mm',
+                      onChanged: (t) => _scene(
+                        _with(
+                          s,
+                          focalMm: (_focalMin * math.exp(t * focalSpan))
+                              .roundToDouble(),
+                        ),
+                      ),
+                    ),
+                    hint(l.photoSceneHint),
+                    label(l.photoSize),
+                    DropdownButton<(int, int)>(
+                      key: const ValueKey('photoSize'),
+                      isExpanded: true,
+                      value: (s.width, s.height),
+                      items: [
+                        for (final (w, h) in sizes)
+                          DropdownMenuItem(
+                            value: (w, h),
+                            child: Text(w == 0 ? l.photoSizeView : '$w × $h'),
+                          ),
+                      ],
+                      onChanged: (size) {
+                        if (size != null) _scene(_with(s, size: size));
                       },
                     ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      title: Text(l.photoDenoise),
-                      value: _denoise,
-                      onChanged: (v) => setState(() => _denoise = v),
+                    label(l.photoQuality),
+                    SegmentedButton<String>(
+                      key: const ValueKey('photoQuality'),
+                      segments: [
+                        for (final (id, name, _, _) in qualities)
+                          ButtonSegment(value: id, label: Text(name)),
+                      ],
+                      selected: {quality.$1},
+                      onSelectionChanged: (q) => _choice(quality: q.first),
+                    ),
+                    hint(quality.$3),
+                    Theme(
+                      // No divider lines around the folded section.
+                      data: Theme.of(context)
+                          .copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
+                        tilePadding: EdgeInsets.zero,
+                        childrenPadding: EdgeInsets.zero,
+                        title: Text(l.photoAdvanced, style: ts(fontSize: 13)),
+                        children: [
+                          _CountRow(
+                            label: l.photoSamples,
+                            controller: _samples,
+                            placeholder: quality.$4,
+                            onChanged: (_) => _choice(),
+                          ),
+                          _CountRow(
+                            label: l.photoBounces,
+                            controller: _bounces,
+                            placeholder: switch (quality.$1) {
+                              'quick' => '4',
+                              'good' => '6',
+                              _ => '10',
+                            },
+                            onChanged: (_) => _choice(),
+                          ),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            dense: true,
+                            title: Text(l.photoDenoise),
+                            value: c.denoise,
+                            onChanged: (v) => _choice(denoise: v),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: Space.s),
+                    FilledButton.icon(
+                      key: const ValueKey('photoRender'),
+                      onPressed: widget.onShoot,
+                      icon: const Icon(Icons.photo_camera_outlined, size: 18),
+                      label: Text(l.photoRender),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(l.cancel),
-        ),
-        FilledButton.icon(
-          key: const ValueKey('photoRender'),
-          onPressed: _render,
-          icon: const Icon(Icons.photo_camera_outlined, size: 18),
-          label: Text(l.photoRender),
-        ),
-      ],
     );
   }
 }
@@ -356,6 +452,7 @@ class _PhotoDialogState extends State<_PhotoDialog> {
 /// A labelled slider with its value written beside it.
 class _SliderRow extends StatelessWidget {
   const _SliderRow({
+    super.key,
     required this.label,
     required this.value,
     required this.min,
@@ -379,7 +476,7 @@ class _SliderRow extends StatelessWidget {
     return Row(
       children: [
         SizedBox(
-          width: 96,
+          width: 84,
           child: Text(label, style: ts(fontSize: 13, color: p.text)),
         ),
         Expanded(
@@ -411,11 +508,13 @@ class _CountRow extends StatelessWidget {
     required this.label,
     required this.controller,
     required this.placeholder,
+    required this.onChanged,
   });
 
   final String label;
   final TextEditingController controller;
   final String placeholder;
+  final ValueChanged<String> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -431,6 +530,7 @@ class _CountRow extends StatelessWidget {
             width: 96,
             child: TextField(
               controller: controller,
+              onChanged: onChanged,
               textAlign: TextAlign.right,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],

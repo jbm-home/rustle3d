@@ -1,6 +1,8 @@
-// Photos in the app: the Photo button asks how to render, the 3D view shows
-// the photo refining with its progress, it can be stopped, saved as PNG and
-// put away.
+// Photos in the app: the Photo button opens the photo scene, whose panel
+// sets the light, the lens and the size while the 3D view shows the photo
+// as it will be; the photo then refines with its progress, it can be
+// stopped, saved as PNG and put away, and the scene is saved with the
+// project.
 
 import 'dart:io';
 
@@ -42,19 +44,44 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('photoButton')));
     await frames();
-    expect(find.text('Render a photo'), findsOneWidget);
-    await tester.tap(find.text('Quick'));
+    expect(find.text('Photo scene'), findsOneWidget);
+    // The view already shows the photo, refining live.
+    expect(engine.photoStatus(), isNotNull);
+    expect(find.byKey(const ValueKey('photoProgress')), findsNothing);
+    // The test window is small: bring each control into view first.
+    Future<void> tap(Finder f) async {
+      await tester.ensureVisible(f);
+      await tester.pump();
+      await tester.tap(f);
+    }
+
+    await tap(find.text('Quick'));
     // A place offers the environments, then back to a studio.
-    await tester.tap(find.text('Place'));
+    await tap(find.text('Place'));
     await frames(2);
     expect(find.byKey(const ValueKey('photoEnvironment')), findsOneWidget);
     expect(find.text('Ferndale'), findsOneWidget);
-    await tester.tap(find.text('Soft'));
+    await tap(find.text('Soft'));
     await frames(2);
     expect(find.byKey(const ValueKey('photoEnvironment')), findsNothing);
     expect(find.text('A first look in seconds'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('photoRender')));
+    // A longer lens.
+    final lens = find.descendant(
+      of: find.byKey(const ValueKey('photoFocal')),
+      matching: find.byType(Slider),
+    );
+    await tester.ensureVisible(lens);
+    await tester.pump();
+    await tester.drag(lens, const Offset(60, 0));
+    await frames(2);
+    final focal = engine.photoScene();
+    expect(focal.light, 'studio', reason: 'not saved before closing');
+    await tap(find.byKey(const ValueKey('photoRender')));
     await frames();
+    // Rendering saved the scene in the project.
+    final saved = engine.photoScene();
+    expect(saved.light, 'soft');
+    expect(saved.focalMm, greaterThan(40));
 
     // The 3D view shows the photo with its progress, and no live controls.
     expect(engine.photoStatus(), isNotNull);
@@ -153,10 +180,16 @@ void main() {
       throwsA(isA<ApiError>()),
     );
 
+    // Putting the photo away goes back to the scene's live photo.
     await tester.tap(find.byKey(const ValueKey('photoClose')));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('photoProgress')), findsNothing);
+    expect(engine.photoStatus(), isNotNull);
+    await tester.tap(find.byKey(const ValueKey('sceneClose')));
     await tester.pump();
     expect(engine.photoStatus(), isNull);
     expect(find.byKey(const ValueKey('photoButton')), findsOneWidget);
+    expect(engine.photoScene().light, 'soft');
     await expectLater(
       engine.savePhoto(path: '$dir/none.png'),
       throwsA(isA<ApiError>()),

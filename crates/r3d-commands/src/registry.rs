@@ -204,6 +204,7 @@ command_registry! {
     "garment.set_print" => GarmentSetPrint,
     "garment.remove_print" => GarmentRemovePrint,
     "panel.set_print_placement" => PanelSetPrintPlacement,
+    "photo.set_scene" => PhotoSetScene,
     "garment.arrange" => GarmentArrange,
     "garment.set_color" => GarmentSetColor,
     "garment.add" => GarmentAdd,

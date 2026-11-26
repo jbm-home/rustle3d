@@ -28,10 +28,11 @@ to show a client or publish online, without leaving Rustle3D.
   gives the samples, bounces, lighting and the time taken.
 
 ## UX
-- One "Photo" button over the 3D view opens a dialog: three quality
-  presets (Quick 16, Good 128, Best 512 samples per pixel), the lighting,
-  the size, and the advanced settings (samples, bounces, denoising)
-  folded away.
+- One "Photo" button over the 3D view opens the photo scene (spec 35):
+  a panel beside the 3D view with the lighting, the lens, the size,
+  three quality presets (Quick 16, Good 128, Best 512 samples per
+  pixel) and the advanced settings (samples, bounces, denoising) folded
+  away, while the 3D view shows the photo as it will be.
 - While the photo refines, a bar at the bottom of the 3D view shows the
   progress (samples, seconds) with Stop, Save image… and Close; the view
   takes no input until it is closed.

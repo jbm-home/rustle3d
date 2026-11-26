@@ -94,6 +94,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PhotoStatus dco_decode_box_autoadd_photo_status(dynamic raw);
 
   @protected
+  SceneSettings dco_decode_box_autoadd_scene_settings(dynamic raw);
+
+  @protected
   SewSpot dco_decode_box_autoadd_sew_spot(dynamic raw);
 
   @protected
@@ -229,6 +232,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   (String, String) dco_decode_record_string_string(dynamic raw);
 
   @protected
+  SceneSettings dco_decode_scene_settings(dynamic raw);
+
+  @protected
   SewSpot dco_decode_sew_spot(dynamic raw);
 
   @protected
@@ -331,6 +337,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PhotoStatus sse_decode_box_autoadd_photo_status(SseDeserializer deserializer);
+
+  @protected
+  SceneSettings sse_decode_box_autoadd_scene_settings(
+    SseDeserializer deserializer,
+  );
 
   @protected
   SewSpot sse_decode_box_autoadd_sew_spot(SseDeserializer deserializer);
@@ -492,6 +503,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  SceneSettings sse_decode_scene_settings(SseDeserializer deserializer);
+
+  @protected
   SewSpot sse_decode_sew_spot(SseDeserializer deserializer);
 
   @protected
@@ -611,6 +625,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_photo_status(
     PhotoStatus self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_scene_settings(
+    SceneSettings self,
     SseSerializer serializer,
   );
 
@@ -808,6 +828,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     (String, String) self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_scene_settings(SceneSettings self, SseSerializer serializer);
 
   @protected
   void sse_encode_sew_spot(SewSpot self, SseSerializer serializer);

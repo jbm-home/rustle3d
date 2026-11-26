@@ -22,8 +22,6 @@ use std::f32::consts::PI;
 
 /// Widest picture sent to the GPU; wider ones are halved.
 pub const MAX_WIDTH: u32 = 4096;
-/// The brightness factor's range.
-pub const BRIGHTNESS: std::ops::RangeInclusive<f32> = 0.05..=20.0;
 /// Mean luminance over the sphere every environment is scaled to.
 const MEAN_LUMINANCE: f32 = 0.8;
 /// Height above the floor the picture is taken from (m): its ground is
@@ -37,18 +35,16 @@ fn luminance(c: [f32; 3]) -> f32 {
     0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
 }
 
-/// The light around a photo: linear RGB texels, top row first, with
-/// how it is turned and how bright it is.
+/// The light around a photo: linear RGB texels, top row first. How it
+/// is turned and how bright it is are the photo's settings.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Environment {
     width: u32,
     height: u32,
     rgb: Vec<[f32; 3]>,
-    /// Turn about the vertical (degrees, counter-clockwise seen from
-    /// above), from where the picture's centre is behind the subject.
-    pub turn_deg: f32,
-    /// Factor on the exposure (see [`BRIGHTNESS`]).
-    pub brightness: f32,
+    /// The factor that brings the mean luminance over the sphere to
+    /// [`MEAN_LUMINANCE`].
+    exposure: f32,
 }
 
 impl Environment {
@@ -81,13 +77,14 @@ impl Environment {
                 rgb.push(sum.map(|c| c / n.max(1.0)));
             }
         }
-        Some(Self {
+        let mut env = Self {
             width: w,
             height: h,
             rgb,
-            turn_deg: 0.0,
-            brightness: 1.0,
-        })
+            exposure: 1.0,
+        };
+        env.exposure = env.mean_exposure();
+        Some(env)
     }
 
     pub fn width(&self) -> u32 {
@@ -103,10 +100,13 @@ impl Environment {
         PI * (y as f32 + 0.5) / self.height as f32
     }
 
-    /// The factor on the texels: the exposure that brings the mean
-    /// luminance over the sphere to [`MEAN_LUMINANCE`], times the
-    /// brightness.
-    pub(crate) fn scale(&self) -> f32 {
+    /// The factor on the texels that brings the mean luminance over the
+    /// sphere to [`MEAN_LUMINANCE`] (before the photo's brightness).
+    pub(crate) fn exposure(&self) -> f32 {
+        self.exposure
+    }
+
+    fn mean_exposure(&self) -> f32 {
         let (mut sum, mut weight) = (0.0f64, 0.0f64);
         for (y, row) in self.rgb.chunks(self.width as usize).enumerate() {
             let s = f64::from(self.theta(y as u32).sin());
@@ -114,16 +114,10 @@ impl Environment {
             weight += s * row.len() as f64;
         }
         let mean = if weight > 0.0 { sum / weight } else { 0.0 };
-        let brightness = if self.brightness.is_finite() {
-            self.brightness
-                .clamp(*BRIGHTNESS.start(), *BRIGHTNESS.end())
+        if mean > 1e-9 {
+            MEAN_LUMINANCE / mean as f32
         } else {
             1.0
-        };
-        if mean > 1e-9 {
-            brightness * MEAN_LUMINANCE / mean as f32
-        } else {
-            brightness
         }
     }
 
@@ -293,12 +287,9 @@ mod tests {
 
     #[test]
     fn exposure_brings_the_mean_to_the_target() {
-        let mut env = uniform(64, 32, [5.0; 3]);
-        assert!((env.scale() * 5.0 - MEAN_LUMINANCE).abs() < 1e-4);
-        env.brightness = 2.0;
-        assert!((env.scale() * 5.0 - 2.0 * MEAN_LUMINANCE).abs() < 1e-4);
-        env.brightness = f32::NAN;
-        assert!((env.scale() * 5.0 - MEAN_LUMINANCE).abs() < 1e-4);
+        let env = uniform(64, 32, [5.0; 3]);
+        assert!((env.exposure() * 5.0 - MEAN_LUMINANCE).abs() < 1e-4);
+        assert_eq!(uniform(4, 2, [0.0; 3]).exposure(), 1.0);
     }
 
     #[test]

@@ -213,15 +213,18 @@ struct PhotoArgs {
     /// Photo: samples per pixel and bounces (quick 16, good 128, best 512).
     #[arg(long, value_enum, default_value = "good")]
     quality: QualityArg,
-    /// Photo: studio setup.
-    #[arg(long, value_enum, default_value = "studio")]
-    lighting: LightingArg,
-    /// Photo: where the camera stands.
-    #[arg(long, value_enum, default_value = "three-quarter")]
-    camera: CameraArg,
-    /// Photo: fill the image with the garment or show the whole body.
-    #[arg(long, value_enum, default_value = "garment")]
-    frame: FrameArg,
+    /// Photo: studio setup (default: the project's photo scene, else
+    /// studio).
+    #[arg(long, value_enum)]
+    lighting: Option<LightingArg>,
+    /// Photo: where the camera stands (default: the project's photo
+    /// scene, else three-quarter).
+    #[arg(long, value_enum)]
+    camera: Option<CameraArg>,
+    /// Photo: fill the image with the garment or show the whole body
+    /// (replaces the photo scene's camera; default: garment).
+    #[arg(long, value_enum)]
+    frame: Option<FrameArg>,
     /// Photo: samples per pixel (overrides --quality).
     #[arg(long)]
     samples: Option<u32>,
@@ -236,43 +239,54 @@ struct PhotoArgs {
     /// file in the project folder (see `r3d environment`).
     #[arg(long)]
     environment: Option<String>,
-    /// Photo: turn of the environment (degrees, counter-clockwise seen
-    /// from above).
-    #[arg(long, default_value_t = 0.0, allow_negative_numbers = true)]
-    turn: f64,
-    /// Photo: factor on the environment's automatic exposure (0.05-20).
-    #[arg(long, default_value_t = 1.0)]
-    brightness: f64,
+    /// Photo: turn of the light around the model (degrees,
+    /// counter-clockwise seen from above; default: the photo scene's,
+    /// else 0).
+    #[arg(long, allow_negative_numbers = true)]
+    turn: Option<f64>,
+    /// Photo: factor on the light (0.05-20; default: the photo scene's,
+    /// else 1).
+    #[arg(long)]
+    brightness: Option<f64>,
 }
 
 impl PhotoArgs {
-    fn options(&self) -> Result<render::PhotoOptions, Failure> {
+    fn options(
+        &self,
+        scene: Option<&r3d_core::PhotoSetup>,
+    ) -> Result<render::PhotoOptions, Failure> {
         // The MCP tool's names, so both front-ends parse the same way.
         let quality = match self.quality {
             QualityArg::Quick => "quick",
             QualityArg::Good => "good",
             QualityArg::Best => "best",
         };
-        let lighting = match self.lighting {
+        let lighting = self.lighting.map(|l| match l {
             LightingArg::Studio => "studio",
             LightingArg::Soft => "soft",
             LightingArg::Dramatic => "dramatic",
-        };
-        let camera = match self.camera {
+        });
+        let camera = self.camera.map(|c| match c {
             CameraArg::Front => render::CameraAngle::Front,
             CameraArg::ThreeQuarter => render::CameraAngle::ThreeQuarter,
             CameraArg::Side => render::CameraAngle::Side,
             CameraArg::Back => render::CameraAngle::Back,
-        };
-        let frame = match self.frame {
+        });
+        let frame = self.frame.map(|f| match f {
             FrameArg::Garment => "garment",
             FrameArg::Body => "body",
-        };
+        });
         let mut args = serde_json::Map::new();
         args.insert("quality".into(), quality.into());
-        args.insert("lighting".into(), lighting.into());
-        args.insert("camera".into(), camera.name().into());
-        args.insert("frame".into(), frame.into());
+        if let Some(l) = lighting {
+            args.insert("lighting".into(), l.into());
+        }
+        if let Some(c) = camera {
+            args.insert("camera".into(), c.name().into());
+        }
+        if let Some(f) = frame {
+            args.insert("frame".into(), f.into());
+        }
         if let Some(n) = self.samples {
             args.insert("samples".into(), n.into());
         }
@@ -282,10 +296,14 @@ impl PhotoArgs {
         args.insert("denoise".into(), (!self.no_denoise).into());
         if let Some(name) = &self.environment {
             args.insert("environment".into(), name.as_str().into());
-            args.insert("turn_deg".into(), self.turn.into());
-            args.insert("brightness".into(), self.brightness.into());
         }
-        Ok(render::PhotoOptions::from_args(&args)?)
+        if let Some(t) = self.turn {
+            args.insert("turn_deg".into(), t.into());
+        }
+        if let Some(b) = self.brightness {
+            args.insert("brightness".into(), b.into());
+        }
+        Ok(render::PhotoOptions::from_args(&args, scene)?)
     }
 }
 
@@ -474,9 +492,10 @@ enum Cmd {
         /// Output PNG file.
         #[arg(long)]
         out: PathBuf,
-        /// Image size, e.g. 1200x900.
-        #[arg(long, default_value = "1200x900", value_parser = parse_size)]
-        size: (u32, u32),
+        /// Image size, e.g. 1200x900 (default: a photo's scene size,
+        /// else 1200x900).
+        #[arg(long, value_parser = parse_size)]
+        size: Option<(u32, u32)>,
         /// 3D: colour the cloth by how tight it is (a bar at the right
         /// edge is the scale: yellow tight, dark loose).
         #[arg(long, value_enum)]
@@ -980,7 +999,7 @@ fn cmd_render(
     project: &Path,
     view: ViewArg,
     out: &Path,
-    size: (u32, u32),
+    size: Option<(u32, u32)>,
     fit_map: Option<FitMapArg>,
     photo: &PhotoArgs,
 ) -> Result<(), Failure> {
@@ -992,10 +1011,17 @@ fn cmd_render(
         .into());
     }
     let ws = Workspace::open(project)?;
-    let view = match view {
-        ViewArg::Board => render::View::Board,
-        ViewArg::Garment => render::View::Garment(fit_map.map(Into::into)),
-        ViewArg::Photo => render::View::Photo(photo.options()?),
+    const DEFAULT_SIZE: (u32, u32) = (1200, 900);
+    let (view, size) = match view {
+        ViewArg::Board => (render::View::Board, size.unwrap_or(DEFAULT_SIZE)),
+        ViewArg::Garment => (
+            render::View::Garment(fit_map.map(Into::into)),
+            size.unwrap_or(DEFAULT_SIZE),
+        ),
+        ViewArg::Photo => (
+            render::View::Photo(photo.options(ws.session().project().photo())?),
+            render::photo_size(&ws, size, DEFAULT_SIZE),
+        ),
     };
     let gpu = render::headless_gpu()?;
     let (png, mut info) = render::render(&gpu, &ws, view, size.0, size.1)?;

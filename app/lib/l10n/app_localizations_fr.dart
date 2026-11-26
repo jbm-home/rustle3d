@@ -1594,14 +1594,25 @@ class LFr extends L {
   String get photo => 'Photo';
 
   @override
-  String get photoTip => 'Faire une image photoréaliste du vêtement';
+  String get photoTip => 'Préparer une photo du vêtement et la rendre';
 
   @override
-  String get photoTitle => 'Faire une photo';
+  String get photoTitle => 'Scène photo';
 
   @override
   String get photoIntro =>
-      'Une image photoréaliste du vêtement tel que la vue 3D le montre maintenant, dans un studio photo.';
+      'La vue 3D montre la photo telle qu\'elle sera. Faites-y glisser pour tourner autour du modèle, la molette pour vous approcher.';
+
+  @override
+  String get photoFocal => 'Focale';
+
+  @override
+  String get photoSceneHint =>
+      'Une focale courte montre plus du lieu autour, une longue moins, avec un rendu plus plat.';
+
+  @override
+  String get photoSceneCloseTip =>
+      'Fermer la scène (elle est enregistrée avec le projet)';
 
   @override
   String get photoQuality => 'Qualité';
@@ -1720,7 +1731,7 @@ class LFr extends L {
   String get photoClose => 'Fermer';
 
   @override
-  String get photoCloseTip => 'Revenir à la vue 3D en direct';
+  String get photoCloseTip => 'Ranger la photo';
 
   @override
   String photoSaved(String file) {

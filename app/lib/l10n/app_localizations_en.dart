@@ -1580,14 +1580,25 @@ class LEn extends L {
   String get photo => 'Photo';
 
   @override
-  String get photoTip => 'Render a photorealistic image of the garment';
+  String get photoTip => 'Set up a photo of the garment and render it';
 
   @override
-  String get photoTitle => 'Render a photo';
+  String get photoTitle => 'Photo scene';
 
   @override
   String get photoIntro =>
-      'A photorealistic image of the garment as the 3D view shows it now, in a photo studio.';
+      'The 3D view shows the photo as it will be. Drag in it to turn around the model, scroll to come closer.';
+
+  @override
+  String get photoFocal => 'Lens';
+
+  @override
+  String get photoSceneHint =>
+      'A short lens shows more of the place around, a long one less, with a flatter look.';
+
+  @override
+  String get photoSceneCloseTip =>
+      'Close the scene (it is saved with the project)';
 
   @override
   String get photoQuality => 'Quality';
@@ -1705,7 +1716,7 @@ class LEn extends L {
   String get photoClose => 'Close';
 
   @override
-  String get photoCloseTip => 'Back to the live 3D view';
+  String get photoCloseTip => 'Put the photo away';
 
   @override
   String photoSaved(String file) {

@@ -21,6 +21,7 @@ pub mod integrity;
 pub mod measure;
 pub mod message;
 pub mod model;
+pub mod photo;
 pub mod print;
 pub mod project_dir;
 pub mod remap;
@@ -46,6 +47,7 @@ pub use model::{
     PathSegment, PatternSource, Pin, Placement, Point, Project, Seam, SeamSide, Size, SourcePiece,
     Symmetry, TemplateRef,
 };
+pub use photo::{PhotoCamera, PhotoLight, PhotoSetup};
 pub use print::{BuiltinPrint, Print, PrintPlacement, PrintSource, Texture, UvFrame};
 pub use remap::Remap;
 pub use trim::{Button, Buttonhole, Zipper};

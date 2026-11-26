@@ -68,6 +68,9 @@ pub struct Project {
     /// Construction details: elastics (M34).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub(crate) details: IdMap<DetailId, Detail>,
+    /// How the project's photos are taken (spec 35, v28).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) photo: Option<crate::photo::PhotoSetup>,
 }
 
 /// A relation the drawing keeps between points, edges, notches and
@@ -1063,6 +1066,7 @@ impl Project {
             buttons: IdMap::new(),
             zippers: IdMap::new(),
             details: IdMap::new(),
+            photo: None,
         }
     }
 
@@ -1072,6 +1076,11 @@ impl Project {
 
     pub fn display_unit(&self) -> DisplayUnit {
         self.display_unit
+    }
+
+    /// How the project's photos are taken, once set.
+    pub fn photo(&self) -> Option<&crate::photo::PhotoSetup> {
+        self.photo.as_ref()
     }
 
     pub fn garments(&self) -> &IdMap<GarmentId, Garment> {

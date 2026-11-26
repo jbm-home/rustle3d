@@ -44,6 +44,8 @@ pub enum IntegrityError {
     BadGrade { entity: AnyId },
     #[error("a variable has an invalid name or an empty formula")]
     BadVariables,
+    #[error("the photo setup has an out-of-range value")]
+    BadPhoto,
 }
 
 impl Localizable for IntegrityError {
@@ -84,6 +86,7 @@ impl Localizable for IntegrityError {
             }
             Self::BadGrading => Message::new("integrity.bad_grading", text),
             Self::BadVariables => Message::new("integrity.bad_variables", text),
+            Self::BadPhoto => Message::new("integrity.bad_photo", text),
             Self::BadGrade { entity } => {
                 Message::new("integrity.bad_grade", text).arg("entity", entity)
             }
@@ -240,6 +243,13 @@ impl Project {
             {
                 return Err(E::BadAvatar);
             }
+        }
+        if self
+            .photo
+            .as_ref()
+            .is_some_and(|p| p.check_numbers().is_err())
+        {
+            return Err(E::BadPhoto);
         }
         let ids = self
             .garments

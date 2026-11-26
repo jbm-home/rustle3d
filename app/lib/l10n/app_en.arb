@@ -794,9 +794,12 @@
     }
   },
   "photo": "Photo",
-  "photoTip": "Render a photorealistic image of the garment",
-  "photoTitle": "Render a photo",
-  "photoIntro": "A photorealistic image of the garment as the 3D view shows it now, in a photo studio.",
+  "photoTip": "Set up a photo of the garment and render it",
+  "photoTitle": "Photo scene",
+  "photoIntro": "The 3D view shows the photo as it will be. Drag in it to turn around the model, scroll to come closer.",
+  "photoFocal": "Lens",
+  "photoSceneHint": "A short lens shows more of the place around, a long one less, with a flatter look.",
+  "photoSceneCloseTip": "Close the scene (it is saved with the project)",
   "photoQuality": "Quality",
   "photoQuick": "Quick",
   "photoQuickHint": "A first look in seconds",
@@ -866,7 +869,7 @@
   "photoStopTip": "Stop refining and keep the image as it is",
   "photoSave": "Save image…",
   "photoClose": "Close",
-  "photoCloseTip": "Back to the live 3D view",
+  "photoCloseTip": "Put the photo away",
   "photoSaved": "Saved {file}.",
   "@photoSaved": {
     "placeholders": {

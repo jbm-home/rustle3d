@@ -259,8 +259,8 @@ fn catalog() -> (Vec<Tool>, BTreeMap<String, Target>) {
         object(json!({
             "type": "object",
             "properties": {
-                "width": { "type": "integer", "minimum": 16, "maximum": 4096, "default": 1024 },
-                "height": { "type": "integer", "minimum": 16, "maximum": 4096, "default": 768 },
+                "width": { "type": "integer", "minimum": 16, "maximum": 4096, "default": 1024, "description": "Default: the photo scene's, else 1024" },
+                "height": { "type": "integer", "minimum": 16, "maximum": 4096, "default": 768, "description": "Default: the photo scene's, else 768" },
                 "quality": {
                     "enum": names(&photo::Quality::ALL.map(photo::Quality::name)),
                     "default": "good",
@@ -284,8 +284,8 @@ fn catalog() -> (Vec<Tool>, BTreeMap<String, Target>) {
                     "type": "string",
                     "description": format!("Light the photo with an environment instead of the studio (`lighting` is then ignored): a built-in one ({}) or a Radiance .hdr file in the project folder (relative path, e.g. environments/room.hdr). It shows behind the model, with an invisible floor that catches the shadows.", r3d_commands::environments::builtin_names().join(", "))
                 },
-                "turn_deg": { "type": "number", "default": 0, "description": "Turn of the environment in degrees, counter-clockwise seen from above; at 0 the picture's centre is behind the model" },
-                "brightness": { "type": "number", "minimum": photo::BRIGHTNESS.start(), "maximum": photo::BRIGHTNESS.end(), "default": 1, "description": "Factor on the environment's automatic exposure" },
+                "turn_deg": { "type": "number", "default": 0, "description": "Turn of the light around the model in degrees, counter-clockwise seen from above: the studio's lights, or the environment (at 0 its centre is behind the model)" },
+                "brightness": { "type": "number", "minimum": photo::BRIGHTNESS.start(), "maximum": photo::BRIGHTNESS.end(), "default": 1, "description": "Factor on the light: the studio's, or the environment's automatic exposure" },
                 "samples": { "type": "integer", "minimum": 1, "maximum": photo::MAX_SAMPLES, "description": "Overrides the quality's samples per pixel" },
                 "bounces": { "type": "integer", "minimum": 0, "maximum": photo::MAX_BOUNCES, "description": "Overrides the quality's light bounces" },
                 "denoise": { "type": "boolean", "default": true }
@@ -298,7 +298,10 @@ fn catalog() -> (Vec<Tool>, BTreeMap<String, Target>) {
         "Render a photorealistic PNG of the garment on the avatar in a photo studio or an \
          environment (path traced, denoised): the last `simulate` result if the project has not changed since, \
          otherwise the panels where the simulation starts. Takes seconds (quick) to minutes \
-         (best) depending on the GPU and the size; the text result gives the time taken."
+         (best) depending on the GPU and the size; the text result gives the time taken. \
+         When the project has a photo scene (`photo.set_scene`, set in the app), its light, \
+         turn, brightness, camera and size are used for what the arguments leave out; \
+         `camera` or `frame` replace its camera."
             .into(),
         photo_schema,
         Target::Render(render::View::Photo(render::PhotoOptions::default())),
@@ -392,12 +395,13 @@ impl Server {
         view: render::View,
         args: &Map<String, Value>,
     ) -> Result<(Vec<u8>, Value), render::RenderError> {
-        let size = |key: &str, default: u32| -> Result<u32, render::RenderError> {
+        let size = |key: &str| -> Result<Option<u32>, render::RenderError> {
             match args.get(key) {
-                None => Ok(default),
+                None => Ok(None),
                 Some(v) => v
                     .as_u64()
                     .and_then(|n| u32::try_from(n).ok())
+                    .map(Some)
                     .ok_or_else(|| CommandError::Malformed {
                         name: key.into(),
                         detail: "expected a whole number of pixels".into(),
@@ -405,9 +409,17 @@ impl Server {
                     .map_err(Into::into),
             }
         };
+        let internal = |detail: &str| CommandError::Internal {
+            detail: detail.into(),
+        };
+        let ws = self
+            .ws
+            .lock()
+            .map_err(|_| internal("workspace lock poisoned"))?;
+        let scene = ws.session().project().photo();
         let (view, extra): (render::View, &[&str]) = match view {
             render::View::Photo(_) => (
-                render::View::Photo(render::PhotoOptions::from_args(args)?),
+                render::View::Photo(render::PhotoOptions::from_args(args, scene)?),
                 &render::PhotoOptions::KEYS,
             ),
             render::View::Garment(_) => {
@@ -439,19 +451,16 @@ impl Server {
             }
             .into());
         }
-        let (width, height) = (size("width", 1024)?, size("height", 768)?);
-        let internal = |detail: &str| CommandError::Internal {
-            detail: detail.into(),
+        let (width, height) = match (size("width")?, size("height")?, &view) {
+            // A photo takes the scene's size unless one is asked for.
+            (None, None, render::View::Photo(_)) => render::photo_size(&ws, None, (1024, 768)),
+            (w, h, _) => (w.unwrap_or(1024), h.unwrap_or(768)),
         };
         let mut gpu = self.gpu.lock().map_err(|_| internal("GPU lock poisoned"))?;
         if gpu.is_none() {
             *gpu = Some(render::headless_gpu()?);
         }
         let gpu = gpu.as_ref().ok_or_else(|| internal("no GPU"))?;
-        let ws = self
-            .ws
-            .lock()
-            .map_err(|_| internal("workspace lock poisoned"))?;
         render::render(gpu, &ws, view, width, height)
     }
 

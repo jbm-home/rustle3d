@@ -131,8 +131,12 @@ class _ShellState extends State<Shell> {
   /// The photo shown in the 3D view (while it refines, and after).
   PhotoStatus? _photo;
 
-  /// How the last photo was asked for.
+  /// How the last photo was refined.
   PhotoChoice _photoChoice = const PhotoChoice();
+
+  /// The photo scene's settings, while it is open (its panel replaces
+  /// the inspector and the 3D view shows the photo as it will be).
+  SceneSettings? _scene;
   final _clock = Stopwatch()..start();
 
   /// AI agents: whether they may connect, and the changes they made (the
@@ -723,15 +727,46 @@ class _ShellState extends State<Shell> {
     }
   }
 
-  /// Ask how to render a photo, then show it refining in the 3D view.
-  Future<void> _askPhoto() async {
-    final choice = await askPhoto(context, widget.engine, _photoChoice);
-    if (choice == null || !mounted) return;
-    _photoChoice = choice;
+  /// Open the photo scene: the project's, or a studio through the 3D
+  /// view's lens.
+  void _openScene() {
+    try {
+      final scene = widget.engine.photoScene();
+      widget.engine.openScene(settings: scene);
+      setState(() => _scene = scene);
+    } on ApiError catch (e) {
+      _toast(context.error(e));
+    }
+  }
+
+  /// A change in the scene panel: the 3D view shows it at once (back to
+  /// the live photo if a finished one was showing).
+  void _setScene(SceneSettings scene) {
+    if (_photo != null) _closePhoto();
+    setState(() => _scene = scene);
+    _guard(() => widget.engine.setScene(settings: scene));
+  }
+
+  /// Render the photo of the scene, refining in the 3D view.
+  void _shoot() {
+    final scene = _scene;
+    if (scene == null) return;
     final status = _guard(
-      () => widget.engine.startPhoto(request: choice.request),
+      () => widget.engine.startPhoto(request: _photoChoice.request(scene)),
     );
     if (status != null) setState(() => _photo = status);
+    _refresh();
+  }
+
+  /// Close the photo scene (saved in the project) and any photo.
+  void _closeScene() {
+    _guard(widget.engine.closeScene);
+    _guard(widget.engine.closePhoto);
+    setState(() {
+      _scene = null;
+      _photo = null;
+    });
+    _refresh();
   }
 
   void _stopPhoto() => _guard(widget.engine.stopPhoto);
@@ -2778,14 +2813,16 @@ class _ShellState extends State<Shell> {
                               onPointerDown: (_) => _keys.requestFocus(),
                               child: _ViewCard(
                                 key: _tourGarment,
-                                title: _photo == null ? '3D' : l.photo,
+                                title: _photo == null && _scene == null
+                                    ? '3D'
+                                    : l.photo,
                                 maximized: _maximized == ViewKind.garment,
                                 onToggleSize: () =>
                                     _toggleMaximized(ViewKind.garment),
-                                icon: _photo == null
+                                icon: _photo == null && _scene == null
                                     ? Icons.view_in_ar_outlined
                                     : Icons.photo_camera_outlined,
-                                trailing: _photo != null
+                                trailing: _photo != null || _scene != null
                                     ? null
                                     : Row(
                                         mainAxisSize: MainAxisSize.min,
@@ -2829,7 +2866,7 @@ class _ShellState extends State<Shell> {
                                               ),
                                               icon: Icons.photo_camera_outlined,
                                               tip: l.photoTip,
-                                              onTap: _askPhoto,
+                                              onTap: _openScene,
                                             ),
                                           ),
                                         ],
@@ -2855,12 +2892,17 @@ class _ShellState extends State<Shell> {
                                           _refresh();
                                           _toast(l.toastPinned);
                                         },
-                                        drawing: _tool == 'draw',
+                                        // In the photo scene, dragging
+                                        // only turns the camera.
+                                        holding: _scene == null,
+                                        drawing:
+                                            _tool == 'draw' && _scene == null,
                                         onDrawn: (_) {
                                           _refresh();
                                           _toast(l.toastLineAdded);
                                         },
-                                        onMeasure: _tool == 'tape'
+                                        onMeasure:
+                                            _tool == 'tape' && _scene == null
                                             ? _measure
                                             : null,
                                         bodyPoints: _showPoints,
@@ -2905,51 +2947,62 @@ class _ShellState extends State<Shell> {
                           ),
                         ),
                       const SizedBox(width: Space.m),
-                      SizedBox(
-                        width: 264,
-                        child: _Inspector(
-                          key: _spotInspector,
+                      if (_scene case final scene?)
+                        ScenePanel(
                           engine: widget.engine,
-                          selection: _selection,
-                          points: _points,
-                          edges: _edges,
-                          constraints: _constraints,
-                          constraintGroups: _constraintGroups,
-                          panel: _panel,
-                          summary: _summary,
-                          edge: _edge,
-                          seams: _seams,
-                          pins: _pins,
-                          onUnpin: (pin) {
-                            _guard(() => widget.engine.unpin(pin: pin));
-                            _refresh();
-                          },
-                          onArc: _askArc,
-                          run: (step) async {
-                            if (_longSteps.contains(step['type'])) {
-                              await _runLong(step);
-                            } else {
-                              _run(step);
-                            }
-                            if (!mounted) return;
-                            _refresh();
-                            // A new placement, or another size on its own
-                            // body, starts the drape again from around the
-                            // body.
-                            if (step['type'] == 'panel.place' ||
-                                step['type'] == 'grading.show_size' ||
-                                step['type'] == 'grading.use_chart') {
-                              await _restart();
-                            }
-                          },
-                          query: _run,
-                          onLibrary: _showPatternLibrary,
-                          showSizes: widget.engine.showSizes(),
-                          onShowSizes: (show) => setState(
-                            () => widget.engine.setShowSizes(show_: show),
+                          scene: scene,
+                          choice: _photoChoice,
+                          onScene: _setScene,
+                          onChoice: (c) => setState(() => _photoChoice = c),
+                          onShoot: _shoot,
+                          onClose: _closeScene,
+                        )
+                      else
+                        SizedBox(
+                          width: 264,
+                          child: _Inspector(
+                            key: _spotInspector,
+                            engine: widget.engine,
+                            selection: _selection,
+                            points: _points,
+                            edges: _edges,
+                            constraints: _constraints,
+                            constraintGroups: _constraintGroups,
+                            panel: _panel,
+                            summary: _summary,
+                            edge: _edge,
+                            seams: _seams,
+                            pins: _pins,
+                            onUnpin: (pin) {
+                              _guard(() => widget.engine.unpin(pin: pin));
+                              _refresh();
+                            },
+                            onArc: _askArc,
+                            run: (step) async {
+                              if (_longSteps.contains(step['type'])) {
+                                await _runLong(step);
+                              } else {
+                                _run(step);
+                              }
+                              if (!mounted) return;
+                              _refresh();
+                              // A new placement, or another size on its own
+                              // body, starts the drape again from around the
+                              // body.
+                              if (step['type'] == 'panel.place' ||
+                                  step['type'] == 'grading.show_size' ||
+                                  step['type'] == 'grading.use_chart') {
+                                await _restart();
+                              }
+                            },
+                            query: _run,
+                            onLibrary: _showPatternLibrary,
+                            showSizes: widget.engine.showSizes(),
+                            onShowSizes: (show) => setState(
+                              () => widget.engine.setShowSizes(show_: show),
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),

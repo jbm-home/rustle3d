@@ -3,7 +3,7 @@
 //! around the garment from where the camera looks, and a dim sky above
 //! the backdrop.
 
-use glam::Vec3;
+use glam::{Quat, Vec3};
 
 use super::Lighting;
 
@@ -57,18 +57,21 @@ pub(crate) struct Studio {
 impl Studio {
     /// `lighting` around a subject centred at `centre`, seen from `eye`:
     /// the soft boxes keep their place relative to the camera, as a
-    /// photographer moves them when walking around the model.
-    pub fn new(lighting: Lighting, centre: Vec3, eye: Vec3) -> Self {
-        let toward = Vec3::new(eye.x - centre.x, 0.0, eye.z - centre.z)
-            .try_normalize()
-            .unwrap_or(Vec3::Z);
+    /// photographer moves them when walking around the model, turned by
+    /// `turn` (radians, counter-clockwise seen from above). `brightness`
+    /// scales the lights and the sky.
+    pub fn new(lighting: Lighting, centre: Vec3, eye: Vec3, turn: f32, brightness: f32) -> Self {
+        let toward = Quat::from_rotation_y(turn)
+            * Vec3::new(eye.x - centre.x, 0.0, eye.z - centre.z)
+                .try_normalize()
+                .unwrap_or(Vec3::Z);
         let right = Vec3::Y.cross(toward);
         // A point `front` metres toward the camera, `side` to its right,
         // `up` above the centre.
         let at =
             |front: f32, side: f32, up: f32| centre + toward * front + right * side + Vec3::Y * up;
         let aim = centre + Vec3::Y * 0.1;
-        match lighting {
+        let mut studio = match lighting {
             Lighting::Studio => Self {
                 lights: vec![
                     // Key: a large box high on the left.
@@ -101,7 +104,13 @@ impl Studio {
                 sky_horizon: Vec3::splat(0.01),
                 backdrop: Vec3::new(0.05, 0.05, 0.055),
             },
+        };
+        for l in &mut studio.lights {
+            l.radiance *= brightness;
         }
+        studio.sky_top *= brightness;
+        studio.sky_horizon *= brightness;
+        studio
     }
 }
 
@@ -161,7 +170,7 @@ mod tests {
     fn soft_boxes_face_the_subject() {
         let centre = Vec3::new(0.0, 1.0, 0.0);
         for lighting in [Lighting::Studio, Lighting::Soft, Lighting::Dramatic] {
-            let studio = Studio::new(lighting, centre, Vec3::new(0.0, 1.0, 3.0));
+            let studio = Studio::new(lighting, centre, Vec3::new(0.0, 1.0, 3.0), 0.0, 1.0);
             for l in &studio.lights {
                 let normal = l.edge_u.cross(l.edge_v).normalize();
                 let middle = l.corner + (l.edge_u + l.edge_v) * 0.5;
@@ -176,10 +185,21 @@ mod tests {
     #[test]
     fn the_studio_turns_with_the_camera() {
         let c = Vec3::ZERO;
-        let front = Studio::new(Lighting::Studio, c, Vec3::Z * 3.0);
-        let back = Studio::new(Lighting::Studio, c, -Vec3::Z * 3.0);
+        let front = Studio::new(Lighting::Studio, c, Vec3::Z * 3.0, 0.0, 1.0);
+        let back = Studio::new(Lighting::Studio, c, -Vec3::Z * 3.0, 0.0, 1.0);
         let (a, b) = (front.lights[0].corner, back.lights[0].corner);
         assert!((a.x + b.x).abs() < 1e-5 && (a.z + b.z).abs() < 1e-5);
+        // Turning the lights half a turn puts them where the camera
+        // behind would have them, twice as bright.
+        let turned = Studio::new(
+            Lighting::Studio,
+            c,
+            Vec3::Z * 3.0,
+            std::f32::consts::PI,
+            2.0,
+        );
+        assert!(turned.lights[0].corner.distance(b) < 1e-4);
+        assert_eq!(turned.lights[0].radiance, back.lights[0].radiance * 2.0);
     }
 
     #[test]

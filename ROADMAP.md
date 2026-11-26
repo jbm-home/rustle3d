@@ -52,6 +52,7 @@ maintainer's briefs that specs cite as "ROADMAP Mxx" in their
 | M40 | Body scans in PLY and STL ✅ (2026-11-26) | A body scan saved as PLY or STL is imported, checked and draped like an OBJ |
 | M41 | Diagnostic report ✅ (2026-11-26) | An agent marks the faces where a drape goes wrong and reads why: stretch, contacts, seam gaps |
 | M42 | The user's own HDRI ✅ (2026-11-26) | A photo render lit by an environment the user brings (`.hdr`) |
+| M42b | Photo scene ✅ (2026-11-26) | The light's turn and brightness and the lens are set while the 3D view shows the photo as it will be; the scene is saved with the project |
 | M43 | Fabric relief: normal and roughness maps | A denim's weave and a satin's sheen show in the 3D view and the photo |
 | M44 | Fabric presets from open measurements | Presets whose weights and thicknesses come from a published dataset, each value with its source |
 | M45 | Self-collision by contacts | A folded skirt's layers lie on each other, without the puffy ~8 mm gap |
@@ -73,6 +74,10 @@ moves to Linux.
 - **M42 — The user's own HDRI**: an environment map in Radiance `.hdr`
   lights the photo render (spec 14), next to the three built-in
   studios; a default set under CC0 (e.g. Poly Haven). OpenEXR later.
+- **M42b — Photo scene** (from the maintainer's use of M42): the photo
+  set up with a live path-traced preview in the 3D view, a lens (focal
+  length), the light's turn and brightness for the studios too, saved
+  in the project (schema v28) and used by `render_photo` (spec 35).
 - **M43 — Fabric relief**: normal and roughness maps for fabrics,
   alongside the colour texture (spec 25), in the 3D view, the photo
   render and the glTF export; a default set under CC0 (e.g. ambientCG,
@@ -135,9 +140,10 @@ back through the CPU every frame.
 
 As noted when each milestone closed; recheck before taking one up.
 
-- **Environment lighting (M42)**: OpenEXR; light bounced off the
-  garment onto the floor; the app's Place controls not yet seen on
-  screen by the maintainer.
+- **Environment lighting (M42, M42b)**: OpenEXR; light bounced off the
+  garment onto the floor; the photo scene's panel and its live preview
+  not yet seen on screen by the maintainer; the preview shows the drape
+  as it was when the scene opened (no refresh while the drape runs).
 - **Diagnostic report (M41)**: marking the faces with the mouse in the
   3D view and copying the report for an agent; a signed distance to a
   moving body.

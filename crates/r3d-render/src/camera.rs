@@ -105,6 +105,35 @@ impl OrbitCamera {
         }
     }
 
+    /// The camera a project's photo setup describes.
+    pub fn from_photo(c: &r3d_core::PhotoCamera) -> Self {
+        let [x, y, z] = c.target_mm.map(|v| (v / 1000.0) as f32);
+        Self {
+            target: Vec3::new(x, y, z),
+            yaw: (c.yaw_deg.to_radians()) as f32,
+            pitch: (c.pitch_deg.to_radians()) as f32,
+            distance: (c.distance_mm / 1000.0) as f32,
+            fov_y: c.field_of_view() as f32,
+        }
+    }
+
+    /// This camera as a project's photo setup holds it, within its ranges.
+    pub fn to_photo(&self) -> r3d_core::PhotoCamera {
+        use r3d_core::photo::{DISTANCE_MM, FOCAL_MM, PITCH_DEG};
+        let clamp = |v: f64, r: std::ops::RangeInclusive<f64>| v.clamp(*r.start(), *r.end());
+        let yaw = f64::from(self.yaw).to_degrees().rem_euclid(360.0);
+        r3d_core::PhotoCamera {
+            target_mm: self.target.to_array().map(|v| f64::from(v) * 1000.0),
+            yaw_deg: if yaw > 180.0 { yaw - 360.0 } else { yaw },
+            pitch_deg: clamp(f64::from(self.pitch).to_degrees(), PITCH_DEG),
+            distance_mm: clamp(f64::from(self.distance) * 1000.0, DISTANCE_MM),
+            focal_mm: clamp(
+                r3d_core::PhotoCamera::focal_for(f64::from(self.fov_y)),
+                FOCAL_MM,
+            ),
+        }
+    }
+
     /// Rotate by a pointer drag (in pixels).
     pub fn orbit(&mut self, dx: f32, dy: f32) {
         self.yaw -= dx * 0.008;
@@ -192,6 +221,20 @@ mod tests {
         // The target is in the middle of the view.
         let (centre, _) = c.project(c.target, 800, 600).unwrap();
         assert!((centre - Vec2::new(400.0, 300.0)).length() < 1e-2);
+    }
+
+    #[test]
+    fn photo_setups_hold_the_camera() {
+        let c = OrbitCamera {
+            yaw: 7.0,
+            ..OrbitCamera::default()
+        };
+        let back = OrbitCamera::from_photo(&c.to_photo());
+        assert!(back.target.distance(c.target) < 1e-5);
+        assert!((back.eye() - c.eye()).length() < 1e-4);
+        assert!((back.fov_y - c.fov_y).abs() < 1e-6);
+        // The default lens is a 38 mm.
+        assert!((c.to_photo().focal_mm - 38.06).abs() < 0.01);
     }
 
     #[test]

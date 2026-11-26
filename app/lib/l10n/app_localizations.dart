@@ -2818,20 +2818,38 @@ abstract class L {
   /// No description provided for @photoTip.
   ///
   /// In en, this message translates to:
-  /// **'Render a photorealistic image of the garment'**
+  /// **'Set up a photo of the garment and render it'**
   String get photoTip;
 
   /// No description provided for @photoTitle.
   ///
   /// In en, this message translates to:
-  /// **'Render a photo'**
+  /// **'Photo scene'**
   String get photoTitle;
 
   /// No description provided for @photoIntro.
   ///
   /// In en, this message translates to:
-  /// **'A photorealistic image of the garment as the 3D view shows it now, in a photo studio.'**
+  /// **'The 3D view shows the photo as it will be. Drag in it to turn around the model, scroll to come closer.'**
   String get photoIntro;
+
+  /// No description provided for @photoFocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Lens'**
+  String get photoFocal;
+
+  /// No description provided for @photoSceneHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A short lens shows more of the place around, a long one less, with a flatter look.'**
+  String get photoSceneHint;
+
+  /// No description provided for @photoSceneCloseTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Close the scene (it is saved with the project)'**
+  String get photoSceneCloseTip;
 
   /// No description provided for @photoQuality.
   ///
@@ -3046,7 +3064,7 @@ abstract class L {
   /// No description provided for @photoCloseTip.
   ///
   /// In en, this message translates to:
-  /// **'Back to the live 3D view'**
+  /// **'Put the photo away'**
   String get photoCloseTip;
 
   /// No description provided for @photoSaved.

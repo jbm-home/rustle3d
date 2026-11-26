@@ -1,7 +1,7 @@
 # Rendering
 
-Status: living document, last updated 2026-11-26 (M42, environment
-lighting).
+Status: living document, last updated 2026-11-26 (M42b, the photo
+scene's live preview).
 
 How `r3d-render` draws, and where each algorithm comes from. Read it
 before touching `crates/r3d-render/src/photo` or its shaders. Every
@@ -145,8 +145,11 @@ soft boxes and no cyclorama then.
   than 4096 are halved first. The picture's centre looks along −z of
   its own frame, which turns about the vertical with the camera (at
   turn 0 the centre is behind the subject) plus the user's turn.
-- **Exposure**: scaled so the mean luminance over the sphere is 0.8,
-  times the user's brightness.
+- **Exposure**: scaled so the mean luminance over the sphere is 0.8
+  (computed once per picture), times the user's brightness. The turn
+  and brightness are photo settings (`Settings::turn_deg`,
+  `Settings::brightness`) and apply to the studio's soft boxes and sky
+  as well.
 - **Importance sampling** (Pharr, Jakob and Humphreys, *Physically Based
   Rendering*, 3rd ed., §13.6.7 and §14.2.4): a piecewise-constant 2D
   distribution over at most 1024 × 512 cells, each the mean luminance
@@ -164,6 +167,20 @@ soft boxes and no cyclorama then.
   unoccluded irradiance computed on the CPU. The denoiser takes the
   ground's colour as the albedo, so only the shadow is filtered and the
   picture stays sharp; the same holds for the background.
+
+### Aiming again (M42b, the photo scene)
+A `PhotoRenderer` keeps its geometry, hierarchy, pipelines and scene
+buffers while the camera, the turn, the brightness (`aim`) or the size
+(`resize`, new per-pixel buffers only) change; both restart the
+accumulation (the first sample overwrites the sums). The parameters
+that follow the camera (inverse view-projection, eye, soft boxes, sky,
+the environment's turn and scale) are recomputed on the CPU; the result
+is bit-identical to a renderer made there from the start (test). The
+studio's backdrop is built around the camera, so `aim` refuses a camera
+within 0.5 m of its wall or above it, and the scene is built again.
+The app's live preview (`r3d-ffi`, `photo.rs`) refines at half the size
+a side while changes come and at full size 0.25 s after the last one,
+up to 64 samples per pixel.
 
 ### Denoising and display
 - Per pixel the path tracer sums the colour, the luminance squared, and

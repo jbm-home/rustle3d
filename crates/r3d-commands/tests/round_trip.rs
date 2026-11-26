@@ -138,6 +138,12 @@ fn every_command_round_trips() {
     h.round_trip(json!({"type": "panel.set_print_placement", "panel": panel,
         "offset_mm": [12.5, -4], "angle_deg": 90}));
     h.round_trip(json!({"type": "garment.remove_print"}));
+    h.round_trip(json!({"type": "photo.set_scene", "scene": {
+        "light": {"kind": "environment", "name": "pav"}, "turn_deg": 30, "brightness": 1.2,
+        "camera": {"target_mm": [0, 900, 0], "yaw_deg": 20, "pitch_deg": 5,
+            "distance_mm": 3000, "focal_mm": 50},
+        "size": [1080, 1350]}}));
+    h.round_trip(json!({"type": "photo.set_scene", "scene": null}));
     let jacket = h.round_trip(json!({"type": "garment.add", "name": "Jacket",
         "fabric": "wool", "color": "#223344"}));
     let jacket = jacket.created[0].to_string();
