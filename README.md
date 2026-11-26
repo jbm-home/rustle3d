@@ -19,7 +19,7 @@
 ---
 
 <p align="center">
-  <img src="assets/screenshots/app.png" alt="Rustle3D: the pattern of a gingham shirt and denim trousers on the left, the shirt tucked into the trousers and draped on an avatar in the middle, the inspector on the right" width="900">
+  <img src="assets/screenshots/demo.gif" alt="Rustle3D in use: an AI agent connected over MCP drafts jeans and a shirt that drape on the avatar, the shirt gets a blue gingham print; the avatar walks; then the photo scene lights the outfit with a neon-lit place and refines the photo in the 3D view" width="900">
 </p>
 
 Rustle3D is a free desktop app for making clothes: draft the pattern in
