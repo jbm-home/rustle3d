@@ -104,9 +104,7 @@ As noted when each milestone closed; recheck before taking one up.
   cards on the start screen and in the library) were not seen on screen
   (captures came back white): to review. The bodysuit's envelope
   neckline (lapped shoulders), snaps as a trim (its crotch is sewn),
-  binding on its leg openings; a baby under 2 years rests its arms
-  against its chest, and the cloth dips up to 2 cm into the armpit
-  between its vertices; bodies from 14 to 18 are mixed with the adult's
+  binding on its leg openings; bodies from 14 to 18 are mixed with the adult's
   (MakeHuman has no teenager); a baby's hip height wanders between belly
   and hips (its estimate is not checked); a child's own gait (an adult's
   walk scaled to its legs).

@@ -347,6 +347,9 @@ struct Arm {
     /// `PROFILE_STEP` along it from `point - REACH_FROM * down`: the wrist
     /// is where it is smallest.
     reach: Vec<f32>,
+    /// Body points closer than this to the axis (m) belong to the arm
+    /// ([`ARM_RADIUS_M`], smaller on a child's).
+    radius: f32,
 }
 
 /// Height step of the body profile (m).
@@ -592,6 +595,7 @@ impl Arm {
             elbow: 0.0,
             fore: down,
             reach: Vec::new(),
+            radius: ARM_RADIUS_M,
         }
     }
 
@@ -606,14 +610,21 @@ impl Arm {
     }
 
     /// The arm through a shoulder, an elbow and a wrist (an imported
-    /// body's arrangement points).
-    fn through([shoulder, elbow, wrist]: [Vec3; 3], positions: &[Vec3], height: f32) -> Self {
+    /// body's arrangement points, a child's skeleton), its points within
+    /// `radius` of the axis.
+    fn through(
+        [shoulder, elbow, wrist]: [Vec3; 3],
+        positions: &[Vec3],
+        height: f32,
+        radius: f32,
+    ) -> Self {
         let mut arm = Self {
             point: shoulder,
             down: (elbow - shoulder).normalize_or(Vec3::NEG_Y),
             elbow: shoulder.distance(elbow),
             fore: Vec3::NEG_Y,
             reach: Vec::new(),
+            radius,
         };
         arm.fore = (wrist - elbow).normalize_or(arm.down);
         arm.measure(positions, height);
@@ -678,6 +689,7 @@ impl Arm {
             elbow,
             fore,
             reach: Vec::new(),
+            radius: ARM_RADIUS_M,
         };
         arm.measure(positions, height);
         // The forearm's band is short and thick: its principal axis can be
@@ -743,7 +755,7 @@ impl Arm {
             let s = q.dot(self.fore).max(0.0);
             (self.elbow + s, (q - self.fore * s).length())
         };
-        (r < ARM_RADIUS_M && p.y < SHOULDER * height).then_some((t, r))
+        (r < self.radius && p.y < SHOULDER * height).then_some((t, r))
     }
 }
 
@@ -822,9 +834,21 @@ impl Form {
         let arms = match parts {
             Some(p) => p
                 .arms
-                .map(|joints| Arm::through(joints, &positions, height)),
+                .map(|joints| Arm::through(joints, &positions, height, ARM_RADIUS_M)),
             None => [1.0, -1.0].map(|side| Arm::find(&positions, height, side)),
         };
+        Self::assemble(positions, triangles, rig, parts, arms)
+    }
+
+    /// The form around its arms.
+    fn assemble(
+        positions: Vec<Vec3>,
+        triangles: Vec<[u32; 3]>,
+        rig: Option<Rig>,
+        parts: Option<&Parts>,
+        arms: [Arm; 2],
+    ) -> Self {
+        let height = positions.iter().map(|p| p.y).fold(0.0, f32::max);
         let body = torso_and_legs(&positions, &arms, height);
         let radial = Profile::new(height, body.iter().map(|p| (p.y, Vec2::new(p.x, p.z))));
         let legs = match parts {
@@ -955,18 +979,51 @@ impl Form {
         let shaped = fitted_body(model, &fitted(body, typed)?);
         let skeleton = Skeleton::new(model, &shaped);
         let arms = clearance::Arms::new(&skeleton, &shaped.positions, model.weights());
+        // A child's arms from its skeleton: found as an adult's (by
+        // fractions of the stature and distances in metres), a baby's
+        // upper arm pointed forwards out of the shoulder, and its sleeves
+        // were wrapped round that, the arm through their cloth. An
+        // adult's are kept as found.
+        let child_arms = body
+            .age_years
+            .and_then(|_| arm_joints(&skeleton))
+            .map(|joints| {
+                let height = shaped.positions.iter().map(|p| p.y).fold(0.0, f32::max);
+                let radius = ARM_RADIUS_M * height / DEFAULT_HEIGHT_M;
+                joints.map(|j| Arm::through(j, &shaped.positions, height, radius))
+            });
         let rig = Rig {
             skeleton,
             weights: model.weights().to_vec(),
             arms,
             bound: None,
         };
-        Ok(Self::with_rig(
-            shaped.positions,
-            model.triangles().to_vec(),
-            Some(rig),
-        ))
+        let triangles = model.triangles().to_vec();
+        Ok(match child_arms {
+            Some(arms) => Self::assemble(shaped.positions, triangles, Some(rig), None, arms),
+            None => Self::with_rig(shaped.positions, triangles, Some(rig)),
+        })
     }
+}
+
+/// Each arm's shoulder, elbow and wrist joints in `skeleton`, left
+/// first.
+fn arm_joints(skeleton: &Skeleton) -> Option<[[Vec3; 3]; 2]> {
+    let head = |name: &str| {
+        skeleton
+            .bones
+            .iter()
+            .find(|b| b.name == name)
+            .map(|b| b.head)
+    };
+    let arm = |side: &str| {
+        Some([
+            head(&format!("upper_arm_{side}"))?,
+            head(&format!("forearm_{side}"))?,
+            head(&format!("hand_{side}"))?,
+        ])
+    };
+    Some([arm("l")?, arm("r")?])
 }
 
 /// How much lower a panel on an arm is placed per metre further down the
@@ -979,6 +1036,17 @@ pub(crate) fn arm_drop(project: &Project) -> Result<f64, CommandError> {
         return Ok(form.arms.first().map_or(0.8, |a| f64::from(-a.down.y)));
     }
     let arm = match project.avatar() {
+        Some(avatar) if avatar.body.age_years.is_some() => {
+            // A child's arm from its skeleton (see `Form::of_body`).
+            let model = body_model()?;
+            let shaped = fitted_body(model, &fitted(&avatar.body, &avatar.measures)?);
+            let Some([shoulder, elbow, _]) =
+                arm_joints(&Skeleton::new(model, &shaped)).map(|[left, _]| left)
+            else {
+                return Ok(0.8);
+            };
+            return Ok(f64::from(-(elbow - shoulder).normalize_or(Vec3::NEG_Y).y));
+        }
         Some(avatar) => {
             let model = body_model()?;
             let positions = fitted_positions(model, &fitted(&avatar.body, &avatar.measures)?);
@@ -3036,5 +3104,58 @@ pub fn scene3d(
         pieces,
         avatar,
         materials,
+    }
+}
+
+#[cfg(test)]
+mod child_sleeves {
+    #![allow(clippy::unwrap_used, clippy::indexing_slicing)]
+    use super::*;
+
+    /// A baby's sleeves start all round its upper arms. Found as an
+    /// adult's, a 6-month-old's arm axis pointed forwards out of the
+    /// shoulder: its sleeves started off the arm (0 of 12 sectors round
+    /// it), a 12-month-old's with the arm out through one side (10).
+    #[test]
+    fn a_babys_sleeves_start_round_its_arms() {
+        for body in [
+            r#"{"masculinity":0.5,"height_cm":68,"bust_cm":44,"waist_cm":44,"hips_cm":46,"age_years":0.5}"#,
+            r#"{"masculinity":0.5,"height_cm":76,"bust_cm":47,"waist_cm":46,"hips_cm":48,"age_years":1}"#,
+        ] {
+            let mut s = crate::Session::new(Project::new("U"));
+            for step in [
+                format!(r#"{{"type":"avatar.set","body":{body}}}"#),
+                r#"{"type":"template.apply","template":"bodysuit"}"#.to_owned(),
+            ] {
+                let value = serde_json::from_str(&step).unwrap();
+                s.run_step(&crate::Step::from_value(value).unwrap()).unwrap();
+            }
+            let form = Form::of_project(s.project()).unwrap().unwrap();
+            let joints = arm_joints(&form.rig.as_ref().unwrap().skeleton).unwrap();
+            let built = build(s.project(), Some(&form), DEFAULT_SPACING_MM).unwrap();
+            for piece in &built.pieces {
+                let name = &s.project().panel(piece.panel).unwrap().name;
+                if !name.starts_with("Sleeve") {
+                    continue;
+                }
+                // Sectors of 30° round the upper arm's middle that the
+                // sleeve's cloth reaches.
+                let [shoulder, elbow, _] = joints[usize::from(name.ends_with("right"))];
+                let d = (elbow - shoulder).normalize();
+                let x = (Vec3::Y - d * d.y).normalize();
+                let z = d.cross(x);
+                let mut sectors = [false; 12];
+                for q in &built.scene.particles[piece.particles.clone()] {
+                    let v = q.position - shoulder;
+                    if !(0.3..0.7).contains(&(v.dot(d) / shoulder.distance(elbow))) {
+                        continue;
+                    }
+                    let a = v.dot(z).atan2(v.dot(x)) + std::f32::consts::PI;
+                    sectors[((a / std::f32::consts::TAU * 12.0) as usize).min(11)] = true;
+                }
+                let round = sectors.iter().filter(|s| **s).count();
+                assert_eq!(round, 12, "{body}: {name} reaches {round} of 12 sectors");
+            }
+        }
     }
 }

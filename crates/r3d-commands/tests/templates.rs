@@ -402,10 +402,9 @@ fn child(masculinity: f64, body: [f64; 5], template: &str) -> Session {
 
 #[test]
 fn a_babys_bodysuit_closes_under_the_crotch() {
-    // A 24 months baby, 88 cm. (At 12 months the arm rests against the
-    // chest: the cloth cuts 2 cm into the armpit's crease between its
-    // vertices, spec 33.)
-    let s = child(0.5, [2.0, 88.0, 51.0, 49.0, 52.0], "bodysuit");
+    // A 12 months baby, 76 cm. (Its arm found as an adult's, the cloth
+    // cut 2 cm into its armpit: only a 24 months baby was tested.)
+    let s = child(0.5, [1.0, 76.0, 47.0, 46.0, 48.0], "bodysuit");
     let p = s.project();
     assert_eq!(p.garments().values().next().unwrap().name, "Bodysuit");
     // The T-shirt's pieces and seams, and the crotch.
@@ -413,10 +412,10 @@ fn a_babys_bodysuit_closes_under_the_crotch() {
     assert_eq!(p.seams().len(), 11);
     let (low, high) = drape(&s, 180);
     eprintln!("bodysuit: {low:.3}..{high:.3}");
-    // From the shoulders (about 0.7 m) down to under the crotch (0.34
+    // From the shoulders (about 0.6 m) down to under the crotch (0.32
     // m), the legs free.
-    assert!(high > 0.65 && high < 0.8, "top at {high}");
-    assert!(low > 0.25 && low < 0.38, "crotch at {low}");
+    assert!(high > 0.55 && high < 0.68, "top at {high}");
+    assert!(low > 0.22 && low < 0.33, "crotch at {low}");
 }
 
 #[test]
