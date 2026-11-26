@@ -248,8 +248,8 @@ struct PhotoArgs {
     /// else 1).
     #[arg(long)]
     brightness: Option<f64>,
-    /// Photo: an environment's radius around the model, in metres
-    /// (3-100; default: the photo scene's, else 6).
+    /// Photo: how far an environment's walls stand from the model at
+    /// floor level, in metres (1-100; default: the photo scene's, else 3).
     #[arg(long)]
     place_size: Option<f64>,
 }

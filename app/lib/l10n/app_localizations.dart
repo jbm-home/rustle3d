@@ -2848,8 +2848,20 @@ abstract class L {
   /// No description provided for @photoSceneHint.
   ///
   /// In en, this message translates to:
-  /// **'A short lens shows more of the place around, a long one less, with a flatter look. With a place, its size is how far its walls stand from the model: about 6 m for a room, more outdoors.'**
+  /// **'A short lens shows more of the place around, a long one less, with a flatter look. With a place, its size is how far its walls stand from the model: about 3 m for a room, more outdoors.'**
   String get photoSceneHint;
+
+  /// No description provided for @photoDefaults.
+  ///
+  /// In en, this message translates to:
+  /// **'Default settings'**
+  String get photoDefaults;
+
+  /// No description provided for @photoDefaultsTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Put the turn, brightness, place size and lens back as they were at first'**
+  String get photoDefaultsTip;
 
   /// No description provided for @photoSceneCloseTip.
   ///

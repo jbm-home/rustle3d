@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 
 /// The brightness factor's range.
 pub const BRIGHTNESS: std::ops::RangeInclusive<f64> = 0.05..=20.0;
-/// An environment's radius around where its picture was taken (m).
-pub const PLACE_SIZE_M: std::ops::RangeInclusive<f64> = 3.0..=100.0;
+/// How far an environment's walls stand from the model at floor level (m).
+pub const PLACE_SIZE_M: std::ops::RangeInclusive<f64> = 1.0..=100.0;
 /// The focal length's range (mm, on a 24 × 36 mm frame).
 pub const FOCAL_MM: std::ops::RangeInclusive<f64> = 10.0..=300.0;
 /// The camera's distance from the point it looks at (mm).
@@ -82,8 +82,9 @@ pub struct PhotoSetup {
     /// Factor on the light (0.05–20; 1: the usual exposure).
     #[serde(default = "one")]
     pub brightness: f64,
-    /// An environment's radius around the model (m, 3–100; 6: a room):
-    /// its floor ends there and the rest of its picture stands around it.
+    /// How far an environment's walls stand from the model at floor
+    /// level (m, 1–100; 3: a room): its floor ends there and the rest of
+    /// its picture stands around it.
     #[serde(default = "room")]
     pub place_size_m: f64,
     pub camera: PhotoCamera,
@@ -98,7 +99,7 @@ fn one() -> f64 {
 }
 
 fn room() -> f64 {
-    6.0
+    3.0
 }
 
 /// Why a photo setup is refused: the field and what is wrong with it.
@@ -180,7 +181,7 @@ mod tests {
             light: PhotoLight::Studio,
             turn_deg: 0.0,
             brightness: 1.0,
-            place_size_m: 6.0,
+            place_size_m: 3.0,
             camera: PhotoCamera {
                 target_mm: [0.0, 900.0, 0.0],
                 yaw_deg: 30.0,
@@ -220,7 +221,7 @@ mod tests {
         s.brightness = f64::NAN;
         assert_eq!(s.check(&[]), Err(SetupProblem::Range("brightness")));
         let mut s = setup();
-        s.place_size_m = 1.0;
+        s.place_size_m = 0.5;
         assert_eq!(s.check(&[]), Err(SetupProblem::Range("place_size_m")));
         let mut s = setup();
         s.size = Some([4096, 4096]);

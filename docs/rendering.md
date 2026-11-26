@@ -159,9 +159,9 @@ soft boxes and no cyclorama then.
   it at every hit, and a BSDF ray that escapes is weighted against it
   with the power heuristic (MIS as above).
 - **Ground-projected place** (M42b): camera rays look the picture up
-  from a point 1.6 m above the subject, where they leave a dome of the
-  place's radius (3–100 m, the user's) centred there, or where they
-  reach the floor inside it. The subject stands on the picture's ground
+  from a point 1.6 m above the subject, where they leave a dome centred
+  there that meets the floor at the place's size (1–100 m from the
+  subject, the user's), or where they reach the floor inside it. The subject stands on the picture's ground
   and its walls stand up at the place's size; an infinite floor
   flattened the whole lower half of the picture onto the ground. The
   radius grows to keep the camera 0.5 m inside. Light reaching the

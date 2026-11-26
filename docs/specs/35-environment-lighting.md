@@ -52,15 +52,16 @@ shadow on the ground.
 - The environment, like the studio, is part of the project's **photo
   scene** (below), saved in the project document.
 - **What the photo shows**: the environment around the model, sharp, as
-  a place of a given **size** (its radius around the model, 3–100 m,
-  default 6 m, a room): the picture lies on a dome of that radius
-  centred 1.6 m above the model, cut by a floor at the model's feet
-  (height 0). Camera rays look the picture up from that centre where
+  a place of a given **size** (how far its walls stand from the model
+  at floor level, 1–100 m, default 3 m, a room): the picture lies on a
+  dome centred 1.6 m above the model, cut by a floor at the model's
+  feet (height 0) at that distance. Camera rays look the picture up from that centre where
   they reach the floor or the dome (a ground-projected environment), so
   the model stands on the picture's ground and its walls stand up at
   the place's size; an infinite floor (M42) flattened the whole lower
   half of the picture onto the ground. The camera always stays inside
-  the dome (its radius grows to the camera's distance plus 0.5 m). The
+  the dome (its radius grows to the camera's distance plus 0.5 m), so a
+  small place shows only with the camera close. The
   floor catches the shadows: it darkens where the model and the garment hide the
   light from it. The floor shows nothing else (no reflection, no colour
   bleeding) and is invisible to everything but the camera. The
@@ -86,7 +87,7 @@ shadow on the ground.
 - The project keeps how its photos are taken (`photo` in the document,
   schema v28; absent until set): the **light** (`studio`, `soft`,
   `dramatic`, or an `environment` by name), its **turn** and
-  **brightness**, an environment's **place size** (3–100 m), the **camera** (the point it looks at in mm, its turn
+  **brightness**, an environment's **place size** (1–100 m), the **camera** (the point it looks at in mm, its turn
   and height angle in degrees, its distance in mm, its **focal length**
   in mm on a 24 × 36 mm frame whose 24 mm side lies along the image's
   shorter side, 10–300 mm) and the image **size** (16–4096 pixels a
@@ -116,9 +117,11 @@ shadow on the ground.
   list of the built-in environments and the project's `.hdr` files, and
   an **Add .hdr…** button: a file dialog, copied into `environments/`),
   **Turn** (−180° to 180°), **Brightness** (×0.25 to ×4), **Place size**
-  (with Place: 3 to 100 m, on a log scale), **Lens** (18 to 200 mm, on a
-  log scale), **Size**, **Quality** and the advanced
-  settings, and **Render**.
+  (with Place: 1 to 100 m, on a log scale), **Lens** (18 to 200 mm, on a
+  log scale), **Default settings** (puts the turn, brightness, place
+  size and lens back to 0°, ×1, 3 m and 38 mm; off when they are
+  already), **Size**, **Quality** and the advanced settings, and
+  **Render**.
 - The scene opens with the project's settings and camera; without them,
   a studio through the 3D view's own lens (about 38 mm). Closing the
   panel (×) or rendering saves the scene in the project when it

@@ -1611,7 +1611,14 @@ class LFr extends L {
 
   @override
   String get photoSceneHint =>
-      'Une focale courte montre plus du lieu autour, une longue moins, avec un rendu plus plat. Avec un lieu, sa taille est la distance de ses murs au modèle : environ 6 m pour une pièce, plus en extérieur.';
+      'Une focale courte montre plus du lieu autour, une longue moins, avec un rendu plus plat. Avec un lieu, sa taille est la distance de ses murs au modèle : environ 3 m pour une pièce, plus en extérieur.';
+
+  @override
+  String get photoDefaults => 'Réglages par défaut';
+
+  @override
+  String get photoDefaultsTip =>
+      'Remettre la rotation, la luminosité, la taille du lieu et la focale comme au départ';
 
   @override
   String get photoSceneCloseTip =>

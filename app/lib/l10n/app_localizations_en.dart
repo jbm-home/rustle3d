@@ -1597,7 +1597,14 @@ class LEn extends L {
 
   @override
   String get photoSceneHint =>
-      'A short lens shows more of the place around, a long one less, with a flatter look. With a place, its size is how far its walls stand from the model: about 6 m for a room, more outdoors.';
+      'A short lens shows more of the place around, a long one less, with a flatter look. With a place, its size is how far its walls stand from the model: about 3 m for a room, more outdoors.';
+
+  @override
+  String get photoDefaults => 'Default settings';
+
+  @override
+  String get photoDefaultsTip =>
+      'Put the turn, brightness, place size and lens back as they were at first';
 
   @override
   String get photoSceneCloseTip =>

@@ -26,9 +26,15 @@ const photoSizes = [
 const _focalMin = 18.0;
 const _focalMax = 200.0;
 
-/// A place's radius around the model (m).
-const _placeMin = 3.0;
+/// How far a place's walls stand from the model (m).
+const _placeMin = 1.0;
 const _placeMax = 100.0;
+
+/// The settings [ScenePanel]'s Default settings button puts back.
+const _turnDefault = 0.0;
+const _brightnessDefault = 1.0;
+const _placeDefault = 3.0;
+const _focalDefault = 38.0;
 
 /// How long to refine a photo, as last chosen (the scene itself is the
 /// project's).
@@ -235,6 +241,11 @@ class _ScenePanelState extends State<ScenePanel> {
     // The lens on a log scale: as many steps from 18 to 35 mm as from 100
     // to 200 mm.
     final focalSpan = math.log(_focalMax / _focalMin);
+    final atDefaults =
+        s.turnDeg == _turnDefault &&
+        s.brightness == _brightnessDefault &&
+        s.placeSizeM == _placeDefault &&
+        s.focalMm == _focalDefault;
     // The place's size on a log scale too.
     final placeSpan = math.log(_placeMax / _placeMin);
     final placeAt =
@@ -394,6 +405,28 @@ class _ScenePanelState extends State<ScenePanel> {
                           s,
                           focalMm: (_focalMin * math.exp(t * focalSpan))
                               .roundToDouble(),
+                        ),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Tooltip(
+                        message: l.photoDefaultsTip,
+                        child: TextButton.icon(
+                          key: const ValueKey('photoDefaults'),
+                          onPressed: atDefaults
+                              ? null
+                              : () => _scene(
+                                  _with(
+                                    s,
+                                    turnDeg: _turnDefault,
+                                    brightness: _brightnessDefault,
+                                    placeSizeM: _placeDefault,
+                                    focalMm: _focalDefault,
+                                  ),
+                                ),
+                          icon: const Icon(Icons.restart_alt_rounded, size: 18),
+                          label: Text(l.photoDefaults),
                         ),
                       ),
                     ),

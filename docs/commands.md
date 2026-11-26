@@ -4901,8 +4901,8 @@ Set how the project's photos are taken: the light (a studio, or an environment b
           "$ref": "#/$defs/PhotoLight"
         },
         "place_size_m": {
-          "default": 6.0,
-          "description": "An environment's radius around the model (m, 3–100; 6: a room):\nits floor ends there and the rest of its picture stands around it.",
+          "default": 3.0,
+          "description": "How far an environment's walls stand from the model at floor\nlevel (m, 1–100; 3: a room): its floor ends there and the rest of\nits picture stands around it.",
           "format": "double",
           "type": "number"
         },

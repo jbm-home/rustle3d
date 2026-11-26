@@ -151,16 +151,16 @@ pub struct Settings {
     pub turn_deg: f32,
     /// Factor on the light (see [`BRIGHTNESS`]).
     pub brightness: f32,
-    /// An environment's radius around where its picture was taken (m,
-    /// see [`PLACE_SIZE`]): its floor ends there and the rest of the
-    /// picture stands on a dome.
+    /// How far an environment's walls stand from the subject at floor
+    /// level (m, see [`PLACE_SIZE`]): its floor ends there and the rest
+    /// of the picture stands on a dome.
     pub place_size_m: f32,
 }
 
-/// The place's radius range (as `r3d_core::photo::PLACE_SIZE_M`) and its
-/// usual value.
-pub const PLACE_SIZE: std::ops::RangeInclusive<f32> = 3.0..=100.0;
-pub const PLACE_SIZE_DEFAULT: f32 = 6.0;
+/// The place's size range (as `r3d_core::photo::PLACE_SIZE_M`) and its
+/// usual value (a room).
+pub const PLACE_SIZE: std::ops::RangeInclusive<f32> = 1.0..=100.0;
+pub const PLACE_SIZE_DEFAULT: f32 = 3.0;
 
 impl Settings {
     pub fn new(quality: Quality, lighting: Lighting) -> Self {
@@ -1077,7 +1077,10 @@ impl PhotoRenderer {
                 } else {
                     PLACE_SIZE_DEFAULT
                 };
-                p.env_dome = [size.max(eye.distance(taken) + 0.5), 0.0, 0.0, 0.0];
+                // The dome around where the picture was taken meets the
+                // floor `size` from the subject.
+                let radius = size.hypot(environment::CAMERA_HEIGHT);
+                p.env_dome = [radius.max(eye.distance(taken) + 0.5), 0.0, 0.0, 0.0];
             }
         }
     }

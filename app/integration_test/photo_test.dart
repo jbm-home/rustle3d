@@ -74,6 +74,14 @@ void main() {
     await tester.pump();
     await tester.drag(lens, const Offset(60, 0));
     await frames(2);
+    // Default settings puts the lens back.
+    await tap(find.byKey(const ValueKey('photoDefaults')));
+    await frames(2);
+    expect(find.text('38 mm'), findsOneWidget);
+    await tester.ensureVisible(lens);
+    await tester.pump();
+    await tester.drag(lens, const Offset(60, 0));
+    await frames(2);
     final focal = engine.photoScene();
     expect(focal.light, 'studio', reason: 'not saved before closing');
     await tap(find.byKey(const ValueKey('photoRender')));
