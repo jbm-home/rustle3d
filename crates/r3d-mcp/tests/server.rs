@@ -67,6 +67,24 @@ fn edits_are_saved_and_undoable() {
 }
 
 #[test]
+fn each_agent_step_is_undone_on_its_own() {
+    let (_tmp, s) = server();
+    // Two changes of one variable in a row: they would merge in a drag.
+    for formula in ["1 cm", "2 cm"] {
+        let (err, out) = call(
+            &s,
+            "variable_set",
+            json!({"name": "ease", "formula": formula}),
+        );
+        assert!(!err, "{out}");
+    }
+    let (err, _) = call(&s, "history_undo", Value::Null);
+    assert!(!err);
+    let (_, list) = call(&s, "variable_list", json!({}));
+    assert!(list.to_string().contains("1 cm"), "{list}");
+}
+
+#[test]
 fn errors_are_readable_results() {
     let (_tmp, s) = server();
     call(&s, "panel_create_rect", json!({"width": 10, "height": 10}));

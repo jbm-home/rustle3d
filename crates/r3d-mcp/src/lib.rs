@@ -533,7 +533,12 @@ impl Server {
                 detail: "workspace lock poisoned".into(),
             })
         })?;
+        // Each of an agent's steps is an undo step of its own: two moves
+        // of the same point in a row would merge, as a drag's do, and so
+        // would a step like the user's last one.
+        ws.seal_history();
         let value = ws.run_step_with(&step, progress)?;
+        ws.seal_history();
         let changed = ws.session().is_dirty();
         if changed {
             ws.save()?;
