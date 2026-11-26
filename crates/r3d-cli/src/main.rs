@@ -231,6 +231,18 @@ struct PhotoArgs {
     /// Photo: keep the raw samples, without denoising.
     #[arg(long)]
     no_denoise: bool,
+    /// Photo: light with an environment instead of the studio: a
+    /// built-in one (ferndale, kontrast, neon, pav, wooden) or a .hdr
+    /// file in the project folder (see `r3d environment`).
+    #[arg(long)]
+    environment: Option<String>,
+    /// Photo: turn of the environment (degrees, counter-clockwise seen
+    /// from above).
+    #[arg(long, default_value_t = 0.0, allow_negative_numbers = true)]
+    turn: f64,
+    /// Photo: factor on the environment's automatic exposure (0.05-20).
+    #[arg(long, default_value_t = 1.0)]
+    brightness: f64,
 }
 
 impl PhotoArgs {
@@ -268,6 +280,11 @@ impl PhotoArgs {
             args.insert("bounces".into(), n.into());
         }
         args.insert("denoise".into(), (!self.no_denoise).into());
+        if let Some(name) = &self.environment {
+            args.insert("environment".into(), name.as_str().into());
+            args.insert("turn_deg".into(), self.turn.into());
+            args.insert("brightness".into(), self.brightness.into());
+        }
         Ok(render::PhotoOptions::from_args(&args)?)
     }
 }
@@ -360,6 +377,14 @@ enum Cmd {
         /// The print turned from the grainline (degrees).
         #[arg(long, default_value_t = 0.0, allow_negative_numbers = true)]
         angle: f64,
+    },
+    /// Copy a Radiance .hdr environment into the project's
+    /// `environments/` folder, to light photos with it
+    /// (`render --view photo --environment PATH`). Prints its path.
+    Environment {
+        project: PathBuf,
+        /// The .hdr file.
+        file: PathBuf,
     },
     /// Export the pattern at 1:1 scale (svg, pdf, dxf) or the draped garment
     /// (glb, obj, game; the cached `simulate` result if up to date) into
@@ -836,6 +861,11 @@ fn cmd_avatar(cmd: AvatarCmd) -> Result<(), Failure> {
     }
 }
 
+fn cmd_environment(project: &Path, file: &Path) -> Result<(), Failure> {
+    let ws = Workspace::open(project)?;
+    print_json(&json!({ "environment": ws.adopt_environment(file)? }))
+}
+
 fn cmd_texture(
     project: &Path,
     print: &str,
@@ -1064,6 +1094,7 @@ fn main() -> ExitCode {
             height_mm,
             angle,
         } => cmd_texture(&project, &print, garment, width_mm, height_mm, angle),
+        Cmd::Environment { project, file } => cmd_environment(&project, &file),
         Cmd::Marker {
             project,
             sizes,

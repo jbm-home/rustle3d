@@ -21,6 +21,13 @@
 //! - Prints (spec 25): the cloth's albedo is read from its print at the
 //!   hit's texture coordinates (bilinear, repeating, sRGB decoded), from
 //!   one storage buffer holding every print's texels.
+//! - Environment lighting (spec 35): a latitude-longitude picture lights
+//!   the photo instead of the studio, sampled by importance and combined
+//!   with the BSDF's samples by MIS ([`environment`]); an invisible floor
+//!   catches the shadows: camera rays that reach it see the environment
+//!   behind, dimmed by the fraction of the floor's light that the scene
+//!   hides (one sample of the environment per pixel, divided by the
+//!   floor's unoccluded irradiance).
 //! - Denoising: an edge-avoiding à-trous wavelet filter (Dammertz et al.
 //!   2010) guided by normals, depth and the luminance variance, as in the
 //!   spatial part of SVGF (Schied et al. 2017), on the light reaching the
@@ -29,6 +36,7 @@
 //!   colours under neutral light come out as specified.
 
 mod bvh;
+mod environment;
 mod sheen;
 mod studio;
 mod tessellate;
@@ -42,6 +50,8 @@ use crate::mesh::Mesh;
 use crate::offscreen;
 use crate::print::Printed;
 use r3d_core::Fabric;
+
+pub use environment::{BRIGHTNESS, Environment};
 
 /// How long to refine: samples per pixel and light bounces.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -256,6 +266,8 @@ pub struct PhotoScene {
     /// the prints' pixels.
     print_of: Vec<(u32, usize)>,
     prints: Vec<(u64, r3d_core::Texture)>,
+    /// The light around, instead of the studio.
+    environment: Option<Environment>,
 }
 
 impl Default for PhotoScene {
@@ -278,6 +290,7 @@ impl PhotoScene {
             surfaces: vec![Surface::backdrop(Vec3::ONE)],
             print_of: Vec::new(),
             prints: Vec::new(),
+            environment: None,
         };
         if let Some(body) = body {
             scene.add(&tessellate::closed(body), Surface::mannequin(), BODY_LEVEL);
@@ -320,6 +333,13 @@ impl PhotoScene {
         self.surface_of
             .extend(std::iter::repeat_n(index, tris.len()));
         self.triangles.extend(tris);
+    }
+
+    /// Light the scene by `environment` instead of the studio (spec 35):
+    /// it shows behind, and a floor at the feet catches the shadows.
+    pub fn with_environment(mut self, environment: Environment) -> Self {
+        self.environment = Some(environment);
+        self
     }
 
     /// Number of triangles (without the backdrop).
@@ -423,6 +443,16 @@ struct TraceParams {
     clamp: f32,
     _pad: [u32; 2],
     lights: [GpuLight; MAX_LIGHTS],
+    /// The environment: texels' offset in the shared buffer, width,
+    /// height, tables' offset.
+    env_at: [u32; 4],
+    /// Sampling grid's columns and rows; 1 when there is an environment.
+    env_grid: [u32; 4],
+    /// Cosine and sine of its turn, its scale, the floor's height.
+    env_turn: [f32; 4],
+    /// 1 / the floor's unoccluded luminance (scaled), then where the
+    /// picture was taken: x, height above the floor, z.
+    env_floor: [f32; 4],
 }
 
 #[repr(C)]
@@ -578,7 +608,11 @@ impl PhotoRenderer {
             .bounds()
             .unwrap_or((Vec3::new(-0.3, 0.0, -0.3), Vec3::new(0.3, 1.8, 0.3)));
         let centre = (lo + hi) * 0.5;
-        let studio = studio::Studio::new(settings.lighting, centre, eye);
+        let mut studio = studio::Studio::new(settings.lighting, centre, eye);
+        let environment = scene.environment.as_ref();
+        if environment.is_some() {
+            studio.lights.clear();
+        }
 
         // The backdrop wraps the camera and the subject.
         let reach = Vec3::new(eye.x, 0.0, eye.z)
@@ -589,7 +623,11 @@ impl PhotoRenderer {
         let height_m = (eye.y.max(hi.y) + 3.0).max(5.0);
         let mut triangles = scene.triangles.clone();
         let mut surface_of = scene.surface_of.clone();
-        let backdrop = studio::backdrop(radius, height_m);
+        let backdrop = if environment.is_some() {
+            Vec::new()
+        } else {
+            studio::backdrop(radius, height_m)
+        };
         surface_of.extend(std::iter::repeat_n(0, backdrop.len()));
         triangles.extend(backdrop.into_iter().map(|(p, n)| (p, n, [[0.0; 2]; 3])));
         let mut surfaces = scene.surfaces.clone();
@@ -639,7 +677,7 @@ impl PhotoRenderer {
             };
         }
         let aspect = width as f32 / height as f32;
-        let params = TraceParams {
+        let mut params = TraceParams {
             inv_view_proj: camera.view_proj(aspect).inverse().to_cols_array_2d(),
             eye: eye.extend(1.0).to_array(),
             sky_top: studio.sky_top.extend(0.0).to_array(),
@@ -651,6 +689,10 @@ impl PhotoRenderer {
             clamp: CLAMP,
             _pad: [0; 2],
             lights,
+            env_at: [0; 4],
+            env_grid: [0; 4],
+            env_turn: [0.0; 4],
+            env_floor: [0.0; 4],
         };
 
         let device = &gpu.device;
@@ -669,6 +711,38 @@ impl PhotoRenderer {
         let table = sheen::albedo_table();
         let mut lut: Vec<u32> = table.iter().map(|v| v.to_bits()).collect();
         lut.extend(print_texels(&scene.prints));
+        if let Some(env) = environment {
+            let (nu, nv, tables) = env.sampling();
+            params.env_at = [
+                lut.len() as u32,
+                env.width(),
+                env.height(),
+                (lut.len() + (env.width() * env.height()) as usize) as u32,
+            ];
+            lut.extend(env.rgbe());
+            lut.extend(tables.iter().map(|v| v.to_bits()));
+            params.env_grid = [nu, nv, 1, 0];
+            // At turn 0 the picture's centre (its −z) is behind the
+            // subject seen from the camera.
+            let toward = Vec3::new(eye.x - centre.x, 0.0, eye.z - centre.z)
+                .try_normalize()
+                .unwrap_or(Vec3::Z);
+            let turn = if env.turn_deg.is_finite() {
+                env.turn_deg.to_radians()
+            } else {
+                0.0
+            };
+            let angle = toward.x.atan2(toward.z) + turn;
+            let scale = env.scale();
+            params.env_turn = [angle.cos(), angle.sin(), scale, lo.y.min(0.0)];
+            let floor = env.floor_irradiance() * scale;
+            params.env_floor = [
+                if floor > 1e-12 { 1.0 / floor } else { 0.0 },
+                centre.x,
+                environment::CAMERA_HEIGHT,
+                centre.z,
+            ];
+        }
         let lut = storage(gpu, "sheen and prints", bytemuck::cast_slice(&lut), none);
         let pixels = u64::from(width) * u64::from(height);
         let make = |label| {

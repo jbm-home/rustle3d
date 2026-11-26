@@ -15,6 +15,7 @@ pub mod drawing;
 pub mod dxf;
 pub mod game;
 pub mod gltf;
+pub mod hdr;
 pub mod import;
 pub mod marker;
 pub mod model;

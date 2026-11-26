@@ -1647,6 +1647,25 @@ class LFr extends L {
   String get lightDramaticHint => 'Une lumière dure sur fond sombre';
 
   @override
+  String get lightEnvironment => 'Lieu';
+
+  @override
+  String get lightEnvironmentHint =>
+      'Un vrai lieu (une image HDR) éclaire le vêtement et se voit derrière lui, avec son ombre au sol';
+
+  @override
+  String get photoEnvironmentAdd => 'Ajouter un .hdr…';
+
+  @override
+  String get photoEnvironmentFiles => 'Images HDR';
+
+  @override
+  String get photoTurn => 'Rotation';
+
+  @override
+  String get photoBrightness => 'Luminosité';
+
+  @override
   String get photoSize => 'Taille';
 
   @override

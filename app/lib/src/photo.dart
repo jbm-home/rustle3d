@@ -1,6 +1,7 @@
 // Photos: the dialog that chooses how to render one, and the bar over the
 // 3D view while it refines (docs/specs/14-photoreal-rendering.md).
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -26,13 +27,24 @@ class PhotoChoice {
     this.samples,
     this.bounces,
     this.denoise = true,
+    this.environment = 'ferndale',
+    this.turnDeg = 0,
+    this.brightness = 1,
   });
 
   /// `quick`, `good` or `best`.
   final String quality;
 
-  /// `studio`, `soft` or `dramatic`.
+  /// `studio`, `soft`, `dramatic`, or `environment` (lit by
+  /// [environment], spec 35).
   final String lighting;
+
+  /// A built-in environment's name or a `.hdr` file in the project.
+  final String environment;
+
+  /// The environment's turn (degrees) and brightness factor.
+  final double turnDeg;
+  final double brightness;
 
   /// Index into [photoSizes].
   final int size;
@@ -44,29 +56,38 @@ class PhotoChoice {
 
   PhotoRequest get request {
     final (width, height) = photoSizes[size.clamp(0, photoSizes.length - 1)];
+    final lit = lighting == 'environment';
     return PhotoRequest(
       quality: quality,
-      lighting: lighting,
+      lighting: lit ? 'studio' : lighting,
       width: width,
       height: height,
       samples: samples,
       bounces: bounces,
       denoise: denoise,
+      environment: lit ? environment : null,
+      turnDeg: turnDeg,
+      brightness: brightness,
     );
   }
 }
 
 /// Ask how to render a photo; `null` when cancelled.
-Future<PhotoChoice?> askPhoto(BuildContext context, PhotoChoice initial) {
+Future<PhotoChoice?> askPhoto(
+  BuildContext context,
+  Engine engine,
+  PhotoChoice initial,
+) {
   return showDialog<PhotoChoice>(
     context: context,
-    builder: (_) => _PhotoDialog(initial: initial),
+    builder: (_) => _PhotoDialog(engine: engine, initial: initial),
   );
 }
 
 class _PhotoDialog extends StatefulWidget {
-  const _PhotoDialog({required this.initial});
+  const _PhotoDialog({required this.engine, required this.initial});
 
+  final Engine engine;
   final PhotoChoice initial;
 
   @override
@@ -78,6 +99,10 @@ class _PhotoDialogState extends State<_PhotoDialog> {
   late String _lighting = widget.initial.lighting;
   late int _size = widget.initial.size;
   late bool _denoise = widget.initial.denoise;
+  late String _environment = widget.initial.environment;
+  late double _turn = widget.initial.turnDeg;
+  late double _brightness = widget.initial.brightness;
+  late List<String> _environments = _listEnvironments();
   late final _samples = TextEditingController(
     text: widget.initial.samples?.toString() ?? '',
   );
@@ -92,6 +117,47 @@ class _PhotoDialogState extends State<_PhotoDialog> {
     super.dispose();
   }
 
+  List<String> _listEnvironments() {
+    try {
+      return widget.engine.environments();
+    } on ApiError {
+      return const [];
+    }
+  }
+
+  /// A built-in environment's name, capitalised, or a file's name.
+  String _environmentName(String id) {
+    if (id.contains('/')) return id.split('/').last;
+    return id.isEmpty ? id : id[0].toUpperCase() + id.substring(1);
+  }
+
+  Future<void> _addEnvironment() async {
+    final l = context.l;
+    final messenger = ScaffoldMessenger.of(context);
+    final file = await openFile(
+      acceptedTypeGroups: [
+        XTypeGroup(label: l.photoEnvironmentFiles, extensions: const ['hdr']),
+      ],
+    );
+    if (file == null || !mounted) return;
+    try {
+      final path = await widget.engine.adoptEnvironment(path: file.path);
+      if (!mounted) return;
+      setState(() {
+        _environments = _listEnvironments();
+        _environment = path;
+      });
+    } on ApiError catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(context.error(e)),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   void _render() {
     Navigator.pop(
       context,
@@ -102,6 +168,9 @@ class _PhotoDialogState extends State<_PhotoDialog> {
         samples: int.tryParse(_samples.text),
         bounces: int.tryParse(_bounces.text),
         denoise: _denoise,
+        environment: _environment,
+        turnDeg: _turn,
+        brightness: _brightness,
       ),
     );
   }
@@ -119,6 +188,7 @@ class _PhotoDialogState extends State<_PhotoDialog> {
       ('studio', l.lightStudio, l.lightStudioHint),
       ('soft', l.lightSoft, l.lightSoftHint),
       ('dramatic', l.lightDramatic, l.lightDramaticHint),
+      ('environment', l.lightEnvironment, l.lightEnvironmentHint),
     ];
     Widget label(String text) => Padding(
       padding: const EdgeInsets.only(top: Space.l, bottom: Space.s),
@@ -169,6 +239,54 @@ class _PhotoDialogState extends State<_PhotoDialog> {
                 onSelectionChanged: (s) => setState(() => _lighting = s.first),
               ),
               hint(lighting.$3),
+              if (_lighting == 'environment') ...[
+                const SizedBox(height: Space.s),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButton<String>(
+                        key: const ValueKey('photoEnvironment'),
+                        isExpanded: true,
+                        value: _environments.contains(_environment)
+                            ? _environment
+                            : null,
+                        items: [
+                          for (final id in _environments)
+                            DropdownMenuItem(
+                              value: id,
+                              child: Text(_environmentName(id)),
+                            ),
+                        ],
+                        onChanged: (id) =>
+                            setState(() => _environment = id ?? _environment),
+                      ),
+                    ),
+                    const SizedBox(width: Space.s),
+                    TextButton(
+                      onPressed: _addEnvironment,
+                      child: Text(l.photoEnvironmentAdd),
+                    ),
+                  ],
+                ),
+                _SliderRow(
+                  label: l.photoTurn,
+                  value: _turn,
+                  min: -180,
+                  max: 180,
+                  divisions: 72,
+                  text: '${_turn.round()}°',
+                  onChanged: (v) => setState(() => _turn = v),
+                ),
+                _SliderRow(
+                  label: l.photoBrightness,
+                  value: _brightness,
+                  min: 0.25,
+                  max: 4,
+                  divisions: 15,
+                  text: '× ${context.number(_brightness, 2)}',
+                  onChanged: (v) => setState(() => _brightness = v),
+                ),
+              ],
               label(l.photoSize),
               DropdownButton<int>(
                 isExpanded: true,
@@ -229,6 +347,57 @@ class _PhotoDialogState extends State<_PhotoDialog> {
           onPressed: _render,
           icon: const Icon(Icons.photo_camera_outlined, size: 18),
           label: Text(l.photoRender),
+        ),
+      ],
+    );
+  }
+}
+
+/// A labelled slider with its value written beside it.
+class _SliderRow extends StatelessWidget {
+  const _SliderRow({
+    required this.label,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.divisions,
+    required this.text,
+    required this.onChanged,
+  });
+
+  final String label;
+  final double value;
+  final double min;
+  final double max;
+  final int divisions;
+  final String text;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    return Row(
+      children: [
+        SizedBox(
+          width: 96,
+          child: Text(label, style: ts(fontSize: 13, color: p.text)),
+        ),
+        Expanded(
+          child: Slider(
+            value: value.clamp(min, max),
+            min: min,
+            max: max,
+            divisions: divisions,
+            onChanged: onChanged,
+          ),
+        ),
+        SizedBox(
+          width: 52,
+          child: Text(
+            text,
+            textAlign: TextAlign.right,
+            style: ts(fontSize: 13, color: p.text, tabular: true),
+          ),
         ),
       ],
     );

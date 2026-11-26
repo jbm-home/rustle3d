@@ -52,6 +52,15 @@ struct Params {
     clamp_value: f32,
     pad: vec2<u32>,
     lights: array<Light, 4>,
+    // The environment (spec 35): texels' offset in `sheen_table`, width,
+    // height, tables' offset; grid columns and rows, 1 when there is
+    // one; cosine and sine of its turn, its scale, the floor's height;
+    // 1 / the floor's unoccluded luminance, then where the picture was
+    // taken (x, height above the floor, z).
+    env_at: vec4<u32>,
+    env_grid: vec4<u32>,
+    env_turn: vec4<f32>,
+    env_floor: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> params: Params;
@@ -59,7 +68,8 @@ struct Params {
 @group(0) @binding(2) var<storage, read> triangles: array<Triangle>;
 @group(0) @binding(3) var<storage, read> surfaces: array<Surface>;
 // The sheen's albedo table (SHEEN_SIZE² floats, as bits), then the prints:
-// their count, each one's offset, width and height, then RGBA8 texels.
+// their count, each one's offset, width and height, then RGBA8 texels;
+// then the environment's RGBE texels and its sampling tables (floats).
 @group(0) @binding(4) var<storage, read> sheen_table: array<u32>;
 @group(0) @binding(5) var<storage, read_write> color_sum: array<vec4<f32>>;
 @group(0) @binding(6) var<storage, read_write> albedo_sum: array<vec4<f32>>;
@@ -226,6 +236,125 @@ fn hit_light(o: vec3<f32>, d: vec3<f32>, t_max: f32) -> vec2<f32> {
 fn sky(d: vec3<f32>) -> vec3<f32> {
     let up = clamp(d.y, 0.0, 1.0);
     return mix(params.sky_horizon.rgb, params.sky_top.rgb, sqrt(up));
+}
+
+// ---------------------------------------------------------------- environment
+
+fn has_environment() -> bool {
+    return params.env_grid.z == 1u;
+}
+
+// World direction into the environment's frame and back (a turn about y).
+fn to_env(d: vec3<f32>) -> vec3<f32> {
+    let c = params.env_turn.x;
+    let s = params.env_turn.y;
+    return vec3<f32>(c * d.x - s * d.z, d.y, s * d.x + c * d.z);
+}
+
+fn from_env(d: vec3<f32>) -> vec3<f32> {
+    let c = params.env_turn.x;
+    let s = params.env_turn.y;
+    return vec3<f32>(c * d.x + s * d.z, d.y, -s * d.x + c * d.z);
+}
+
+// Picture coordinates of a direction in the environment's frame.
+fn env_uv(d: vec3<f32>) -> vec2<f32> {
+    return vec2<f32>(0.5 + atan2(d.x, -d.z) * (0.5 * INV_PI), acos(clamp(d.y, -1.0, 1.0)) * INV_PI);
+}
+
+// Ward's RGBE decoding.
+fn env_texel(x: u32, y: u32) -> vec3<f32> {
+    let t = sheen_table[params.env_at.x + y * params.env_at.y + x];
+    let e = t >> 24u;
+    if e == 0u {
+        return vec3<f32>(0.0);
+    }
+    let m = vec3<f32>(f32(t & 0xffu), f32((t >> 8u) & 0xffu), f32((t >> 16u) & 0xffu));
+    return (m + 0.5) * exp2(f32(e) - 136.0);
+}
+
+// The light coming from world direction `d`: bilinear, repeating across
+// the picture's sides, scaled.
+fn environment(d: vec3<f32>) -> vec3<f32> {
+    let w = params.env_at.y;
+    let h = params.env_at.z;
+    let uv = env_uv(to_env(d));
+    let p = uv * vec2<f32>(f32(w), f32(h)) - 0.5;
+    let f = fract(p);
+    let x0 = i32(floor(p.x));
+    let y0 = clamp(i32(floor(p.y)), 0, i32(h) - 1);
+    let y1 = clamp(i32(floor(p.y)) + 1, 0, i32(h) - 1);
+    let xa = u32(((x0 % i32(w)) + i32(w)) % i32(w));
+    let xb = (xa + 1u) % w;
+    let top = mix(env_texel(xa, u32(y0)), env_texel(xb, u32(y0)), f.x);
+    let bottom = mix(env_texel(xa, u32(y1)), env_texel(xb, u32(y1)), f.x);
+    return mix(top, bottom, f.y) * params.env_turn.z;
+}
+
+fn table(i: u32) -> f32 {
+    return bitcast<f32>(sheen_table[params.env_at.w + i]);
+}
+
+// Last index i < n with cdf[i] <= u (the CDF starts at `at`).
+fn search(at: u32, n: u32, u: f32) -> u32 {
+    var lo = 0u;
+    var hi = n;
+    while hi - lo > 1u {
+        let mid = (lo + hi) / 2u;
+        if table(at + mid) <= u {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    return lo;
+}
+
+// Offset of the cells' densities in the tables.
+fn density_at() -> u32 {
+    let nu = params.env_grid.x;
+    let nv = params.env_grid.y;
+    return nv + 1u + nv * (nu + 1u);
+}
+
+// Density (solid angle) of picking world direction `d`.
+fn env_pdf(d: vec3<f32>) -> f32 {
+    let e = to_env(d);
+    let sin_t = sqrt(max(1.0 - e.y * e.y, 0.0));
+    if sin_t < 1e-6 {
+        return 0.0;
+    }
+    let nu = params.env_grid.x;
+    let nv = params.env_grid.y;
+    let uv = env_uv(e);
+    let i = min(u32(uv.x * f32(nu)), nu - 1u);
+    let j = min(u32(uv.y * f32(nv)), nv - 1u);
+    return table(density_at() + j * nu + i) / (2.0 * PI * PI * sin_t);
+}
+
+// A world direction picked in proportion to the light (xyz) and its
+// density (w; 0 when unusable). Pharr, Jakob and Humphreys, PBRT 14.2.4.
+fn env_sample() -> vec4<f32> {
+    let nu = params.env_grid.x;
+    let nv = params.env_grid.y;
+    let u1 = rand();
+    let j = search(0u, nv, u1);
+    let c0 = table(j);
+    let v = (f32(j) + (u1 - c0) / max(table(j + 1u) - c0, 1e-12)) / f32(nv);
+    let row = nv + 1u + j * (nu + 1u);
+    let u2 = rand();
+    let i = search(row, nu, u2);
+    let d0 = table(row + i);
+    let u = (f32(i) + (u2 - d0) / max(table(row + i + 1u) - d0, 1e-12)) / f32(nu);
+    let theta = clamp(v, 0.0, 1.0) * PI;
+    let phi = 2.0 * PI * (u - 0.5);
+    let sin_t = sin(theta);
+    if sin_t < 1e-6 {
+        return vec4<f32>(0.0, 1.0, 0.0, 0.0);
+    }
+    let local = vec3<f32>(sin_t * sin(phi), cos(theta), -sin_t * cos(phi));
+    let pdf = table(density_at() + j * nu + i) / (2.0 * PI * PI * sin_t);
+    return vec4<f32>(from_env(local), pdf);
 }
 
 // Orthonormal basis around n (Duff et al. 2017, "Building an Orthonormal
@@ -504,7 +633,53 @@ fn trace(@builtin(global_invocation_id) id: vec3<u32>) {
             radiance += c;
             break;
         }
+        // The floor that catches shadows: seen by the camera only, as the
+        // picture's ground seen from where it was taken (so it lies under
+        // the subject in perspective and meets the horizon far away),
+        // dimmed by the share of the floor's light the scene hides.
+        if has_environment() && bounce == 0u && d.y < 0.0 {
+            let t_floor = (params.env_turn.w - o.y) / d.y;
+            if t_floor > 0.0 && t_floor < hit.t {
+                let q = o + d * t_floor + vec3<f32>(0.0, EPS, 0.0);
+                let taken = vec3<f32>(
+                    params.env_floor.y,
+                    params.env_turn.w + params.env_floor.z,
+                    params.env_floor.w,
+                );
+                let behind = environment(normalize(q - taken));
+                let s = env_sample();
+                var lit = 0.0;
+                if s.w > 0.0 && s.y > 0.0 && intersect(q, s.xyz, FAR, true).tri == NONE {
+                    lit = luminance(environment(s.xyz)) * s.y / s.w * params.env_floor.x;
+                }
+                radiance = behind * lit;
+                first_albedo = behind;
+                first_normal = vec3<f32>(0.0, 1.0, 0.0);
+                first_depth = t_floor;
+                first_hit = 1.0;
+                break;
+            }
+        }
         if hit.tri == NONE {
+            if has_environment() {
+                let light = environment(d);
+                if bounce == 0u {
+                    // The denoiser keeps the picture sharp.
+                    first_albedo = light;
+                    radiance += light;
+                    break;
+                }
+                var w = 1.0;
+                if last_pdf > 0.0 {
+                    w = power_heuristic(last_pdf, env_pdf(d));
+                }
+                var c = throughput * light * w;
+                if bounce > 1u {
+                    c = clamp_contribution(c);
+                }
+                radiance += c;
+                break;
+            }
             var c = throughput * sky(d);
             if bounce > 1u {
                 c = clamp_contribution(c);
@@ -582,6 +757,28 @@ fn trace(@builtin(global_invocation_id) id: vec3<u32>) {
                         let light_pdf = l.radiance.w * dist * dist / (l.corner.w * cos_l);
                         let w = power_heuristic(light_pdf, e.a);
                         var c = throughput * l.radiance.rgb * e.rgb * (w / light_pdf);
+                        if bounce > 0u {
+                            c = clamp_contribution(c);
+                        }
+                        radiance += c;
+                    }
+                }
+            }
+        }
+
+        // Next event estimation: a direction of the environment.
+        if has_environment() {
+            let s = env_sample();
+            if s.w > 0.0 {
+                let wi_world = s.xyz;
+                let front = dot(wi_world, ng) > 0.0;
+                let origin = select(out_back, out_front, front);
+                let wi = to_local * wi_world;
+                if (wi.z > 0.0) == front {
+                    let e = bsdf_eval(lb, wo, wi);
+                    if max3(e.rgb) > 0.0 && intersect(origin, wi_world, FAR, true).tri == NONE {
+                        let w = power_heuristic(s.w, e.a);
+                        var c = throughput * environment(wi_world) * e.rgb * (w / s.w);
                         if bounce > 0u {
                             c = clamp_contribution(c);
                         }

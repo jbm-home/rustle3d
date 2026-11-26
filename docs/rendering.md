@@ -1,7 +1,7 @@
 # Rendering
 
-Status: living document, last updated 2026-11-19 (M15, baked normal
-maps for game exports).
+Status: living document, last updated 2026-11-26 (M42, environment
+lighting).
 
 How `r3d-render` draws, and where each algorithm comes from. Read it
 before touching `crates/r3d-render/src/photo` or its shaders. Every
@@ -134,6 +134,37 @@ colour.
   right, a rim behind. Soft: three large boxes, white backdrop. Dramatic:
   one small hard key from the side and a rim, dark backdrop.
 
+### Environments (M42, spec 35)
+A latitude-longitude picture (Radiance `.hdr`, read by `r3d_io::hdr`
+after Ward 1991, "Real Pixels", Graphics Gems II) can light the photo
+instead of the studio (`PhotoScene::with_environment`); there are no
+soft boxes and no cyclorama then.
+- **Storage**: the texels as Ward's RGBE, one `u32` each, after the
+  prints in the buffer shared with the sheen table (no storage binding
+  is free), decoded in the shader and read bilinearly; pictures wider
+  than 4096 are halved first. The picture's centre looks along −z of
+  its own frame, which turns about the vertical with the camera (at
+  turn 0 the centre is behind the subject) plus the user's turn.
+- **Exposure**: scaled so the mean luminance over the sphere is 0.8,
+  times the user's brightness.
+- **Importance sampling** (Pharr, Jakob and Humphreys, *Physically Based
+  Rendering*, 3rd ed., §13.6.7 and §14.2.4): a piecewise-constant 2D
+  distribution over at most 1024 × 512 cells, each the mean luminance
+  of its texels times sin θ; a marginal CDF over the rows and a
+  conditional CDF per row, searched by bisection; the density of a
+  direction is `p(u, v) / (2π² sin θ)`. Next event estimation samples
+  it at every hit, and a BSDF ray that escapes is weighted against it
+  with the power heuristic (MIS as above).
+- **Shadow catcher**: an invisible floor at the feet that camera rays
+  alone see. It shows the picture's ground as seen from 1.6 m above the
+  subject (a projection of the lower half on the plane, so the subject
+  stands on it and the floor meets the horizon far away), times the
+  share of the floor's light the scene leaves: one environment sample
+  per pixel, `L(ω) cos θ V(ω) / p(ω)`, divided by the floor's
+  unoccluded irradiance computed on the CPU. The denoiser takes the
+  ground's colour as the albedo, so only the shadow is filtered and the
+  picture stays sharp; the same holds for the background.
+
 ### Denoising and display
 - Per pixel the path tracer sums the colour, the luminance squared, and
   at the first hit the albedo, depth and normal.
@@ -154,14 +185,17 @@ colour.
   2160) and 4096 pixels a side.
 - Prints colour the cloth's albedo only (no weave normal or roughness
   maps); the cloth is a single surface, printed alike on both sides.
+- Environments: the floor shows no light bounced off the garment; the
+  picture's own objects on the ground are flattened onto the floor.
 
 ### Prints
 A printed surface (`Cloth::print`) carries texture coordinates on its
 triangles (interpolated flat through the Phong tessellation) and the
 index of its print. At a hit the albedo is the print's colour there:
 bilinear, repeating, decoded from sRGB, read from one storage buffer
-that holds the sheen table and every print's texels (one `u32` per
-texel; WebGPU guarantees eight storage buffers per stage, all in use).
+that holds the sheen table, every print's texels and the environment
+(one `u32` per texel; WebGPU guarantees eight storage buffers per stage
+and the passes use most of them).
 No mip-maps: the samples a pixel takes average the print as they
 accumulate. The denoiser is guided by this albedo, so the print stays
 sharp after filtering. The sheen keeps the tint of the print's average
@@ -201,7 +235,11 @@ the GPU: its images are baked on the CPU by `r3d_geom::bake`.
 `crates/r3d-render/tests/photo.rs` (skipped on machines without any GPU
 adapter; a software Vulkan driver such as lavapipe is enough): a photo in each lighting, the same photo twice is
 identical, more samples and the denoiser smooth the image at the same
-mean brightness, progressive sample counting, oversized photos refused.
+mean brightness, progressive sample counting, oversized photos refused,
+a photo in each built-in environment, a whole turn of the environment
+changing nothing, and the floor's shadow under a plate in an even sky.
+`photo::environment`'s unit tests check the densities (1 / 4π for an
+even sky, integrating to 1 with a sun) and the RGBE encoding.
 Unit tests cover the hierarchy (every triangle in one leaf; walking it
 finds the brute-force closest hit), tessellation, hole capping, the
 studio and the sheen table. Set `R3D_RENDER_OUT` to keep the images.

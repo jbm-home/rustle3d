@@ -34,6 +34,8 @@ pub enum WorkspaceError {
     Texture(#[from] r3d_io::texture::TextureError),
     #[error(transparent)]
     Model(#[from] r3d_io::model::ModelError),
+    #[error(transparent)]
+    Hdr(#[from] r3d_io::hdr::HdrError),
     #[error("not a readable zip archive: {detail}")]
     Archive { detail: String },
     #[error(
@@ -68,6 +70,7 @@ impl Localizable for WorkspaceError {
             Self::Image(e) => e.message(),
             Self::Texture(e) => e.message(),
             Self::Model(e) => e.message(),
+            Self::Hdr(e) => e.message(),
             Self::Archive { detail } => {
                 Message::new("archive.invalid", self.to_string()).arg("detail", detail)
             }

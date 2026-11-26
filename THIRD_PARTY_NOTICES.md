@@ -36,3 +36,8 @@ under the SIL Open Font License 1.1 (full text: `OFL-manrope.txt`).
 Derived from MakeHuman's assets (base mesh and morph targets), CC0 1.0
 Universal, https://github.com/makehumancommunity/makehuman. Details and
 changes: `assets/avatars/README.md`. No MakeHuman code (AGPL) is used.
+
+### Photo environments — `assets/environments/`
+
+Five HDR environment maps from Poly Haven (https://polyhaven.com), CC0
+1.0 Universal, unchanged. Sources: `assets/environments/README.md`.

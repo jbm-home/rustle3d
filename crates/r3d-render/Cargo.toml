@@ -21,6 +21,7 @@ wgpu.workspace = true
 [dev-dependencies]
 r3d-avatar.workspace = true
 r3d-commands.workspace = true
+r3d-io.workspace = true
 serde_json.workspace = true
 
 [lints]

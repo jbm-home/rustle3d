@@ -7,7 +7,7 @@ use r3d_avatar::model::BodyModel;
 use r3d_commands::{Session, drape};
 use r3d_core::{Fabric, Project, Texture};
 use r3d_render::photo::{
-    self, Cloth, Lighting, PhotoRenderer, PhotoScene, Quality, Settings, Surface,
+    self, Cloth, Environment, Lighting, PhotoRenderer, PhotoScene, Quality, Settings, Surface,
 };
 use r3d_render::{Gpu, Mesh, OrbitCamera, Printed, RenderError};
 
@@ -226,6 +226,118 @@ fn progressive_rendering_counts_its_samples() {
     photo.resolve(&gpu);
     let (w, h, _) = pixels(&photo.png(&gpu).unwrap());
     assert_eq!((w, h), (32, 24));
+}
+
+/// A built-in environment from the application's set.
+fn builtin_environment(name: &str) -> Environment {
+    let (_, bytes) = r3d_commands::environments::BUILTIN
+        .iter()
+        .find(|(n, _)| *n == name)
+        .unwrap();
+    let hdr = r3d_io::hdr::decode(bytes).unwrap();
+    Environment::new(hdr.width, hdr.height, |i| {
+        r3d_io::hdr::texel_rgb(hdr.rgbe[i])
+    })
+    .unwrap()
+}
+
+#[test]
+fn a_photo_in_each_built_in_environment() {
+    let Some(gpu) = gpu() else { return };
+    let camera = OrbitCamera::default();
+    let settings = Settings::new(Quality::Quick, Lighting::Studio);
+    for name in r3d_commands::environments::builtin_names() {
+        let scene = skirt_scene(Fabric::Denim).with_environment(builtin_environment(name));
+        let png = photo::render_png(&gpu, &scene, &camera, settings, 160, 120).unwrap();
+        let luma = mean_luma(&pixels(&png).2);
+        assert!(luma > 3.0 && luma < 250.0, "{name}: {luma}");
+        keep(&format!("photo-env-{name}.png"), &png);
+    }
+}
+
+#[test]
+fn environment_photos_are_deterministic_and_turn_by_whole_turns() {
+    let Some(gpu) = gpu() else { return };
+    let camera = OrbitCamera::facing(0.3);
+    let settings = Settings {
+        samples: 4,
+        ..Settings::new(Quality::Quick, Lighting::Studio)
+    };
+    let shoot = |turn_deg| {
+        let mut env = builtin_environment("ferndale");
+        env.turn_deg = turn_deg;
+        let scene = skirt_scene(Fabric::Silk).with_environment(env);
+        photo::render_png(&gpu, &scene, &camera, settings, 96, 72).unwrap()
+    };
+    let a = shoot(30.0);
+    assert_eq!(a, shoot(30.0));
+    // A whole turn more: the same picture, up to rounding.
+    let (_, _, pa) = pixels(&a);
+    let (_, _, pb) = pixels(&shoot(390.0));
+    let diff: f64 = pa
+        .iter()
+        .zip(&pb)
+        .map(|(x, y)| (f64::from(*x) - f64::from(*y)).abs())
+        .sum::<f64>()
+        / pa.len() as f64;
+    assert!(diff < 1.0, "{diff}");
+    // A half turn: another picture.
+    let (_, _, pc) = pixels(&shoot(210.0));
+    assert_ne!(pa, pc);
+}
+
+#[test]
+fn the_floor_catches_shadows_and_shows_the_environment() {
+    let Some(gpu) = gpu() else { return };
+    // A 2 m square plate 30 cm above the floor, under an even orange sky.
+    let plate = Mesh {
+        positions: [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)]
+            .map(|(x, z)| glam::Vec3::new(x, 0.3, z))
+            .to_vec(),
+        normals: Vec::new(),
+        indices: vec![0, 2, 1, 0, 3, 2],
+        colors: Vec::new(),
+        uvs: Vec::new(),
+    };
+    let surface = Surface::fabric(Fabric::Cotton, Some("#808080"));
+    let colour = [1.0, 0.5, 0.25];
+    let env = Environment::new(64, 32, |_| colour).unwrap();
+    let scene = PhotoScene::new(&[], &[(&plate, surface)], None).with_environment(env);
+    // From the side, low: the floor under the plate shows below it.
+    let camera = OrbitCamera {
+        target: glam::Vec3::new(0.0, 0.15, 0.0),
+        yaw: 0.0,
+        pitch: 0.0,
+        distance: 3.0,
+        fov_y: 35f32.to_radians(),
+    };
+    let settings = Settings {
+        samples: 64,
+        ..Settings::new(Quality::Quick, Lighting::Studio)
+    };
+    let (w, h) = (160, 160);
+    let png = photo::render_png(&gpu, &scene, &camera, settings, w, h).unwrap();
+    keep("photo-env-floor.png", &png);
+    let (_, _, px) = pixels(&png);
+    let at = |p: glam::Vec3| {
+        let (xy, _) = camera.project(p, w, h).unwrap();
+        let i = (xy.y as usize * w as usize + xy.x as usize) * 4;
+        [px[i], px[i + 1], px[i + 2]].map(f64::from)
+    };
+    let luma = |c: [f64; 3]| 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    let under = at(glam::Vec3::new(0.0, 0.0, 0.0));
+    let open = at(glam::Vec3::new(0.0, 0.0, 2.0));
+    let sky = at(glam::Vec3::new(0.0, 1.2, 0.0));
+    assert!(luma(under) < 0.5 * luma(open), "{under:?} vs {open:?}");
+    // In the open the floor is the sky's colour (it shows the
+    // environment, lit as it is).
+    for k in 0..3 {
+        assert!(
+            (open[k] - sky[k]).abs() < 0.15 * sky[0],
+            "{open:?} vs {sky:?}"
+        );
+    }
+    assert!(sky[0] > sky[1] && sky[1] > sky[2], "{sky:?}");
 }
 
 #[test]

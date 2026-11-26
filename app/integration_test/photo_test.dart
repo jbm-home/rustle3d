@@ -44,8 +44,14 @@ void main() {
     await frames();
     expect(find.text('Render a photo'), findsOneWidget);
     await tester.tap(find.text('Quick'));
+    // A place offers the environments, then back to a studio.
+    await tester.tap(find.text('Place'));
+    await frames(2);
+    expect(find.byKey(const ValueKey('photoEnvironment')), findsOneWidget);
+    expect(find.text('Ferndale'), findsOneWidget);
     await tester.tap(find.text('Soft'));
     await frames(2);
+    expect(find.byKey(const ValueKey('photoEnvironment')), findsNothing);
     expect(find.text('A first look in seconds'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('photoRender')));
     await frames();
@@ -86,6 +92,8 @@ void main() {
         samples: 2,
         bounces: 1,
         denoise: false,
+        turnDeg: 0,
+        brightness: 1,
       ),
     );
     expect((fixed.width, fixed.height, fixed.total), (64, 48, 2));
@@ -101,9 +109,48 @@ void main() {
           width: 4096,
           height: 4096,
           denoise: true,
+          turnDeg: 0,
+          brightness: 1,
         ),
       ),
       throwsA(isA<ApiError>().having((e) => e.code, 'code', 'photo_too_large')),
+    );
+
+    // Lit by a place: the built-in environments, and an unknown one
+    // refused.
+    expect(engine.environments(), containsAll(['ferndale', 'neon']));
+    final lit = engine.startPhoto(
+      request: const PhotoRequest(
+        quality: 'quick',
+        lighting: 'studio',
+        width: 48,
+        height: 48,
+        samples: 1,
+        denoise: true,
+        environment: 'neon',
+        turnDeg: 45,
+        brightness: 1.5,
+      ),
+    );
+    expect(lit.total, 1);
+    while (!engine.photoStatus()!.finished) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(engine.photoStatus()!.error, isNull);
+    expect(
+      () => engine.startPhoto(
+        request: const PhotoRequest(
+          quality: 'quick',
+          lighting: 'studio',
+          width: 48,
+          height: 48,
+          denoise: true,
+          environment: 'sunset',
+          turnDeg: 0,
+          brightness: 1,
+        ),
+      ),
+      throwsA(isA<ApiError>()),
     );
 
     await tester.tap(find.byKey(const ValueKey('photoClose')));

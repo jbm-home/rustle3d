@@ -450,6 +450,13 @@ pub struct PhotoRequest {
     pub samples: Option<u32>,
     pub bounces: Option<u32>,
     pub denoise: bool,
+    /// An environment that lights the photo instead of `lighting`: a
+    /// built-in name or a `.hdr` file in the project (spec 35).
+    pub environment: Option<String>,
+    /// Its turn (degrees, counter-clockwise seen from above).
+    pub turn_deg: f64,
+    /// Factor on its exposure (0.05–20).
+    pub brightness: f64,
 }
 
 /// How far a photo has come.
@@ -1785,6 +1792,25 @@ impl Engine {
         ws.adopt_texture(Path::new(&path)).map_err(err)
     }
 
+    /// The environments a photo can be lit by (spec 35): the built-in
+    /// ones by name, then the project's `.hdr` files by path.
+    #[frb(sync)]
+    pub fn environments(&self) -> Result<Vec<String>, ApiError> {
+        let ws = self.workspace()?;
+        let mut out: Vec<String> = r3d_commands::environments::builtin_names()
+            .map(str::to_owned)
+            .to_vec();
+        out.extend(ws.environment_files());
+        Ok(out)
+    }
+
+    /// Copy a `.hdr` environment the user picked into the project's
+    /// `environments/` folder; returns its path in the project.
+    pub fn adopt_environment(&self, path: String) -> Result<String, ApiError> {
+        let ws = self.workspace()?;
+        ws.adopt_environment(Path::new(&path)).map_err(err)
+    }
+
     /// One repeat of a print as PNG, for the inspector: the built-in
     /// `builtin` (`stripes`, `gingham`, `dots`, `twill`) in `garment`'s
     /// colour, or without it the garment's own print. Empty when the
@@ -2515,6 +2541,20 @@ impl Engine {
 
         let ws = self.workspace()?;
         let project = ws.session().project();
+        let environment = match &request.environment {
+            None => None,
+            Some(name) => {
+                let choice = r3d_mcp::render::EnvironmentChoice {
+                    name: name.clone(),
+                    turn_deg: request.turn_deg as f32,
+                    brightness: request.brightness as f32,
+                };
+                Some(
+                    r3d_mcp::render::environment(&ws, &choice)
+                        .map_err(|e| ApiError::from(e.message()))?,
+                )
+            }
+        };
         let mut slot = self.graphics()?;
         let g = slot
             .as_mut()
@@ -2588,6 +2628,7 @@ impl Engine {
                 .collect(),
             body,
             camera: g.camera,
+            environment,
         };
         let job = PhotoJob::start(g.gpu.clone(), subject, settings, width, height)
             .map_err(|e| ApiError::new("internal", e.to_string()))?;

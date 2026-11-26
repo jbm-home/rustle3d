@@ -1633,6 +1633,25 @@ class LEn extends L {
   String get lightDramaticHint => 'One hard light on a dark backdrop';
 
   @override
+  String get lightEnvironment => 'Place';
+
+  @override
+  String get lightEnvironmentHint =>
+      'A real place (an HDR image) lights the garment and shows behind it, with its shadow on the floor';
+
+  @override
+  String get photoEnvironmentAdd => 'Add .hdr…';
+
+  @override
+  String get photoEnvironmentFiles => 'HDR images';
+
+  @override
+  String get photoTurn => 'Turn';
+
+  @override
+  String get photoBrightness => 'Brightness';
+
+  @override
   String get photoSize => 'Size';
 
   @override

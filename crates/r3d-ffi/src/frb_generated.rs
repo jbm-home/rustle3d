@@ -40,7 +40,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1314906696;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1875845554;
 
 // Section: executor
 
@@ -153,6 +153,57 @@ fn wire__crate__api__engine__Engine_add_point_near_impl(
                 )?;
                 std::result::Result::Ok(output_ok)
             })())
+        },
+    )
+}
+fn wire__crate__api__engine__Engine_adopt_environment_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "Engine_adopt_environment",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Engine>,
+            >>::sse_decode(&mut deserializer);
+            let api_path = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::api::engine::ApiError>((move || {
+                    let mut api_that_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_that, 0, false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_that_guard = api_that_guard.unwrap();
+                    let output_ok =
+                        crate::api::engine::Engine::adopt_environment(&*api_that_guard, api_path)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
         },
     )
 }
@@ -1044,6 +1095,52 @@ fn wire__crate__api__engine__Engine_edge_spot_near_impl(
                     api_y_mm,
                     api_max_mm,
                 )?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__engine__Engine_environments_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "Engine_environments",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Engine>,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, crate::api::engine::ApiError>((move || {
+                let mut api_that_guard = None;
+                let decode_indices_ =
+                    flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                        flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                            &api_that, 0, false,
+                        ),
+                    ]);
+                for i in decode_indices_ {
+                    match i {
+                        0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                        _ => unreachable!(),
+                    }
+                }
+                let api_that_guard = api_that_guard.unwrap();
+                let output_ok = crate::api::engine::Engine::environments(&*api_that_guard)?;
                 std::result::Result::Ok(output_ok)
             })())
         },
@@ -5463,6 +5560,9 @@ impl SseDecode for crate::api::engine::PhotoRequest {
         let mut var_samples = <Option<u32>>::sse_decode(deserializer);
         let mut var_bounces = <Option<u32>>::sse_decode(deserializer);
         let mut var_denoise = <bool>::sse_decode(deserializer);
+        let mut var_environment = <Option<String>>::sse_decode(deserializer);
+        let mut var_turnDeg = <f64>::sse_decode(deserializer);
+        let mut var_brightness = <f64>::sse_decode(deserializer);
         return crate::api::engine::PhotoRequest {
             quality: var_quality,
             lighting: var_lighting,
@@ -5471,6 +5571,9 @@ impl SseDecode for crate::api::engine::PhotoRequest {
             samples: var_samples,
             bounces: var_bounces,
             denoise: var_denoise,
+            environment: var_environment,
+            turn_deg: var_turnDeg,
+            brightness: var_brightness,
         };
     }
 }
@@ -5670,67 +5773,73 @@ fn pde_ffi_dispatcher_primary_impl(
 ) {
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
-        3 => wire__crate__api__engine__Engine_adopt_texture_impl(port, ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__engine__Engine_export_file_impl(port, ptr, rust_vec_len, data_len),
-        22 => wire__crate__api__engine__Engine_export_game_impl(port, ptr, rust_vec_len, data_len),
-        23 => {
+        3 => wire__crate__api__engine__Engine_adopt_environment_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        4 => wire__crate__api__engine__Engine_adopt_texture_impl(port, ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__engine__Engine_export_file_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__engine__Engine_export_game_impl(port, ptr, rust_vec_len, data_len),
+        25 => {
             wire__crate__api__engine__Engine_export_marker_impl(port, ptr, rust_vec_len, data_len)
         }
-        24 => {
+        26 => {
             wire__crate__api__engine__Engine_export_techpack_impl(port, ptr, rust_vec_len, data_len)
         }
-        28 => wire__crate__api__engine__Engine_import_body_impl(port, ptr, rust_vec_len, data_len),
-        29 => {
+        30 => wire__crate__api__engine__Engine_import_body_impl(port, ptr, rust_vec_len, data_len),
+        31 => {
             wire__crate__api__engine__Engine_import_motion_impl(port, ptr, rust_vec_len, data_len)
         }
-        30 => {
+        32 => {
             wire__crate__api__engine__Engine_import_pattern_impl(port, ptr, rust_vec_len, data_len)
         }
-        33 => wire__crate__api__engine__Engine_marker_impl(port, ptr, rust_vec_len, data_len),
-        46 => wire__crate__api__engine__Engine_read_view_impl(port, ptr, rust_vec_len, data_len),
-        48 => wire__crate__api__engine__Engine_render_view_impl(port, ptr, rust_vec_len, data_len),
-        49 => wire__crate__api__engine__Engine_reset_simulation_impl(
+        35 => wire__crate__api__engine__Engine_marker_impl(port, ptr, rust_vec_len, data_len),
+        48 => wire__crate__api__engine__Engine_read_view_impl(port, ptr, rust_vec_len, data_len),
+        50 => wire__crate__api__engine__Engine_render_view_impl(port, ptr, rust_vec_len, data_len),
+        51 => wire__crate__api__engine__Engine_reset_simulation_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        51 => wire__crate__api__engine__Engine_run_long_impl(port, ptr, rust_vec_len, data_len),
-        53 => {
+        53 => wire__crate__api__engine__Engine_run_long_impl(port, ptr, rust_vec_len, data_len),
+        55 => {
             wire__crate__api__engine__Engine_run_simulation_impl(port, ptr, rust_vec_len, data_len)
         }
-        54 => wire__crate__api__engine__Engine_save_photo_impl(port, ptr, rust_vec_len, data_len),
-        64 => wire__crate__api__engine__Engine_set_library_impl(port, ptr, rust_vec_len, data_len),
-        65 => wire__crate__api__engine__Engine_set_motion_impl(port, ptr, rust_vec_len, data_len),
-        82 => wire__crate__api__engine__Engine_use_library_motion_impl(
+        56 => wire__crate__api__engine__Engine_save_photo_impl(port, ptr, rust_vec_len, data_len),
+        66 => wire__crate__api__engine__Engine_set_library_impl(port, ptr, rust_vec_len, data_len),
+        67 => wire__crate__api__engine__Engine_set_motion_impl(port, ptr, rust_vec_len, data_len),
+        84 => wire__crate__api__engine__Engine_use_library_motion_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        91 => wire__crate__api__library__export_library_pattern_impl(
+        93 => wire__crate__api__library__export_library_pattern_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        92 => {
+        94 => {
             wire__crate__api__projects__export_project_zip_impl(port, ptr, rust_vec_len, data_len)
         }
-        94 => wire__crate__api__library__import_library_pattern_impl(
+        96 => wire__crate__api__library__import_library_pattern_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        95 => {
+        97 => {
             wire__crate__api__projects__import_project_zip_impl(port, ptr, rust_vec_len, data_len)
         }
-        98 => {
+        100 => {
             wire__crate__api__templates__project_thumbnail_impl(port, ptr, rust_vec_len, data_len)
         }
-        105 => wire__crate__api__templates__template_list_impl(port, ptr, rust_vec_len, data_len),
-        106 => {
+        107 => wire__crate__api__templates__template_list_impl(port, ptr, rust_vec_len, data_len),
+        108 => {
             wire__crate__api__templates__template_thumbnail_impl(port, ptr, rust_vec_len, data_len)
         }
         _ => unreachable!(),
@@ -5747,87 +5856,88 @@ fn pde_ffi_dispatcher_sync_impl(
     match func_id {
         1 => wire__crate__api__engine__Engine_add_notch_near_impl(ptr, rust_vec_len, data_len),
         2 => wire__crate__api__engine__Engine_add_point_near_impl(ptr, rust_vec_len, data_len),
-        4 => wire__crate__api__engine__Engine_agent_changes_impl(ptr, rust_vec_len, data_len),
-        5 => wire__crate__api__engine__Engine_agent_status_impl(ptr, rust_vec_len, data_len),
-        6 => wire__crate__api__engine__Engine_allow_agents_impl(ptr, rust_vec_len, data_len),
-        7 => wire__crate__api__engine__Engine_attach_view_impl(ptr, rust_vec_len, data_len),
-        8 => wire__crate__api__engine__Engine_body_fitting_impl(ptr, rust_vec_len, data_len),
-        9 => wire__crate__api__engine__Engine_body_points_impl(ptr, rust_vec_len, data_len),
-        10 => wire__crate__api__engine__Engine_cancel_impl(ptr, rust_vec_len, data_len),
-        11 => wire__crate__api__engine__Engine_clear_tape_impl(ptr, rust_vec_len, data_len),
-        12 => wire__crate__api__engine__Engine_click_impl(ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__engine__Engine_close_photo_impl(ptr, rust_vec_len, data_len),
-        14 => wire__crate__api__engine__Engine_cloth_point_impl(ptr, rust_vec_len, data_len),
-        15 => {
+        5 => wire__crate__api__engine__Engine_agent_changes_impl(ptr, rust_vec_len, data_len),
+        6 => wire__crate__api__engine__Engine_agent_status_impl(ptr, rust_vec_len, data_len),
+        7 => wire__crate__api__engine__Engine_allow_agents_impl(ptr, rust_vec_len, data_len),
+        8 => wire__crate__api__engine__Engine_attach_view_impl(ptr, rust_vec_len, data_len),
+        9 => wire__crate__api__engine__Engine_body_fitting_impl(ptr, rust_vec_len, data_len),
+        10 => wire__crate__api__engine__Engine_body_points_impl(ptr, rust_vec_len, data_len),
+        11 => wire__crate__api__engine__Engine_cancel_impl(ptr, rust_vec_len, data_len),
+        12 => wire__crate__api__engine__Engine_clear_tape_impl(ptr, rust_vec_len, data_len),
+        13 => wire__crate__api__engine__Engine_click_impl(ptr, rust_vec_len, data_len),
+        14 => wire__crate__api__engine__Engine_close_photo_impl(ptr, rust_vec_len, data_len),
+        15 => wire__crate__api__engine__Engine_cloth_point_impl(ptr, rust_vec_len, data_len),
+        16 => {
             wire__crate__api__engine__Engine_corner_or_edge_near_impl(ptr, rust_vec_len, data_len)
         }
-        16 => wire__crate__api__engine__Engine_detach_view_impl(ptr, rust_vec_len, data_len),
-        17 => wire__crate__api__engine__Engine_disconnect_agent_impl(ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__engine__Engine_drag_impl(ptr, rust_vec_len, data_len),
-        19 => wire__crate__api__engine__Engine_drag_snap_impl(ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__engine__Engine_edge_spot_near_impl(ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__engine__Engine_fabrics_impl(ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__engine__Engine_fit_board_impl(ptr, rust_vec_len, data_len),
-        27 => wire__crate__api__engine__Engine_fit_legend_impl(ptr, rust_vec_len, data_len),
-        31 => wire__crate__api__engine__Engine_length_between_impl(ptr, rust_vec_len, data_len),
-        32 => wire__crate__api__engine__Engine_look_from_impl(ptr, rust_vec_len, data_len),
-        34 => wire__crate__api__engine__Engine_motions_impl(ptr, rust_vec_len, data_len),
-        35 => wire__crate__api__engine__Engine_move_body_point_impl(ptr, rust_vec_len, data_len),
-        36 => wire__crate__api__engine__Engine_open_impl(ptr, rust_vec_len, data_len),
-        37 => wire__crate__api__engine__Engine_photo_status_impl(ptr, rust_vec_len, data_len),
-        38 => wire__crate__api__engine__Engine_pick_edge_near_impl(ptr, rust_vec_len, data_len),
-        39 => wire__crate__api__engine__Engine_pick_piece_at_impl(ptr, rust_vec_len, data_len),
-        40 => wire__crate__api__engine__Engine_pin_at_impl(ptr, rust_vec_len, data_len),
-        41 => wire__crate__api__engine__Engine_press_impl(ptr, rust_vec_len, data_len),
-        42 => wire__crate__api__engine__Engine_print_preview_impl(ptr, rust_vec_len, data_len),
-        43 => wire__crate__api__engine__Engine_progress_impl(ptr, rust_vec_len, data_len),
-        44 => wire__crate__api__engine__Engine_projector_drawing_impl(ptr, rust_vec_len, data_len),
-        45 => wire__crate__api__engine__Engine_pull_impl(ptr, rust_vec_len, data_len),
-        47 => wire__crate__api__engine__Engine_release_impl(ptr, rust_vec_len, data_len),
-        50 => wire__crate__api__engine__Engine_run_impl(ptr, rust_vec_len, data_len),
-        52 => wire__crate__api__engine__Engine_run_script_impl(ptr, rust_vec_len, data_len),
-        55 => wire__crate__api__engine__Engine_select_impl(ptr, rust_vec_len, data_len),
-        56 => wire__crate__api__engine__Engine_selected_edge_impl(ptr, rust_vec_len, data_len),
-        57 => wire__crate__api__engine__Engine_selected_edges_impl(ptr, rust_vec_len, data_len),
-        58 => wire__crate__api__engine__Engine_selected_guides_impl(ptr, rust_vec_len, data_len),
-        59 => wire__crate__api__engine__Engine_selected_notches_impl(ptr, rust_vec_len, data_len),
-        60 => wire__crate__api__engine__Engine_selected_points_impl(ptr, rust_vec_len, data_len),
-        61 => wire__crate__api__engine__Engine_selection_impl(ptr, rust_vec_len, data_len),
-        62 => wire__crate__api__engine__Engine_set_canvas_impl(ptr, rust_vec_len, data_len),
-        63 => wire__crate__api__engine__Engine_set_fit_map_impl(ptr, rust_vec_len, data_len),
-        66 => wire__crate__api__engine__Engine_set_show_sizes_impl(ptr, rust_vec_len, data_len),
-        67 => wire__crate__api__engine__Engine_sew_chain_impl(ptr, rust_vec_len, data_len),
-        68 => wire__crate__api__engine__Engine_sew_side_points_impl(ptr, rust_vec_len, data_len),
-        69 => wire__crate__api__engine__Engine_sew_spot_near_impl(ptr, rust_vec_len, data_len),
-        70 => wire__crate__api__engine__Engine_show_sizes_impl(ptr, rust_vec_len, data_len),
-        71 => wire__crate__api__engine__Engine_simulation_status_impl(ptr, rust_vec_len, data_len),
-        72 => wire__crate__api__engine__Engine_snap_impl(ptr, rust_vec_len, data_len),
-        73 => wire__crate__api__engine__Engine_start_photo_impl(ptr, rust_vec_len, data_len),
-        74 => wire__crate__api__engine__Engine_stop_photo_impl(ptr, rust_vec_len, data_len),
-        75 => wire__crate__api__engine__Engine_stroke_end_impl(ptr, rust_vec_len, data_len),
-        76 => wire__crate__api__engine__Engine_stroke_start_impl(ptr, rust_vec_len, data_len),
-        77 => wire__crate__api__engine__Engine_stroke_to_impl(ptr, rust_vec_len, data_len),
-        78 => wire__crate__api__engine__Engine_tape_at_impl(ptr, rust_vec_len, data_len),
-        79 => wire__crate__api__engine__Engine_to_pattern_impl(ptr, rust_vec_len, data_len),
-        80 => wire__crate__api__engine__Engine_to_view_impl(ptr, rust_vec_len, data_len),
-        81 => wire__crate__api__engine__Engine_unpin_impl(ptr, rust_vec_len, data_len),
-        83 => wire__crate__api__engine__Engine_zoom_impl(ptr, rust_vec_len, data_len),
-        84 => wire__crate__api__library__add_library_motion_impl(ptr, rust_vec_len, data_len),
-        85 => wire__crate__api__templates__app_version_impl(ptr, rust_vec_len, data_len),
-        86 => wire__crate__api__library__body_presets_impl(ptr, rust_vec_len, data_len),
-        87 => wire__crate__api__library__delete_body_preset_impl(ptr, rust_vec_len, data_len),
-        88 => wire__crate__api__library__delete_library_motion_impl(ptr, rust_vec_len, data_len),
-        89 => wire__crate__api__library__delete_library_pattern_impl(ptr, rust_vec_len, data_len),
-        90 => wire__crate__api__projects__delete_project_impl(ptr, rust_vec_len, data_len),
-        93 => wire__crate__api__projects__free_project_path_impl(ptr, rust_vec_len, data_len),
-        96 => wire__crate__api__library__library_motions_impl(ptr, rust_vec_len, data_len),
-        97 => wire__crate__api__library__library_patterns_impl(ptr, rust_vec_len, data_len),
-        99 => wire__crate__api__library__rename_library_motion_impl(ptr, rust_vec_len, data_len),
-        100 => wire__crate__api__library__rename_library_pattern_impl(ptr, rust_vec_len, data_len),
-        101 => wire__crate__api__projects__rename_project_impl(ptr, rust_vec_len, data_len),
-        102 => wire__crate__api__engine__save_agent_extension_impl(ptr, rust_vec_len, data_len),
-        103 => wire__crate__api__library__save_body_preset_impl(ptr, rust_vec_len, data_len),
-        104 => wire__crate__api__engine__set_ui_adapter_impl(ptr, rust_vec_len, data_len),
+        17 => wire__crate__api__engine__Engine_detach_view_impl(ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__engine__Engine_disconnect_agent_impl(ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__engine__Engine_drag_impl(ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__engine__Engine_drag_snap_impl(ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__engine__Engine_edge_spot_near_impl(ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__engine__Engine_environments_impl(ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__engine__Engine_fabrics_impl(ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__engine__Engine_fit_board_impl(ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__engine__Engine_fit_legend_impl(ptr, rust_vec_len, data_len),
+        33 => wire__crate__api__engine__Engine_length_between_impl(ptr, rust_vec_len, data_len),
+        34 => wire__crate__api__engine__Engine_look_from_impl(ptr, rust_vec_len, data_len),
+        36 => wire__crate__api__engine__Engine_motions_impl(ptr, rust_vec_len, data_len),
+        37 => wire__crate__api__engine__Engine_move_body_point_impl(ptr, rust_vec_len, data_len),
+        38 => wire__crate__api__engine__Engine_open_impl(ptr, rust_vec_len, data_len),
+        39 => wire__crate__api__engine__Engine_photo_status_impl(ptr, rust_vec_len, data_len),
+        40 => wire__crate__api__engine__Engine_pick_edge_near_impl(ptr, rust_vec_len, data_len),
+        41 => wire__crate__api__engine__Engine_pick_piece_at_impl(ptr, rust_vec_len, data_len),
+        42 => wire__crate__api__engine__Engine_pin_at_impl(ptr, rust_vec_len, data_len),
+        43 => wire__crate__api__engine__Engine_press_impl(ptr, rust_vec_len, data_len),
+        44 => wire__crate__api__engine__Engine_print_preview_impl(ptr, rust_vec_len, data_len),
+        45 => wire__crate__api__engine__Engine_progress_impl(ptr, rust_vec_len, data_len),
+        46 => wire__crate__api__engine__Engine_projector_drawing_impl(ptr, rust_vec_len, data_len),
+        47 => wire__crate__api__engine__Engine_pull_impl(ptr, rust_vec_len, data_len),
+        49 => wire__crate__api__engine__Engine_release_impl(ptr, rust_vec_len, data_len),
+        52 => wire__crate__api__engine__Engine_run_impl(ptr, rust_vec_len, data_len),
+        54 => wire__crate__api__engine__Engine_run_script_impl(ptr, rust_vec_len, data_len),
+        57 => wire__crate__api__engine__Engine_select_impl(ptr, rust_vec_len, data_len),
+        58 => wire__crate__api__engine__Engine_selected_edge_impl(ptr, rust_vec_len, data_len),
+        59 => wire__crate__api__engine__Engine_selected_edges_impl(ptr, rust_vec_len, data_len),
+        60 => wire__crate__api__engine__Engine_selected_guides_impl(ptr, rust_vec_len, data_len),
+        61 => wire__crate__api__engine__Engine_selected_notches_impl(ptr, rust_vec_len, data_len),
+        62 => wire__crate__api__engine__Engine_selected_points_impl(ptr, rust_vec_len, data_len),
+        63 => wire__crate__api__engine__Engine_selection_impl(ptr, rust_vec_len, data_len),
+        64 => wire__crate__api__engine__Engine_set_canvas_impl(ptr, rust_vec_len, data_len),
+        65 => wire__crate__api__engine__Engine_set_fit_map_impl(ptr, rust_vec_len, data_len),
+        68 => wire__crate__api__engine__Engine_set_show_sizes_impl(ptr, rust_vec_len, data_len),
+        69 => wire__crate__api__engine__Engine_sew_chain_impl(ptr, rust_vec_len, data_len),
+        70 => wire__crate__api__engine__Engine_sew_side_points_impl(ptr, rust_vec_len, data_len),
+        71 => wire__crate__api__engine__Engine_sew_spot_near_impl(ptr, rust_vec_len, data_len),
+        72 => wire__crate__api__engine__Engine_show_sizes_impl(ptr, rust_vec_len, data_len),
+        73 => wire__crate__api__engine__Engine_simulation_status_impl(ptr, rust_vec_len, data_len),
+        74 => wire__crate__api__engine__Engine_snap_impl(ptr, rust_vec_len, data_len),
+        75 => wire__crate__api__engine__Engine_start_photo_impl(ptr, rust_vec_len, data_len),
+        76 => wire__crate__api__engine__Engine_stop_photo_impl(ptr, rust_vec_len, data_len),
+        77 => wire__crate__api__engine__Engine_stroke_end_impl(ptr, rust_vec_len, data_len),
+        78 => wire__crate__api__engine__Engine_stroke_start_impl(ptr, rust_vec_len, data_len),
+        79 => wire__crate__api__engine__Engine_stroke_to_impl(ptr, rust_vec_len, data_len),
+        80 => wire__crate__api__engine__Engine_tape_at_impl(ptr, rust_vec_len, data_len),
+        81 => wire__crate__api__engine__Engine_to_pattern_impl(ptr, rust_vec_len, data_len),
+        82 => wire__crate__api__engine__Engine_to_view_impl(ptr, rust_vec_len, data_len),
+        83 => wire__crate__api__engine__Engine_unpin_impl(ptr, rust_vec_len, data_len),
+        85 => wire__crate__api__engine__Engine_zoom_impl(ptr, rust_vec_len, data_len),
+        86 => wire__crate__api__library__add_library_motion_impl(ptr, rust_vec_len, data_len),
+        87 => wire__crate__api__templates__app_version_impl(ptr, rust_vec_len, data_len),
+        88 => wire__crate__api__library__body_presets_impl(ptr, rust_vec_len, data_len),
+        89 => wire__crate__api__library__delete_body_preset_impl(ptr, rust_vec_len, data_len),
+        90 => wire__crate__api__library__delete_library_motion_impl(ptr, rust_vec_len, data_len),
+        91 => wire__crate__api__library__delete_library_pattern_impl(ptr, rust_vec_len, data_len),
+        92 => wire__crate__api__projects__delete_project_impl(ptr, rust_vec_len, data_len),
+        95 => wire__crate__api__projects__free_project_path_impl(ptr, rust_vec_len, data_len),
+        98 => wire__crate__api__library__library_motions_impl(ptr, rust_vec_len, data_len),
+        99 => wire__crate__api__library__library_patterns_impl(ptr, rust_vec_len, data_len),
+        101 => wire__crate__api__library__rename_library_motion_impl(ptr, rust_vec_len, data_len),
+        102 => wire__crate__api__library__rename_library_pattern_impl(ptr, rust_vec_len, data_len),
+        103 => wire__crate__api__projects__rename_project_impl(ptr, rust_vec_len, data_len),
+        104 => wire__crate__api__engine__save_agent_extension_impl(ptr, rust_vec_len, data_len),
+        105 => wire__crate__api__library__save_body_preset_impl(ptr, rust_vec_len, data_len),
+        106 => wire__crate__api__engine__set_ui_adapter_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -6146,6 +6256,9 @@ impl flutter_rust_bridge::IntoDart for crate::api::engine::PhotoRequest {
             self.samples.into_into_dart().into_dart(),
             self.bounces.into_into_dart().into_dart(),
             self.denoise.into_into_dart().into_dart(),
+            self.environment.into_into_dart().into_dart(),
+            self.turn_deg.into_into_dart().into_dart(),
+            self.brightness.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -6792,6 +6905,9 @@ impl SseEncode for crate::api::engine::PhotoRequest {
         <Option<u32>>::sse_encode(self.samples, serializer);
         <Option<u32>>::sse_encode(self.bounces, serializer);
         <bool>::sse_encode(self.denoise, serializer);
+        <Option<String>>::sse_encode(self.environment, serializer);
+        <f64>::sse_encode(self.turn_deg, serializer);
+        <f64>::sse_encode(self.brightness, serializer);
     }
 }
 

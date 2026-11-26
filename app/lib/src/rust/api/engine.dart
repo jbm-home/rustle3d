@@ -45,6 +45,10 @@ abstract class Engine implements RustOpaqueInterface {
     required double maxMm,
   });
 
+  /// Copy a `.hdr` environment the user picked into the project's
+  /// `environments/` folder; returns its path in the project.
+  Future<String> adoptEnvironment({required String path});
+
   /// Copy a print image the user chose (anywhere; PNG or JPEG) into the
   /// project's `textures/` folder. Returns its path in the project, for
   /// `garment.set_print`. Refused (`texture.format`, `texture.bad`) when
@@ -143,6 +147,10 @@ abstract class Engine implements RustOpaqueInterface {
     required double yMm,
     required double maxMm,
   });
+
+  /// The environments a photo can be lit by (spec 35): the built-in
+  /// ones by name, then the project's `.hdr` files by path.
+  List<String> environments();
 
   /// Write an export to `path`, a file the user chose (anywhere): the
   /// pattern (every size of a graded one, nested), or the garment as the
@@ -887,6 +895,16 @@ class PhotoRequest {
   final int? bounces;
   final bool denoise;
 
+  /// An environment that lights the photo instead of `lighting`: a
+  /// built-in name or a `.hdr` file in the project (spec 35).
+  final String? environment;
+
+  /// Its turn (degrees, counter-clockwise seen from above).
+  final double turnDeg;
+
+  /// Factor on its exposure (0.05–20).
+  final double brightness;
+
   const PhotoRequest({
     required this.quality,
     required this.lighting,
@@ -895,6 +913,9 @@ class PhotoRequest {
     this.samples,
     this.bounces,
     required this.denoise,
+    this.environment,
+    required this.turnDeg,
+    required this.brightness,
   });
 
   @override
@@ -905,7 +926,10 @@ class PhotoRequest {
       height.hashCode ^
       samples.hashCode ^
       bounces.hashCode ^
-      denoise.hashCode;
+      denoise.hashCode ^
+      environment.hashCode ^
+      turnDeg.hashCode ^
+      brightness.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -918,7 +942,10 @@ class PhotoRequest {
           height == other.height &&
           samples == other.samples &&
           bounces == other.bounces &&
-          denoise == other.denoise;
+          denoise == other.denoise &&
+          environment == other.environment &&
+          turnDeg == other.turnDeg &&
+          brightness == other.brightness;
 }
 
 /// How far a photo has come.

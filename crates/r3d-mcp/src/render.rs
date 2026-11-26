@@ -24,7 +24,7 @@ use serde_json::{Value, json};
 use std::sync::Arc;
 
 /// What to draw.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum View {
     /// The 2D pattern.
     Board,
@@ -77,13 +77,24 @@ impl CameraAngle {
     }
 }
 
+/// The environment that lights a photo instead of the studio (spec 35).
+#[derive(Clone, Debug, PartialEq)]
+pub struct EnvironmentChoice {
+    /// A built-in name or a `.hdr` file in the project folder.
+    pub name: String,
+    /// Degrees, counter-clockwise seen from above.
+    pub turn_deg: f32,
+    pub brightness: f32,
+}
+
 /// How to take a photo.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PhotoOptions {
     pub settings: Settings,
     pub angle: CameraAngle,
     /// Frame the garment (true) or the whole body.
     pub close_up: bool,
+    pub environment: Option<EnvironmentChoice>,
 }
 
 impl Default for PhotoOptions {
@@ -92,13 +103,15 @@ impl Default for PhotoOptions {
             settings: Settings::new(Quality::Good, Lighting::Studio),
             angle: CameraAngle::default(),
             close_up: true,
+            environment: None,
         }
     }
 }
 
 impl PhotoOptions {
     /// Options from a tool's arguments: `quality`, `lighting`, `camera`,
-    /// `frame`, and the advanced `samples`, `bounces`, `denoise`.
+    /// `frame`, `environment` with `turn_deg` and `brightness`, and the
+    /// advanced `samples`, `bounces`, `denoise`.
     /// Unknown keys are left to the caller.
     pub fn from_args(args: &serde_json::Map<String, Value>) -> Result<Self, CommandError> {
         let malformed = |name: &str, detail: String| CommandError::Malformed {
@@ -160,17 +173,74 @@ impl PhotoOptions {
                 .as_bool()
                 .ok_or_else(|| malformed("denoise", "expected true or false".into()))?;
         }
+        let number =
+            |key: &str, range: std::ops::RangeInclusive<f32>, default: f32| match args.get(key) {
+                None => Ok(default),
+                Some(v) => v
+                    .as_f64()
+                    .map(|n| n as f32)
+                    .filter(|n| range.contains(n))
+                    .ok_or_else(|| {
+                        malformed(
+                            key,
+                            format!(
+                                "expected a number from {} to {}",
+                                range.start(),
+                                range.end()
+                            ),
+                        )
+                    }),
+            };
+        let environment = match text("environment")? {
+            None => None,
+            Some(name) => Some(EnvironmentChoice {
+                name: name.to_owned(),
+                turn_deg: number("turn_deg", -360_000.0..=360_000.0, 0.0)?,
+                brightness: number("brightness", photo::BRIGHTNESS, 1.0)?,
+            }),
+        };
         Ok(Self {
             settings,
             angle,
             close_up,
+            environment,
         })
     }
 
     /// Keys [`Self::from_args`] reads.
-    pub const KEYS: [&'static str; 7] = [
-        "quality", "lighting", "camera", "frame", "samples", "bounces", "denoise",
+    pub const KEYS: [&'static str; 10] = [
+        "quality",
+        "lighting",
+        "camera",
+        "frame",
+        "samples",
+        "bounces",
+        "denoise",
+        "environment",
+        "turn_deg",
+        "brightness",
     ];
+}
+
+/// The environment `choice` names, from the built-in set or the
+/// project folder, turned and scaled as it says.
+pub fn environment(
+    ws: &Workspace,
+    choice: &EnvironmentChoice,
+) -> Result<photo::Environment, RenderError> {
+    let hdr = ws.environment(&choice.name)?;
+    let mut env = photo::Environment::new(hdr.width, hdr.height, |i| {
+        hdr.rgbe
+            .get(i)
+            .map_or([0.0; 3], |t| r3d_commands::environments::texel_rgb(*t))
+    })
+    .ok_or_else(|| CommandError::Malformed {
+        name: "environment".into(),
+        detail: "an empty picture".into(),
+    })?;
+    env.turn_deg = choice.turn_deg;
+    env.brightness = choice.brightness;
+    Ok(env)
 }
 
 /// Width of style lines drawn on the garment, and their lift off the
@@ -186,6 +256,8 @@ pub const SIZE_RANGE: std::ops::RangeInclusive<u32> = 16..=4096;
 pub enum RenderError {
     #[error(transparent)]
     Command(#[from] CommandError),
+    #[error(transparent)]
+    Workspace(#[from] r3d_commands::WorkspaceError),
     #[error("cannot render: {0}")]
     Gpu(String),
 }
@@ -194,6 +266,7 @@ impl Localizable for RenderError {
     fn message(&self) -> Message {
         match self {
             Self::Command(e) => e.message(),
+            Self::Workspace(e) => e.message(),
             Self::Gpu(detail) => Message::new("gpu", self.to_string()).arg("detail", detail),
         }
     }
@@ -514,6 +587,7 @@ pub fn techpack_views(
                     settings: Settings::new(Quality::Quick, Lighting::Studio),
                     angle: *angle,
                     close_up: true,
+                    environment: None,
                 };
                 Ok((render(gpu, ws, View::Photo(options), w, h)?.0, *caption))
             })
@@ -598,7 +672,10 @@ pub fn render(
                 .iter()
                 .map(|(mesh, material)| (mesh, Surface::plain(material.base)))
                 .collect();
-            let scene = PhotoScene::new(&cloth, &extras, dressed.avatar.as_ref());
+            let mut scene = PhotoScene::new(&cloth, &extras, dressed.avatar.as_ref());
+            if let Some(choice) = &options.environment {
+                scene = scene.with_environment(environment(ws, choice)?);
+            }
             let camera = if options.close_up {
                 garment_camera(&dressed, options.angle)
             } else {
@@ -617,20 +694,25 @@ pub fn render(
                     other => gpu_failure(other),
                 })?;
             let s = options.settings;
-            Ok((
-                png,
-                json!({
-                    "view": "photo",
-                    "drape": dressed.state,
-                    "pieces": dressed.pieces.len(),
-                    "avatar": dressed.avatar.is_some(),
-                    "samples": s.samples,
-                    "bounces": s.bounces,
-                    "lighting": s.lighting.name(),
-                    "denoised": s.denoise,
-                    "seconds": (start.elapsed().as_secs_f64() * 10.0).round() / 10.0,
-                }),
-            ))
+            let mut facts = json!({
+                "view": "photo",
+                "drape": dressed.state,
+                "pieces": dressed.pieces.len(),
+                "avatar": dressed.avatar.is_some(),
+                "samples": s.samples,
+                "bounces": s.bounces,
+                "denoised": s.denoise,
+                "seconds": (start.elapsed().as_secs_f64() * 10.0).round() / 10.0,
+            });
+            match &options.environment {
+                Some(e) => {
+                    facts["environment"] = json!(e.name);
+                    facts["turn_deg"] = json!(e.turn_deg);
+                    facts["brightness"] = json!(e.brightness);
+                }
+                None => facts["lighting"] = json!(s.lighting.name()),
+            }
+            Ok((png, facts))
         }
     }
 }

@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
-use r3d_render::photo::{Cloth, PhotoRenderer, PhotoScene, Settings, Surface};
+use r3d_render::photo::{Cloth, Environment, PhotoRenderer, PhotoScene, Settings, Surface};
 use r3d_render::{Gpu, Mesh, OrbitCamera};
 
 /// GPU time each batch of samples aims for: short enough that the 3D
@@ -49,6 +49,8 @@ pub(crate) struct Subject {
     pub trims: Vec<(Mesh, Surface)>,
     pub body: Option<Mesh>,
     pub camera: OrbitCamera,
+    /// The light around instead of the studio.
+    pub environment: Option<Environment>,
 }
 
 pub(crate) struct PhotoJob {
@@ -80,7 +82,7 @@ impl PhotoJob {
             .name("photo".into())
             .spawn(move || {
                 let started = Instant::now();
-                let result = run(&gpu, &subject, settings, width, height, &worker, started);
+                let result = run(&gpu, subject, settings, width, height, &worker, started);
                 if let Ok(mut p) = worker.progress.lock() {
                     p.finished = true;
                     p.seconds = started.elapsed().as_secs_f64();
@@ -127,13 +129,14 @@ impl Drop for PhotoJob {
 
 fn run(
     gpu: &Gpu,
-    subject: &Subject,
+    mut subject: Subject,
     settings: Settings,
     width: u32,
     height: u32,
     shared: &Shared,
     started: Instant,
 ) -> Result<(), String> {
+    let environment = subject.environment.take();
     let cloth: Vec<Cloth<'_>> = subject
         .cloth
         .iter()
@@ -147,7 +150,10 @@ fn run(
         })
         .collect();
     let extras: Vec<(&Mesh, Surface)> = subject.trims.iter().map(|(m, s)| (m, *s)).collect();
-    let scene = PhotoScene::new(&cloth, &extras, subject.body.as_ref());
+    let mut scene = PhotoScene::new(&cloth, &extras, subject.body.as_ref());
+    if let Some(env) = environment {
+        scene = scene.with_environment(env);
+    }
     let mut photo = PhotoRenderer::new(gpu, &scene, &subject.camera, settings, width, height)
         .map_err(|e| e.to_string())?;
     *shared.image.lock().map_err(|e| e.to_string())? = Some(photo.image().clone());

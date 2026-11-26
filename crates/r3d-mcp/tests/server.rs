@@ -187,6 +187,45 @@ fn agents_simulate_and_look_at_the_garment() {
     assert_eq!(info["lighting"], "soft");
     assert_eq!(info["drape"], "simulated");
 
+    // Lit by a built-in environment, turned.
+    let photo = serde_json::to_value(s.call(
+        "render_photo",
+        Some(Map::from_iter([
+            ("width".into(), json!(48)),
+            ("height".into(), json!(48)),
+            ("samples".into(), json!(1)),
+            ("environment".into(), json!("neon")),
+            ("turn_deg".into(), json!(90)),
+            ("brightness".into(), json!(1.5)),
+        ])),
+    ))
+    .unwrap();
+    assert_eq!(photo["content"][0]["type"], "image", "{photo}");
+    let info: Value = serde_json::from_str(photo["content"][1]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(info["environment"], "neon");
+    assert_eq!(info["turn_deg"], 90.0);
+    assert_eq!(info["brightness"], 1.5);
+    assert!(info.get("lighting").is_none());
+    for (args, name) in [
+        (json!({ "environment": "sunset" }), "environment"),
+        (
+            json!({ "environment": "neon", "brightness": 50 }),
+            "brightness",
+        ),
+    ] {
+        let (err, body) = call(&s, "render_photo", args);
+        assert!(err);
+        assert_eq!(body["error"]["code"], "malformed");
+        assert_eq!(body["error"]["args"]["name"], name);
+    }
+    let (err, body) = call(
+        &s,
+        "render_photo",
+        json!({ "environment": "environments/no.hdr" }),
+    );
+    assert!(err);
+    assert_eq!(body["error"]["code"], "read_failed", "{body}");
+
     // The tech pack opens with the front and back of the drape.
     let (err, out) = call(
         &s,

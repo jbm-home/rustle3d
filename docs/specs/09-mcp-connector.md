@@ -54,7 +54,9 @@ and look at the result, either headless or live in the user's open app.
   `simulate` result if the document has not changed since, otherwise the
   starting positions, and says which. `render_photo` (M14, spec 14)
   path-traces the same garment in a photo studio: `quality`
-  (quick/good/best), `lighting` (studio/soft/dramatic), `camera`
+  (quick/good/best), `lighting` (studio/soft/dramatic) or
+  `environment` (a built-in name or a `.hdr` file in the project) with
+  `turn_deg` and `brightness` (M42, spec 35), `camera`
   (front/three_quarter/side/back), `frame` (garment/body), and advanced
   `samples`, `bounces`, `denoise`; the text result gives the time taken.
   Highlighting of ids comes later.

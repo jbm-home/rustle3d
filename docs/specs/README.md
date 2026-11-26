@@ -44,3 +44,4 @@ descriptions, public papers, open standards, general garment-making knowledge.
 | 32 | [Pattern library](32-pattern-library.md) | M38 |
 | 33 | [Children](33-children.md) | M39 |
 | 34 | [Diagnostic report of a drape](34-diagnostic-report.md) | M41 |
+| 35 | [Environment lighting for photos](35-environment-lighting.md) | M42 |

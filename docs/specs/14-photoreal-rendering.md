@@ -11,7 +11,7 @@ to show a client or publish online, without leaving Rustle3D.
   a preset size up to 3840 × 2160), seen from the current view in the app
   or from a camera angle headless (front, three-quarter, side, back;
   framing the garment or the whole body).
-- Three studio setups instead of an HDRI file: **Studio** (key, fill and
+- Three studio setups, or an environment (an HDRI, spec 35): **Studio** (key, fill and
   rim soft boxes, light grey seamless backdrop), **Soft** (large soft
   boxes, white backdrop), **Dramatic** (one hard key and a rim, dark
   backdrop). The soft boxes keep their place relative to the camera.
@@ -48,6 +48,5 @@ to show a client or publish online, without leaving Rustle3D.
   current batch of samples (each aims at 40 ms of GPU time).
 
 ## Not yet
-- Loading the user's own HDRI environment; textures, prints and weave
-  detail (normal maps); cloth thickness at the edges; hardware ray
+- Weave detail (normal maps); cloth thickness at the edges; hardware ray
   queries (wgpu's are an unsafe, experimental feature).

@@ -51,7 +51,8 @@ To dress the avatar: avatar_set, panel_place each panel around the body, seam_ad
 then simulate (headless drape, cached; with `motion` the avatar walks, turns or raises its arms, with `motion_file` it plays a BVH \
 motion capture in the project folder, and the \
 cloth follows) and render_3d to see the result; render_board shows the pattern; \
-render_photo makes a photorealistic studio image of the draped garment (quality quick for a first look). \
+render_photo makes a photorealistic studio image of the draped garment (quality quick for a first look; \
+`environment` lights it with a built-in place or a .hdr file in the project folder instead of the studio). \
 For production: marker_compute / export_marker lay the pieces out on the fabric (yardage, cost); \
 export_techpack writes the tech pack PDF (views, colourways, bill of materials, measurements, pattern, sewing notes). \
 Errors carry a stable `code`, `args` and an English `text`.";
@@ -279,6 +280,12 @@ fn catalog() -> (Vec<Tool>, BTreeMap<String, Target>) {
                     "default": "garment",
                     "description": "Fill the image with the garment, or show the whole body"
                 },
+                "environment": {
+                    "type": "string",
+                    "description": format!("Light the photo with an environment instead of the studio (`lighting` is then ignored): a built-in one ({}) or a Radiance .hdr file in the project folder (relative path, e.g. environments/room.hdr). It shows behind the model, with an invisible floor that catches the shadows.", r3d_commands::environments::builtin_names().join(", "))
+                },
+                "turn_deg": { "type": "number", "default": 0, "description": "Turn of the environment in degrees, counter-clockwise seen from above; at 0 the picture's centre is behind the model" },
+                "brightness": { "type": "number", "minimum": photo::BRIGHTNESS.start(), "maximum": photo::BRIGHTNESS.end(), "default": 1, "description": "Factor on the environment's automatic exposure" },
                 "samples": { "type": "integer", "minimum": 1, "maximum": photo::MAX_SAMPLES, "description": "Overrides the quality's samples per pixel" },
                 "bounces": { "type": "integer", "minimum": 0, "maximum": photo::MAX_BOUNCES, "description": "Overrides the quality's light bounces" },
                 "denoise": { "type": "boolean", "default": true }
@@ -288,8 +295,8 @@ fn catalog() -> (Vec<Tool>, BTreeMap<String, Target>) {
     };
     add(
         "render_photo".into(),
-        "Render a photorealistic PNG of the garment on the avatar in a photo studio (path \
-         traced, denoised): the last `simulate` result if the project has not changed since, \
+        "Render a photorealistic PNG of the garment on the avatar in a photo studio or an \
+         environment (path traced, denoised): the last `simulate` result if the project has not changed since, \
          otherwise the panels where the simulation starts. Takes seconds (quick) to minutes \
          (best) depending on the GPU and the size; the text result gives the time taken."
             .into(),
@@ -347,7 +354,7 @@ impl Server {
                 return error_result(&CommandError::UnknownType { name: name.into() }.message());
             }
             Some(Target::Render(view)) => {
-                return match self.render(*view, &args) {
+                return match self.render(view.clone(), &args) {
                     Ok((png, info)) => CallToolResult::success(vec![
                         ContentBlock::image(STANDARD.encode(png), "image/png"),
                         ContentBlock::text(info.to_string()),

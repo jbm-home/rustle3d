@@ -725,7 +725,7 @@ class _ShellState extends State<Shell> {
 
   /// Ask how to render a photo, then show it refining in the 3D view.
   Future<void> _askPhoto() async {
-    final choice = await askPhoto(context, _photoChoice);
+    final choice = await askPhoto(context, widget.engine, _photoChoice);
     if (choice == null || !mounted) return;
     _photoChoice = choice;
     final status = _guard(

@@ -25,6 +25,7 @@ pub mod commands;
 pub mod diagnose;
 pub mod docs;
 pub mod drape;
+pub mod environments;
 pub mod error;
 pub mod fit;
 pub mod game;

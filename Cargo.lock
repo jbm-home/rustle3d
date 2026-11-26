@@ -2071,6 +2071,7 @@ dependencies = [
  "r3d-commands",
  "r3d-core",
  "r3d-geom",
+ "r3d-io",
  "serde_json",
  "thiserror",
  "wgpu",

@@ -43,9 +43,14 @@ where `library.*` steps in scripts and over MCP find saved patterns
   `--lighting studio|soft|dramatic`, `--camera
   front|three-quarter|side|back`, `--frame garment|body`, `--samples N`,
   `--bounces N` and `--no-denoise`; its output adds the samples and the
-  seconds taken. `--fit-map strain|gap` (3D only, M24, spec 24) colours
+  seconds taken. `--environment NAME|PATH` lights it with a built-in
+  environment or a `.hdr` file in the project instead of the studio,
+  with `--turn DEG` and `--brightness K` (M42, spec 35). `--fit-map strain|gap` (3D only, M24, spec 24) colours
   the cloth by how tight it is, with a scale bar at the right edge; the
   output adds the scale and the tightest value.
+- `r3d environment <project> <file.hdr>`: check a Radiance picture and
+  copy it into the project's `environments/` folder (spec 35); prints
+  its path in the project.
 - `r3d texture <project> <image|stripes|gingham|dots|twill> [--garment
   id] [--width-mm W] [--height-mm H] [--angle DEG]`: put a print on a
   garment (spec 25): a PNG or JPEG is checked and copied into the

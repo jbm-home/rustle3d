@@ -51,12 +51,12 @@ maintainer's briefs that specs cite as "ROADMAP Mxx" in their
 | M39 | Children ✅ (2026-11-26) | A 4-year-old girl's pyjama and a baby's bodysuit, drafted on children's bodies and graded by age |
 | M40 | Body scans in PLY and STL ✅ (2026-11-26) | A body scan saved as PLY or STL is imported, checked and draped like an OBJ |
 | M41 | Diagnostic report ✅ (2026-11-26) | An agent marks the faces where a drape goes wrong and reads why: stretch, contacts, seam gaps |
-| M42 | The user's own HDRI | A photo render lit by an environment the user brings (`.hdr`) |
+| M42 | The user's own HDRI ✅ (2026-11-26) | A photo render lit by an environment the user brings (`.hdr`) |
 | M43 | Fabric relief: normal and roughness maps | A denim's weave and a satin's sheen show in the 3D view and the photo |
 | M44 | Fabric presets from open measurements | Presets whose weights and thicknesses come from a published dataset, each value with its source |
 | M45 | Self-collision by contacts | A folded skirt's layers lie on each other, without the puffy ~8 mm gap |
 
-Next: M42; M16's Linux part when the work
+Next: M43; M16's Linux part when the work
 moves to Linux.
 
 ## Planned milestones (proposed 2026-11-26)
@@ -135,6 +135,9 @@ back through the CPU every frame.
 
 As noted when each milestone closed; recheck before taking one up.
 
+- **Environment lighting (M42)**: OpenEXR; light bounced off the
+  garment onto the floor; the app's Place controls not yet seen on
+  screen by the maintainer.
 - **Diagnostic report (M41)**: marking the faces with the mouse in the
   3D view and copying the report for an agent; a signed distance to a
   moving body.

@@ -2917,6 +2917,42 @@ abstract class L {
   /// **'One hard light on a dark backdrop'**
   String get lightDramaticHint;
 
+  /// No description provided for @lightEnvironment.
+  ///
+  /// In en, this message translates to:
+  /// **'Place'**
+  String get lightEnvironment;
+
+  /// No description provided for @lightEnvironmentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A real place (an HDR image) lights the garment and shows behind it, with its shadow on the floor'**
+  String get lightEnvironmentHint;
+
+  /// No description provided for @photoEnvironmentAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add .hdr…'**
+  String get photoEnvironmentAdd;
+
+  /// No description provided for @photoEnvironmentFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'HDR images'**
+  String get photoEnvironmentFiles;
+
+  /// No description provided for @photoTurn.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn'**
+  String get photoTurn;
+
+  /// No description provided for @photoBrightness.
+  ///
+  /// In en, this message translates to:
+  /// **'Brightness'**
+  String get photoBrightness;
+
   /// No description provided for @photoSize.
   ///
   /// In en, this message translates to:
