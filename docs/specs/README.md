@@ -43,3 +43,4 @@ descriptions, public papers, open standards, general garment-making knowledge.
 | 31 | [Construction details 2: elastic, topstitching, interfacing, quilting](31-construction-details-2.md) | M34 |
 | 32 | [Pattern library](32-pattern-library.md) | M38 |
 | 33 | [Children](33-children.md) | M39 |
+| 34 | [Diagnostic report of a drape](34-diagnostic-report.md) | M41 |

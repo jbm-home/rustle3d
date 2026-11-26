@@ -22,6 +22,7 @@
 pub mod actions;
 pub mod bodies;
 pub mod commands;
+pub mod diagnose;
 pub mod docs;
 pub mod drape;
 pub mod error;

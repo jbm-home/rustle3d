@@ -472,6 +472,19 @@ enum Cmd {
         #[arg(long, value_delimiter = ',')]
         heights_cm: Vec<f64>,
     },
+    /// Where the drape goes wrong and why (the cached `simulate` result):
+    /// per face its strain, area, distance to the body, nearby cloth and
+    /// seam gaps; every seam's gap; the worst faces.
+    Diagnose {
+        project: PathBuf,
+        /// Faces listed per list (1-200).
+        #[arg(long, default_value_t = 20)]
+        limit: u32,
+        /// Regions to report on, as the JSON array of `drape.diagnose`
+        /// (e.g. '[{"kind":"drape","point_m":[0,1.2,0.1],"radius_mm":30}]').
+        #[arg(long)]
+        regions: Option<String>,
+    },
     /// List every operation, or print the JSON schema of one.
     Schema { name: Option<String> },
     /// Serve a project to an AI agent over MCP (stdio). With --project, the
@@ -920,6 +933,19 @@ fn cmd_fit(project: &Path, threshold_pct: f64, heights_cm: Vec<f64>) -> Result<(
     print_json(&result)
 }
 
+fn cmd_diagnose(project: &Path, limit: u32, regions: Option<&str>) -> Result<(), Failure> {
+    let mut ws = Workspace::open(project)?;
+    let regions: Value = match regions {
+        Some(text) => serde_json::from_str(text).map_err(|_| {
+            r3d_commands::CommandError::invalid("regions", r3d_commands::error::Invalid::Format)
+        })?,
+        None => json!([]),
+    };
+    let step = json!({ "type": "drape.diagnose", "limit": limit, "regions": regions });
+    let result = ws.run_step(&Step::from_value(step)?)?;
+    print_json(&result)
+}
+
 fn cmd_render(
     project: &Path,
     view: ViewArg,
@@ -1081,6 +1107,11 @@ fn main() -> ExitCode {
             threshold_pct,
             heights_cm,
         } => cmd_fit(&project, threshold_pct, heights_cm),
+        Cmd::Diagnose {
+            project,
+            limit,
+            regions,
+        } => cmd_diagnose(&project, limit, regions.as_deref()),
         Cmd::Schema { name } => cmd_schema(name.as_deref()),
         Cmd::Mcp {
             project,

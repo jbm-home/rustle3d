@@ -61,6 +61,10 @@ where `library.*` steps in scripts and over MCP find saved patterns
   cached drape fits (`fit.report`, spec 24): strain per piece, the tight
   spots, the ease at the chest, waist and hips (and at the heights
   given).
+- `r3d diagnose <project> [--limit N] [--regions JSON]`: where the
+  cached drape goes wrong and why (`drape.diagnose`, spec 34): per face
+  its strain, area, distance to the body, nearby cloth and seam gap;
+  every seam's gap; the worst faces.
 - `r3d mcp --project path`: MCP server over a folder; `r3d mcp --attach
   [--endpoint file]`: relay to the project open in the app (see 09).
 - `r3d export <project> --format svg|pdf|dxf|glb|obj|game [--paper a4|letter|single]

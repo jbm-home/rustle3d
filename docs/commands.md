@@ -8668,6 +8668,114 @@ A length on the cached drape between two points of it (`from`, `to`, m): straigh
 
 </details>
 
+### `drape.diagnose`
+
+Where the drape goes wrong and why, read from the cached drape (`simulate` first; says `drape`: simulated or start). Per face: piece, place on the pattern (mm) and on the drape (m), strain (% stretch beyond the pattern), area against the pattern's (below 1: crumpled), signed distance to the body (mm, negative inside; unsigned while the body moves), the nearest other cloth within 10 mm that is not the face's own neighbourhood (a fold or another layer: piece and distance), and the largest gap of a seam at its corners. With `regions` (a disc on a piece's pattern, or a ball on the drape): each region's summary and its faces, the most strained first. Always: counts (faces, particles that are not numbers, particles more than 2 mm inside the body), every seam's largest and mean gap (widest first), the worst faces of the whole drape (most strained, most crumpled, deepest in the body), at most `limit` (default 20) per list, and `replay`: the project version (`fingerprint`), simulated time and motion this drape comes from.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "PanelId": {
+      "description": "Identifier of a panel, e.g. `panel:1`.",
+      "pattern": "^panel:[1-9][0-9]*$",
+      "type": "string"
+    },
+    "Region": {
+      "description": "Where to look.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A disc on a piece of the pattern: its faces whose centre lies\nwithin `radius_mm` of `at_mm` (the piece's coordinates, base size,\nas `fit.report` gives its tight spots).",
+          "properties": {
+            "at_mm": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "kind": {
+              "const": "pattern",
+              "type": "string"
+            },
+            "panel": {
+              "$ref": "#/$defs/PanelId"
+            },
+            "radius_mm": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "panel",
+            "at_mm",
+            "radius_mm"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A ball on the drape: its faces whose centre lies within\n`radius_mm` of `point_m` (m, x right, y up, z forward, as\n`fit.tape` takes its points).",
+          "properties": {
+            "kind": {
+              "const": "drape",
+              "type": "string"
+            },
+            "point_m": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "radius_mm": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "point_m",
+            "radius_mm"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The diagnostic report of the drape.",
+  "properties": {
+    "limit": {
+      "default": 20,
+      "description": "Faces listed per list (1–200, default 20).",
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "regions": {
+      "description": "Regions to report on; omitted: the whole drape.",
+      "items": {
+        "$ref": "#/$defs/Region"
+      },
+      "type": "array"
+    }
+  },
+  "title": "DrapeDiagnose",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `library.list`
 
 The pattern library: `builtin`, the built-in patterns (each a template: its id, English title and kind; add one with template.apply), and `patterns`, the user's own saved with library.save (name, kind, folder, and the template it was drafted from if any; add one with library.add). Kinds: tops, bottoms, dresses_and_skirts, accessories, children.

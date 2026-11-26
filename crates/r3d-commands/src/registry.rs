@@ -8,6 +8,7 @@ use serde_json::Value;
 
 use crate::actions::*;
 use crate::commands::*;
+use crate::diagnose::DrapeDiagnose;
 use crate::error::CommandError;
 use crate::fit::{FitLength, FitReport, FitTape};
 use crate::game::ExportGame;
@@ -281,6 +282,7 @@ action_registry! {
     "fit.report" => FitReport,
     "fit.tape" => FitTape,
     "fit.length" => FitLength,
+    "drape.diagnose" => DrapeDiagnose,
     "library.list" => LibraryList,
     "library.add" => LibraryAdd,
     "library.save" => LibrarySave,

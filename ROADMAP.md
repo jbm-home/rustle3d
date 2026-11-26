@@ -50,13 +50,13 @@ maintainer's briefs that specs cite as "ROADMAP Mxx" in their
 | M38 | Pattern library ✅ (2026-11-25) | In an open project, a jean and a short are added from the library; a skirt saved there from one project is added to another, drafted for its body |
 | M39 | Children ✅ (2026-11-26) | A 4-year-old girl's pyjama and a baby's bodysuit, drafted on children's bodies and graded by age |
 | M40 | Body scans in PLY and STL ✅ (2026-11-26) | A body scan saved as PLY or STL is imported, checked and draped like an OBJ |
-| M41 | Diagnostic report | An agent marks the faces where a drape goes wrong and reads why: stretch, contacts, seam gaps |
+| M41 | Diagnostic report ✅ (2026-11-26) | An agent marks the faces where a drape goes wrong and reads why: stretch, contacts, seam gaps |
 | M42 | The user's own HDRI | A photo render lit by an environment the user brings (`.hdr`) |
 | M43 | Fabric relief: normal and roughness maps | A denim's weave and a satin's sheen show in the 3D view and the photo |
 | M44 | Fabric presets from open measurements | Presets whose weights and thicknesses come from a published dataset, each value with its source |
 | M45 | Self-collision by contacts | A folded skirt's layers lie on each other, without the puffy ~8 mm gap |
 
-Next: M41, M42 (in this order); M16's Linux part when the work
+Next: M42; M16's Linux part when the work
 moves to Linux.
 
 ## Planned milestones (proposed 2026-11-26)
@@ -135,6 +135,11 @@ back through the CPU every frame.
 
 As noted when each milestone closed; recheck before taking one up.
 
+- **Diagnostic report (M41)**: marking the faces with the mouse in the
+  3D view and copying the report for an agent; a signed distance to a
+  moving body.
+- **Body scans (M40)**: PLY and STL tested on files we wrote, not yet
+  on a real scanner's file.
 - **Children (M39)**: the app's new controls (Adult | Child and the age
   in the Body panel, the five charts in the sizes dialog, the children's
   cards on the start screen and in the library) were not seen on screen

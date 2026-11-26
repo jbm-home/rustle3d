@@ -64,6 +64,9 @@ and look at the result, either headless or live in the user's open app.
   piece. `fit_report` and `fit_tape` are the `fit.report` and `fit.tape`
   actions: strain per piece, tight spots, ease at the chest, waist and
   hips; a tape at a height or a point.
+- **Diagnosis** (M41, spec 34): `drape_diagnose` is the
+  `drape.diagnose` action: where the drape goes wrong (regions on the
+  pattern or the drape, or the worst faces) and why.
 - **Prints** (M21, spec 25): `garment_set_print`, `garment_remove_print`
   and `panel_set_print_placement` are the commands; an image must
   already be in the project folder (the server reads and writes nothing

@@ -30,7 +30,7 @@ use r3d_avatar::skeleton::{Pose, Skeleton, skin};
 use r3d_core::seam::{Span, Track};
 use r3d_core::{
     Around, ButtonId, DetailId, EdgeId, Fabric, GarmentId, PanelId, PinId, PointId, Project,
-    SeamSide, Transaction,
+    SeamId, SeamSide, Transaction,
 };
 use r3d_geom::DVec2;
 use r3d_geom::Rigid;
@@ -68,6 +68,8 @@ pub struct Drape {
     pub pins: Vec<(PinId, Vec<usize>)>,
     /// The particles along each simulated contour edge, start to end.
     pub edges: BTreeMap<EdgeId, Vec<usize>>,
+    /// Each seam's sewn pairs in `scene.seams`.
+    pub seams: Vec<(SeamId, Range<usize>)>,
     /// The elastic of each of `scene.elastics`, in its order.
     pub elastics: Vec<DetailId>,
     /// How far each particle stands out of the cloth where it is quilted
@@ -2248,14 +2250,17 @@ pub fn build(
         }
         Some(out)
     };
-    for seam in project.seams().values() {
+    let mut seams = Vec::new();
+    for (id, seam) in project.seams() {
         if let (Some(a), Some(b)) = (side_particles(&seam.a), side_particles(&seam.b)) {
+            let first = scene.seams.len();
             scene.seams.extend(
                 a.iter()
                     .zip(&b)
                     .filter(|(x, y)| x != y)
                     .map(|(x, y)| [*x, *y]),
             );
+            seams.push((*id, first..scene.seams.len()));
         }
     }
 
@@ -2340,6 +2345,7 @@ pub fn build(
         pieces,
         pins,
         edges,
+        seams,
         elastics,
         puff,
     })
