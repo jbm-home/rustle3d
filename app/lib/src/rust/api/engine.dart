@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `check`, `cloth_hit`, `corner_at`, `corner_landing`, `dressed_now`, `edge_spot`, `edited`, `environment`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `field_of_view`, `forget_missing`, `form_now`, `form_soon`, `frozen_board`, `garment_view_size`, `gpu_solver`, `graphics`, `import_from`, `live_body`, `long`, `look`, `marker_spec`, `marks_of`, `moving_avatar`, `new`, `new`, `offset_along`, `parse_track`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `prints_of`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `save_scene`, `selected`, `set_busy`, `sim`, `solver`, `start_scene_photo`, `stroke_hit`, `subject`, `to_theme`, `top`, `workspace`
+// These functions are ignored because they are not marked as `pub`: `adjust_by`, `board_scene`, `check`, `cloth_hit`, `corner_at`, `corner_landing`, `dressed_now`, `edge_spot`, `edited`, `environment`, `err`, `export_to`, `extend_stroke`, `fall_back_if_failed`, `field_of_view`, `forget_missing`, `form_now`, `form_soon`, `frame_key`, `frozen_board`, `garment_view_size`, `gpu_solver`, `graphics`, `import_from`, `live_body`, `long`, `look`, `marker_spec`, `marks_of`, `moving_avatar`, `new`, `new`, `offset_along`, `parse_track`, `pick_cloth`, `piece_meshes`, `poisoned`, `press_board`, `prints_of`, `pull_board`, `rebuild`, `refresh_avatar`, `render_garment`, `report`, `resync_if_due`, `rgba`, `run_created`, `run_with`, `save_scene`, `selected`, `set_busy`, `sim`, `solver`, `start_scene_photo`, `stroke_hit`, `subject`, `to_theme`, `top`, `workspace`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Graphics`, `View`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`
 
@@ -362,9 +362,11 @@ abstract class Engine implements RustOpaqueInterface {
   void release();
 
   /// Render a view and wait until the GPU is done, so the UI never shows
-  /// a half-drawn frame. Returns the CPU + GPU time in milliseconds.
-  /// Asynchronous for the UI: the wait never blocks its thread.
-  Future<double> renderView({required int view});
+  /// a half-drawn frame. Returns the CPU + GPU time in milliseconds, or
+  /// `None` when nothing it shows changed since its last frame (which
+  /// stays shown). Asynchronous for the UI: the wait never blocks its
+  /// thread.
+  Future<double?> renderView({required int view});
 
   /// Start the simulation again from the pattern: the pieces around the
   /// body, paused. Can take seconds (a new body is fitted first): the UI
@@ -374,6 +376,11 @@ abstract class Engine implements RustOpaqueInterface {
   /// Run one step (a JSON object, as in scripts and MCP) and return its
   /// JSON result. Changes are saved immediately.
   String run({required String stepJson});
+
+  /// [`Engine::run`] for one move of a drag: saved on
+  /// [`Engine::release`] rather than at every move (the whole document
+  /// is written each time).
+  String runDragging({required String stepJson});
 
   /// [`Engine::run`] for a step that may take seconds (a template, a size
   /// range, new measurements), off the UI thread: [`Engine::progress`]

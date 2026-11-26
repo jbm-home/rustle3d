@@ -336,7 +336,8 @@ class _RustViewState extends State<RustView>
     _rendering = true;
     try {
       final ms = await widget.engine.renderView(view: view);
-      if (!mounted || view != _viewId) return;
+      // Null: nothing changed, the last frame stays.
+      if (ms == null || !mounted || view != _viewId) return;
       _channel.invokeMethod('frame', {'textureId': texture});
       widget.onFrameTime?.call(ms);
     } on ApiError {
@@ -350,14 +351,15 @@ class _RustViewState extends State<RustView>
   /// at a time.
   Future<void> _readBack(int view) async {
     _reading = true;
-    final double ms;
+    final double? ms;
     try {
       ms = await widget.engine.renderView(view: view);
     } on ApiError {
       _reading = false;
       return;
     }
-    if (!mounted || view != _viewId) {
+    // Null: nothing changed, the last pixels stay.
+    if (ms == null || !mounted || view != _viewId) {
       _reading = false;
       return;
     }

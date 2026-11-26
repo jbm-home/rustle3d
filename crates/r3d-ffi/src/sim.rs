@@ -44,6 +44,9 @@ pub(crate) struct Published {
     /// Why the solver stopped stepping (its device failed); the positions
     /// are those of its last good step.
     pub failed: Option<String>,
+    /// Counts the publications: the same serial, the same state (what the
+    /// views redraw from).
+    pub serial: u64,
 }
 
 pub(crate) struct SimThread {
@@ -70,12 +73,21 @@ impl SimThread {
     /// Update the published state right away, so callers see the effect
     /// of a control before the thread gets to it.
     fn publish_now(&self, update: impl FnOnce(&mut Published)) {
-        update(
-            &mut self
-                .published
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner),
-        );
+        let mut p = self
+            .published
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let serial = p.serial + 1;
+        update(&mut p);
+        p.serial = serial;
+    }
+
+    /// The serial of the latest publication (read without copying it).
+    pub fn serial(&self) -> u64 {
+        self.published
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .serial
     }
 
     /// Load a new solver, paused, replacing the current one.
@@ -153,6 +165,7 @@ fn publish(
     failed: Option<&String>,
 ) {
     let mut p = out.lock().unwrap_or_else(PoisonError::into_inner);
+    let serial = p.serial + 1;
     p.loaded = solver.is_some();
     p.failed = failed.cloned();
     p.running = running && solver.is_some();
@@ -167,6 +180,7 @@ fn publish(
         }
         None => *p = Published::default(),
     }
+    p.serial = serial;
 }
 
 fn run(rx: &Receiver<Control>, out: &Mutex<Published>) {
@@ -191,8 +205,9 @@ fn run(rx: &Receiver<Control>, out: &Mutex<Published>) {
                 Err(_) => return,
             }
         };
-        // Moving a grab changes nothing visible until the next step.
-        let changed = !matches!(message, Some(Control::GrabTo(_)));
+        // Moving a grab changes nothing visible until the next step; a
+        // due frame of a failed solver does not step.
+        let mut changed = !matches!(message, Some(Control::GrabTo(_)));
         match message {
             Some(Control::Load(s)) => {
                 solver = Some(s);
@@ -237,6 +252,8 @@ fn run(rx: &Receiver<Control>, out: &Mutex<Published>) {
                         Ok(()) => step_ms = start.elapsed().as_secs_f64() * 1000.0,
                         Err(e) => failed = Some(e.to_string()),
                     }
+                } else {
+                    changed = false;
                 }
                 // Late frames drop simulated time rather than catch up.
                 next = (next + frame).max(Instant::now());

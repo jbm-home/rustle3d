@@ -24,6 +24,7 @@ use crate::cloth::{
     PICK_PX, RESYNC_EVERY, SEAM_END, SNAP_PX, STROKE_STEP_MM, Sync, Tool, ray_triangle,
 };
 use crate::forms::{FormKey, Forms};
+use crate::frame::{FrameKey, Shown};
 use crate::photo::{Look, OpenScene, PhotoJob, SCENE_SAMPLES, Subject};
 use crate::sim::SimThread;
 use r3d_core::seam::Track;
@@ -342,6 +343,8 @@ struct View {
     shared: bool,
     /// Board pan/zoom chosen by the user; `None` fits the pattern.
     board_view: Option<BoardView>,
+    /// What its last frame was drawn from (`None`: drawn every time).
+    drawn: Option<FrameKey>,
 }
 
 /// GPU state, created when the first view is attached.
@@ -1108,7 +1111,15 @@ impl Engine {
     /// JSON result. Changes are saved immediately.
     #[frb(sync)]
     pub fn run(&self, step_json: String) -> Result<String, ApiError> {
-        self.run_with(&step_json, &Progress::default())
+        self.run_with(&step_json, &Progress::default(), true)
+    }
+
+    /// [`Engine::run`] for one move of a drag: saved on
+    /// [`Engine::release`] rather than at every move (the whole document
+    /// is written each time).
+    #[frb(sync)]
+    pub fn run_dragging(&self, step_json: String) -> Result<String, ApiError> {
+        self.run_with(&step_json, &Progress::default(), false)
     }
 
     /// [`Engine::run`] for a step that may take seconds (a template, a size
@@ -1117,14 +1128,21 @@ impl Engine {
     /// New measurements are fitted before it returns.
     pub fn run_long(&self, step_json: String) -> Result<String, ApiError> {
         self.long("step", |progress| {
-            let out = self.run_with(&step_json, progress)?;
+            let out = self.run_with(&step_json, progress, true)?;
             let key = FormKey::of(self.workspace()?.session().project());
             self.form_now(key)?;
             Ok(out)
         })
     }
 
-    fn run_with(&self, step_json: &str, progress: &Progress) -> Result<String, ApiError> {
+    /// Run a step; `save`: write the document now if it changed (else on
+    /// release, or with the next step saved).
+    fn run_with(
+        &self,
+        step_json: &str,
+        progress: &Progress,
+        save: bool,
+    ) -> Result<String, ApiError> {
         let value: serde_json::Value = serde_json::from_str(step_json).map_err(|e| ApiError {
             code: "malformed".into(),
             args: HashMap::from([("detail".into(), e.to_string())]),
@@ -1136,7 +1154,7 @@ impl Engine {
         if !matches!(step, Step::Query(_) | Step::List) {
             self.edited()?;
         }
-        if ws.session().is_dirty() {
+        if save && ws.session().is_dirty() {
             ws.save().map_err(err)?;
         }
         // Moving through the history selects what changed, so the user
@@ -1996,6 +2014,7 @@ impl Engine {
                     ViewKind::Board => g.board_view.take(),
                     ViewKind::Garment => None,
                 },
+                drawn: None,
             },
         );
         Ok(id)
@@ -2048,24 +2067,40 @@ impl Engine {
     }
 
     /// Render a view and wait until the GPU is done, so the UI never shows
-    /// a half-drawn frame. Returns the CPU + GPU time in milliseconds.
-    /// Asynchronous for the UI: the wait never blocks its thread.
-    pub fn render_view(&self, view: u32) -> Result<f64, ApiError> {
+    /// a half-drawn frame. Returns the CPU + GPU time in milliseconds, or
+    /// `None` when nothing it shows changed since its last frame (which
+    /// stays shown). Asynchronous for the UI: the wait never blocks its
+    /// thread.
+    pub fn render_view(&self, view: u32) -> Result<Option<f64>, ApiError> {
         let start = Instant::now();
         self.fall_back_if_failed()?;
         self.resync_if_due()?;
         let selected = self.selected()?.clone();
+        let edges = self.selected_edges.lock().map_err(|_| poisoned())?.clone();
         let ws = self.workspace()?;
         let project = ws.session().project();
         let mut slot = self.graphics()?;
         let g = slot
             .as_mut()
             .ok_or_else(|| ApiError::new("no_view", "no view attached"))?;
+        let prints = self.prints_of(project, ws.dir())?;
+        let kind = g
+            .views
+            .get(&view)
+            .ok_or_else(|| ApiError::new("no_view", format!("unknown view {view}")))?
+            .kind;
+        if kind == ViewKind::Garment {
+            self.refresh_avatar(g, project)?;
+        }
+        let key = self.frame_key(g, view, &ws, selected.clone(), edges.clone(), &prints)?;
         let theme = g.theme;
         let v = g
             .views
             .get(&view)
             .ok_or_else(|| ApiError::new("no_view", format!("unknown view {view}")))?;
+        if key.is_some() && v.drawn == key {
+            return Ok(None);
+        }
         let target = Target {
             view: &v.target,
             width: v.width,
@@ -2073,8 +2108,7 @@ impl Engine {
         };
         match v.kind {
             ViewKind::Board => {
-                let edges = self.selected_edges.lock().map_err(|_| poisoned())?.clone();
-                let prints = crate::cloth::board_prints(&self.prints_of(project, ws.dir())?);
+                let prints = crate::cloth::board_prints(&prints);
                 let scene = self
                     .board_scene(project, &selected)
                     .with_selected_edges(&edges)
@@ -2101,9 +2135,12 @@ impl Engine {
                 } else {
                     drop(photo);
                     let revision = ws.session().revision();
-                    self.render_garment(g, project, revision, ws.dir(), &selected, view)?;
+                    self.render_garment(g, project, revision, &prints, &selected, view)?;
                 }
             }
+        }
+        if let Some(v) = g.views.get_mut(&view) {
+            v.drawn = key;
         }
         if let Some(v) = g.views.get(&view).filter(|v| v.shared) {
             // The compositor reads the texture on its own device: leave it
@@ -2131,7 +2168,61 @@ impl Engine {
         device
             .poll(wgpu::PollType::wait_indefinitely())
             .map_err(|e| ApiError::new("gpu", e.to_string()))?;
-        Ok(start.elapsed().as_secs_f64() * 1000.0)
+        Ok(Some(start.elapsed().as_secs_f64() * 1000.0))
+    }
+
+    /// What `view`'s next frame would be drawn from; `None` when it
+    /// changes on its own (a photo taking samples, the live photo scene),
+    /// so that it is drawn every time.
+    fn frame_key(
+        &self,
+        g: &Graphics,
+        view: u32,
+        ws: &Workspace,
+        selected: Vec<PanelId>,
+        edges: Vec<EdgeId>,
+        prints: &HashMap<r3d_core::GarmentId, Arc<PrintImage>>,
+    ) -> Result<Option<FrameKey>, ApiError> {
+        let Some(v) = g.views.get(&view) else {
+            return Ok(None);
+        };
+        let shown = match v.kind {
+            ViewKind::Board => Shown::Board {
+                view: v.board_view,
+                sizes: self.show_sizes.load(Ordering::Relaxed),
+            },
+            ViewKind::Garment => {
+                let photo = match self.photo.lock().map_err(|_| poisoned())?.as_ref() {
+                    None => None,
+                    Some(job) => {
+                        let progress = job.progress();
+                        if job.is_live() || !progress.finished {
+                            return Ok(None);
+                        }
+                        Some(progress.samples)
+                    }
+                };
+                Shown::Garment {
+                    camera: g.camera,
+                    sim: self.sim()?.as_ref().map_or(0, SimThread::serial),
+                    avatar: g.avatar.as_ref().map(|(id, _)| *id),
+                    fit_map: *self.fit_map.lock().map_err(|_| poisoned())?,
+                    tape: self.tape.lock().map_err(|_| poisoned())?.clone(),
+                    photo,
+                }
+            }
+        };
+        let mut prints: Vec<_> = prints.iter().map(|(id, p)| (*id, p.key)).collect();
+        prints.sort_unstable();
+        Ok(Some(FrameKey {
+            revision: ws.session().revision(),
+            size: (v.width, v.height),
+            theme: g.theme,
+            selected,
+            edges,
+            prints,
+            shown,
+        }))
     }
 
     /// The fitted avatar mesh for the project's measurements. New ones
@@ -2244,12 +2335,10 @@ impl Engine {
         g: &mut Graphics,
         project: &r3d_core::Project,
         revision: u64,
-        dir: &Path,
+        prints: &HashMap<r3d_core::GarmentId, Arc<PrintImage>>,
         selected: &[PanelId],
         view: u32,
     ) -> Result<(), ApiError> {
-        let prints = self.prints_of(project, dir)?;
-        self.refresh_avatar(g, project)?;
         let theme = g.theme;
         let v = g
             .views
@@ -2318,7 +2407,7 @@ impl Engine {
             _ => None,
         };
         let pieces = match (cloth.as_ref(), at.as_ref()) {
-            (Some(d), Some(at)) => piece_meshes(d, at, paint.as_deref(), project, &prints),
+            (Some(d), Some(at)) => piece_meshes(d, at, paint.as_deref(), project, prints),
             _ => Vec::new(),
         };
         drop(cloth);
@@ -3871,7 +3960,7 @@ impl Engine {
                     "offset_mm": from.offset_mm,
                     "centre_x_mm": from.centre_x_mm,
                 });
-                self.run(step.to_string())?;
+                self.run_dragging(step.to_string())?;
                 self.rebuild(false)?;
                 held.tool
             }
@@ -4036,7 +4125,7 @@ impl Engine {
             _ => return Ok(None),
         };
         // A move the pattern refuses leaves the hold where it was.
-        let moved_ok = self.run(step.to_string()).is_ok();
+        let moved_ok = self.run_dragging(step.to_string()).is_ok();
         if let (true, Some(h)) = (moved_ok, self.held.lock().map_err(|_| poisoned())?.as_mut()) {
             h.tool = next;
         }
@@ -4089,7 +4178,7 @@ impl Engine {
             return applied;
         }
         step["mm"] = serde_json::json!(total - applied);
-        if self.run(step.to_string()).is_ok() {
+        if self.run_dragging(step.to_string()).is_ok() {
             total
         } else {
             applied
@@ -4149,7 +4238,14 @@ impl Engine {
     /// (a drag is one step, the next one another).
     #[frb(sync)]
     pub fn release(&self) -> Result<(), ApiError> {
-        self.workspace()?.seal_history();
+        {
+            // The drag's moves are saved now.
+            let mut ws = self.workspace()?;
+            ws.seal_history();
+            if ws.session().is_dirty() {
+                ws.save().map_err(err)?;
+            }
+        }
         *self.drag_snap.lock().map_err(|_| poisoned())? = None;
         let held = self.held.lock().map_err(|_| poisoned())?.take();
         let was_pulling = held.is_some_and(|h| matches!(h.tool, Tool::Pull { pulling: true }));
@@ -4413,6 +4509,44 @@ mod tests {
         let status = after_rebuild();
         assert!(status.time_s < before, "{} vs {before}", status.time_s);
         assert!(status.loaded && status.running);
+    }
+
+    #[test]
+    fn a_drag_is_saved_on_release() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("P.r3d");
+        let engine = Engine::open(dir.to_string_lossy().into()).unwrap();
+        let saved =
+            || std::fs::read_to_string(dir.join(r3d_core::project_dir::PROJECT_FILE)).unwrap();
+        engine
+            .run_dragging(r#"{"type":"project.rename","name":"Moved"}"#.into())
+            .unwrap();
+        assert!(!saved().contains("Moved"));
+        engine.release().unwrap();
+        assert!(saved().contains("Moved"));
+    }
+
+    #[test]
+    fn an_unchanged_view_is_not_drawn_again() {
+        let tmp = tempfile::tempdir().unwrap();
+        let engine = Engine::open(tmp.path().join("P.r3d").to_string_lossy().into()).unwrap();
+        // Without a GPU (some CI machines) there is no view to draw.
+        let Ok(board) = engine.attach_view(ViewKind::Board, None, 64, 48) else {
+            return;
+        };
+        let garment = engine.attach_view(ViewKind::Garment, None, 64, 48).unwrap();
+        for view in [board, garment] {
+            assert!(engine.render_view(view).unwrap().is_some());
+            assert!(engine.render_view(view).unwrap().is_none());
+            engine.drag(view, 5.0, 0.0).unwrap();
+            assert!(engine.render_view(view).unwrap().is_some());
+        }
+        // An edit redraws the board.
+        engine
+            .run(r#"{"type":"project.rename","name":"Q"}"#.into())
+            .unwrap();
+        assert!(engine.render_view(board).unwrap().is_some());
+        assert!(engine.render_view(board).unwrap().is_none());
     }
 
     #[test]

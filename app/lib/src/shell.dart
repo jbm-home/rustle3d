@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'dart:math' show atan2, max, min, pi;
 
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -149,6 +150,10 @@ class _ShellState extends State<Shell> {
   /// nothing redraws).
   Timer? _agentPoll;
 
+  /// Refreshes the render rate and the simulation's state. A timer, not
+  /// the 3D frames: an unchanged view draws none.
+  Timer? _statusPoll;
+
   /// The view taking the space of both views, if one does.
   ViewKind? _maximized;
 
@@ -203,6 +208,10 @@ class _ShellState extends State<Shell> {
       const Duration(milliseconds: 200),
       (_) => _pollAgents(),
     );
+    _statusPoll = Timer.periodic(
+      const Duration(milliseconds: 500),
+      (_) => _pollStatus(),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _maybeTour();
@@ -219,6 +228,7 @@ class _ShellState extends State<Shell> {
     FocusManager.instance.removeListener(_keepKeys);
     _keys.dispose();
     _agentPoll?.cancel();
+    _statusPoll?.cancel();
     _fitPoll?.cancel();
     widget.engine.dispose();
     super.dispose();
@@ -457,13 +467,32 @@ class _ShellState extends State<Shell> {
     }
   }
 
-  dynamic _run(Map<String, Object?> step) {
+  /// Run `step`; `dragging`: one move of a drag, saved on release.
+  dynamic _run(Map<String, Object?> step, {bool dragging = false}) {
+    final json = jsonEncode(step);
     try {
-      return jsonDecode(widget.engine.run(stepJson: jsonEncode(step)));
+      return jsonDecode(
+        dragging
+            ? widget.engine.runDragging(stepJson: json)
+            : widget.engine.run(stepJson: json),
+      );
     } on ApiError catch (e) {
       _toast(context.error(e));
       return null;
     }
+  }
+
+  bool _refreshQueued = false;
+
+  /// [_refresh] once at the next frame, however many moves a drag makes
+  /// before it (a mouse can report a thousand a second).
+  void _refreshSoon() {
+    if (_refreshQueued) return;
+    _refreshQueued = true;
+    SchedulerBinding.instance.scheduleFrameCallback((_) {
+      _refreshQueued = false;
+      if (mounted) _refresh();
+    });
   }
 
   void _toast(String text) {
@@ -540,14 +569,22 @@ class _ShellState extends State<Shell> {
         setState(() => _photo = now);
       }
     }
+  }
+
+  /// The 3D frames drawn per second and the simulation's state, redrawn
+  /// only when they changed.
+  void _pollStatus() {
     final elapsed = _clock.elapsedMilliseconds;
-    if (elapsed >= 500) {
+    if (elapsed <= 0) return;
+    final fps = _frames * 1000 / elapsed;
+    final sim = _guard(widget.engine.simulationStatus);
+    _frames = 0;
+    _clock.reset();
+    if (fps != _fps || sim != _sim) {
       setState(() {
-        _fps = _frames * 1000 / elapsed;
-        _sim = _guard(widget.engine.simulationStatus);
+        _fps = fps;
+        _sim = sim;
       });
-      _frames = 0;
-      _clock.reset();
     }
   }
 
@@ -1525,7 +1562,7 @@ class _ShellState extends State<Shell> {
       };
     }
     try {
-      widget.engine.run(stepJson: jsonEncode(step));
+      widget.engine.runDragging(stepJson: jsonEncode(step));
       d
         ..angle = angle
         ..factor = factor;
@@ -1534,7 +1571,7 @@ class _ShellState extends State<Shell> {
       d.refused = true;
       _toast(context.error(e));
     }
-    _refresh();
+    _refreshSoon();
   }
 
   void _frameRelease() {
@@ -1573,8 +1610,8 @@ class _ShellState extends State<Shell> {
         'c1': [c1.dx, c1.dy],
         'c2': [c2.dx, c2.dy],
       },
-    });
-    _refresh();
+    }, dragging: true);
+    _refreshSoon();
   }
 
   void _handleRelease() {
@@ -1786,15 +1823,19 @@ class _ShellState extends State<Shell> {
       'type': 'constraint.place_label',
       'constraint': c['id'],
       'offset': [to.dx, to.dy],
-    });
-    _refresh();
+    }, dragging: true);
+    _refreshSoon();
   }
 
   void _labelRelease() {
     final drag = _labelDrag;
     if (drag == null) return;
     _labelDrag = null;
-    if (drag.$4) return;
+    if (drag.$4) {
+      // Saves the drag.
+      _guard(widget.engine.release);
+      return;
+    }
     // A click on a label: its value field.
     final rect = _labelRects.where((r) => r.$1['id'] == drag.$1['id']);
     if (rect.isEmpty) return;

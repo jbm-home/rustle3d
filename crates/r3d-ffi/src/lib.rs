@@ -8,6 +8,7 @@
 pub mod api;
 mod cloth;
 mod forms;
+mod frame;
 mod photo;
 mod sew;
 mod sim;
