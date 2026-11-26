@@ -366,7 +366,7 @@ impl Upper {
                 body,
                 scale: ease_scale(&avatar.body),
             })
-            .ok_or_else(|| internal("the body's shoulders and neck were not found".into()))
+            .ok_or_else(|| CommandError::internal("the body's shoulders and neck were not found"))
     }
 
     /// From the centre line to the shoulder's tip, for a pattern of chest
@@ -556,12 +556,8 @@ impl Piece {
         self.edges
             .get(k)
             .copied()
-            .ok_or_else(|| internal(format!("piece has no edge {k}")))
+            .ok_or_else(|| CommandError::internal(format!("piece has no edge {k}")))
     }
-}
-
-fn internal(detail: String) -> CommandError {
-    CommandError::Internal { detail }
 }
 
 impl Draft<'_, '_> {
@@ -599,7 +595,7 @@ impl Draft<'_, '_> {
                 AnyId::Panel(p) => Some(*p),
                 _ => None,
             })
-            .ok_or_else(|| internal("no panel created".into()))?;
+            .ok_or_else(|| CommandError::internal("no panel created"))?;
         self.created.push(id.into());
         let edges: Vec<EdgeId> = out
             .created
@@ -668,7 +664,7 @@ impl Draft<'_, '_> {
                 AnyId::Panel(p) => Some(*p),
                 _ => None,
             })
-            .ok_or_else(|| internal("no mirror created".into()))?;
+            .ok_or_else(|| CommandError::internal("no mirror created"))?;
         self.created.push(id.into());
         let p = self.tx.project();
         let copy_edges = p.panel(id).map(|pn| pn.contour.clone()).unwrap_or_default();
@@ -680,7 +676,7 @@ impl Draft<'_, '_> {
                     .iter()
                     .copied()
                     .find(|e| mirrored_source(p, *e).is_some_and(|(s, _)| s == *src))
-                    .ok_or_else(|| internal(format!("no mirror of {src}")))
+                    .ok_or_else(|| CommandError::internal(format!("no mirror of {src}")))
             })
             .collect::<Result<_, _>>()?;
         let origin_x = 2.0 * axis - source.origin_x;
@@ -895,7 +891,7 @@ impl Draft<'_, '_> {
                 AnyId::InternalLine(l) => Some(*l),
                 _ => None,
             })
-            .ok_or_else(|| internal("no line created".into()))
+            .ok_or_else(|| CommandError::internal("no line created"))
     }
 
     /// Edges `ks` of `piece` as one seam side, in their order around it
@@ -972,7 +968,7 @@ impl Draft<'_, '_> {
         let (Some((a0, _)), Some((b0, b1))) =
             (self.side_ends(a_piece, &a), self.side_ends(b_piece, &b))
         else {
-            return Err(internal("a side without ends".into()));
+            return Err(CommandError::internal("a side without ends"));
         };
         if a0.distance(b1) < a0.distance(b0) {
             b.reversed = Some(b.reversed != Some(true));
@@ -992,7 +988,9 @@ impl Draft<'_, '_> {
                     .iter()
                     .map(|e| {
                         let p = d.tx.project();
-                        let edge = p.edge(*e).ok_or_else(|| internal(format!("no edge {e}")))?;
+                        let edge = p
+                            .edge(*e)
+                            .ok_or_else(|| CommandError::internal(format!("no edge {e}")))?;
                         let y = |pt| p.point(pt).map_or(0.0, |q| q.pos.y);
                         Ok((
                             *e,
@@ -1006,7 +1004,7 @@ impl Draft<'_, '_> {
         let total = |c: &[(EdgeId, f64, bool)]| c.iter().map(|(_, l, _)| l).sum::<f64>();
         let (ta, tb) = (total(&a), total(&b));
         if ta <= 0.0 || tb <= 0.0 {
-            return Err(internal("an empty chain".into()));
+            return Err(CommandError::internal("an empty chain"));
         }
         // Where each chain's edges meet, as shares of its length.
         let cuts = |c: &[(EdgeId, f64, bool)], t: f64| {
@@ -1048,7 +1046,7 @@ impl Draft<'_, '_> {
             }
             let (Some(sa), Some(sb)) = (stretch_of(&a, ta, u0, u1), stretch_of(&b, tb, u0, u1))
             else {
-                return Err(internal("a stretch outside its chain".into()));
+                return Err(CommandError::internal("a stretch outside its chain"));
             };
             self.sew_sides(sa, sb)?;
         }
@@ -1352,11 +1350,11 @@ fn draft_size(
     sizes: Sizes,
     i: usize,
 ) -> Result<Drafted, CommandError> {
-    let avatar = size_avatar(p, i).ok_or_else(|| internal(format!("no size {i}")))?;
+    let avatar = size_avatar(p, i).ok_or_else(|| CommandError::internal(format!("no size {i}")))?;
     let size = p
         .grading()
         .and_then(|g| g.sizes.get(i))
-        .ok_or_else(|| internal(format!("no size {i}")))?;
+        .ok_or_else(|| CommandError::internal(format!("no size {i}")))?;
     let sizes = Sizes {
         chest_cm: sizes.chest_cm.map(|v| v + size.bust_cm),
         waist_cm: sizes.waist_cm.map(|v| v + size.waist_cm),
@@ -1526,7 +1524,7 @@ fn draft_in(
         }
         Template::PyjamaBottoms => trousers(&mut d, &sizes, &avatar, Legs::Pyjama)?,
         Template::Pyjama | Template::JoggingSuit => {
-            return Err(internal("a set is drafted part by part".into()));
+            return Err(CommandError::internal("a set is drafted part by part"));
         }
         Template::Shirt => shirt(&mut d, &sizes, &avatar.body)?,
         Template::Trousers => trousers(&mut d, &sizes, &avatar, Legs::Trousers)?,
@@ -1661,7 +1659,7 @@ fn skirt(d: &mut Draft, s: &Sizes, body: &Body, flare: f64) -> Result<(), Comman
     // the hips instead.
     let bbox = |piece: &Piece| d.tx.project().panel_bounding_box(piece.id);
     let (Some(left_box), Some(right_box)) = (bbox(&back), bbox(&right)) else {
-        return Err(internal("a skirt piece has no outline".into()));
+        return Err(CommandError::internal("a skirt piece has no outline"));
     };
     let (left_cb, right_cb) = (left_box.max.x, right_box.min.x);
     d.place_at(&back, Around::Body, 180.0, top, 30.0, Some(left_cb))?;
@@ -1916,7 +1914,7 @@ fn hood(d: &mut Draft, body: &Body, front: &Piece, back: &Piece) -> Result<(), C
     // crumpled at the nape.
     let bbox = |piece: &Piece| d.tx.project().panel_bounding_box(piece.id);
     let (Some(left_box), Some(right_box)) = (bbox(&left), bbox(&right)) else {
-        return Err(internal("a hood piece has no outline".into()));
+        return Err(CommandError::internal("a hood piece has no outline"));
     };
     let (left_back, right_back) = (left_box.max.x, right_box.min.x);
     let hood_top = body.height_cm + HOOD_OVER_HEAD_CM;
@@ -2153,7 +2151,7 @@ fn shirt(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
             AnyId::Edge(e) => Some(*e),
             _ => None,
         })
-        .ok_or_else(|| internal("the sleeve cap was not split".into()))?;
+        .ok_or_else(|| CommandError::internal("the sleeve cap was not split"))?;
     left.edges.insert(3, upper);
     let right = d.mirror(&left, "Sleeve right")?;
     // Cuffs, with a lap to button: edges 0 wrist, 1 right end, 2 top
@@ -2798,7 +2796,7 @@ fn jeans(d: &mut Draft, b: &Block) -> Result<(), CommandError> {
         lines
             .get(k)
             .copied()
-            .ok_or_else(|| internal(format!("no line {k}")))
+            .ok_or_else(|| CommandError::internal(format!("no line {k}")))
     };
     let sides = [
         (

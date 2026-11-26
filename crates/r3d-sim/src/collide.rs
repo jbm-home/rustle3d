@@ -332,6 +332,18 @@ impl StaticMesh {
         }
     }
 
+    /// Whether grid coordinates `q` fall within the field: false for a
+    /// NaN or infinite position too, so that casting them to `usize` and
+    /// adding 1 cannot overflow.
+    fn inside(&self, q: Vec3) -> bool {
+        let top = Vec3::new(
+            self.dims[0] as f32,
+            self.dims[1] as f32,
+            self.dims[2] as f32,
+        ) * BRICK as f32;
+        q.cmpge(Vec3::ZERO).all() && q.cmplt(top).all()
+    }
+
     /// Index in `values` of grid node `(x, y, z)`, if its brick is near
     /// the surface.
     fn index(&self, x: usize, y: usize, z: usize) -> Option<usize> {
@@ -361,7 +373,7 @@ impl StaticMesh {
     /// for a body without a skin.
     pub fn skin_at(&self, p: Vec3) -> Option<&Skin> {
         let q = ((p - self.origin) / self.voxel).round();
-        if q.min_element() < 0.0 {
+        if !self.inside(q) {
             return None;
         }
         let i = self.index(q.x as usize, q.y as usize, q.z as usize)?;
@@ -372,7 +384,7 @@ impl StaticMesh {
     /// the band around the surface.
     pub fn sample(&self, p: Vec3) -> Option<Contact> {
         let q = (p - self.origin) / self.voxel;
-        if q.min_element() < 0.0 {
+        if !self.inside(q) {
             return None;
         }
         let (x, y, z) = (q.x as usize, q.y as usize, q.z as usize);

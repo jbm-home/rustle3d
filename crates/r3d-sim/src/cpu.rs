@@ -368,11 +368,12 @@ impl Solver for CpuSolver {
         for s in 0..SUBSTEPS {
             if s == 0 || self.model.layers.moved_on(&self.x, &self.gathered) {
                 let m = &self.model;
-                let posed = m.motion.as_ref().map(|mo| {
-                    let now = mo.at(self.time);
-                    Posed::new(now.clone(), now)
-                });
-                if let Some(body) = m.collider.as_ref() {
+                // Only layers between garments read the turned triangles.
+                if let Some(body) = m.collider.as_ref().filter(|_| m.layers.reach > 0.0) {
+                    let posed = m.motion.as_ref().map(|mo| {
+                        let now = mo.at(self.time);
+                        Posed::new(now.clone(), now)
+                    });
                     m.layers.turned(
                         &self.x,
                         |p| {
@@ -394,6 +395,10 @@ impl Solver for CpuSolver {
             }
             self.substep(h);
             self.time += h;
+        }
+        if !self.x.iter().all(|p| p.is_finite()) {
+            self.x.clone_from(&self.start);
+            return Err(StepError::Diverged);
         }
         self.stats = StepStats::measure(
             &self.x,

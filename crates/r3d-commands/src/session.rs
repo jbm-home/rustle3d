@@ -96,14 +96,6 @@ impl Session {
 
     /// Execute commands atomically as a single undo step named `label`. If
     /// any command fails, nothing is changed and the error says which one.
-    pub fn execute_batch(
-        &mut self,
-        label: &str,
-        cmds: &[Command],
-    ) -> Result<Vec<CommandOutput>, CommandError> {
-        self.execute_batch_with(label, cmds, &Progress::default())
-    }
-
     fn execute_batch_with(
         &mut self,
         label: &str,

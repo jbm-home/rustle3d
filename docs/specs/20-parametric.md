@@ -36,14 +36,16 @@ the rest of what I fixed (lengths, angles) stays.
   `waist + 2` is refused. A distance's or a length's formula must give a
   positive length, an angle's a plain number from 0 to 180 (degrees).
 - **Errors** carry a code and are refused before anything changes:
-  `formula.syntax` (with the character), `formula.unknown_name`,
+  `formula.syntax` (with the character; also past 32 nested
+  parentheses or signs, or 256 terms), `formula.unknown_name`,
   `formula.no_body` (a measurement while the project has no body),
   `formula.cycle` (a variable computed from itself), `formula.unit`,
   `formula.domain` (a division by zero, the root of a negative),
   `formula.range` (a value the dimension cannot have),
   `formula.bad_name` (a variable's name).
 - **Variables** are names for formulas (`ease = 2 cm`, `dart = (hips -
-  waist) / 8`), project-wide. A variable still used cannot be removed.
+  waist) / 8`), project-wide. A variable still used cannot be removed,
+  nor changed so that a variable using it no longer computes.
 - **Redrafting.** After every step, each dimension's formula is computed
   again (the body or a variable may have changed) and the drawing solved
   (spec 19). Without a body, formulas naming measurements keep their

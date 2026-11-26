@@ -137,19 +137,6 @@ impl Measure {
         }
     }
 
-    /// Whether it goes around the body (a girth) rather than along it.
-    pub fn is_girth(self) -> bool {
-        matches!(
-            self,
-            Measure::Neck
-                | Measure::UpperArm
-                | Measure::Wrist
-                | Measure::Thigh
-                | Measure::Knee
-                | Measure::Ankle
-        )
-    }
-
     /// Values accepted (cm), generous enough for adults of any build and
     /// for babies.
     pub fn range_cm(self) -> (f64, f64) {

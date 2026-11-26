@@ -825,11 +825,6 @@ impl Seam {
         self.a.edges.contains(&edge) || self.b.edges.contains(&edge)
     }
 
-    /// Whether the seam runs along internal line `line`.
-    pub fn touches_line(&self, line: InternalLineId) -> bool {
-        self.a.line == Some(line) || self.b.line == Some(line)
-    }
-
     /// From whole edge `edge`: its side and the other side, each as an
     /// edge and whether it is walked reversed, when both sides are whole
     /// edges (what the tools reshaping seams work on).

@@ -362,8 +362,20 @@ class _RustViewState extends State<RustView>
       return;
     }
     widget.onFrameTime?.call(ms);
+    final Uint8List pixels;
+    try {
+      pixels = await widget.engine.readView(view: view);
+    } on ApiError {
+      // The view went away (resized) between the render and the read.
+      _reading = false;
+      return;
+    }
+    if (!mounted || view != _viewId) {
+      _reading = false;
+      return;
+    }
+    // Still the view the pixels came from, so still its size.
     final size = _physical;
-    final pixels = await widget.engine.readView(view: view);
     ui.decodeImageFromPixels(
       pixels,
       size.width.round(),

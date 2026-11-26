@@ -125,6 +125,15 @@ impl SimThread {
             .unwrap_or_else(PoisonError::into_inner)
             .clone()
     }
+
+    /// Whether the solver failed (read without copying the positions).
+    pub fn failed(&self) -> bool {
+        self.published
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .failed
+            .is_some()
+    }
 }
 
 impl Drop for SimThread {
@@ -182,6 +191,8 @@ fn run(rx: &Receiver<Control>, out: &Mutex<Published>) {
                 Err(_) => return,
             }
         };
+        // Moving a grab changes nothing visible until the next step.
+        let changed = !matches!(message, Some(Control::GrabTo(_)));
         match message {
             Some(Control::Load(s)) => {
                 solver = Some(s);
@@ -231,7 +242,9 @@ fn run(rx: &Receiver<Control>, out: &Mutex<Published>) {
                 next = (next + frame).max(Instant::now());
             }
         }
-        publish(out, solver.as_deref(), running, step_ms, failed.as_ref());
+        if changed {
+            publish(out, solver.as_deref(), running, step_ms, failed.as_ref());
+        }
     }
 }
 

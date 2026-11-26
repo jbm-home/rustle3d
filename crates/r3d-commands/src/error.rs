@@ -237,6 +237,13 @@ impl From<r3d_core::file::FileError> for CommandError {
 }
 
 impl CommandError {
+    /// A broken invariant (a bug, not the user's input).
+    pub fn internal(detail: impl Into<String>) -> Self {
+        Self::Internal {
+            detail: detail.into(),
+        }
+    }
+
     pub fn invalid(field: &'static str, reason: Invalid) -> Self {
         CommandError::Invalid { field, reason }
     }

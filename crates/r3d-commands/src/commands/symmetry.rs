@@ -130,10 +130,6 @@ pub(crate) fn sync_symmetry(tx: &mut Transaction<'_>) -> Result<(), CommandError
     Ok(())
 }
 
-fn internal(detail: String) -> CommandError {
-    CommandError::Internal { detail }
-}
-
 /// The drawn half: the contour edges from the one leaving `start` to the
 /// one arriving at `end`.
 fn drawn_half(
@@ -148,33 +144,28 @@ fn drawn_half(
         .contour
         .iter()
         .position(|e| !reflected.contains(e) && p.edge(*e).is_some_and(|e| e.start == sym.start))
-        .ok_or_else(|| internal(format!("{}: no edge leaves the axis", sym.start)))?;
+        .ok_or_else(|| CommandError::internal(format!("{}: no edge leaves the axis", sym.start)))?;
     let mut half = Vec::new();
     for i in 0..n {
         let id = panel
             .contour
             .get((first + i) % n)
             .copied()
-            .ok_or_else(|| internal("contour".into()))?;
+            .ok_or_else(|| CommandError::internal("contour"))?;
         if reflected.contains(&id) {
-            return Err(internal(format!("{id} is reflected and drawn")));
+            return Err(CommandError::internal(format!(
+                "{id} is reflected and drawn"
+            )));
         }
         half.push(id);
         if p.edge(id).is_some_and(|e| e.end == sym.end) {
             return Ok(half);
         }
     }
-    Err(internal(format!("{}: no edge reaches the axis", sym.end)))
-}
-
-/// Write `value` only if it differs, so unchanged halves record nothing.
-macro_rules! put_if_changed {
-    ($tx:expr, $get:ident, $put:ident, $id:expr, $value:expr) => {{
-        let value = $value;
-        if $tx.project().$get($id) != Some(&value) {
-            $tx.$put($id, value);
-        }
-    }};
+    Err(CommandError::internal(format!(
+        "{}: no edge reaches the axis",
+        sym.end
+    )))
 }
 
 fn sync_panel(tx: &mut Transaction<'_>, id: PanelId) -> Result<(), CommandError> {
@@ -183,7 +174,7 @@ fn sync_panel(tx: &mut Transaction<'_>, id: PanelId) -> Result<(), CommandError>
         return Ok(());
     };
     let m = Mirror::new(sym.origin, sym.dir)
-        .ok_or_else(|| internal(format!("{id} has a degenerate axis")))?;
+        .ok_or_else(|| CommandError::internal(format!("{id} has a degenerate axis")))?;
     let half = drawn_half(tx, &panel, &sym)?;
 
     // 1. The drawn half's ends stay on the axis.

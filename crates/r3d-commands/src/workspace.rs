@@ -149,6 +149,17 @@ impl Workspace {
         &self.session
     }
 
+    /// A copy of the project and its folders, without the history, for
+    /// slow read-only work (renders) done after releasing a shared lock.
+    pub fn snapshot(&self) -> Self {
+        Self {
+            dir: self.dir.clone(),
+            session: Session::new(self.session.project().clone()),
+            pending_backup: None,
+            library: self.library.clone(),
+        }
+    }
+
     /// End the current merge run of the history (a gesture is over).
     pub fn seal_history(&mut self) {
         self.session.seal_history();

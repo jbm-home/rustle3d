@@ -124,9 +124,17 @@ enum Node {
 
 const FUNCTIONS: [&str; 4] = ["min", "max", "abs", "sqrt"];
 
+/// How deep parentheses, signs and calls may nest, and how many terms a
+/// formula may have: parsing and computing recurse, and must stay
+/// within the stack whatever is typed.
+const MAX_NESTING: u32 = 32;
+const MAX_NODES: u32 = 256;
+
 struct Parser<'a> {
     text: &'a str,
     at: usize,
+    nesting: u32,
+    nodes: u32,
 }
 
 impl Parser<'_> {
@@ -169,6 +177,29 @@ impl Parser<'_> {
         Some(rest[..len].to_owned())
     }
 
+    /// Parse with `f` one level deeper.
+    fn nested(
+        &mut self,
+        f: impl FnOnce(&mut Self) -> Result<Node, FormulaError>,
+    ) -> Result<Node, FormulaError> {
+        if self.nesting >= MAX_NESTING {
+            return Err(self.error());
+        }
+        self.nesting += 1;
+        let node = f(self);
+        self.nesting -= 1;
+        node
+    }
+
+    /// Count `node` in the formula's terms.
+    fn term(&mut self, node: Node) -> Result<Node, FormulaError> {
+        self.nodes += 1;
+        if self.nodes > MAX_NODES {
+            return Err(self.error());
+        }
+        Ok(node)
+    }
+
     fn sum(&mut self) -> Result<Node, FormulaError> {
         let mut left = self.product()?;
         loop {
@@ -179,7 +210,8 @@ impl Parser<'_> {
             } else {
                 return Ok(left);
             };
-            left = Node::Bin(op, Box::new(left), Box::new(self.product()?));
+            let right = self.product()?;
+            left = self.term(Node::Bin(op, Box::new(left), Box::new(right)))?;
         }
     }
 
@@ -193,23 +225,25 @@ impl Parser<'_> {
             } else {
                 return Ok(left);
             };
-            left = Node::Bin(op, Box::new(left), Box::new(self.unary()?));
+            let right = self.unary()?;
+            left = self.term(Node::Bin(op, Box::new(left), Box::new(right)))?;
         }
     }
 
     fn unary(&mut self) -> Result<Node, FormulaError> {
         if self.eat('-') {
-            return Ok(Node::Neg(Box::new(self.unary()?)));
+            let inner = self.nested(Self::unary)?;
+            return self.term(Node::Neg(Box::new(inner)));
         }
         if self.eat('+') {
-            return self.unary();
+            return self.nested(Self::unary);
         }
         self.atom()
     }
 
     fn atom(&mut self) -> Result<Node, FormulaError> {
         if self.eat('(') {
-            let inner = self.sum()?;
+            let inner = self.nested(Self::sum)?;
             return if self.eat(')') {
                 Ok(inner)
             } else {
@@ -239,7 +273,7 @@ impl Parser<'_> {
                     (1.0, 0)
                 }
             };
-            return Ok(Node::Number(value * scale, power));
+            return self.term(Node::Number(value * scale, power));
         }
         let Some(name) = self.word() else {
             return Err(self.error());
@@ -248,21 +282,26 @@ impl Parser<'_> {
             if !FUNCTIONS.contains(&name.as_str()) {
                 return Err(FormulaError::UnknownName { name });
             }
-            let mut args = vec![self.sum()?];
+            let mut args = vec![self.nested(Self::sum)?];
             while self.eat(',') {
-                args.push(self.sum()?);
+                args.push(self.nested(Self::sum)?);
             }
             if !self.eat(')') {
                 return Err(self.error());
             }
-            return Ok(Node::Call(name, args));
+            return self.term(Node::Call(name, args));
         }
-        Ok(Node::Name(name))
+        self.term(Node::Name(name))
     }
 }
 
 fn parse(text: &str) -> Result<Node, FormulaError> {
-    let mut p = Parser { text, at: 0 };
+    let mut p = Parser {
+        text,
+        at: 0,
+        nesting: 0,
+        nodes: 0,
+    };
     let node = p.sum()?;
     p.skip();
     if p.at < text.len() {
@@ -283,6 +322,15 @@ pub fn valid_name(name: &str) -> bool {
         && !["mm", "cm", "m", "in", "deg"].contains(&name)
 }
 
+/// Where one computation is: the names being computed (to catch a
+/// cycle) and those already computed, each computed once however often
+/// it is used (`b = a + a`, `c = b + b`… would otherwise take 2ⁿ steps).
+#[derive(Default)]
+struct Walk {
+    stack: Vec<String>,
+    known: BTreeMap<String, Quantity>,
+}
+
 /// What formulas are computed with: a body (the avatar's measurements,
 /// or none), the named variables' formulas and the named dimensions
 /// (their formula, else their value).
@@ -296,15 +344,15 @@ pub struct Scope<'a> {
 impl<'a> Scope<'a> {
     /// Compute `text`.
     pub fn eval(&self, text: &str) -> Result<Quantity, FormulaError> {
-        self.eval_in(text, &mut Vec::new())
+        self.eval_in(text, &mut Walk::default())
     }
 
-    fn eval_in(&self, text: &str, stack: &mut Vec<String>) -> Result<Quantity, FormulaError> {
+    fn eval_in(&self, text: &str, walk: &mut Walk) -> Result<Quantity, FormulaError> {
         let node = parse(text)?;
-        self.node(&node, stack)
+        self.node(&node, walk)
     }
 
-    fn name(&self, name: &str, stack: &mut Vec<String>) -> Result<Quantity, FormulaError> {
+    fn name(&self, name: &str, walk: &mut Walk) -> Result<Quantity, FormulaError> {
         if is_body_name(name) {
             let avatar = self.body.ok_or_else(|| FormulaError::NoBody {
                 name: name.to_owned(),
@@ -342,18 +390,24 @@ impl<'a> Scope<'a> {
                 }
             }
         };
-        if stack.iter().any(|n| n == name) {
+        if let Some(q) = walk.known.get(name) {
+            return Ok(*q);
+        }
+        if walk.stack.iter().any(|n| n == name) {
             return Err(FormulaError::Cycle {
                 name: name.to_owned(),
             });
         }
-        stack.push(name.to_owned());
-        let q = self.eval_in(formula, stack);
-        stack.pop();
+        walk.stack.push(name.to_owned());
+        let q = self.eval_in(formula, walk);
+        walk.stack.pop();
+        if let Ok(q) = q {
+            walk.known.insert(name.to_owned(), q);
+        }
         q
     }
 
-    fn node(&self, node: &Node, stack: &mut Vec<String>) -> Result<Quantity, FormulaError> {
+    fn node(&self, node: &Node, walk: &mut Walk) -> Result<Quantity, FormulaError> {
         let same = |a: Quantity, b: Quantity| {
             if a.power == b.power {
                 Ok(())
@@ -369,16 +423,16 @@ impl<'a> Scope<'a> {
                 value: *value,
                 power: *power,
             },
-            Node::Name(name) => self.name(name, stack)?,
+            Node::Name(name) => self.name(name, walk)?,
             Node::Neg(inner) => {
-                let q = self.node(inner, stack)?;
+                let q = self.node(inner, walk)?;
                 Quantity {
                     value: -q.value,
                     ..q
                 }
             }
             Node::Bin(op, a, b) => {
-                let (a, b) = (self.node(a, stack)?, self.node(b, stack)?);
+                let (a, b) = (self.node(a, walk)?, self.node(b, walk)?);
                 match op {
                     '+' | '-' => {
                         same(a, b)?;
@@ -407,7 +461,7 @@ impl<'a> Scope<'a> {
             Node::Call(f, args) => {
                 let args: Vec<Quantity> = args
                     .iter()
-                    .map(|a| self.node(a, stack))
+                    .map(|a| self.node(a, walk))
                     .collect::<Result<_, _>>()?;
                 match (f.as_str(), args.as_slice()) {
                     ("min" | "max", [first, rest @ ..]) if !rest.is_empty() => {
@@ -545,6 +599,44 @@ mod tests {
         let knee = Measure::Knee.estimate(&b.body) * 10.0;
         assert_eq!(s.eval_as("knee", 1), Ok(knee));
         assert!(s.uses_body("arm_length - 2 cm"));
+    }
+
+    #[test]
+    fn deep_or_long_formulas_are_refused_not_crashed_on() {
+        let vars = BTreeMap::new();
+        let s = Scope {
+            body: None,
+            variables: &vars,
+            dimensions: &BTreeMap::new(),
+        };
+        let code = |t: &str| s.eval_as(t, 0).map_err(|e| e.message().code);
+        let deep = format!("{}1{}", "(".repeat(100_000), ")".repeat(100_000));
+        assert_eq!(code(&deep), Err("formula.syntax"));
+        assert_eq!(
+            code(&format!("{}1", "-".repeat(100_000))),
+            Err("formula.syntax")
+        );
+        assert_eq!(code(&"+1".repeat(100_000)), Err("formula.syntax"));
+        assert_eq!(
+            code(&format!("{}1{}", "(".repeat(20), ")".repeat(20))),
+            Ok(1.0)
+        );
+    }
+
+    #[test]
+    fn a_variable_used_many_times_is_computed_once() {
+        // v40 uses v39 twice, which uses v38 twice…: 2⁴⁰ steps unless
+        // each is computed once.
+        let mut vars = BTreeMap::from([("v0".to_owned(), "1".to_owned())]);
+        for k in 1..=40 {
+            vars.insert(format!("v{k}"), format!("v{0} + v{0} - v{0}", k - 1));
+        }
+        let s = Scope {
+            body: None,
+            variables: &vars,
+            dimensions: &BTreeMap::new(),
+        };
+        assert_eq!(s.eval_as("v40", 0), Ok(1.0));
     }
 
     #[test]

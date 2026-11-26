@@ -445,21 +445,8 @@ impl CommandSpec for VariableSet {
         }
         let mut variables = tx.project().variables().clone();
         variables.insert(name.to_owned(), self.formula.trim().to_owned());
-        // It must compute (a body measurement without a body waits).
-        let scope = r3d_core::formula::Scope {
-            body: tx.project().avatar(),
-            variables: &variables,
-            dimensions: tx.project().constraints(),
-        };
-        match scope.eval(name) {
-            Ok(_) | Err(r3d_core::formula::FormulaError::NoBody { .. }) => {}
-            Err(error) => {
-                return Err(CommandError::Formula {
-                    of: name.to_owned(),
-                    error,
-                });
-            }
-        }
+        // It must compute, and so must those using it.
+        check_variables(tx, &variables, Some(name))?;
         tx.set_variables(variables);
         Ok(CommandOutput::default())
     }
@@ -488,25 +475,40 @@ impl CommandSpec for VariableRemove {
             return Err(CommandError::invalid("name", Invalid::Empty));
         }
         // Still used by another variable: say which.
-        let scope = r3d_core::formula::Scope {
-            body: tx.project().avatar(),
-            variables: &variables,
-            dimensions: tx.project().constraints(),
-        };
-        for name in variables.keys() {
-            match scope.eval(name) {
-                Ok(_) | Err(r3d_core::formula::FormulaError::NoBody { .. }) => {}
-                Err(error) => {
-                    return Err(CommandError::Formula {
-                        of: name.clone(),
-                        error,
-                    });
-                }
-            }
-        }
+        check_variables(tx, &variables, None)?;
         tx.set_variables(variables);
         Ok(CommandOutput::default())
     }
+}
+
+/// Refuse `variables` if one of them does not compute (one using a body
+/// measurement without a body waits for it); `first` is checked first,
+/// so that its own error is the one reported.
+fn check_variables(
+    tx: &Transaction<'_>,
+    variables: &std::collections::BTreeMap<String, String>,
+    first: Option<&str>,
+) -> Result<(), CommandError> {
+    let scope = r3d_core::formula::Scope {
+        body: tx.project().avatar(),
+        variables,
+        dimensions: tx.project().constraints(),
+    };
+    for name in first
+        .into_iter()
+        .chain(variables.keys().map(String::as_str))
+    {
+        match scope.eval(name) {
+            Ok(_) | Err(r3d_core::formula::FormulaError::NoBody { .. }) => {}
+            Err(error) => {
+                return Err(CommandError::Formula {
+                    of: name.to_owned(),
+                    error,
+                });
+            }
+        }
+    }
+    Ok(())
 }
 
 /// The named variables, with their values.

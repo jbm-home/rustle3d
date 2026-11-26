@@ -633,8 +633,6 @@ Future<(List<double>, int)?> _askNumbers(
   );
 }
 
-/// Ask for a dimension's formula (empty: no formula). Returns it, or null
-/// when cancelled.
 /// Ask for a dimension's name ('' for none; null when cancelled).
 Future<String?> _askName(BuildContext context, String current) {
   final text = TextEditingController(text: current);
@@ -685,6 +683,8 @@ Future<String?> _askName(BuildContext context, String current) {
   );
 }
 
+/// Ask for a dimension's formula (empty: no formula). Returns it, or null
+/// when cancelled.
 Future<String?> _askFormula(BuildContext context, String current) {
   final text = TextEditingController(text: current);
   return showDialog<String>(

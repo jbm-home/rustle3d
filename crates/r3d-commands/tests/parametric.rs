@@ -174,6 +174,18 @@ fn formulas_are_checked() {
     )
     .unwrap_err();
     assert_eq!(err.message().code, "formula.cycle");
+    // A change that breaks a variable using it: refused.
+    ok(
+        &mut s,
+        json!({"type": "variable.set", "name": "b", "formula": "ease + 1 mm"}),
+    );
+    let err = run(
+        &mut s,
+        json!({"type": "variable.set", "name": "ease", "formula": "2"}),
+    )
+    .unwrap_err();
+    assert_eq!(err.message().code, "formula.unit");
+    ok(&mut s, json!({"type": "variable.remove", "name": "b"}));
     // Still in use: refused.
     let err = run(&mut s, json!({"type": "variable.remove", "name": "ease"})).unwrap_err();
     assert_eq!(err.message().code, "formula.unknown_name");

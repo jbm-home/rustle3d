@@ -413,10 +413,13 @@ impl Server {
         let internal = |detail: &str| CommandError::Internal {
             detail: detail.into(),
         };
+        // Render a copy: the app shares the lock and must not wait for
+        // a photo.
         let ws = self
             .ws
             .lock()
-            .map_err(|_| internal("workspace lock poisoned"))?;
+            .map_err(|_| internal("workspace lock poisoned"))?
+            .snapshot();
         let scene = ws.session().project().photo();
         let (view, extra): (render::View, &[&str]) = match view {
             render::View::Photo(_) => (
@@ -497,7 +500,7 @@ impl Server {
             }
             .message()
         };
-        // The GPU before the workspace, as in `render`.
+        // The GPU before the workspace (only held to copy it).
         let mut gpu = self.gpu.lock().map_err(|_| internal("GPU lock poisoned"))?;
         if views != render::TechPackViews::None && gpu.is_none() {
             *gpu = Some(render::headless_gpu().map_err(|e| e.message())?);
@@ -505,7 +508,8 @@ impl Server {
         let ws = self
             .ws
             .lock()
-            .map_err(|_| internal("workspace lock poisoned"))?;
+            .map_err(|_| internal("workspace lock poisoned"))?
+            .snapshot();
         let pictures = match (views, gpu.as_ref()) {
             (render::TechPackViews::None, _) | (_, None) => Vec::new(),
             (_, Some(gpu)) => {

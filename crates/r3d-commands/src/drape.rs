@@ -1408,12 +1408,6 @@ pub fn fabric_preset(f: Fabric) -> FabricPreset {
     }
 }
 
-fn internal(detail: impl Into<String>) -> CommandError {
-    CommandError::Internal {
-        detail: detail.into(),
-    }
-}
-
 /// `n` segments shared among a seam side's stretches by their lengths,
 /// at least one each (largest remainders).
 fn split(n: usize, spans: &[Span]) -> Vec<usize> {
@@ -1850,12 +1844,12 @@ pub fn build(
             for e in edges {
                 let at = samples
                     .get(&Track::Edge(*e))
-                    .ok_or_else(|| internal(format!("{e} is not sampled")))?;
+                    .ok_or_else(|| CommandError::internal(format!("{e} is not sampled")))?;
                 starts.push(pts.len());
                 for s in at.iter().take(at.len().saturating_sub(1)) {
                     let (p, _) = project
                         .track_point(Track::Edge(*e), *s)
-                        .ok_or_else(|| internal(format!("{e} has no geometry")))?;
+                        .ok_or_else(|| CommandError::internal(format!("{e} has no geometry")))?;
                     pts.push(p);
                 }
             }
@@ -1951,7 +1945,7 @@ pub fn build(
         }
         let quilt_end = line_pts.len();
         let mesh = mesh_panel(&boundary, &hole_pts, &line_pts, &fine, piece_spacing)
-            .map_err(|e| internal(format!("{panel_id}: {e}")))?;
+            .map_err(|e| CommandError::internal(format!("{panel_id}: {e}")))?;
         let quilted: Vec<Vec<u32>> = mesh
             .lines
             .get(quilt_start..quilt_end)
@@ -2810,7 +2804,7 @@ pub fn simulate(
         progress.check()?;
         solver
             .step(1.0 / 60.0)
-            .map_err(|e| internal(e.to_string()))?;
+            .map_err(|e| CommandError::internal(e.to_string()))?;
         if frame % PROGRESS_FRAMES == 0 || frame == frames {
             progress.report(&Status {
                 task: "simulate.frames",
@@ -2845,7 +2839,8 @@ const CAPTURED_TAG: u32 = Motion::BUILT_IN.len() as u32 + 1;
 /// JSON), the mesh spacing and the solver's substeps. FNV-1a, stable
 /// across runs and platforms.
 pub fn fingerprint(project: &Project) -> Result<u64, CommandError> {
-    let json = r3d_core::file::to_json(project).map_err(|e| internal(e.to_string()))?;
+    let json =
+        r3d_core::file::to_json(project).map_err(|e| CommandError::internal(e.to_string()))?;
     let tail = [
         DEFAULT_SPACING_MM.to_le_bytes(),
         u64::from(SUBSTEPS).to_le_bytes(),

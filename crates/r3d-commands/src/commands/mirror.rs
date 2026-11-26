@@ -184,10 +184,6 @@ pub(crate) fn sync_mirrors(tx: &mut Transaction<'_>) -> Result<(), CommandError>
     Ok(())
 }
 
-fn internal(detail: String) -> CommandError {
-    CommandError::Internal { detail }
-}
-
 /// Mirror angle in degrees, rounded to 1e-9° to avoid float noise.
 fn mirrored_angle(m: &Mirror, deg: f64) -> f64 {
     let g = DVec2::from_angle(deg.to_radians());
@@ -216,16 +212,6 @@ fn derived_ids(
     (notches, lines)
 }
 
-/// Write `value` only if it differs, so unchanged copies record nothing.
-macro_rules! put_if_changed {
-    ($tx:expr, $get:ident, $put:ident, $id:expr, $value:expr) => {{
-        let value = $value;
-        if $tx.project().$get($id) != Some(&value) {
-            $tx.$put($id, value);
-        }
-    }};
-}
-
 fn sync_panel(tx: &mut Transaction<'_>, copy_id: PanelId) -> Result<(), CommandError> {
     let copy = get_panel(tx.project(), copy_id)?;
     let Some(link) = copy.mirror_of.clone() else {
@@ -233,7 +219,7 @@ fn sync_panel(tx: &mut Transaction<'_>, copy_id: PanelId) -> Result<(), CommandE
     };
     let source = get_panel(tx.project(), link.source)?;
     let m = Mirror::new(link.origin, link.dir)
-        .ok_or_else(|| internal(format!("{copy_id} has a degenerate mirror axis")))?;
+        .ok_or_else(|| CommandError::internal(format!("{copy_id} has a degenerate mirror axis")))?;
     let f = |p: DVec2| m.apply(p) + link.offset;
 
     // 1. Desired geometry. Reflection reverses orientation, so the loop is

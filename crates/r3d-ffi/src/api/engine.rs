@@ -990,10 +990,7 @@ impl Engine {
     /// If the GPU solver failed, carry on from its last positions on the
     /// CPU, for the rest of the session.
     fn fall_back_if_failed(&self) -> Result<(), ApiError> {
-        let failed = self
-            .sim()?
-            .as_ref()
-            .is_some_and(|t| t.latest().failed.is_some());
+        let failed = self.sim()?.as_ref().is_some_and(SimThread::failed);
         if failed && !self.cpu_only.swap(true, Ordering::Relaxed) {
             self.rebuild(true)?;
         }
@@ -2007,15 +2004,20 @@ impl Engine {
     /// The last frame of a view attached without a UI surface, as BGRA
     /// pixels, row after row (platforms without shared textures).
     pub fn read_view(&self, view: u32) -> Result<Vec<u8>, ApiError> {
-        let slot = self.graphics()?;
-        let g = slot
-            .as_ref()
-            .ok_or_else(|| ApiError::new("no_view", "no view attached"))?;
-        let v = g
-            .views
-            .get(&view)
-            .ok_or_else(|| ApiError::new("no_view", format!("unknown view {view}")))?;
-        r3d_render::offscreen::read_pixels(&g.gpu, &v.texture)
+        let (gpu, texture) = {
+            let slot = self.graphics()?;
+            let g = slot
+                .as_ref()
+                .ok_or_else(|| ApiError::new("no_view", "no view attached"))?;
+            let v = g
+                .views
+                .get(&view)
+                .ok_or_else(|| ApiError::new("no_view", format!("unknown view {view}")))?;
+            (g.gpu.clone(), v.texture.clone())
+        };
+        // Read without the lock: it waits for the GPU, and the UI thread
+        // takes it for clicks and drags.
+        r3d_render::offscreen::read_pixels(&gpu, &texture)
             .map_err(|e| ApiError::new("gpu", e.to_string()))
     }
 
@@ -4167,7 +4169,8 @@ impl Engine {
     /// A drag of (`dx`, `dy`) pixels: orbit the 3D camera, pan the board.
     #[frb(sync)]
     pub fn drag(&self, view: u32, dx: f64, dy: f64) -> Result<(), ApiError> {
-        let ws = self.workspace()?;
+        // Fixes the board's view first (the pattern is only read then).
+        let board = self.frozen_board(view)?;
         let mut slot = self.graphics()?;
         let Some(g) = slot.as_mut() else {
             return Ok(());
@@ -4175,16 +4178,13 @@ impl Engine {
         let Some(v) = g.views.get_mut(&view) else {
             return Ok(());
         };
-        match v.kind {
-            ViewKind::Garment => g.camera.orbit(dx as f32, dy as f32),
-            ViewKind::Board => {
-                let scene = self.board_scene(ws.session().project(), &[]);
-                let mut bv = v
-                    .board_view
-                    .unwrap_or_else(|| BoardView::fit(scene.bounds(), v.width, v.height));
+        match (v.kind, board) {
+            (ViewKind::Garment, _) => g.camera.orbit(dx as f32, dy as f32),
+            (ViewKind::Board, Some((mut bv, ..))) => {
                 bv.center -= r3d_geom::DVec2::new(dx, -dy) * bv.mm_per_px;
                 v.board_view = Some(bv);
             }
+            (ViewKind::Board, None) => {}
         }
         Ok(())
     }
@@ -4192,7 +4192,7 @@ impl Engine {
     /// A scroll of `amount` (positive = zoom in) at pixel (`x`, `y`).
     #[frb(sync)]
     pub fn zoom(&self, view: u32, x: f64, y: f64, amount: f64) -> Result<(), ApiError> {
-        let ws = self.workspace()?;
+        let board = self.frozen_board(view)?;
         let mut slot = self.graphics()?;
         let Some(g) = slot.as_mut() else {
             return Ok(());
@@ -4200,13 +4200,10 @@ impl Engine {
         let Some(v) = g.views.get_mut(&view) else {
             return Ok(());
         };
-        match v.kind {
-            ViewKind::Garment => g.camera.zoom(amount as f32),
-            ViewKind::Board => {
-                let scene = self.board_scene(ws.session().project(), &[]);
-                let mut bv = v
-                    .board_view
-                    .unwrap_or_else(|| BoardView::fit(scene.bounds(), v.width, v.height));
+        match (v.kind, board) {
+            (ViewKind::Garment, _) => g.camera.zoom(amount as f32),
+            (ViewKind::Board, None) => {}
+            (ViewKind::Board, Some((mut bv, ..))) => {
                 // Keep the board point under the cursor fixed while zooming.
                 let anchor = bv.to_board(x, y, v.width, v.height);
                 bv.mm_per_px = (bv.mm_per_px * (1.0 - amount * 0.1)).clamp(0.02, 50.0);

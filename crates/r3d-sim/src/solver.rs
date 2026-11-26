@@ -110,11 +110,14 @@ impl StepStats {
     }
 }
 
-/// Why a step failed (a GPU backend can lose its device).
+/// Why a step failed: a GPU backend can lose its device, and any backend
+/// can blow up (a position no longer finite).
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum StepError {
     #[error("the simulation device failed: {0}")]
     Device(String),
+    #[error("the simulation diverged")]
+    Diverged,
 }
 
 /// A cloth solver backend.

@@ -344,10 +344,14 @@ impl LayerContact {
 
     /// Move `i` and what is welded to it by `delta`.
     fn shift(&self, x: &mut [Vec3], i: usize, delta: Vec3) {
-        let moved: Vec<usize> = self.welded(x, i).collect();
-        for j in moved {
-            x[j] += delta;
+        let partners = self.sewn.get(i).map(Vec::as_slice).unwrap_or_default();
+        let at = x[i];
+        for j in partners.iter().map(|j| *j as usize) {
+            if x[j].distance_squared(at) <= OPEN_SEAM * OPEN_SEAM {
+                x[j] += delta;
+            }
         }
+        x[i] += delta;
     }
 
     /// Whether triangle `k` holds cloth off now: always for the cloth's

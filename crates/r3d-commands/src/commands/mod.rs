@@ -1,5 +1,16 @@
 //! Command implementations, grouped by entity.
 
+/// Write `value` only if it differs, so unchanged derived entities (mirror
+/// copies, symmetric halves) record nothing.
+macro_rules! put_if_changed {
+    ($tx:expr, $get:ident, $put:ident, $id:expr, $value:expr) => {{
+        let value = $value;
+        if $tx.project().$get($id) != Some(&value) {
+            $tx.$put($id, value);
+        }
+    }};
+}
+
 mod arrange;
 mod avatar;
 mod clip;

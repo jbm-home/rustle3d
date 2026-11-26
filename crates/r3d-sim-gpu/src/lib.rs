@@ -1265,7 +1265,7 @@ impl GpuSolver {
         rx.recv()
             .map_err(|e| StepError::Device(e.to_string()))?
             .map_err(|e| StepError::Device(e.to_string()))?;
-        {
+        let finite = {
             let view = slice
                 .get_mapped_range()
                 .map_err(|e| StepError::Device(e.to_string()))?;
@@ -1274,8 +1274,14 @@ impl GpuSolver {
             std::mem::swap(&mut self.start, &mut self.x);
             self.x.clear();
             self.x.extend(x.iter().map(|p| Vec3::new(p[0], p[1], p[2])));
-        }
+            self.x.iter().all(|p| p.is_finite())
+        };
         self.readback.unmap();
+        if !finite {
+            // Keep the last good positions (the CPU fallback goes on from them).
+            std::mem::swap(&mut self.start, &mut self.x);
+            return Err(StepError::Diverged);
+        }
         Ok(())
     }
 }
