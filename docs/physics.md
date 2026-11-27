@@ -535,6 +535,42 @@ the radius are settled by two fixed-point steps), so the start pose is not
 stretched: an inconsistent first version stretched the panels at the hips
 and the hem bunched up 7 cm when they relaxed.
 
+Below the crotch, alone (2026-11-27). A dress down to the ankles started
+with its side seams 13 cm open at the hem and 21–29 cm at the knees and
+hips; closing in the first frame at 13 m/s across the gap between the
+legs, they threw the front and the back through each other and the back
+stayed caught between the legs (`tests/templates.rs`
+`a_long_dress_hangs_in_front_of_and_behind_the_legs`). Two causes: the
+"everything above" reach took in the arms' shoulder caps (above 0.78 of
+stature the arm's points count as body), the deltoids 25 cm from the
+axis at the armpits against 18–20 cm for the shoulders and hips, which
+set every section below them 28 cm out at the sides; and pushed out
+without taking any length back, the circle was then 1.62 m around for
+1.47 m of hem. Above the crotch the torso is in the way and seams closing
+across a gap pull the cloth over it; below it nothing lies between the
+legs. There, for a garment alone, the start surface goes over (within
+8 cm below the crotch) to a section, sampled every 5°:
+
+- outside, by the placement gap, the torso above it without the arms'
+  shoulder caps (points above 0.78 of stature, farther out than the
+  shoulder joint and within the arm's radius of its axis carried on up),
+  and the whole body within 3 cm of its own height;
+- a circle of the garment's own radius pushed out where the body reaches
+  farther, the circle taken in (at the front and the back, where the
+  body leaves room) until the section is as long as the garment; only
+  where the body's outline plus the gap is longer do the seams start
+  open (the long dress 11 cm at most, below 0.5 m);
+- arc lengths kept along the section, not along a circle at the radius
+  reached (the fixed-point steps above are exact only on a circle).
+
+The gap is kept: narrowed down to 5 mm where the cloth was short, the
+jeans' waistband, placed 38 mm out to start outside the rest of the
+jeans, started inside them and its button stayed 2 cm open. Applied above
+the crotch as well, these changes moved every fitted top's start: a
+T-shirt was still moving at 2 cm/s after 4 s on the GPU, a sleeve's
+elastic hem stayed 4 % long, and a shirt tucked into trousers showed
+through them.
+
 An earlier fixed flare (radius growing 0.35 m per metre) started an A-line
 hem at 2.5 m around for 1.56 m of cloth: the seams pulled it in and the hem
 buckled inward. With the garment's own width it hangs as an A-line.

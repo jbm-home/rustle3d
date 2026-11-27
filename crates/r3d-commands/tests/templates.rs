@@ -271,6 +271,55 @@ fn a_dress_hangs_from_the_shoulders() {
     assert!(low > 0.45 && low < 0.7, "hem at {low}");
 }
 
+/// A dress down to the ankles hangs in front of the legs at the front and
+/// behind them at the back. Its start surface took in the upper arms at
+/// the armpits, 1.62 m around for 1.47 m of hem: the side seams started
+/// 13 cm open at the hem and 29 cm at the hips, closed in the first frame
+/// at 13 m/s, threw the front and the back through each other and left
+/// the back caught between the legs (docs/physics.md, Starting positions).
+#[test]
+fn a_long_dress_hangs_in_front_of_and_behind_the_legs() {
+    let mut s = Session::new(Project::new("Untitled"));
+    common::women_m(&mut s);
+    run(
+        &mut s,
+        json!({"type": "template.apply", "template": "dress", "sizes": {"length_cm": 140}}),
+    );
+    let form = Form::of_project(s.project()).unwrap().unwrap();
+    let drape = build(s.project(), Some(&form), DEFAULT_SPACING_MM).unwrap();
+    let start: Vec<_> = drape.scene.particles.iter().map(|p| p.position).collect();
+    // Below the hips the side seams start half as open as they did
+    // (21.5 cm); not closed, as the dress is narrower at the knees than
+    // the torso above them plus the placement gap.
+    let open = drape
+        .scene
+        .seams
+        .iter()
+        .map(|[a, b]| (start[*a as usize], start[*b as usize]))
+        .filter(|(a, _)| a.y < 0.5)
+        .map(|(a, b)| a.distance(b))
+        .fold(0.0f32, f32::max);
+    assert!(open < 0.12, "side seams start {open} m open below the hips");
+    let mut solver = CpuSolver::new(drape.scene);
+    for _ in 0..240 {
+        solver.step(1.0 / 60.0).unwrap();
+    }
+    let stats = solver.stats();
+    assert!(stats.max_seam_gap < 0.005, "seams open: {stats:?}");
+    let p = solver.positions();
+    // The cloth on the middle of the front and of the back, below the
+    // crotch, stays on its side of the legs.
+    let crossed = start
+        .iter()
+        .zip(p)
+        .filter(|(a, _)| a.x.abs() < 0.05 && a.y < 0.7)
+        .filter(|(a, b)| a.z * b.z <= 0.0 || b.z.abs() < 0.04)
+        .count();
+    assert_eq!(crossed, 0, "cloth between the legs");
+    let low = p.iter().map(|v| v.y).fold(f32::MAX, f32::min);
+    assert!(low < 0.15, "hem at {low}");
+}
+
 #[test]
 fn a_tote_bag_hangs_from_its_handles() {
     let s = draft("tote_bag");

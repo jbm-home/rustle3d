@@ -145,6 +145,9 @@ pub struct Form {
     pub triangles: Vec<[u32; 3]>,
     /// The body's distance from its vertical axis, arms left out.
     radial: Profile,
+    /// The same without the arms' shoulder caps: the torso the cloth
+    /// below the crotch hangs from.
+    torso: Profile,
     /// The left (+x) and right arms.
     arms: [Arm; 2],
     /// The left (+x) and right legs.
@@ -409,7 +412,8 @@ const CROTCH_FRACTION: f32 = 0.46;
 const MEDIAN_POINT_M: f32 = 0.01;
 const CROTCH_ABOVE: f32 = 0.3;
 /// A trouser leg goes from around the leg to around the body over this
-/// height above the crotch (m).
+/// height above the crotch, and a garment alone from around the body to
+/// around the legs over this height below it (m).
 const CROTCH_BLEND_M: f32 = 0.08;
 
 /// How far a body part reaches from a vertical axis (m): every
@@ -638,16 +642,32 @@ impl Arm {
     /// upper arm when the arm is raised), the elbow, and the middle of
     /// the wrist (or a forearm's length past the elbow).
     fn joints(&self, positions: &[Vec3], height: f32) -> [Vec3; 3] {
+        let elbow = self.point + self.down * self.elbow;
+        let wrist = self
+            .wrist(positions, height)
+            .unwrap_or(elbow + self.fore * FOREARM * height);
+        [self.shoulder(height), elbow, wrist]
+    }
+
+    /// The shoulder joint: the axis where it reaches the shoulder's
+    /// height, or a little above the upper arm when the arm is raised.
+    fn shoulder(&self, height: f32) -> Vec3 {
         let up = if self.down.y < -0.3 {
             (SHOULDER_JOINT * height - self.point.y) / self.down.y
         } else {
             -RAISED_SHOULDER_M
         };
-        let elbow = self.point + self.down * self.elbow;
-        let wrist = self
-            .wrist(positions, height)
-            .unwrap_or(elbow + self.fore * FOREARM * height);
-        [self.point + self.down * up, elbow, wrist]
+        self.point + self.down * up
+    }
+
+    /// Whether `p` is the cap of this arm's shoulder: above the height
+    /// where [`Arm::holds`] stops, farther out than the shoulder joint and
+    /// near the upper arm's axis carried on up (the deltoid).
+    fn caps(&self, p: Vec3, height: f32) -> bool {
+        let joint = self.shoulder(height);
+        let q = p - joint;
+        let off_axis = (q - self.down * q.dot(self.down)).length();
+        p.y >= SHOULDER * height && q.x * joint.x > 0.0 && off_axis < self.radius
     }
 
     /// Find the arm on `side` of a body (A pose).
@@ -853,6 +873,12 @@ impl Form {
         let height = positions.iter().map(|p| p.y).fold(0.0, f32::max);
         let body = torso_and_legs(&positions, &arms, height);
         let radial = Profile::new(height, body.iter().map(|p| (p.y, Vec2::new(p.x, p.z))));
+        let torso = Profile::new(
+            height,
+            body.iter()
+                .filter(|p| !arms.iter().any(|a| a.caps(**p, height)))
+                .map(|p| (p.y, Vec2::new(p.x, p.z))),
+        );
         let legs = match parts {
             Some(p) => {
                 let [left, right] = p.legs;
@@ -878,6 +904,7 @@ impl Form {
             positions,
             triangles,
             radial,
+            torso,
             arms,
             legs,
             crotch,
@@ -1097,6 +1124,24 @@ impl Under<'_> {
             .map_or(DEFAULT_BODY_RADIUS_M, |f| f.radial.reach(top, below, theta))
     }
 
+    /// How far out the torso reaches at angle `theta` anywhere between
+    /// heights `top` and `y`, or the body near `y` (within
+    /// `LEG_REACH_SPAN_M`; m).
+    fn hangs_over(&self, y: f32, top: f32, theta: f32) -> f32 {
+        self.form.map_or(DEFAULT_BODY_RADIUS_M, |f| {
+            let near = f
+                .radial
+                .reach(y + LEG_REACH_SPAN_M, 2.0 * LEG_REACH_SPAN_M, theta);
+            near.max(f.torso.reach(top, top - y, theta))
+        })
+    }
+
+    /// The height of the crotch (m).
+    fn crotch(&self) -> f32 {
+        self.form
+            .map_or(CROTCH_FRACTION * DEFAULT_HEIGHT_M, |f| f.crotch)
+    }
+
     /// The leg on `side` (+1 left).
     fn leg(&self, side: f32) -> Option<&Leg> {
         self.form.and_then(|f| f.legs.get(usize::from(side < 0.0)))
@@ -1178,12 +1223,88 @@ fn centre_x(l: &Laid) -> f64 {
     (lo + hi) / 2.0
 }
 
+/// Directions a section of the start surface around the body is sampled
+/// in (5° apart; the body profile has 10° bins).
+const SECTION_SAMPLES: usize = 72;
+/// Angle between two directions of a section (rad).
+const SECTION_STEP: f32 = std::f32::consts::TAU / SECTION_SAMPLES as f32;
+
+/// A horizontal section of a garment's start surface around the body: its
+/// radius in `SECTION_SAMPLES` directions (angle 0 = the front, as
+/// placements count) and the arc length along it from direction 0 to each.
+struct Section {
+    radius: [f32; SECTION_SAMPLES],
+    arc: [f32; SECTION_SAMPLES + 1],
+}
+
+impl Section {
+    fn new(radius: [f32; SECTION_SAMPLES]) -> Self {
+        let mut arc = [0.0; SECTION_SAMPLES + 1];
+        let mut sum = 0.0;
+        for (i, a) in arc.iter_mut().enumerate().skip(1) {
+            let (r0, r1) = (radius[i - 1], radius[i % SECTION_SAMPLES]);
+            sum += Vec2::new((r0 + r1) / 2.0 * SECTION_STEP, r1 - r0).length();
+            *a = sum;
+        }
+        Self { radius, arc }
+    }
+
+    fn perimeter(&self) -> f32 {
+        self.arc[SECTION_SAMPLES]
+    }
+
+    /// Arc length from direction 0 to angle `theta` (rad).
+    fn arc_at(&self, theta: f32) -> f32 {
+        let u = theta.rem_euclid(std::f32::consts::TAU) / SECTION_STEP;
+        let i = (u.floor() as usize).min(SECTION_SAMPLES - 1);
+        let t = u - i as f32;
+        self.arc[i] + t * (self.arc[i + 1] - self.arc[i])
+    }
+
+    /// The point (x, z) at arc length `s` from angle `from` along the
+    /// section, towards increasing angles: on a circle, `s / r` from it.
+    fn point(&self, from: f32, s: f32) -> Vec2 {
+        let target = (self.arc_at(from) + s).rem_euclid(self.perimeter().max(1e-6));
+        let i = self
+            .arc
+            .partition_point(|&a| a <= target)
+            .saturating_sub(1)
+            .min(SECTION_SAMPLES - 1);
+        let length = self.arc[i + 1] - self.arc[i];
+        let t = if length > 0.0 {
+            ((target - self.arc[i]) / length).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        let theta = (i as f32 + t) * SECTION_STEP;
+        let r = self.radius[i] + t * (self.radius[(i + 1) % SECTION_SAMPLES] - self.radius[i]);
+        Vec2::new(r * theta.sin(), r * theta.cos())
+    }
+}
+
+/// The largest value in `lo..=hi` for which `holds` (true up to some
+/// value, false past it), to within a millionth of the range; `lo` if it
+/// never holds.
+fn largest(holds: impl Fn(f32) -> bool, lo: f32, hi: f32) -> f32 {
+    let (mut lo, mut hi) = (lo, hi);
+    for _ in 0..20 {
+        let mid = (lo + hi) / 2.0;
+        if holds(mid) {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    lo
+}
+
 /// Start positions of a panel wrapped around the body: its horizontal
 /// centre goes to the placement angle, its top to the placement height;
 /// distances along the pattern are kept as arc lengths. At each height the
 /// radius is the larger of the body's (plus the gap) and the garment's own
 /// (`around`: circumference at a height / 2π), so the panels start just
-/// touching.
+/// touching. Alone, below the crotch, the panel goes over to a section
+/// around the legs ([`hanging_section`]), within `CROTCH_BLEND_M`.
 fn wrap_body(l: &Laid, under: &Under, around: &dyn Fn(f32) -> f32) -> Vec<Vec3> {
     let centre = centre_x(l);
     let gap = if under.several {
@@ -1193,6 +1314,9 @@ fn wrap_body(l: &Laid, under: &Under, around: &dyn Fn(f32) -> f32) -> Vec<Vec3> 
     };
     let top_y = l.place.top_cm as f32 / 100.0;
     let angle0 = (l.place.angle_deg as f32).to_radians();
+    let crotch = under.crotch();
+    // The mesh has rows of vertices at the same height: one section each.
+    let mut sections: HashMap<u64, Section> = HashMap::new();
     l.mesh
         .vertices
         .iter()
@@ -1220,9 +1344,55 @@ fn wrap_body(l: &Laid, under: &Under, around: &dyn Fn(f32) -> f32) -> Vec<Vec3> 
                 r = under.outside(alone, from, span, theta);
             }
             let theta = angle0 + arc / r;
-            Vec3::new(r * theta.sin(), y, r * theta.cos())
+            let around_body = Vec3::new(r * theta.sin(), y, r * theta.cos());
+            let blend = if under.several {
+                0.0
+            } else {
+                ((crotch - y) / CROTCH_BLEND_M).clamp(0.0, 1.0)
+            };
+            if blend <= 0.0 {
+                return around_body;
+            }
+            let section = sections
+                .entry(v.y.to_bits())
+                .or_insert_with(|| hanging_section(under, y, top_y, gap, around(y)));
+            let p = section.point(angle0, arc);
+            around_body.lerp(Vec3::new(p.x, y, p.y), blend)
         })
         .collect()
+}
+
+/// The section of a garment's start surface around the legs, alone, at
+/// height `y` below the crotch, the garment hanging from `top` (m) and
+/// `length` around there: outside the torso above it by `gap`, and no
+/// longer than the garment where the body leaves room.
+///
+/// Around the body, the start surface is a circle of the garment's own
+/// radius pushed out where the body reaches farther, anywhere above, arms'
+/// shoulder caps included. Down a long dress the deltoids, 25 cm from the
+/// axis at the armpits, set the sides 28 cm out to the hem, and that
+/// surface was 1.62 m around for 1.47 m of hem: the side seams started
+/// 13 cm open at the hem, closed in the first frame at 13 m/s across the
+/// gap between the legs, threw the front and the back through each other
+/// and left the back caught between the legs. Above the crotch the torso
+/// is in the way, and seams closing there pull the cloth over it. Below
+/// it, the cloth hangs from the torso, not the arms, with the circle taken
+/// in (at the front and the back, where the body leaves room) until the
+/// section is as long as the garment; only where the body's outline plus
+/// the gap is longer do the seams start open. The gap is kept: narrowed
+/// onto the body, a waistband placed farther out than the rest of its
+/// garment started inside it and its button stayed 2 cm open.
+fn hanging_section(under: &Under, y: f32, top: f32, gap: f32, length: f32) -> Section {
+    let body: [f32; SECTION_SAMPLES] =
+        std::array::from_fn(|i| under.hangs_over(y, top, i as f32 * SECTION_STEP) + gap);
+    let own = (length / std::f32::consts::TAU).max(1e-3);
+    let fits = |r: f32| Section::new(body.map(|b| b.max(r))).perimeter() <= length * 1.0001;
+    let r = if fits(own) {
+        own
+    } else {
+        largest(fits, 0.0, own)
+    };
+    Section::new(body.map(|b| b.max(r)))
 }
 
 /// Start positions of a panel wrapped around the arm on `side` (+1
