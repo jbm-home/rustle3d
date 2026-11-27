@@ -95,7 +95,9 @@ the body's, and the ease between them, as a tailor would with a tape.
   20° of square to that axis, the shortest closed loop through the point
   is taken (5° steps, then 1°). The level loop through the point is
   kept instead where the cloth is flat or bends alike both ways (no
-  axis), or where it goes round and is at most 3 % longer: a tape round
+  axis), or where it goes round and is at most 3 % longer. Lengths here
+  are the taut tape's (over the folds, as `garment_tape_cm`), so the
+  folds of a loose garment do not turn the tape. A tape round
   the torso is held level, while a slanting tape down the back towards
   the waist would be shorter. So the chest reads level all round, and a
   short sleeve standing out from the arm is measured square to it.

@@ -148,7 +148,9 @@ fn edits_carry_the_drape_over_without_a_jump() {
         assert!(gap < 0.08, "jump of {gap} m");
     }
     // ...and once it has hung for a second, the longer skirt is lower than
-    // the same drape without the change.
+    // the same drape without the change. Not by the whole 50 mm: the
+    // front's longer sides are sewn to the back's unchanged ones, which
+    // hold its hem up (on the Women M body it settles about 19 mm lower).
     let lowest = |s: &CpuSolver, piece: &r3d_commands::drape::Piece| {
         piece
             .particles
@@ -163,7 +165,7 @@ fn edits_carry_the_drape_over_without_a_jump() {
         longer.step(1.0 / 60.0).unwrap();
     }
     let (before, after) = (lowest(&solver, front_old), lowest(&longer, front_new));
-    assert!(after < before - 0.02, "{before} -> {after}");
+    assert!(after < before - 0.01, "{before} -> {after}");
 }
 
 #[test]

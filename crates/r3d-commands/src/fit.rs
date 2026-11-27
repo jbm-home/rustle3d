@@ -887,7 +887,9 @@ impl<'a> Cloth<'a> {
     /// [`AXIS_SEARCH_DEG`] of that (every [`ROUND_STEP_DEG`], then to the
     /// degree), so round a slanting sleeve; but level, as a tape is held
     /// round the torso, where the cloth does not show its way or the
-    /// level loop is about as short. Without a closed one, the level cut.
+    /// level loop is about as short. Lengths are the tape's ([`Loop::tape`]),
+    /// taut over the folds: a loose garment's folds do not turn it. Without
+    /// a closed one, the level cut.
     fn round(&self, p: Vec3) -> Option<Loop> {
         let level = self.through(Plane::level(p.y), p);
         let Some((n, axis)) = self.axis(p) else {
@@ -909,7 +911,7 @@ impl<'a> Cloth<'a> {
                         .filter(|l| l.closed)
                         .map(|l| (deg, l))
                 })
-                .min_by(|a, b| a.1.length().total_cmp(&b.1.length()))
+                .min_by(|a, b| a.1.tape().total_cmp(&b.1.tape()))
         };
         let steps = (AXIS_SEARCH_DEG / ROUND_STEP_DEG) as i32;
         let fine = ROUND_STEP_DEG as i32 - 1;
@@ -921,7 +923,7 @@ impl<'a> Cloth<'a> {
         .and_then(|(deg, _)| shortest((-fine..=fine).map(|k| deg + k as f32).collect()))
         .map(|(_, l)| l);
         match (best, level) {
-            (Some(b), Some(f)) if !f.closed || f.length() > b.length() * LEVEL_SLACK => Some(b),
+            (Some(b), Some(f)) if !f.closed || f.tape() > b.tape() * LEVEL_SLACK => Some(b),
             (b, f) => f.or(b),
         }
     }
