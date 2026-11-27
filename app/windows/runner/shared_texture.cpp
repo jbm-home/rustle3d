@@ -119,6 +119,16 @@ std::unique_ptr<SharedTextureBridge::Shared> SharedTextureBridge::CreateShared(
   return shared;
 }
 
+void SharedTextureBridge::Dispose(int64_t id) {
+  auto it = shared_.find(id);
+  if (it != shared_.end()) {
+    // Free the texture once Flutter no longer uses it.
+    std::shared_ptr<Shared> gone = std::move(it->second);
+    shared_.erase(it);
+    textures_->UnregisterTexture(id, [gone]() {});
+  }
+}
+
 void SharedTextureBridge::Handle(
     const flutter::MethodCall<EncodableValue>& call,
     std::unique_ptr<flutter::MethodResult<EncodableValue>> result) {
@@ -136,12 +146,17 @@ void SharedTextureBridge::Handle(
         (static_cast<int64_t>(desc.AdapterLuid.HighPart) << 32) |
         static_cast<int64_t>(desc.AdapterLuid.LowPart);
     result->Success(EncodableValue(luid));
-  } else if (method == "create") {
+  } else if (method == "create" || method == "resize") {
     auto shared = CreateShared(static_cast<int>(IntArg(a, "width", 0)),
                                static_cast<int>(IntArg(a, "height", 0)));
     if (!shared) {
       result->Error("texture", "cannot create surface");
       return;
+    }
+    // A resize registers a new texture: unlike macOS, the Windows
+    // registry may change while Flutter composites.
+    if (method == "resize") {
+      Dispose(IntArg(a, "textureId", -1));
     }
     const int64_t id = textures_->RegisterTexture(shared->variant.get());
     const auto handle =
@@ -155,14 +170,7 @@ void SharedTextureBridge::Handle(
     textures_->MarkTextureFrameAvailable(IntArg(a, "textureId", -1));
     result->Success();
   } else if (method == "dispose") {
-    const int64_t id = IntArg(a, "textureId", -1);
-    auto it = shared_.find(id);
-    if (it != shared_.end()) {
-      // Free the texture once Flutter no longer uses it.
-      std::shared_ptr<Shared> gone = std::move(it->second);
-      shared_.erase(it);
-      textures_->UnregisterTexture(id, [gone]() {});
-    }
+    Dispose(IntArg(a, "textureId", -1));
     result->Success();
   } else {
     result->NotImplemented();

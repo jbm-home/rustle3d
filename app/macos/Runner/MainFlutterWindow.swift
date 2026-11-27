@@ -44,14 +44,15 @@ class MainFlutterWindow: NSWindow {
 }
 
 
-/// A GPU surface that the Rust core renders into and Flutter composites
-/// without any copy: the IOSurface memory is wrapped as a Metal texture on
-/// the Rust side (crates/r3d-ffi/src/surface.rs) and as a CVPixelBuffer here.
-final class SharedTexture: NSObject, FlutterTexture {
+/// An IOSurface that the Rust core renders into and Flutter composites
+/// without any copy: the memory is wrapped as a Metal texture on the Rust
+/// side (crates/r3d-ffi/src/surface.rs) and as a CVPixelBuffer here.
+struct SharedSurface {
   let surface: IOSurface
-  private let pixelBuffer: CVPixelBuffer
+  let pixelBuffer: CVPixelBuffer
 
   init?(width: Int, height: Int) {
+    guard width > 0, height > 0 else { return nil }
     let properties: [IOSurfacePropertyKey: Any] = [
       .width: width,
       .height: height,
@@ -69,17 +70,59 @@ final class SharedTexture: NSObject, FlutterTexture {
   }
 
   /// Pointer to the IOSurfaceRef, handed to Rust (same process).
-  var surfacePointer: Int {
+  var pointer: Int {
     Int(bitPattern: Unmanaged.passUnretained(surface).toOpaque())
-  }
-
-  func copyPixelBuffer() -> Unmanaged<CVPixelBuffer>? {
-    Unmanaged.passRetained(pixelBuffer)
   }
 }
 
-/// Method channel `dev.rustle3d/texture`: create, refresh and dispose shared
-/// textures for the Dart `RustView` widget.
+/// One view's texture, registered with Flutter once for the life of the
+/// view. A resize swaps the surface behind it instead of registering a new
+/// texture: Flutter's macOS texture registry is not safe to change while
+/// the raster thread composites a frame that uses one of its textures
+/// (unregistering during a window resize crashed the app).
+final class SharedTexture: NSObject, FlutterTexture {
+  /// Guards `shown`, read by Flutter's raster thread.
+  private let lock = NSLock()
+  /// The surface Flutter composites.
+  private var shown: SharedSurface
+  /// The surface of the last resize, shown from its first frame on.
+  private var next: SharedSurface?
+
+  init(surface: SharedSurface) {
+    shown = surface
+  }
+
+  /// Make a surface of the new size; it replaces the shown one at its
+  /// first frame, so the old picture stays up until then.
+  func resize(width: Int, height: Int) -> SharedSurface? {
+    next = SharedSurface(width: width, height: height)
+    return next
+  }
+
+  /// The surface at `pointer` has a new frame. False when it is neither
+  /// the shown surface nor the next one (a frame of a replaced surface).
+  func frame(surface pointer: Int) -> Bool {
+    if let next, next.pointer == pointer {
+      lock.lock()
+      shown = next
+      lock.unlock()
+      self.next = nil
+      return true
+    }
+    lock.lock()
+    defer { lock.unlock() }
+    return shown.pointer == pointer
+  }
+
+  func copyPixelBuffer() -> Unmanaged<CVPixelBuffer>? {
+    lock.lock()
+    defer { lock.unlock() }
+    return Unmanaged.passRetained(shown.pixelBuffer)
+  }
+}
+
+/// Method channel `dev.rustle3d/texture`: create, resize, refresh and
+/// dispose shared textures for the Dart `RustView` widget.
 final class SharedTextureBridge {
   private let registry: FlutterTextureRegistry
   private let channel: FlutterMethodChannel
@@ -96,26 +139,35 @@ final class SharedTextureBridge {
 
   private func handle(_ call: FlutterMethodCall, result: FlutterResult) {
     let args = call.arguments as? [String: Any] ?? [:]
+    let id = args["textureId"] as? Int64
+    let width = args["width"] as? Int ?? 0
+    let height = args["height"] as? Int ?? 0
     switch call.method {
     case "create":
-      guard let width = args["width"] as? Int, let height = args["height"] as? Int,
-        width > 0, height > 0, let texture = SharedTexture(width: width, height: height)
-      else {
+      guard let surface = SharedSurface(width: width, height: height) else {
         result(FlutterError(code: "texture", message: "cannot create surface", details: nil))
         return
       }
+      let texture = SharedTexture(surface: surface)
       let id = registry.register(texture)
       textures[id] = texture
-      result(["textureId": id, "surface": texture.surfacePointer])
+      result(["textureId": id, "surface": surface.pointer])
+    case "resize":
+      guard let id, let surface = textures[id]?.resize(width: width, height: height) else {
+        result(FlutterError(code: "texture", message: "cannot create surface", details: nil))
+        return
+      }
+      result(["textureId": id, "surface": surface.pointer])
     case "frame":
-      if let id = args["textureId"] as? Int64 {
+      if let id, let surface = args["surface"] as? Int,
+        textures[id]?.frame(surface: surface) == true
+      {
         registry.textureFrameAvailable(id)
       }
       result(nil)
     case "dispose":
-      if let id = args["textureId"] as? Int64 {
+      if let id, textures.removeValue(forKey: id) != nil {
         registry.unregisterTexture(id)
-        textures.removeValue(forKey: id)
       }
       result(nil)
     default:

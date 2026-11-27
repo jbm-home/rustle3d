@@ -135,6 +135,10 @@ class _RustViewState extends State<RustView>
   int? _textureId;
   int? _viewId;
 
+  /// The surface the view renders into (shared mode): the texture's, or
+  /// after a resize the one it switches to at its first frame.
+  int? _surface;
+
   /// Shared textures (macOS, Windows); otherwise the pixels are copied.
   /// `--dart-define=R3D_COPY_PIXELS=true` tries the copied path there.
   /// Turned off for the session when a texture cannot be shared (e.g.
@@ -149,9 +153,12 @@ class _RustViewState extends State<RustView>
 
   /// A frame is rendering (shared mode).
   bool _rendering = false;
+
+  /// The view's size, and the layout's latest (physical pixels).
   Size _physical = Size.zero;
+  Size _wanted = Size.zero;
   double _ratio = 1;
-  bool _creating = false;
+  bool _resizing = false;
   Offset _downAt = Offset.zero;
   bool _dragged = false;
 
@@ -261,60 +268,99 @@ class _RustViewState extends State<RustView>
   }
 
   void _release() {
-    final view = _viewId;
+    _detach();
     final texture = _textureId;
-    _viewId = null;
     _textureId = null;
-    if (view != null) {
-      widget.engine.detachView(view: view);
-    }
+    _surface = null;
     if (texture != null) {
       _channel.invokeMethod('dispose', {'textureId': texture});
     }
   }
 
+  void _detach() {
+    final view = _viewId;
+    _viewId = null;
+    if (view != null) widget.engine.detachView(view: view);
+  }
+
+  /// Size the view to the layout's `physical` size, then to any size asked
+  /// for meanwhile (a window resize asks for many).
   Future<void> _resize(Size physical) async {
-    if (_creating || physical == _physical || physical.isEmpty) return;
-    _creating = true;
-    _physical = physical;
-    _release();
+    _wanted = physical;
+    if (_resizing) return;
+    _resizing = true;
+    while (mounted && _wanted != _physical && !_wanted.isEmpty) {
+      _physical = _wanted;
+      await _attach(_physical);
+    }
+    _resizing = false;
+  }
+
+  /// Attach a view of `physical` size, replacing the current one. Shared
+  /// mode keeps the texture registered and only swaps its surface:
+  /// registering and unregistering textures while the window resizes
+  /// crashed Flutter's compositor on macOS.
+  Future<void> _attach(Size physical) async {
+    final width = physical.width.round();
+    final height = physical.height.round();
     if (!_shared) {
+      _detach();
       _viewId = widget.engine.attachView(
         kind: widget.kind,
         surface: null,
-        width: physical.width.round(),
-        height: physical.height.round(),
+        width: width,
+        height: height,
       );
-      _creating = false;
       return;
     }
-    final created = await _channel.invokeMapMethod<String, Object>('create', {
-      'width': physical.width.round(),
-      'height': physical.height.round(),
-    });
-    final textureId = created?['textureId'] as int?;
-    final surface = created?['surface'] as int?;
-    if (mounted && textureId != null && surface != null) {
-      try {
-        _viewId = widget.engine.attachView(
-          kind: widget.kind,
-          surface: BigInt.from(surface),
-          width: physical.width.round(),
-          height: physical.height.round(),
-        );
-        setState(() => _textureId = textureId);
-      } on ApiError catch (e) {
-        if (e.code != 'ui_surface') rethrow;
-        // Read the pixels back instead, from now on.
-        _channel.invokeMethod('dispose', {'textureId': textureId});
-        _shared = false;
-        _physical = Size.zero;
-        _creating = false;
-        if (mounted) setState(() {});
-        return;
-      }
+    final texture = _textureId;
+    final Map<String, Object>? reply;
+    try {
+      reply = await _channel.invokeMapMethod<String, Object>(
+        texture == null ? 'create' : 'resize',
+        {'textureId': ?texture, 'width': width, 'height': height},
+      );
+    } on PlatformException {
+      _stopSharing();
+      return;
     }
-    _creating = false;
+    final textureId = reply?['textureId'] as int?;
+    final surface = reply?['surface'] as int?;
+    if (textureId == null || surface == null) {
+      _stopSharing();
+      return;
+    }
+    if (!mounted) {
+      // dispose() released the texture it knew of, not a new one.
+      if (textureId != texture) {
+        _channel.invokeMethod('dispose', {'textureId': textureId});
+      }
+      return;
+    }
+    _detach();
+    _textureId = textureId;
+    try {
+      _viewId = widget.engine.attachView(
+        kind: widget.kind,
+        surface: BigInt.from(surface),
+        width: width,
+        height: height,
+      );
+      _surface = surface;
+    } on ApiError catch (e) {
+      if (e.code != 'ui_surface') rethrow;
+      _stopSharing();
+      return;
+    }
+    if (textureId != texture) setState(() {});
+  }
+
+  /// Read the pixels back instead, from now on.
+  void _stopSharing() {
+    _release();
+    _shared = false;
+    _physical = Size.zero;
+    if (mounted) setState(() {});
   }
 
   void _renderFrame() {
@@ -326,19 +372,23 @@ class _RustViewState extends State<RustView>
       return;
     }
     final texture = _textureId;
-    if (texture == null || _rendering) return;
-    _render(view, texture);
+    final surface = _surface;
+    if (texture == null || surface == null || _rendering) return;
+    _render(view, texture, surface);
   }
 
   /// Shared mode: render off the UI thread, then hand the frame to the
   /// compositor; one frame at a time.
-  Future<void> _render(int view, int texture) async {
+  Future<void> _render(int view, int texture, int surface) async {
     _rendering = true;
     try {
       final ms = await widget.engine.renderView(view: view);
       // Null: nothing changed, the last frame stays.
       if (ms == null || !mounted || view != _viewId) return;
-      _channel.invokeMethod('frame', {'textureId': texture});
+      _channel.invokeMethod('frame', {
+        'textureId': texture,
+        'surface': surface,
+      });
       widget.onFrameTime?.call(ms);
     } on ApiError {
       // The view went away while it rendered.

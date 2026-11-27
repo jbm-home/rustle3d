@@ -21,7 +21,9 @@
 // Method channel `dev.rustle3d/texture`, as on macOS:
 // - `adapter` → the LUID of Flutter's adapter, for the Rust device;
 // - `create` {width, height} → {textureId, surface (the NT handle)};
-// - `frame` {textureId} → the texture has a new frame;
+// - `resize` {textureId, width, height} → {textureId, surface}: here a new
+//   texture replaces the old one;
+// - `frame` {textureId, surface} → the texture has a new frame;
 // - `dispose` {textureId}.
 class SharedTextureBridge {
  public:
@@ -37,6 +39,9 @@ class SharedTextureBridge {
   void Handle(const flutter::MethodCall<flutter::EncodableValue>& call,
               std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
                   result);
+
+  // Unregister a texture, freed once Flutter no longer uses it.
+  void Dispose(int64_t id);
 
   // The D3D11 device on Flutter's adapter, made on first use.
   bool EnsureDevice();
