@@ -1956,7 +1956,7 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
 name = "r3d-avatar"
-version = "26.11.26"
+version = "26.11.27"
 dependencies = [
  "glam",
  "r3d-core",
@@ -1969,7 +1969,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-cli"
-version = "26.11.26"
+version = "26.11.27"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -1982,7 +1982,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-commands"
-version = "26.11.26"
+version = "26.11.27"
 dependencies = [
  "glam",
  "png",
@@ -2002,7 +2002,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-core"
-version = "26.11.26"
+version = "26.11.27"
 dependencies = [
  "glam",
  "r3d-geom",
@@ -2015,7 +2015,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-geom"
-version = "26.11.26"
+version = "26.11.27"
 dependencies = [
  "glam",
  "proptest",
@@ -2024,7 +2024,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-io"
-version = "26.11.26"
+version = "26.11.27"
 dependencies = [
  "glam",
  "lopdf",
@@ -2043,7 +2043,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-mcp"
-version = "26.11.26"
+version = "26.11.27"
 dependencies = [
  "base64",
  "glam",
@@ -2061,7 +2061,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-render"
-version = "26.11.26"
+version = "26.11.27"
 dependencies = [
  "bytemuck",
  "glam",
@@ -2079,7 +2079,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-sim"
-version = "26.11.26"
+version = "26.11.27"
 dependencies = [
  "criterion",
  "glam",
@@ -2091,7 +2091,7 @@ dependencies = [
 
 [[package]]
 name = "r3d-sim-gpu"
-version = "26.11.26"
+version = "26.11.27"
 dependencies = [
  "bytemuck",
  "criterion",
@@ -2109,7 +2109,7 @@ dependencies = [
 
 [[package]]
 name = "r3d_ffi"
-version = "26.11.26"
+version = "26.11.27"
 dependencies = [
  "flutter_rust_bridge",
  "glam",
@@ -3469,7 +3469,7 @@ checksum = "e450f9b2ed1dff33c94c12589a87338689467b9c4f5d8a5710bd09a847d2c8a7"
 
 [[package]]
 name = "xtask"
-version = "26.11.26"
+version = "26.11.27"
 dependencies = [
  "ctrlc",
  "glam",
