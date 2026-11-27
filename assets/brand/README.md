@@ -34,7 +34,7 @@ Same license as the code (GPL-3.0-or-later). The wordmark is set in Manrope Extr
 After changing a master SVG:
 
 ```sh
-./scripts/brand-icons.sh ../rustle3dweb   # the site's folder is optional
+./scripts/brand-icons.sh ../rustle3dweb/site   # the site's folder is optional
 ```
 
 It writes the macOS app icons, the Windows `.ico`, the Linux window icon,

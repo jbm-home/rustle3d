@@ -4,7 +4,7 @@
 # also writes the site's favicon, Apple touch icon and manifest icons.
 # Needs rsvg-convert (librsvg2-bin) and ImageMagick 7 (magick).
 #
-#   ./scripts/brand-icons.sh [../rustle3dweb]
+#   ./scripts/brand-icons.sh [../rustle3dweb/site]
 set -euo pipefail
 cd "$(dirname "$0")/.."
 B=assets/brand
