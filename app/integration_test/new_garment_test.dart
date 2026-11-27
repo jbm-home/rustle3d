@@ -1,6 +1,8 @@
-// The start screen's new-garment window: choosing another body fits it
-// (a second or more) off the UI thread, behind a card, and then shows the
-// template's sizes for that body.
+// The start screen's new-project window (docs/specs/36-objects.md,
+// 37-body-at-creation.md): the body is chosen by who it dresses, a size
+// and a silhouette, typed measurements say the size they make, the
+// template's sizes follow the body without blocking the window; a blank
+// project can be an object, which opens without a body.
 
 import 'dart:io';
 
@@ -15,53 +17,99 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async => await RustLib.init());
 
-  testWidgets('another body is fitted behind a card', (tester) async {
+  ProjectStore newStore() {
     final dir = Directory.systemTemp.createTempSync('r3d').path;
     File('$dir/tour-seen').createSync();
     Directory('$dir/projects').createSync();
-    final store = ProjectStore(projectsDir: '$dir/projects', libraryDir: dir);
+    return ProjectStore(projectsDir: '$dir/projects', libraryDir: dir);
+  }
 
-    // The bar animates: pumpAndSettle would never return.
-    Future<void> until(bool Function() done) async {
-      final end = DateTime.now().add(const Duration(seconds: 60));
-      while (!done() && DateTime.now().isBefore(end)) {
-        await tester.pump(const Duration(milliseconds: 50));
-      }
-      expect(done(), isTrue);
+  /// Pump until [done], letting Rust's futures complete (they need real
+  /// time, not the test's clock).
+  Future<void> until(WidgetTester tester, bool Function() done) async {
+    final end = DateTime.now().add(const Duration(seconds: 90));
+    while (!done() && DateTime.now().isBefore(end)) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
     }
+    expect(done(), isTrue);
+  }
 
-    final create = find.ancestor(
-      of: find.text('Create'),
-      matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
-    );
-    bool ready() =>
-        create.evaluate().isNotEmpty &&
-        tester.widget<ButtonStyleButton>(create).onPressed != null;
+  final create = find.byKey(const Key('createProject'));
+  bool ready(WidgetTester tester) =>
+      create.evaluate().isNotEmpty &&
+      tester.widget<ButtonStyleButton>(create).onPressed != null;
+
+  testWidgets('the body is chosen by size and the sizes follow it', (
+    tester,
+  ) async {
     List<String> sizes() => [
       for (final f in tester.widgetList<TextField>(
         find.descendant(
-          of: find.byType(Wrap),
+          of: find.byKey(const Key('templateSizes')),
           matching: find.byType(TextField),
         ),
       ))
         f.controller!.text,
     ];
-    final card = find.text('Changing the body');
+    String field(String key) => tester
+        .widget<TextField>(find.byKey(Key('bodyField_$key')))
+        .controller!
+        .text;
 
-    await tester.pumpWidget(Rustle3dApp(store: store));
-    await until(() => find.text('T-shirt').evaluate().isNotEmpty);
+    await tester.pumpWidget(Rustle3dApp(store: newStore()));
+    await until(tester, () => find.text('T-shirt').evaluate().isNotEmpty);
     await tester.tap(find.text('T-shirt').first);
-    await until(ready);
-    final adult = sizes();
-    expect(adult, isNotEmpty);
+    await until(tester, () => ready(tester));
+    // Women's 38 to start with, as the chart has it.
+    expect(field('bust_cm'), '88');
+    final first = sizes();
+    expect(first, isNotEmpty);
 
-    await tester.tap(find.byType(DropdownButtonFormField<String>));
-    await until(() => find.text('Baby 12 months').evaluate().isNotEmpty);
-    await tester.tap(find.text('Baby 12 months').last);
-    await until(() => card.evaluate().isNotEmpty);
-    expect(find.text('Fitting the body to the measurements…'), findsOneWidget);
-    await until(() => card.evaluate().isEmpty);
-    expect(ready(), isTrue);
-    expect(sizes(), isNot(adult));
+    // Another size: its measurements, and the template's sizes for it.
+    await tester.tap(find.byKey(const Key('bodySize')));
+    await until(tester, () => find.text('44').evaluate().isNotEmpty);
+    await tester.tap(find.text('44').last);
+    await tester.pump();
+    expect(field('bust_cm'), '100');
+    await until(tester, () => ready(tester) && sizes().join() != first.join());
+
+    // A pear shape keeps the bust and widens the hips.
+    await tester.tap(find.byKey(const Key('silhouette_pear')));
+    await tester.pump();
+    expect((field('bust_cm'), field('hips_cm')), ('100', '114'));
+
+    // Typed measurements say the size they make.
+    await tester.enterText(find.byKey(const Key('bodyField_bust_cm')), '92');
+    await tester.pump();
+    expect(find.textContaining('make a size 40'), findsOneWidget);
+
+    // A baby's body: the sizes follow, without a card over the window.
+    await tester.tap(find.text('Babies'));
+    await tester.pump();
+    // No busy card over the window: the sizes come in the background.
+    expect(find.text('Changing the body'), findsNothing);
+    await until(tester, () => ready(tester));
+    expect(sizes(), isNot(first));
+  });
+
+  testWidgets('a blank project made as an object has no body', (tester) async {
+    await tester.pumpWidget(Rustle3dApp(store: newStore()));
+    await until(tester, () => find.text('Blank project').evaluate().isNotEmpty);
+    await tester.tap(find.text('Blank project'));
+    await until(tester, () => ready(tester));
+    await tester.tap(find.byKey(const Key('kindObject')));
+    await tester.pump();
+    expect(find.byKey(const Key('stuffing')), findsOneWidget);
+    expect(find.byKey(const Key('bodyChart')), findsNothing);
+    await tester.tap(create);
+    // The project opens with an Object button where the Body menu was.
+    await until(
+      tester,
+      () => find.widgetWithText(TextButton, 'Object').evaluate().isNotEmpty,
+    );
+    expect(find.byKey(const Key('bodyMenuImport')), findsNothing);
   });
 }

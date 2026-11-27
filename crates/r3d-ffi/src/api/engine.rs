@@ -363,6 +363,10 @@ struct Graphics {
     /// The board's pan/zoom when its view went away (resized, or hidden
     /// by the 3D view taking its space), for the next board view.
     board_view: Option<BoardView>,
+    /// Whether the camera frames the cloth of an object project (spec
+    /// 36), which has no body to frame: done once, on its first drawn
+    /// cloth, and again when [`Engine::look_from`] asks.
+    framed_object: bool,
 }
 
 impl Graphics {
@@ -380,6 +384,7 @@ impl Graphics {
             avatar: None,
             blit: None,
             board_view: None,
+            framed_object: false,
         })
     }
 }
@@ -2417,6 +2422,22 @@ impl Engine {
             .map_err(|_| poisoned())?
             .as_deref()
             .map(|band| Mesh::ribbon(band, TAPE_WIDTH_M, TAPE_LIFT_M));
+        // An object has no body to frame: the camera frames its cloth,
+        // once; back to a garment, it frames a standing body again.
+        if project.object().is_some() {
+            let mut points = pieces.iter().flat_map(|p| p.mesh.positions.iter());
+            if !g.framed_object
+                && let Some(first) = points.next()
+            {
+                let (lo, hi) =
+                    points.fold((*first, *first), |(lo, hi), p| (lo.min(*p), hi.max(*p)));
+                g.camera = OrbitCamera::framing(lo, hi, g.camera.yaw);
+                g.framed_object = true;
+            }
+        } else if g.framed_object {
+            g.camera = OrbitCamera::facing(g.camera.yaw);
+            g.framed_object = false;
+        }
         let moving = self.moving_avatar(project, published.time)?;
         let mut draws = Vec::with_capacity(pieces.len() + 1);
         if let Some(avatar) = moving.as_ref().or(g.avatar.as_ref().map(|(_, m)| m)) {
@@ -4338,6 +4359,8 @@ impl Engine {
         if let Some(g) = self.graphics()?.as_mut() {
             let height = g.avatar.as_ref().map_or(0.0, |(_, m)| top(m));
             g.camera = OrbitCamera::facing(yaw).for_height(height);
+            // An object is framed on its cloth at the next frame.
+            g.framed_object = false;
         }
         Ok(())
     }

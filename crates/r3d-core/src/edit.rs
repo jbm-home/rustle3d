@@ -18,6 +18,7 @@ use crate::model::{
     Avatar, Constraint, DisplayUnit, Edge, Garment, Grading, Guide, IdMap, InternalLine, Notch,
     Panel, Pin, Point, Project, Seam,
 };
+use crate::object::ObjectSetup;
 use crate::photo::PhotoSetup;
 use crate::trim::{Button, Zipper};
 
@@ -69,6 +70,10 @@ pub enum Change {
     Photo {
         before: Option<Box<PhotoSetup>>,
         after: Option<Box<PhotoSetup>>,
+    },
+    Object {
+        before: Option<ObjectSetup>,
+        after: Option<ObjectSetup>,
     },
 }
 
@@ -122,6 +127,9 @@ impl Change {
             Change::Photo { before, after } => {
                 p.photo = if forward { after } else { before }.as_deref().cloned();
             }
+            Change::Object { before, after } => {
+                p.object = if forward { *after } else { *before };
+            }
         }
     }
 
@@ -156,6 +164,7 @@ impl Change {
                 *after = b.clone()
             }
             (Change::Photo { after, .. }, Change::Photo { after: b, .. }) => *after = b.clone(),
+            (Change::Object { after, .. }, Change::Object { after: b, .. }) => *after = *b,
             _ => return false,
         }
         true
@@ -247,7 +256,8 @@ impl ChangeSet {
                 | Change::DisplayUnit { .. }
                 | Change::Grading { .. }
                 | Change::Variables { .. }
-                | Change::Photo { .. } => {}
+                | Change::Photo { .. }
+                | Change::Object { .. } => {}
             }
         }
         out
@@ -502,6 +512,14 @@ impl<'a> Transaction<'a> {
         self.changes.push(Change::Photo {
             before: before.map(Box::new),
             after: photo.map(Box::new),
+        });
+    }
+
+    pub fn set_object(&mut self, object: Option<ObjectSetup>) {
+        let before = mem::replace(&mut self.project.object, object);
+        self.changes.push(Change::Object {
+            before,
+            after: object,
         });
     }
 

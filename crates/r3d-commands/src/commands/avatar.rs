@@ -55,6 +55,7 @@ impl Described for AvatarSet {
 
 impl CommandSpec for AvatarSet {
     fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
+        super::object::wearable(tx, "body")?;
         validate_body(&self.body)?;
         if let Some(p) = &self.preset {
             non_blank("preset", p)?;
@@ -163,6 +164,7 @@ fn orientation(
 
 /// Set the avatar to `mesh`, guessing its points and measuring it.
 fn use_mesh(tx: &mut Transaction<'_>, mut mesh: AvatarMesh) -> Result<(), CommandError> {
+    super::object::wearable(tx, "file")?;
     let placed = crate::bodies::placed(&mesh)?;
     mesh.points = crate::bodies::guess_points(&placed);
     let (body, _) = crate::bodies::measure(&placed, &mesh.points);

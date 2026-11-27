@@ -370,6 +370,12 @@ fn every_command_round_trips() {
         serde_json::from_str(&r3d_core::file::to_json(h.session.project()).unwrap()).unwrap();
     h.round_trip(json!({"type": "pattern.add", "pattern": pattern}));
 
+    // An object (spec 36): the body goes, then the project is a garment
+    // again.
+    h.round_trip(json!({"type": "object.set"}));
+    h.round_trip(json!({"type": "object.set", "stuffing": 0.8}));
+    h.round_trip(json!({"type": "object.clear"}));
+
     let registered: BTreeSet<_> = Command::registry().iter().map(|i| i.name).collect();
     let missing: Vec<_> = registered.difference(&h.covered).collect();
     assert!(

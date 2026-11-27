@@ -377,7 +377,13 @@
   "agentsExtensionHint": "An extension file for Claude Desktop and other assistants that install MCP bundles (.mcpb): save it, then open it, or drop it into the assistant's Settings > Extensions. It runs r3d from where the app is installed, so it keeps working after an update; if you move the app, save it again.",
   "agentsSaveExtension": "Save rustle3d.mcpb…",
   "agentsExtensionSaved": "Saved: {path}. Open it to install it in your assistant.",
-  "@agentsExtensionSaved": {"placeholders": {"path": {"type": "String"}}},
+  "@agentsExtensionSaved": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
   "agentsCopy": "Copy",
   "agentsNoR3d": "r3d was not found next to the app (a build from source?): build it with cargo build -p r3d-cli and put its full path in place of r3d.",
   "agentsStepAsk": "Ask your agent",
@@ -911,7 +917,7 @@
   "errBodyOutOfRange": "A size of this range would give the avatar measurements outside what it accepts.",
   "errBaseOffset": "The base size cannot move: it is the pattern as drawn.",
   "sizesOnBoard": "Show the sizes on the board",
-  "stepName": "{step, select, pattern_add{Add pattern} project_rename{Rename project} project_set_display_unit{Change units} avatar_set{Change body} avatar_remove{Remove body} panel_create_rect{Add rectangle} panel_create_polygon{Add polygon} panel_create_path{Add curved piece} panel_rename{Rename piece} panel_translate{Move piece} panel_rotate{Rotate piece} panel_scale{Scale piece} panel_set_grain{Set grainline} panel_set_seam_allowance{Set seam allowance} panel_mirror{Mirror piece} panel_unlink{Unlink copy} panel_place{Place piece} panel_delete{Delete piece} panel_cut{Cut piece} panel_paste{Paste} point_move{Move point} point_set_distance{Set distance} point_remove{Remove point} edge_set_curve{Bend edge} edge_split{Add point} edge_move{Move edge} notch_add{Add notch} notch_move{Move notch} notch_remove{Remove notch} internal_line_add{Draw line} internal_line_remove{Remove line} seam_add{Sew} seam_remove{Unsew} seam_flip{Flip seam} seam_set_gathered{Gather seam} edge_lengthen{Lengthen} edge_set_length{Set length} seam_take_in{Take in} seam_match_length{Match lengths} pin_add{Pin} pin_remove{Unpin} garment_set_fabric{Change fabric} garment_arrange{Arrange pieces} garment_set_color{Change colour} garment_add{Add garment} garment_rename{Rename garment} garment_remove{Remove garment} garment_set_layer{Change layer} panel_set_garment{Move to garment} grading_set_sizes{Set sizes} grading_use_chart{Use size chart} grading_clear{Remove sizes} grading_show_size{Show size} point_set_grade{Grade point} template_apply{Add template} pattern_import{Import pattern} batch{Several changes} constraint_add{Add constraint} constraint_remove{Remove constraint} constraint_set_value{Change dimension} point_set_smooth{Smooth point} panel_unfold{Unfold piece} guide_add{Add construction line} guide_move{Move construction line} guide_remove{Remove construction line} panel_create_ellipse{Add ellipse} panel_create_sector{Add circle skirt} edge_set_arc{Make arc} constraint_set_formula{Set formula} variable_set{Set variable} variable_remove{Remove variable} seam_set_ease{Set ease} dart_add{Add dart} pleat_add{Add pleat} panel_add_hole{Cut hole} panel_remove_hole{Fill hole} panel_boolean{Join or cut pieces} other{{step}}}",
+  "stepName": "{step, select, pattern_add{Add pattern} project_rename{Rename project} project_set_display_unit{Change units} avatar_set{Change body} avatar_remove{Remove body} panel_create_rect{Add rectangle} panel_create_polygon{Add polygon} panel_create_path{Add curved piece} panel_rename{Rename piece} panel_translate{Move piece} panel_rotate{Rotate piece} panel_scale{Scale piece} panel_set_grain{Set grainline} panel_set_seam_allowance{Set seam allowance} panel_mirror{Mirror piece} panel_unlink{Unlink copy} panel_place{Place piece} panel_delete{Delete piece} panel_cut{Cut piece} panel_paste{Paste} point_move{Move point} point_set_distance{Set distance} point_remove{Remove point} edge_set_curve{Bend edge} edge_split{Add point} edge_move{Move edge} notch_add{Add notch} notch_move{Move notch} notch_remove{Remove notch} internal_line_add{Draw line} internal_line_remove{Remove line} seam_add{Sew} seam_remove{Unsew} seam_flip{Flip seam} seam_set_gathered{Gather seam} edge_lengthen{Lengthen} edge_set_length{Set length} seam_take_in{Take in} seam_match_length{Match lengths} pin_add{Pin} pin_remove{Unpin} garment_set_fabric{Change fabric} garment_arrange{Arrange pieces} garment_set_color{Change colour} garment_add{Add garment} garment_rename{Rename garment} garment_remove{Remove garment} garment_set_layer{Change layer} panel_set_garment{Move to garment} grading_set_sizes{Set sizes} grading_use_chart{Use size chart} grading_clear{Remove sizes} grading_show_size{Show size} point_set_grade{Grade point} template_apply{Add template} pattern_import{Import pattern} batch{Several changes} constraint_add{Add constraint} constraint_remove{Remove constraint} constraint_set_value{Change dimension} point_set_smooth{Smooth point} panel_unfold{Unfold piece} guide_add{Add construction line} guide_move{Move construction line} guide_remove{Remove construction line} panel_create_ellipse{Add ellipse} panel_create_sector{Add circle skirt} edge_set_arc{Make arc} constraint_set_formula{Set formula} variable_set{Set variable} variable_remove{Remove variable} seam_set_ease{Set ease} dart_add{Add dart} pleat_add{Add pleat} panel_add_hole{Cut hole} panel_remove_hole{Fill hole} panel_boolean{Join or cut pieces} object_set{Make an object} object_clear{Wear on a body} other{{step}}}",
   "@stepName": {
     "description": "A step of the undo history, by its command name with dots as underscores.",
     "placeholders": {
@@ -1491,7 +1497,6 @@
   "bodyPointsHint": "Inside the body, in cm: across (left +), height, depth (front +). Drag them in the 3D view with Body › Show arrangement points.",
   "bodyGuessAgain": "Guess again",
   "bodyHasWarnings": "The body has things to check.",
-
   "pointChest": "Chest",
   "pointWaist": "Waist",
   "pointHips": "Hips",
@@ -1650,7 +1655,6 @@
       }
     }
   },
-
   "errNoImportedBody": "The avatar has no imported body.",
   "exportGame": "Garment for a game engine (glTF)…",
   "gameTitle": "Export for a game engine",
@@ -1984,5 +1988,87 @@
         "type": "String"
       }
     }
-  }
+  },
+  "newProjectTitle": "New project",
+  "kindWorn": "Garment",
+  "kindWornBlurb": "Worn: draped on a body",
+  "kindObject": "Object",
+  "kindObjectBlurb": "No body: a bag, a cushion, an accessory",
+  "garmentSizes": "Garment measurements",
+  "templateCushion": "Cushion",
+  "templateCushionBlurb": "Two squares sewn all around, stuffed.",
+  "sizeYears": "{age} years",
+  "@sizeYears": {
+    "placeholders": {
+      "age": {
+        "type": "String"
+      }
+    }
+  },
+  "sizeMonths": "{months} months",
+  "@sizeMonths": {
+    "placeholders": {
+      "months": {
+        "type": "String"
+      }
+    }
+  },
+  "bodySize": "Size",
+  "silhouette": "Silhouette",
+  "silhouetteBalanced": "Standard",
+  "silhouetteBalancedHint": "The size chart's proportions",
+  "silhouetteHourglass": "Hourglass",
+  "silhouetteHourglassHint": "A marked waist",
+  "silhouettePear": "Pear",
+  "silhouettePearHint": "Hips fuller than the bust",
+  "silhouetteStraight": "Straight",
+  "silhouetteStraightHint": "Little waist, narrower hips",
+  "silhouetteRound": "Round",
+  "silhouetteRoundHint": "Fuller at the waist",
+  "silhouetteInverted": "Inverted triangle",
+  "silhouetteInvertedHint": "Narrower hips under a broad chest",
+  "silhouetteSlim": "Slim",
+  "silhouetteSlimHint": "Slimmer than the chart for this age",
+  "silhouetteSturdy": "Sturdy",
+  "silhouetteSturdyHint": "Fuller than the chart for this age",
+  "myBodies": "My bodies",
+  "myBodiesTip": "Start from one of your saved bodies",
+  "chartMeasurements": "The {chart} size chart's measurements: change them if you like.",
+  "@chartMeasurements": {
+    "placeholders": {
+      "chart": {
+        "type": "String"
+      }
+    }
+  },
+  "typedMeasurements": "Your measurements.",
+  "typedNearestSize": "Your measurements make a size {size}.",
+  "@typedNearestSize": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "nearestSizeOn": "Nearest size: {size} ({chart})",
+  "@nearestSizeOn": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      },
+      "chart": {
+        "type": "String"
+      }
+    }
+  },
+  "stuffing": "Stuffing",
+  "stuffingNone": "None",
+  "stuffingFirm": "Firm",
+  "stuffingHint": "Only parts closed all around are stuffed (a cushion, a toy); an open bag keeps the shape of its seams.",
+  "objectTitle": "Object",
+  "objectSubtitle": "No body: in 3D the object floats without weight, in the shape its seams give it.",
+  "objectWear": "Wear it on a body",
+  "objectMade": "The project is now an object: no body, no weight in 3D.",
+  "bodyMenuObject": "Make it an object (no body)",
+  "errObject": "This project is an object, without a body: wear it on a body first."
 }

@@ -91,6 +91,7 @@ element's rest area or length as each method prescribes.
 | Self-contact | Particle–particle unilateral distance `≥ h`, excluding rest neighbors | [7], [8] | Basic self-collision for the MVP; see §5. |
 | Friction | Position-based Coulomb friction (static/kinetic) on contacts | [7] | Separate cloth–body and cloth–cloth coefficients. |
 | Damping | XPBD constraint damping plus light global velocity damping | [2] | Air drag later. |
+| Stuffing (objects) | Pressure force along each closed triangle's area-weighted normal | [1], [27] | Weightless scenes only; see "Objects" in §5. |
 
 ### Closures (M20)
 
@@ -759,6 +760,45 @@ one and the inseam swept through the gap.
   layers of different garments since M19, see Several garments), and
   edge–edge contacts [6].
 
+### Objects: weightless, stuffed (M46)
+
+An object project (spec 36) has no body. Its scene is **weightless**
+(`SimScene::weightless`: no gravity, no ground), so the cloth keeps the
+shape its seams give it instead of hanging in folds.
+
+- **Stuffing** is a pressure `p` (`SimScene::pressure`, up to 400 Pa)
+  on the cloth closed all around: each such triangle is pushed along its
+  area-weighted normal `(b − a) × (c − a) / 2`, towards its right side,
+  a third to each corner [1, 27] (`solver::stuffing`; the GPU kernel
+  `inflate` gathers it per particle over its triangles, before
+  `predict`). On a closed surface these forces sum to no force and no
+  torque. A triangle is stuffed when its piece of cloth, joined by seams
+  and closures (union–find), has no free edge (`Model::inflated`); an
+  open part pushed on every face but its mouth would fly off, so a bag
+  is never stuffed. The pressure grows from the end of the sewing ramp
+  over as long again (`solver::inflation`): pushing cloth not yet closed
+  would push it apart.
+- **Inertia and damping.** Without weight the shape at rest does not
+  depend on mass, but its dynamics do: 400 Pa on 120 g/m² cotton is an
+  acceleration of over 300 g, and the cloth, corrected that hard every
+  substep while stretched, fluttered and spun (a position correction
+  conserves angular momentum only to first order: on stretched cloth
+  that turns, `λ Σ gᵢ × vᵢ` feeds the turn). A weightless scene's cloth
+  moves as if 30 times heavier (`WEIGHTLESS_INERTIA`) and is damped at
+  least 5/s (`WEIGHTLESS_DAMPING`): it settles in about a second.
+- **No drift, no spin.** Nothing outside acts on a free object, yet it
+  drifted a few centimetres a minute: corrections smaller than a
+  position's last bit (positions near 1 m, `f32`) round unevenly and
+  add up to momentum. At each frame the rigid motion of the free
+  particles (mass-weighted mean velocity, and the spin `I⁻¹ L` about
+  their centre of mass, `solver::Drift`) is taken off their velocities:
+  exactly on the CPU, from the last frame's motion on the GPU (read
+  back anyway), at the first substep's `predict`. Pinned particles are
+  left out: a bag hung from pins does not swing about them either.
+- Checked by `a_stuffed_cushion_swells_smooth_and_stays_put` and
+  `an_open_bag_is_not_stuffed` (§8) on both backends, and
+  `a_stuffed_cushion_is_round_and_smooth` on the cushion template.
+
 ### Known issues
 
 
@@ -966,5 +1006,6 @@ positions alone, so the CPU and GPU results read alike:
 24. A. M. Andrew. *Another efficient algorithm for convex hulls in two dimensions.* Information Processing Letters 9(5), 1979.
 25. K.-J. Choi, H.-S. Ko. *Stable but Responsive Cloth.* SIGGRAPH 2002 (post-buckling response: cloth under compression buckles at a small force).
 26. L. Kavan, S. Collins, J. Žára, C. O'Sullivan. *Geometric Skinning with Approximate Dual Quaternion Blending.* ACM Transactions on Graphics 27(4), 2008.
+27. Y. Mori, T. Igarashi. *Plushie: An Interactive Design System for Plush Toys.* SIGGRAPH 2007 (a sewn cloth surface inflated by an inner pressure).
 
 Reading order for contributors: [1] → [2] → [3] → [4] → [5] → [7] → [8] → [6].

@@ -40,7 +40,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1608442284;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1317761769;
 
 // Section: executor
 
@@ -4950,6 +4950,36 @@ fn wire__crate__api__library__library_patterns_impl(
         },
     )
 }
+fn wire__crate__api__templates__nearest_size_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "nearest_size",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_body_json = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, crate::api::engine::ApiError>((move || {
+                let output_ok = crate::api::templates::nearest_size(api_body_json)?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
 fn wire__crate__api__templates__project_thumbnail_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -5179,6 +5209,73 @@ fn wire__crate__api__engine__set_ui_adapter_impl(
                 let output_ok = Ok::<_, ()>({
                     crate::api::engine::set_ui_adapter(api_luid);
                 })?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__templates__size_body_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "size_body",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_chart = <String>::sse_decode(&mut deserializer);
+            let api_size = <String>::sse_decode(&mut deserializer);
+            let api_silhouette = <String>::sse_decode(&mut deserializer);
+            let api_height_cm = <Option<f64>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, crate::api::engine::ApiError>((move || {
+                let output_ok = crate::api::templates::size_body(
+                    api_chart,
+                    api_size,
+                    api_silhouette,
+                    api_height_cm,
+                )?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__templates__size_charts_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "size_charts",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            transform_result_sse::<_, crate::api::engine::ApiError>((move || {
+                let output_ok = crate::api::templates::size_charts()?;
                 std::result::Result::Ok(output_ok)
             })())
         },
@@ -6097,11 +6194,11 @@ fn pde_ffi_dispatcher_primary_impl(
         102 => {
             wire__crate__api__projects__import_project_zip_impl(port, ptr, rust_vec_len, data_len)
         }
-        105 => {
+        106 => {
             wire__crate__api__templates__project_thumbnail_impl(port, ptr, rust_vec_len, data_len)
         }
-        112 => wire__crate__api__templates__template_list_impl(port, ptr, rust_vec_len, data_len),
-        113 => {
+        115 => wire__crate__api__templates__template_list_impl(port, ptr, rust_vec_len, data_len),
+        116 => {
             wire__crate__api__templates__template_thumbnail_impl(port, ptr, rust_vec_len, data_len)
         }
         _ => unreachable!(),
@@ -6199,12 +6296,15 @@ fn pde_ffi_dispatcher_sync_impl(
         100 => wire__crate__api__projects__free_project_path_impl(ptr, rust_vec_len, data_len),
         103 => wire__crate__api__library__library_motions_impl(ptr, rust_vec_len, data_len),
         104 => wire__crate__api__library__library_patterns_impl(ptr, rust_vec_len, data_len),
-        106 => wire__crate__api__library__rename_library_motion_impl(ptr, rust_vec_len, data_len),
-        107 => wire__crate__api__library__rename_library_pattern_impl(ptr, rust_vec_len, data_len),
-        108 => wire__crate__api__projects__rename_project_impl(ptr, rust_vec_len, data_len),
-        109 => wire__crate__api__engine__save_agent_extension_impl(ptr, rust_vec_len, data_len),
-        110 => wire__crate__api__library__save_body_preset_impl(ptr, rust_vec_len, data_len),
-        111 => wire__crate__api__engine__set_ui_adapter_impl(ptr, rust_vec_len, data_len),
+        105 => wire__crate__api__templates__nearest_size_impl(ptr, rust_vec_len, data_len),
+        107 => wire__crate__api__library__rename_library_motion_impl(ptr, rust_vec_len, data_len),
+        108 => wire__crate__api__library__rename_library_pattern_impl(ptr, rust_vec_len, data_len),
+        109 => wire__crate__api__projects__rename_project_impl(ptr, rust_vec_len, data_len),
+        110 => wire__crate__api__engine__save_agent_extension_impl(ptr, rust_vec_len, data_len),
+        111 => wire__crate__api__library__save_body_preset_impl(ptr, rust_vec_len, data_len),
+        112 => wire__crate__api__engine__set_ui_adapter_impl(ptr, rust_vec_len, data_len),
+        113 => wire__crate__api__templates__size_body_impl(ptr, rust_vec_len, data_len),
+        114 => wire__crate__api__templates__size_charts_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }

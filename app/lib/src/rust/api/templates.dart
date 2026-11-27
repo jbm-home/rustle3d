@@ -19,6 +19,30 @@ String appVersion() => RustLib.instance.api.crateApiTemplatesAppVersion();
 Future<String> templateList({required String bodyJson}) =>
     RustLib.instance.api.crateApiTemplatesTemplateList(bodyJson: bodyJson);
 
+/// The built-in size charts as the `grading.charts` query gives them,
+/// without a body (`nearest` null): a new project's body is chosen from
+/// them (spec 37).
+String sizeCharts() => RustLib.instance.api.crateApiTemplatesSizeCharts();
+
+/// The body (a `Body` as JSON) of `size` on `chart`, shaped by
+/// `silhouette`, `height_cm` tall when given: the `avatar.size_body`
+/// query.
+String sizeBody({
+  required String chart,
+  required String size,
+  required String silhouette,
+  double? heightCm,
+}) => RustLib.instance.api.crateApiTemplatesSizeBody(
+  chart: chart,
+  size: size,
+  silhouette: silhouette,
+  heightCm: heightCm,
+);
+
+/// The chart and size nearest `body_json` (a `Body`): `{chart, name}`.
+String nearestSize({required String bodyJson}) =>
+    RustLib.instance.api.crateApiTemplatesNearestSize(bodyJson: bodyJson);
+
 /// A PNG picture of `template`'s pattern pieces at default sizes for a
 /// standard body, on the board colours of `colors`.
 Future<Uint8List> templateThumbnail({

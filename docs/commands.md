@@ -482,6 +482,52 @@ Drape on the built-in body again, fitted to the avatar's measurements (those tak
 
 </details>
 
+### `object.set`
+
+Make the project an object rather than a garment worn (a bag, a cushion, a toy): it has no body (the avatar and its measurements are removed), and in 3D it is weightless, so the cloth keeps the shape its seams give it instead of falling in folds; the parts closed all around are stuffed by `stuffing` (0 none – 1 firm, default 0.5; open parts never are). Again on an object, it changes the stuffing. object.clear makes it a garment again.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Make the project an object, or change its stuffing.",
+  "properties": {
+    "stuffing": {
+      "description": "How firmly the parts closed all around are stuffed: 0 none, 1\nfirm. Left out: as it is, or 0.5 for a project becoming an object.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "title": "ObjectSet",
+  "type": "object"
+}
+```
+
+</details>
+
+### `object.clear`
+
+Make an object project a garment worn again: weight comes back in 3D; give it a body with avatar.set.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Make the project a garment worn again.",
+  "title": "ObjectClear",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `panel.create_rect`
 
 Create a rectangular panel. Returns the panel, then its 4 points (counter-clockwise from the origin), then its 4 edges.
@@ -5677,6 +5723,11 @@ Draft a starter garment (t_shirt, shirt, trousers, hoodie, joggers, jeans, short
           "type": "string"
         },
         {
+          "const": "cushion",
+          "description": "A cushion: two rectangles sewn all around, best in an object\nproject (`object.set`), where it is stuffed.",
+          "type": "string"
+        },
+        {
           "const": "sweatshirt",
           "description": "A sweatshirt: the hoodie without its hood.",
           "type": "string"
@@ -7303,7 +7354,7 @@ Read-only. Lengths in mm, areas in mm², rounded to 0.001.
 
 ### `project.summary`
 
-Project name, display unit, the garments (fabric, colour, notes, print), the size range (names, base, shown; null without one), entity counts and a summary of every panel.
+Project name, display unit, the garments (fabric, colour, notes, print), the size range (names, base, shown; null without one), `object` (its stuffing when the project makes an object, null for a garment worn; spec 36), entity counts and a summary of every panel.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -7526,6 +7577,123 @@ Built-in body presets: standard women's and men's sizes, as {name, body} pairs u
 
 </details>
 
+### `avatar.size_body`
+
+The body (for avatar.set) of a size of a built-in chart, shaped by a `silhouette` that keeps its bust and moves its waist and hips: `balanced` (as the chart), `hourglass`, `pear`, `straight`, `round`, `inverted_triangle`, or for children `slim`, `balanced`, `round` (grading.charts lists each chart's); `height_cm` to change its height.
+
+<details><summary>Parameters (JSON schema)</summary>
+
+```json
+{
+  "$defs": {
+    "Silhouette": {
+      "description": "A body's shape at a size: where its waist and hips stand from the\nchart's, which keeps the bust (or the chest). Approximate values from\ngeneral garment-making knowledge.",
+      "oneOf": [
+        {
+          "const": "balanced",
+          "description": "As the chart (a woman's waist 18 cm under the bust, hips 8 over;\na man's waist 12 under the chest, hips 4 over).",
+          "type": "string"
+        },
+        {
+          "const": "hourglass",
+          "description": "A marked waist, the hips as the chart (X).",
+          "type": "string"
+        },
+        {
+          "const": "pear",
+          "description": "Hips fuller than the chart (A).",
+          "type": "string"
+        },
+        {
+          "const": "straight",
+          "description": "Little waist: waist fuller, hips narrower (H).",
+          "type": "string"
+        },
+        {
+          "const": "round",
+          "description": "Fuller at the waist (O).",
+          "type": "string"
+        },
+        {
+          "const": "inverted_triangle",
+          "description": "Narrower hips under a broad chest (V).",
+          "type": "string"
+        },
+        {
+          "const": "slim",
+          "description": "Slimmer all round (a child's chart; an adult's waist and hips).",
+          "type": "string"
+        }
+      ]
+    },
+    "SizeChart": {
+      "description": "A built-in size chart.",
+      "oneOf": [
+        {
+          "const": "women",
+          "description": "European women's sizes 32 to 56 (bust 76–134 cm).",
+          "type": "string"
+        },
+        {
+          "const": "men",
+          "description": "European men's sizes 44 to 60 (chest 88–120 cm).",
+          "type": "string"
+        },
+        {
+          "const": "girls",
+          "description": "Girls' sizes by age, 2 to 14 years (height 92–164 cm).",
+          "type": "string"
+        },
+        {
+          "const": "boys",
+          "description": "Boys' sizes by age, 2 to 14 years (height 92–164 cm).",
+          "type": "string"
+        },
+        {
+          "const": "babies",
+          "description": "Babies' sizes by age in months, 3m to 24m (height 62–88 cm).",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The body of a size of a built-in chart.",
+  "properties": {
+    "chart": {
+      "$ref": "#/$defs/SizeChart",
+      "description": "`women`, `men`, `girls`, `boys` or `babies`."
+    },
+    "height_cm": {
+      "description": "Its height (cm); default the chart's.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "silhouette": {
+      "$ref": "#/$defs/Silhouette",
+      "default": "balanced",
+      "description": "Its shape (default `balanced`, as the chart)."
+    },
+    "size": {
+      "description": "A size of the chart, e.g. \"38\" (grading.charts lists them).",
+      "type": "string"
+    }
+  },
+  "required": [
+    "chart",
+    "size"
+  ],
+  "title": "AvatarSizeBody",
+  "type": "object"
+}
+```
+
+</details>
+
 ### `avatar.check`
 
 Check the imported body before draping: `ready` (no error), triangle and vertex counts, height, units/up axis/turn used, whether the file has a skeleton, `items` (each a stable `code`, a `severity` error/warning/info and `args`: file.unavailable, mesh.open, mesh.non_manifold, mesh.pieces, mesh.heavy, mesh.coarse, mesh.reoriented, mesh.inside_out, mesh.degenerate, scale.height, orientation.up, orientation.facing, points.outside, points.side, measurements.clamped, motion.rig with `source` file or points: what places the skeleton the body moves with) and the arrangement points with their distance to the surface (mm, negative inside). Fails when the avatar has no imported body.
@@ -7682,7 +7850,7 @@ Check the grading in every size of the range: the seams (not gathered) whose two
 
 ### `grading.charts`
 
-The built-in size charts for grading.use_chart: each chart's sizes with their bodies (cm).
+The built-in size charts for grading.use_chart: each chart's sizes with their bodies (cm), the silhouettes it offers (avatar.size_body), and `nearest`: on the chart that dresses the project's avatar, the size nearest its body (null on the others and without an avatar).
 
 <details><summary>Parameters (JSON schema)</summary>
 

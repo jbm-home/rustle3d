@@ -69,7 +69,7 @@ fn summarize(p: &Project, id: PanelId) -> Result<PanelSummary, CommandError> {
 pub struct ProjectSummary {}
 
 impl Described for ProjectSummary {
-    const SUMMARY: &'static str = "Project name, display unit, the garments (fabric, colour, notes, print), the size range (names, base, shown; null without one), entity counts and a summary of every panel.";
+    const SUMMARY: &'static str = "Project name, display unit, the garments (fabric, colour, notes, print), the size range (names, base, shown; null without one), `object` (its stuffing when the project makes an object, null for a garment worn; spec 36), entity counts and a summary of every panel.";
 }
 
 #[derive(Serialize)]
@@ -86,6 +86,7 @@ struct SummaryOut {
     display_unit: DisplayUnit,
     garments: Vec<Value>,
     grading: Value,
+    object: Option<r3d_core::ObjectSetup>,
     counts: Counts,
     panels: Vec<PanelSummary>,
 }
@@ -122,6 +123,7 @@ impl QuerySpec for ProjectSummary {
                     "shown": name(g.shown),
                 })
             }),
+            object: p.object().copied(),
             counts: Counts {
                 garments: p.garments().len(),
                 panels: p.panels().len(),
@@ -535,6 +537,7 @@ impl QuerySpec for AvatarGet {
             return Ok(serde_json::json!({
                 "body": avatar.body,
                 "preset": avatar.preset,
+                "size": nearest_size(&avatar.body),
                 "achieved": avatar.body,
                 "heights_cm": {
                     "waist": cm(r3d_core::BodyPoint::Waist),
@@ -555,6 +558,7 @@ impl QuerySpec for AvatarGet {
         Ok(serde_json::json!({
             "body": avatar.body,
             "preset": avatar.preset,
+            "size": nearest_size(&avatar.body),
             "achieved": {
                 "height_cm": r1(a.height_cm),
                 "bust_cm": r1(a.bust_cm),
@@ -587,6 +591,46 @@ impl QuerySpec for AvatarCheck {
             .and_then(|a| a.mesh.as_ref())
             .ok_or(CommandError::NoImportedBody)?;
         to_value(&crate::bodies::check(mesh))
+    }
+}
+
+/// The chart and size nearest `body`, as `{chart, name}`.
+fn nearest_size(body: &r3d_core::Body) -> Value {
+    let chart = crate::commands::SizeChart::of(body);
+    serde_json::json!({"chart": chart, "name": chart.nearest(body)})
+}
+
+/// The body of a size of a built-in chart.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AvatarSizeBody {
+    /// `women`, `men`, `girls`, `boys` or `babies`.
+    pub chart: crate::commands::SizeChart,
+    /// A size of the chart, e.g. "38" (grading.charts lists them).
+    pub size: String,
+    /// Its shape (default `balanced`, as the chart).
+    #[serde(default)]
+    pub silhouette: crate::commands::Silhouette,
+    /// Its height (cm); default the chart's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height_cm: Option<f64>,
+}
+
+impl Described for AvatarSizeBody {
+    const SUMMARY: &'static str = "The body (for avatar.set) of a size of a built-in chart, shaped by a `silhouette` that keeps its bust and moves its waist and hips: `balanced` (as the chart), `hourglass`, `pear`, `straight`, `round`, `inverted_triangle`, or for children `slim`, `balanced`, `round` (grading.charts lists each chart's); `height_cm` to change its height.";
+}
+
+impl QuerySpec for AvatarSizeBody {
+    fn run(&self, _p: &Project) -> Result<Value, CommandError> {
+        if let Some(h) = self.height_cm {
+            crate::error::finite("height_cm", &[h])?;
+        }
+        let body = self
+            .chart
+            .body(&self.size, self.silhouette, self.height_cm)
+            .ok_or_else(|| CommandError::invalid("size", Invalid::UnknownSize))?;
+        crate::commands::validate_body(&body)?;
+        to_value(&body)
     }
 }
 
@@ -986,12 +1030,13 @@ impl QuerySpec for GradingCheck {
 pub struct GradingCharts {}
 
 impl Described for GradingCharts {
-    const SUMMARY: &'static str = "The built-in size charts for grading.use_chart: each chart's sizes with their bodies (cm).";
+    const SUMMARY: &'static str = "The built-in size charts for grading.use_chart: each chart's sizes with their bodies (cm), the silhouettes it offers (avatar.size_body), and `nearest`: on the chart that dresses the project's avatar, the size nearest its body (null on the others and without an avatar).";
 }
 
 impl QuerySpec for GradingCharts {
-    fn run(&self, _: &Project) -> Result<Value, CommandError> {
+    fn run(&self, p: &Project) -> Result<Value, CommandError> {
         use crate::commands::SizeChart;
+        let body = p.avatar().map(|a| a.body);
         let charts: Vec<Value> = SizeChart::ALL
             .into_iter()
             .map(|c| {
@@ -1000,7 +1045,12 @@ impl QuerySpec for GradingCharts {
                     .into_iter()
                     .map(|(name, body)| serde_json::json!({"name": name, "body": body}))
                     .collect();
-                serde_json::json!({ "chart": c, "sizes": sizes })
+                let nearest = body
+                    .filter(|b| SizeChart::of(b) == c)
+                    .and_then(|b| c.nearest(&b));
+                serde_json::json!({
+                    "chart": c, "sizes": sizes, "silhouettes": c.silhouettes(), "nearest": nearest,
+                })
             })
             .collect();
         Ok(Value::Array(charts))

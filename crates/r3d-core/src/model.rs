@@ -71,6 +71,10 @@ pub struct Project {
     /// How the project's photos are taken (spec 35, v28).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) photo: Option<crate::photo::PhotoSetup>,
+    /// Set when the project makes an object rather than a garment worn:
+    /// no avatar then (spec 36, v30).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) object: Option<crate::object::ObjectSetup>,
 }
 
 /// A relation the drawing keeps between points, edges, notches and
@@ -1062,6 +1066,7 @@ impl Project {
             zippers: IdMap::new(),
             details: IdMap::new(),
             photo: None,
+            object: None,
         }
     }
 
@@ -1076,6 +1081,12 @@ impl Project {
     /// How the project's photos are taken, once set.
     pub fn photo(&self) -> Option<&crate::photo::PhotoSetup> {
         self.photo.as_ref()
+    }
+
+    /// How the object is shown, when the project makes an object rather
+    /// than a garment worn (spec 36).
+    pub fn object(&self) -> Option<&crate::object::ObjectSetup> {
+        self.object.as_ref()
     }
 
     pub fn garments(&self) -> &IdMap<GarmentId, Garment> {

@@ -3274,7 +3274,7 @@ abstract class L {
   /// A step of the undo history, by its command name with dots as underscores.
   ///
   /// In en, this message translates to:
-  /// **'{step, select, pattern_add{Add pattern} project_rename{Rename project} project_set_display_unit{Change units} avatar_set{Change body} avatar_remove{Remove body} panel_create_rect{Add rectangle} panel_create_polygon{Add polygon} panel_create_path{Add curved piece} panel_rename{Rename piece} panel_translate{Move piece} panel_rotate{Rotate piece} panel_scale{Scale piece} panel_set_grain{Set grainline} panel_set_seam_allowance{Set seam allowance} panel_mirror{Mirror piece} panel_unlink{Unlink copy} panel_place{Place piece} panel_delete{Delete piece} panel_cut{Cut piece} panel_paste{Paste} point_move{Move point} point_set_distance{Set distance} point_remove{Remove point} edge_set_curve{Bend edge} edge_split{Add point} edge_move{Move edge} notch_add{Add notch} notch_move{Move notch} notch_remove{Remove notch} internal_line_add{Draw line} internal_line_remove{Remove line} seam_add{Sew} seam_remove{Unsew} seam_flip{Flip seam} seam_set_gathered{Gather seam} edge_lengthen{Lengthen} edge_set_length{Set length} seam_take_in{Take in} seam_match_length{Match lengths} pin_add{Pin} pin_remove{Unpin} garment_set_fabric{Change fabric} garment_arrange{Arrange pieces} garment_set_color{Change colour} garment_add{Add garment} garment_rename{Rename garment} garment_remove{Remove garment} garment_set_layer{Change layer} panel_set_garment{Move to garment} grading_set_sizes{Set sizes} grading_use_chart{Use size chart} grading_clear{Remove sizes} grading_show_size{Show size} point_set_grade{Grade point} template_apply{Add template} pattern_import{Import pattern} batch{Several changes} constraint_add{Add constraint} constraint_remove{Remove constraint} constraint_set_value{Change dimension} point_set_smooth{Smooth point} panel_unfold{Unfold piece} guide_add{Add construction line} guide_move{Move construction line} guide_remove{Remove construction line} panel_create_ellipse{Add ellipse} panel_create_sector{Add circle skirt} edge_set_arc{Make arc} constraint_set_formula{Set formula} variable_set{Set variable} variable_remove{Remove variable} seam_set_ease{Set ease} dart_add{Add dart} pleat_add{Add pleat} panel_add_hole{Cut hole} panel_remove_hole{Fill hole} panel_boolean{Join or cut pieces} other{{step}}}'**
+  /// **'{step, select, pattern_add{Add pattern} project_rename{Rename project} project_set_display_unit{Change units} avatar_set{Change body} avatar_remove{Remove body} panel_create_rect{Add rectangle} panel_create_polygon{Add polygon} panel_create_path{Add curved piece} panel_rename{Rename piece} panel_translate{Move piece} panel_rotate{Rotate piece} panel_scale{Scale piece} panel_set_grain{Set grainline} panel_set_seam_allowance{Set seam allowance} panel_mirror{Mirror piece} panel_unlink{Unlink copy} panel_place{Place piece} panel_delete{Delete piece} panel_cut{Cut piece} panel_paste{Paste} point_move{Move point} point_set_distance{Set distance} point_remove{Remove point} edge_set_curve{Bend edge} edge_split{Add point} edge_move{Move edge} notch_add{Add notch} notch_move{Move notch} notch_remove{Remove notch} internal_line_add{Draw line} internal_line_remove{Remove line} seam_add{Sew} seam_remove{Unsew} seam_flip{Flip seam} seam_set_gathered{Gather seam} edge_lengthen{Lengthen} edge_set_length{Set length} seam_take_in{Take in} seam_match_length{Match lengths} pin_add{Pin} pin_remove{Unpin} garment_set_fabric{Change fabric} garment_arrange{Arrange pieces} garment_set_color{Change colour} garment_add{Add garment} garment_rename{Rename garment} garment_remove{Remove garment} garment_set_layer{Change layer} panel_set_garment{Move to garment} grading_set_sizes{Set sizes} grading_use_chart{Use size chart} grading_clear{Remove sizes} grading_show_size{Show size} point_set_grade{Grade point} template_apply{Add template} pattern_import{Import pattern} batch{Several changes} constraint_add{Add constraint} constraint_remove{Remove constraint} constraint_set_value{Change dimension} point_set_smooth{Smooth point} panel_unfold{Unfold piece} guide_add{Add construction line} guide_move{Move construction line} guide_remove{Remove construction line} panel_create_ellipse{Add ellipse} panel_create_sector{Add circle skirt} edge_set_arc{Make arc} constraint_set_formula{Set formula} variable_set{Set variable} variable_remove{Remove variable} seam_set_ease{Set ease} dart_add{Add dart} pleat_add{Add pleat} panel_add_hole{Cut hole} panel_remove_hole{Fill hole} panel_boolean{Join or cut pieces} object_set{Make an object} object_clear{Wear on a body} other{{step}}}'**
   String stepName(String step);
 
   /// No description provided for @undoStep.
@@ -6690,6 +6690,270 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Baby {months} months'**
   String presetBaby(String months);
+
+  /// No description provided for @newProjectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New project'**
+  String get newProjectTitle;
+
+  /// No description provided for @kindWorn.
+  ///
+  /// In en, this message translates to:
+  /// **'Garment'**
+  String get kindWorn;
+
+  /// No description provided for @kindWornBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Worn: draped on a body'**
+  String get kindWornBlurb;
+
+  /// No description provided for @kindObject.
+  ///
+  /// In en, this message translates to:
+  /// **'Object'**
+  String get kindObject;
+
+  /// No description provided for @kindObjectBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'No body: a bag, a cushion, an accessory'**
+  String get kindObjectBlurb;
+
+  /// No description provided for @garmentSizes.
+  ///
+  /// In en, this message translates to:
+  /// **'Garment measurements'**
+  String get garmentSizes;
+
+  /// No description provided for @templateCushion.
+  ///
+  /// In en, this message translates to:
+  /// **'Cushion'**
+  String get templateCushion;
+
+  /// No description provided for @templateCushionBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Two squares sewn all around, stuffed.'**
+  String get templateCushionBlurb;
+
+  /// No description provided for @sizeYears.
+  ///
+  /// In en, this message translates to:
+  /// **'{age} years'**
+  String sizeYears(String age);
+
+  /// No description provided for @sizeMonths.
+  ///
+  /// In en, this message translates to:
+  /// **'{months} months'**
+  String sizeMonths(String months);
+
+  /// No description provided for @bodySize.
+  ///
+  /// In en, this message translates to:
+  /// **'Size'**
+  String get bodySize;
+
+  /// No description provided for @silhouette.
+  ///
+  /// In en, this message translates to:
+  /// **'Silhouette'**
+  String get silhouette;
+
+  /// No description provided for @silhouetteBalanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard'**
+  String get silhouetteBalanced;
+
+  /// No description provided for @silhouetteBalancedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The size chart\'s proportions'**
+  String get silhouetteBalancedHint;
+
+  /// No description provided for @silhouetteHourglass.
+  ///
+  /// In en, this message translates to:
+  /// **'Hourglass'**
+  String get silhouetteHourglass;
+
+  /// No description provided for @silhouetteHourglassHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A marked waist'**
+  String get silhouetteHourglassHint;
+
+  /// No description provided for @silhouettePear.
+  ///
+  /// In en, this message translates to:
+  /// **'Pear'**
+  String get silhouettePear;
+
+  /// No description provided for @silhouettePearHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Hips fuller than the bust'**
+  String get silhouettePearHint;
+
+  /// No description provided for @silhouetteStraight.
+  ///
+  /// In en, this message translates to:
+  /// **'Straight'**
+  String get silhouetteStraight;
+
+  /// No description provided for @silhouetteStraightHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Little waist, narrower hips'**
+  String get silhouetteStraightHint;
+
+  /// No description provided for @silhouetteRound.
+  ///
+  /// In en, this message translates to:
+  /// **'Round'**
+  String get silhouetteRound;
+
+  /// No description provided for @silhouetteRoundHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fuller at the waist'**
+  String get silhouetteRoundHint;
+
+  /// No description provided for @silhouetteInverted.
+  ///
+  /// In en, this message translates to:
+  /// **'Inverted triangle'**
+  String get silhouetteInverted;
+
+  /// No description provided for @silhouetteInvertedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Narrower hips under a broad chest'**
+  String get silhouetteInvertedHint;
+
+  /// No description provided for @silhouetteSlim.
+  ///
+  /// In en, this message translates to:
+  /// **'Slim'**
+  String get silhouetteSlim;
+
+  /// No description provided for @silhouetteSlimHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Slimmer than the chart for this age'**
+  String get silhouetteSlimHint;
+
+  /// No description provided for @silhouetteSturdy.
+  ///
+  /// In en, this message translates to:
+  /// **'Sturdy'**
+  String get silhouetteSturdy;
+
+  /// No description provided for @silhouetteSturdyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fuller than the chart for this age'**
+  String get silhouetteSturdyHint;
+
+  /// No description provided for @myBodies.
+  ///
+  /// In en, this message translates to:
+  /// **'My bodies'**
+  String get myBodies;
+
+  /// No description provided for @myBodiesTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Start from one of your saved bodies'**
+  String get myBodiesTip;
+
+  /// No description provided for @chartMeasurements.
+  ///
+  /// In en, this message translates to:
+  /// **'The {chart} size chart\'s measurements: change them if you like.'**
+  String chartMeasurements(String chart);
+
+  /// No description provided for @typedMeasurements.
+  ///
+  /// In en, this message translates to:
+  /// **'Your measurements.'**
+  String get typedMeasurements;
+
+  /// No description provided for @typedNearestSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Your measurements make a size {size}.'**
+  String typedNearestSize(String size);
+
+  /// No description provided for @nearestSizeOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Nearest size: {size} ({chart})'**
+  String nearestSizeOn(String size, String chart);
+
+  /// No description provided for @stuffing.
+  ///
+  /// In en, this message translates to:
+  /// **'Stuffing'**
+  String get stuffing;
+
+  /// No description provided for @stuffingNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get stuffingNone;
+
+  /// No description provided for @stuffingFirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Firm'**
+  String get stuffingFirm;
+
+  /// No description provided for @stuffingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Only parts closed all around are stuffed (a cushion, a toy); an open bag keeps the shape of its seams.'**
+  String get stuffingHint;
+
+  /// No description provided for @objectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Object'**
+  String get objectTitle;
+
+  /// No description provided for @objectSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No body: in 3D the object floats without weight, in the shape its seams give it.'**
+  String get objectSubtitle;
+
+  /// No description provided for @objectWear.
+  ///
+  /// In en, this message translates to:
+  /// **'Wear it on a body'**
+  String get objectWear;
+
+  /// No description provided for @objectMade.
+  ///
+  /// In en, this message translates to:
+  /// **'The project is now an object: no body, no weight in 3D.'**
+  String get objectMade;
+
+  /// No description provided for @bodyMenuObject.
+  ///
+  /// In en, this message translates to:
+  /// **'Make it an object (no body)'**
+  String get bodyMenuObject;
+
+  /// No description provided for @errObject.
+  ///
+  /// In en, this message translates to:
+  /// **'This project is an object, without a body: wear it on a body first.'**
+  String get errObject;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

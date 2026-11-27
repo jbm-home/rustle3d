@@ -111,6 +111,129 @@ impl SizeChart {
             SizeChart::Babies => Children::Babies.sizes(),
         }
     }
+
+    /// The chart that dresses `body`: by its age and masculinity (the
+    /// babies' chart is for either, at 0.5; it ends at 2 years, where
+    /// the girls' and boys' start).
+    pub fn of(body: &Body) -> SizeChart {
+        let masculine = body.masculinity >= 0.5;
+        let either = (body.masculinity - 0.5).abs() < 0.01;
+        match body.age_years {
+            Some(age) if age < 2.0 || (age <= 2.0 && either) => SizeChart::Babies,
+            Some(_) if masculine => SizeChart::Boys,
+            Some(_) => SizeChart::Girls,
+            None if masculine => SizeChart::Men,
+            None => SizeChart::Women,
+        }
+    }
+
+    /// The size nearest `body`: an adult's by its bust (the chest), as
+    /// charts size them, then by its waist and hips; a child's by its
+    /// height (its age). Of two as near, the smaller.
+    pub fn nearest(self, body: &Body) -> Option<String> {
+        let gap = |b: &Body| match self {
+            SizeChart::Women | SizeChart::Men => (
+                (b.bust_cm - body.bust_cm).abs(),
+                (b.waist_cm - body.waist_cm).abs() + (b.hips_cm - body.hips_cm).abs(),
+            ),
+            _ => ((b.height_cm - body.height_cm).abs(), 0.0),
+        };
+        self.sizes()
+            .into_iter()
+            .fold(None::<(String, (f64, f64))>, |best, (name, b)| match best {
+                Some((_, d)) if d <= gap(&b) => best,
+                _ => Some((name, gap(&b))),
+            })
+            .map(|(name, _)| name)
+    }
+
+    /// The silhouettes offered on this chart, the chart's own first
+    /// (children's from slim to round).
+    pub fn silhouettes(self) -> &'static [Silhouette] {
+        use Silhouette::*;
+        match self {
+            SizeChart::Women => &[Balanced, Hourglass, Pear, Straight, Round, InvertedTriangle],
+            SizeChart::Men => &[Balanced, InvertedTriangle, Straight, Round],
+            _ => &[Slim, Balanced, Round],
+        }
+    }
+
+    /// The body of size `name` shaped as `silhouette`, `height_cm` tall
+    /// when given (else the chart's).
+    pub fn body(self, name: &str, silhouette: Silhouette, height_cm: Option<f64>) -> Option<Body> {
+        let (_, mut body) = self.sizes().into_iter().find(|(n, _)| n == name.trim())?;
+        match self {
+            SizeChart::Women | SizeChart::Men => {
+                let (waist, hips) = silhouette.offsets_cm(self == SizeChart::Men);
+                body.waist_cm += waist;
+                body.hips_cm += hips;
+            }
+            _ => {
+                let k = silhouette.children_scale();
+                let half = |v: f64| (v * k * 2.0).round() / 2.0;
+                body.bust_cm = half(body.bust_cm);
+                body.waist_cm = half(body.waist_cm);
+                body.hips_cm = half(body.hips_cm);
+            }
+        }
+        if let Some(h) = height_cm {
+            body.height_cm = h;
+        }
+        Some(body)
+    }
+}
+
+/// A body's shape at a size: where its waist and hips stand from the
+/// chart's, which keeps the bust (or the chest). Approximate values from
+/// general garment-making knowledge.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Silhouette {
+    /// As the chart (a woman's waist 18 cm under the bust, hips 8 over;
+    /// a man's waist 12 under the chest, hips 4 over).
+    #[default]
+    Balanced,
+    /// A marked waist, the hips as the chart (X).
+    Hourglass,
+    /// Hips fuller than the chart (A).
+    Pear,
+    /// Little waist: waist fuller, hips narrower (H).
+    Straight,
+    /// Fuller at the waist (O).
+    Round,
+    /// Narrower hips under a broad chest (V).
+    InvertedTriangle,
+    /// Slimmer all round (a child's chart; an adult's waist and hips).
+    Slim,
+}
+
+impl Silhouette {
+    /// What it adds to an adult's waist and hips (cm).
+    fn offsets_cm(self, man: bool) -> (f64, f64) {
+        match (self, man) {
+            (Silhouette::Balanced, _) => (0.0, 0.0),
+            (Silhouette::Hourglass, false) => (-6.0, 0.0),
+            (Silhouette::Hourglass, true) => (-4.0, 2.0),
+            (Silhouette::Pear, false) => (0.0, 6.0),
+            (Silhouette::Pear, true) => (2.0, 5.0),
+            (Silhouette::Straight, false) => (6.0, -4.0),
+            (Silhouette::Straight, true) => (4.0, -2.0),
+            (Silhouette::Round, false) => (12.0, 2.0),
+            (Silhouette::Round, true) => (12.0, 4.0),
+            (Silhouette::InvertedTriangle, false) => (0.0, -6.0),
+            (Silhouette::InvertedTriangle, true) => (-6.0, -3.0),
+            (Silhouette::Slim, _) => (-4.0, -4.0),
+        }
+    }
+
+    /// What a child's girths are multiplied by.
+    fn children_scale(self) -> f64 {
+        match self {
+            Silhouette::Slim => 0.93,
+            Silhouette::Round => 1.08,
+            _ => 1.0,
+        }
+    }
 }
 
 /// The project's size range, or an error saying there is none.
@@ -432,6 +555,7 @@ impl CommandSpec for GradingUseChart {
             .get(base)
             .ok_or_else(|| CommandError::invalid("base", Invalid::UnknownSize))?;
         if tx.project().avatar().is_none() {
+            super::object::wearable(tx, "chart")?;
             tx.set_avatar(Some(Avatar {
                 body: *base_body,
                 preset: None,
@@ -629,5 +753,48 @@ mod tests {
         let women = SizeChart::Women.sizes();
         let bust = |n: &str| women.iter().find(|(s, _)| s == n).unwrap().1.bust_cm;
         assert_eq!((bust("36"), bust("46"), bust("52")), (84.0, 104.0, 122.0));
+    }
+
+    #[test]
+    fn a_body_finds_its_size_and_a_size_its_body() {
+        for chart in SizeChart::ALL {
+            for (name, body) in chart.sizes() {
+                assert_eq!(SizeChart::of(&body), chart, "{name}");
+                assert_eq!(chart.nearest(&body).as_deref(), Some(name.as_str()));
+                for s in chart.silhouettes() {
+                    let shaped = chart.body(&name, *s, None).unwrap();
+                    validate_body(&shaped).unwrap();
+                    // A silhouette keeps the size.
+                    assert_eq!(
+                        chart.nearest(&shaped).as_deref(),
+                        Some(name.as_str()),
+                        "{s:?}"
+                    );
+                }
+            }
+        }
+        // The standard women's M (bust 90, waist 73, hips 98) is a 40,
+        // not the middle of the chart (44).
+        let m = Body {
+            masculinity: 0.0,
+            height_cm: 168.0,
+            bust_cm: 90.0,
+            waist_cm: 73.0,
+            hips_cm: 98.0,
+            age_years: None,
+        };
+        assert_eq!(SizeChart::Women.nearest(&m).as_deref(), Some("40"));
+        let pear = SizeChart::Women
+            .body("38", Silhouette::Pear, Some(160.0))
+            .unwrap();
+        assert_eq!(
+            (pear.height_cm, pear.bust_cm, pear.waist_cm, pear.hips_cm),
+            (160.0, 88.0, 70.0, 102.0)
+        );
+        assert!(
+            SizeChart::Women
+                .body("37", Silhouette::Balanced, None)
+                .is_none()
+        );
     }
 }

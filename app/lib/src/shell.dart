@@ -18,6 +18,7 @@ import 'design/tokens.dart';
 import 'i18n.dart';
 import 'learn.dart';
 import 'motion_library.dart';
+import 'object_panel.dart';
 import 'pattern_library.dart';
 import 'photo.dart';
 import 'projector.dart';
@@ -283,6 +284,38 @@ class _ShellState extends State<Shell> {
 
   void _showBodyCheck() => showBodyCheck(context, widget.engine, _refresh);
 
+  /// The standard body new projects start with (a garment again).
+  Map<String, dynamic> _standardBody() =>
+      (jsonDecode(bodyPresets(libraryDir: widget.libraryDir)) as List)
+          .cast<Map<String, dynamic>>()
+          .firstWhere((p) => p['name'] == 'Women M');
+
+  /// An object project's stuffing (docs/specs/36-objects.md), null for a
+  /// garment worn.
+  double? get _stuffing =>
+      ((_summary['object'] as Map?)?['stuffing'] as num?)?.toDouble();
+
+  void _showObject() => showObjectPanel(
+    context,
+    widget.engine,
+    _standardBody(),
+    _stuffing ?? 0.5,
+    _refresh,
+  );
+
+  /// Make the project an object: its body goes, the 3D view shows it
+  /// weightless (one undo step).
+  void _makeObject() {
+    try {
+      widget.engine.run(stepJson: '{"type":"object.set"}');
+    } on ApiError catch (e) {
+      _toast(context.error(e));
+      return;
+    }
+    _refresh();
+    _toast(context.l.objectMade);
+  }
+
   /// "The body has things to check", with a way to the check.
   void _bodyNotice() {
     final l = context.l;
@@ -301,11 +334,16 @@ class _ShellState extends State<Shell> {
   }
 
   /// The Body menu: `measurements`, `import`, `check`, `points` (show or
-  /// hide the arrangement points) or `builtin`.
+  /// hide the arrangement points), `builtin`, `object` (make the project
+  /// an object, without a body); `object_panel` opens an object's panel.
   void _onBodyMenu(String choice) {
     switch (choice) {
       case 'measurements':
         _showBody();
+      case 'object':
+        _makeObject();
+      case 'object_panel':
+        _showObject();
       case 'import':
         _importBody();
       case 'check':
@@ -2621,6 +2659,7 @@ class _ShellState extends State<Shell> {
                 onRedo: _redo,
                 onGoTo: _goToStep,
                 onBody: _onBodyMenu,
+                object: _stuffing != null,
                 bodyCheck: _bodyCheck,
                 showPoints: _showPoints,
                 onExport: _export,
@@ -3102,6 +3141,7 @@ class _TopBar extends StatelessWidget {
     required this.onGoTo,
     required this.onRedo,
     required this.onBody,
+    required this.object,
     required this.bodyCheck,
     required this.showPoints,
     required this.onExport,
@@ -3132,6 +3172,10 @@ class _TopBar extends StatelessWidget {
 
   /// A choice of the Body menu (see `_onBodyMenu`).
   final ValueChanged<String> onBody;
+
+  /// The project makes an object: an Object button stands where the Body
+  /// menu was.
+  final bool object;
 
   /// The imported body's check; `null` with the built-in body.
   final Map<String, dynamic>? bodyCheck;
@@ -3214,12 +3258,20 @@ class _TopBar extends StatelessWidget {
               icon: const Icon(Icons.collections_bookmark_outlined, size: 18),
               label: Text(l.libraryManage),
             ),
-            _BodyMenu(
-              key: bodyKey,
-              check: bodyCheck,
-              showPoints: showPoints,
-              onChoice: onBody,
-            ),
+            if (object)
+              TextButton.icon(
+                key: bodyKey,
+                onPressed: () => onBody('object_panel'),
+                icon: const Icon(Icons.view_in_ar_outlined, size: 18),
+                label: Text(l.objectTitle),
+              )
+            else
+              _BodyMenu(
+                key: bodyKey,
+                check: bodyCheck,
+                showPoints: showPoints,
+                onChoice: onBody,
+              ),
             _AgentButton(status: agent, onOpen: onAgents),
             Tooltip(
               message: l.importTip,
@@ -3358,6 +3410,11 @@ class _BodyMenu extends StatelessWidget {
           key: const Key('bodyMenuImport'),
           value: 'import',
           child: Text(l.bodyMenuImport),
+        ),
+        PopupMenuItem(
+          key: const Key('bodyMenuObject'),
+          value: 'object',
+          child: Text(l.bodyMenuObject),
         ),
         if (imported) ...[
           const PopupMenuDivider(),
@@ -7168,11 +7225,18 @@ class _SizeChartDialogState extends State<_SizeChartDialog> {
     final sizes = [
       for (final s in (current?['sizes'] as List?) ?? const []) s as String,
     ];
+    // The range in use; else the chart dressing the body, around its
+    // size.
     final chart = widget.charts
         .map((c) => c['chart'] as String)
         .firstWhere(
           (c) => sizes.isNotEmpty && sizes.every(_names(c).contains),
-          orElse: () => widget.charts.first['chart'] as String,
+          orElse: () =>
+              (widget.charts.firstWhere(
+                    (c) => c['nearest'] != null,
+                    orElse: () => widget.charts.first,
+                  ) as Map)['chart']
+                  as String,
         );
     _choose(chart);
     if (sizes.isNotEmpty && _names(chart).contains(sizes.first)) {
@@ -7182,14 +7246,20 @@ class _SizeChartDialogState extends State<_SizeChartDialog> {
     }
   }
 
-  /// Switch to [chart], with a range around its middle.
+  /// Switch to [chart], with a range around the body's size on it (the
+  /// size nearest the body's measurements), else around its middle.
   void _choose(String chart) {
     final names = _names(chart);
     _chart = chart;
-    final mid = names.length ~/ 2;
-    _from = names[(mid - 2).clamp(0, names.length - 1)];
-    _to = names[(mid + 4).clamp(0, names.length - 1)];
-    _base = names[mid];
+    final nearest =
+        widget.charts.firstWhere((c) => c['chart'] == chart)['nearest']
+            as String?;
+    final base = nearest != null && names.contains(nearest)
+        ? names.indexOf(nearest)
+        : names.length ~/ 2;
+    _from = names[(base - 2).clamp(0, names.length - 1)];
+    _to = names[(base + 3).clamp(0, names.length - 1)];
+    _base = names[base];
   }
 
   @override

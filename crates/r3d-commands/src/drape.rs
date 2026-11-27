@@ -57,6 +57,10 @@ const BODY_VOXEL: f32 = 0.005;
 const DEFAULT_HEIGHT_M: f32 = 1.68;
 /// Body radius assumed when there is no avatar (m).
 const DEFAULT_BODY_RADIUS_M: f32 = 0.16;
+/// An object's stuffing pressure at full stuffing (Pa): a 40 cm cotton
+/// cushion half stuffed swells about 15 cm thick, its cloth stretched
+/// well under 1 % (docs/physics.md, "Objects").
+const FULL_STUFFING_PA: f64 = 400.0;
 
 /// A built simulation scene.
 #[derive(Debug, Clone)]
@@ -1986,9 +1990,14 @@ pub fn build(
         })
         .collect();
 
+    // An object floats where it was laid, weightless, its closed parts
+    // stuffed (spec 36).
+    let object = project.object();
     let mut scene = SimScene {
         fabrics,
-        ground: true,
+        ground: object.is_none(),
+        weightless: object.is_some(),
+        pressure: object.map_or(0.0, |o| (o.stuffing * FULL_STUFFING_PA) as f32),
         ..SimScene::default()
     };
     let mut pieces = Vec::new();

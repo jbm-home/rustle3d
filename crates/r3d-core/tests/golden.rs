@@ -13,10 +13,10 @@ use glam::DVec2;
 use r3d_core::file::{self, SCHEMA_VERSION};
 use r3d_core::{
     Along, Around, Avatar, AvatarMesh, Body, BodyPoint, Button, Buttonhole, Constraint, Edge,
-    EdgeCurve, EdgeEnd, Fabric, FabricDetails, Garment, Grading, Guide, InternalLine, Notch, Panel,
-    PathSegment, PatternSource, PhotoCamera, PhotoLight, PhotoSetup, Pin, Placement, Point, Print,
-    PrintPlacement, PrintSource, Project, Seam, SeamSide, Size, SourcePiece, Symmetry, TemplateRef,
-    Transaction, UpAxis, Zipper,
+    EdgeCurve, EdgeEnd, Fabric, FabricDetails, Garment, Grading, Guide, InternalLine, Notch,
+    ObjectSetup, Panel, PathSegment, PatternSource, PhotoCamera, PhotoLight, PhotoSetup, Pin,
+    Placement, Point, Print, PrintPlacement, PrintSource, Project, Seam, SeamSide, Size,
+    SourcePiece, Symmetry, TemplateRef, Transaction, UpAxis, Zipper,
 };
 use r3d_core::{
     Detail, Elastic, Interfacing, InterfacingArea, InterfacingFabric, InterfacingWeight,
@@ -512,20 +512,31 @@ fn sample() -> Project {
     p
 }
 
+/// A project that makes an object rather than a garment worn (v30): no
+/// avatar, a stuffing.
+fn object_sample() -> Project {
+    let mut p = Project::new("Golden object");
+    let mut tx = Transaction::begin(&mut p);
+    tx.set_object(Some(ObjectSetup { stuffing: 0.7 }));
+    tx.commit();
+    p
+}
+
 #[test]
 fn current_version_matches_golden() {
-    let project = sample();
-    project.check_integrity().unwrap();
-    let json = file::to_json(&project).unwrap();
-    let path = golden_dir(SCHEMA_VERSION).join("sample.json");
-    if std::env::var_os("UPDATE_GOLDEN").is_some() {
-        fs::write(&path, &json).unwrap();
+    for (name, project) in [("sample.json", sample()), ("object.json", object_sample())] {
+        project.check_integrity().unwrap();
+        let json = file::to_json(&project).unwrap();
+        let path = golden_dir(SCHEMA_VERSION).join(name);
+        if std::env::var_os("UPDATE_GOLDEN").is_some() {
+            fs::write(&path, &json).unwrap();
+        }
+        let expected = fs::read_to_string(&path).unwrap();
+        assert_eq!(
+            json, expected,
+            "golden file {name} differs; run with UPDATE_GOLDEN=1 if intended"
+        );
     }
-    let expected = fs::read_to_string(&path).unwrap();
-    assert_eq!(
-        json, expected,
-        "golden file differs; run with UPDATE_GOLDEN=1 if intended"
-    );
 }
 
 #[test]

@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'body_picker.dart' show nearestSizeText;
 import 'busy.dart';
 import 'design/tokens.dart';
 import 'i18n.dart';
@@ -278,6 +279,23 @@ class _BodyPanelState extends State<_BodyPanel> {
     });
   }
 
+  /// The size the fields make on their chart ("40 (Woman)"), none while
+  /// one is not a number.
+  String? _nearestText(L l) {
+    final body = <String, Object>{'masculinity': _masculinity};
+    for (final e in _fields.entries) {
+      final v = double.tryParse(e.value.text.replaceAll(',', '.'));
+      if (v == null) return null;
+      body[e.key] = v;
+    }
+    if (_child) {
+      final age = double.tryParse(_age.text.replaceAll(',', '.'));
+      if (age == null) return null;
+      body['age_years'] = age;
+    }
+    return nearestSizeText(l, body);
+  }
+
   bool get _isCustom =>
       _presets.any((p) => p['name'] == _preset && p['builtin'] == false);
 
@@ -430,6 +448,14 @@ class _BodyPanelState extends State<_BodyPanel> {
                 ),
             ],
           ),
+          if (_nearestText(l) case final size?) ...[
+            const SizedBox(height: Space.s),
+            Text(
+              size,
+              key: const Key('bodyNearestSize'),
+              style: ts(fontSize: 12.5, color: p.textMuted),
+            ),
+          ],
           if (_error != null) ...[
             const SizedBox(height: Space.m),
             Text(_error!, style: ts(fontSize: 13, color: p.danger)),

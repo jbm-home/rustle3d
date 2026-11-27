@@ -46,6 +46,8 @@ pub enum IntegrityError {
     BadVariables,
     #[error("the photo setup has an out-of-range value")]
     BadPhoto,
+    #[error("the object setup has an out-of-range value, or the object project has an avatar")]
+    BadObject,
 }
 
 impl Localizable for IntegrityError {
@@ -87,6 +89,7 @@ impl Localizable for IntegrityError {
             Self::BadGrading => Message::new("integrity.bad_grading", text),
             Self::BadVariables => Message::new("integrity.bad_variables", text),
             Self::BadPhoto => Message::new("integrity.bad_photo", text),
+            Self::BadObject => Message::new("integrity.bad_object", text),
             Self::BadGrade { entity } => {
                 Message::new("integrity.bad_grade", text).arg("entity", entity)
             }
@@ -250,6 +253,11 @@ impl Project {
             .is_some_and(|p| p.check_numbers().is_err())
         {
             return Err(E::BadPhoto);
+        }
+        if let Some(o) = &self.object
+            && (!o.valid() || self.avatar.is_some())
+        {
+            return Err(E::BadObject);
         }
         let ids = self
             .garments

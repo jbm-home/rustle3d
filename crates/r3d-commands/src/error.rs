@@ -90,6 +90,10 @@ pub enum Invalid {
     WithMotion,
     #[error("needs a body: set the avatar first (avatar.set)")]
     NoBody,
+    #[error(
+        "cannot be set: the project makes an object, which has no body (object.clear makes it a garment)"
+    )]
+    Object,
     #[error("is missing a measurement our bodies need (height, bust_circ, waist_circ, hip_circ)")]
     MissingMeasurement,
     #[error("already has an elastic there")]
@@ -145,6 +149,7 @@ impl Invalid {
             Invalid::TextureSize => "invalid.texture_size",
             Invalid::WithMotion => "invalid.with_motion",
             Invalid::NoBody => "invalid.no_body",
+            Invalid::Object => "invalid.object",
             Invalid::MissingMeasurement => "invalid.missing_measurement",
             Invalid::HasElastic => "invalid.has_elastic",
             Invalid::OtherKind => "invalid.other_kind",

@@ -65,6 +65,9 @@ pub enum Template {
     Dress,
     /// A tote bag: two rectangles with handles, hanging from two pins.
     ToteBag,
+    /// A cushion: two rectangles sewn all around, best in an object
+    /// project (`object.set`), where it is stuffed.
+    Cushion,
     /// A sweatshirt: the hoodie without its hood.
     Sweatshirt,
     /// A baby's bodysuit in jersey: the T-shirt's block going on under
@@ -85,7 +88,7 @@ pub enum Template {
 }
 
 impl Template {
-    pub const ALL: [Template; 17] = [
+    pub const ALL: [Template; 18] = [
         Template::TShirt,
         Template::Shirt,
         Template::Trousers,
@@ -97,6 +100,7 @@ impl Template {
         Template::StraightSkirt,
         Template::ALineSkirt,
         Template::ToteBag,
+        Template::Cushion,
         Template::Sweatshirt,
         Template::Bodysuit,
         Template::Pyjama,
@@ -121,6 +125,7 @@ impl Template {
             Template::StraightSkirt => "straight_skirt",
             Template::ALineSkirt => "a_line_skirt",
             Template::ToteBag => "tote_bag",
+            Template::Cushion => "cushion",
             Template::TShirt => "t_shirt",
             Template::Shirt => "shirt",
             Template::Trousers => "trousers",
@@ -150,7 +155,7 @@ impl Template {
             Template::Dress | Template::StraightSkirt | Template::ALineSkirt => {
                 PatternKind::DressesAndSkirts
             }
-            Template::ToteBag => PatternKind::Accessories,
+            Template::ToteBag | Template::Cushion => PatternKind::Accessories,
             Template::Bodysuit
             | Template::Pyjama
             | Template::PyjamaTop
@@ -165,6 +170,7 @@ impl Template {
             Template::StraightSkirt => "Straight skirt",
             Template::ALineSkirt => "A-line skirt",
             Template::ToteBag => "Tote bag",
+            Template::Cushion => "Cushion",
             Template::TShirt => "T-shirt",
             Template::Shirt => "Shirt",
             Template::Trousers => "Trousers",
@@ -198,7 +204,7 @@ impl Template {
             | Template::Sweatshirt
             | Template::PyjamaTop => &["chest_cm", "length_cm", "sleeve_cm", "ease_cm"],
             Template::Dress => &["chest_cm", "waist_cm", "hips_cm", "length_cm", "ease_cm"],
-            Template::ToteBag => &["width_cm", "length_cm"],
+            Template::ToteBag | Template::Cushion => &["width_cm", "length_cm"],
             Template::Bodysuit => &["chest_cm", "hips_cm", "length_cm", "sleeve_cm", "ease_cm"],
             Template::Pyjama | Template::JoggingSuit => &[
                 "chest_cm",
@@ -441,7 +447,7 @@ impl Sizes {
             Template::TShirt => (0.39 * h, 10.0),
             Template::Shirt => (0.43 * h, 12.0),
             Template::Dress => (0.55 * h, 8.0),
-            Template::ToteBag => (40.0, 0.0),
+            Template::ToteBag | Template::Cushion => (40.0, 0.0),
             // From the neck (where the top starts, lifted) down under the
             // crotch.
             Template::Bodysuit => (torso + TOP_LIFT_CM + 2.0, 6.0),
@@ -463,7 +469,10 @@ impl Sizes {
             hips_cm: Some(self.hips_cm.unwrap_or(body.hips_cm)),
             chest_cm: Some(self.chest_cm.unwrap_or(body.bust_cm)),
             length_cm: Some(self.length_cm.unwrap_or(round1(length))),
-            width_cm: Some(self.width_cm.unwrap_or(38.0)),
+            width_cm: Some(self.width_cm.unwrap_or(match template {
+                Template::Cushion => 40.0,
+                _ => 38.0,
+            })),
             sleeve_cm: Some(self.sleeve_cm.unwrap_or(round1(sleeve))),
             ease_cm: Some(self.ease_cm.unwrap_or(ease)),
         };
@@ -1533,6 +1542,7 @@ fn draft_in(
         Template::Shorts => trousers(&mut d, &sizes, &avatar, Legs::Shorts)?,
         Template::Dress => dress(&mut d, &sizes, &avatar.body)?,
         Template::ToteBag => tote_bag(&mut d, &sizes)?,
+        Template::Cushion => cushion(&mut d, &sizes)?,
     }
     let fabric = match template {
         Template::TShirt
@@ -3070,6 +3080,35 @@ fn dress(d: &mut Draft, s: &Sizes, body: &Body) -> Result<(), CommandError> {
     }
     d.place(&front, Around::Body, 0.0, neck_height + TOP_LIFT_CM)?;
     d.place(&back, Around::Body, 180.0, neck_height + TOP_LIFT_CM)?;
+    Ok(())
+}
+
+/// A cushion's middle stands this high (cm), its two faces this far from
+/// its middle when it starts (mm).
+const CUSHION_MIDDLE_CM: f64 = 100.0;
+const CUSHION_FACES_MM: f64 = 20.0;
+
+/// A cushion: front and back alike, two rectangles facing out, sewn all
+/// around. In an object project it floats, stuffed (spec 36).
+fn cushion(d: &mut Draft, s: &Sizes) -> Result<(), CommandError> {
+    let w = mm("width_cm", s.width_cm)? / 2.0;
+    let h = mm("length_cm", s.length_cm)?;
+    let outline = [
+        (p(-w, 0.0), None),
+        (p(w, 0.0), None),
+        (p(w, h), None),
+        (p(-w, h), None),
+    ];
+    let front = d.panel("Front", &outline)?;
+    let back = d.panel("Back", &outline)?;
+    // Edges: 0 bottom, 1 right, 2 top, 3 left; facing each other, the
+    // front's right meets the back's left.
+    for (f, b) in [(0, 0), (1, 3), (2, 2), (3, 1)] {
+        d.sew(front.edge(f)?, back.edge(b)?)?;
+    }
+    let top = CUSHION_MIDDLE_CM + h / 20.0;
+    d.place_at(&front, Around::Flat, 0.0, top, CUSHION_FACES_MM, None)?;
+    d.place_at(&back, Around::Flat, 180.0, top, CUSHION_FACES_MM, None)?;
     Ok(())
 }
 

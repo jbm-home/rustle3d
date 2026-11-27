@@ -143,6 +143,7 @@ extension Messages on BuildContext {
       'invalid.duplicate_name' => l.errDuplicateName,
       'invalid.body_out_of_range' => l.errBodyOutOfRange,
       'invalid.base_offset' => l.errBaseOffset,
+      'invalid.object' => l.errObject,
       'derived' => l.errDerived,
       'constraints_unsolvable' => l.errUnsolvable,
       'invalid.symmetric' => l.errSymmetric,

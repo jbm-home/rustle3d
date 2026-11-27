@@ -877,7 +877,8 @@ pub fn regrade_needed(project: &Project, changes: &[Change]) -> bool {
             | Change::Detail(_)
             | Change::Name { .. }
             | Change::DisplayUnit { .. }
-            | Change::Photo { .. } => false,
+            | Change::Photo { .. }
+            | Change::Object { .. } => false,
         };
         if regrade {
             return true;

@@ -12,6 +12,7 @@ use crate::layers::LayerContact;
 use crate::motion::BodyMotion;
 use crate::scene::SimScene;
 use crate::selfcollide::SelfContact;
+use crate::solver::{WEIGHTLESS_DAMPING, WEIGHTLESS_INERTIA};
 
 /// Strain-based membrane on one triangle (Müller et al. 2014): stretch
 /// `|F·u| − 1`, `|F·v| − 1` and shear `F·u · F·v` in the material frame.
@@ -113,6 +114,13 @@ pub struct Model {
     /// How the body moves, if it does (only with a collider).
     pub motion: Option<BodyMotion>,
     pub ground: bool,
+    /// No gravity ([`SimScene::weightless`]).
+    pub weightless: bool,
+    /// The stuffing's pressure (Pa, [`SimScene::pressure`]).
+    pub pressure: f32,
+    /// Per cloth triangle (in `layers.triangles` order): whether the
+    /// pressure pushes it, i.e. it lies on cloth closed all around.
+    pub inflated: Vec<bool>,
 }
 
 impl Model {
@@ -273,6 +281,14 @@ impl Model {
             }
         }
 
+        if scene.weightless {
+            for m in &mut mass {
+                *m *= WEIGHTLESS_INERTIA;
+            }
+            for d in &mut damping {
+                *d = d.max(WEIGHTLESS_DAMPING);
+            }
+        }
         let inv_mass = scene
             .particles
             .iter()
@@ -330,6 +346,11 @@ impl Model {
             longest,
             thickness.iter().copied().fold(0.0, f32::max),
         );
+        let inflated = if scene.pressure > 0.0 {
+            closed(n, &corners, &ties, &layers.free)
+        } else {
+            vec![false; corners.len()]
+        };
         let self_contact =
             SelfContact::new(&rest_positions, &corners, &ties, &overlaps, &layers.garment);
         layers.sewn = self_contact.sewn.clone();
@@ -351,6 +372,62 @@ impl Model {
             motion: scene.motion.filter(|_| scene.collider.is_some()),
             collider: scene.collider,
             ground: scene.ground,
+            weightless: scene.weightless,
+            pressure: scene.pressure.max(0.0),
+            inflated,
         }
     }
+}
+
+/// Per triangle of `corners` (over `n` particles, joined by `ties`, with
+/// [`LayerContact::free`] edges `free`): whether it lies on a piece of
+/// cloth closed all around, its pieces joined by seams and closures with
+/// no free edge left. Only those are stuffed: an open part pushed on all
+/// its faces but its mouth would drift away (docs/physics.md, "Objects").
+fn closed(n: usize, corners: &[[u32; 3]], ties: &[[u32; 2]], free: &[u8]) -> Vec<bool> {
+    let mut parent: Vec<u32> = (0..n as u32).collect();
+    fn root(parent: &mut [u32], mut i: u32) -> u32 {
+        while let Some(&p) = parent.get(i as usize) {
+            if p == i {
+                break;
+            }
+            // Path halving.
+            let up = parent.get(p as usize).copied().unwrap_or(p);
+            if let Some(slot) = parent.get_mut(i as usize) {
+                *slot = up;
+            }
+            i = up;
+        }
+        i
+    }
+    let join = |parent: &mut Vec<u32>, a: u32, b: u32| {
+        let (ra, rb) = (root(parent, a), root(parent, b));
+        if let Some(slot) = parent.get_mut(ra as usize) {
+            *slot = rb;
+        }
+    };
+    for t in corners {
+        join(&mut parent, t[0], t[1]);
+        join(&mut parent, t[1], t[2]);
+    }
+    for [a, b] in ties {
+        join(&mut parent, *a, *b);
+    }
+    let edges = (1u8 << 3) - 1;
+    let mut open = vec![false; n];
+    for (t, bits) in corners.iter().zip(free) {
+        if bits & edges != 0 {
+            let r = root(&mut parent, t[0]);
+            if let Some(o) = open.get_mut(r as usize) {
+                *o = true;
+            }
+        }
+    }
+    corners
+        .iter()
+        .map(|t| {
+            let r = root(&mut parent, t[0]);
+            !open.get(r as usize).copied().unwrap_or(true)
+        })
+        .collect()
 }

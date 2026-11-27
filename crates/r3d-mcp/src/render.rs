@@ -498,16 +498,26 @@ impl Dressed {
     }
 }
 
-/// A camera on the garment from `angle`, framing it (or the body when
+/// A camera on the garment from `yaw`, framing it (or the body when
 /// there is no cloth).
-fn garment_camera(dressed: &Dressed, angle: CameraAngle) -> OrbitCamera {
+fn garment_camera(dressed: &Dressed, yaw: f32) -> OrbitCamera {
     let mut points = dressed.pieces.iter().flat_map(|p| p.mesh.positions.iter());
     let garment = points
         .next()
         .map(|first| points.fold((*first, *first), |(lo, hi), p| (lo.min(*p), hi.max(*p))));
     match garment {
-        Some((lo, hi)) => OrbitCamera::framing(lo, hi, angle.yaw()),
-        None => OrbitCamera::facing(angle.yaw()),
+        Some((lo, hi)) => OrbitCamera::framing(lo, hi, yaw),
+        None => OrbitCamera::facing(yaw),
+    }
+}
+
+/// A camera from `yaw` on the whole body, head to toe; without one (an
+/// object, spec 36), on the cloth.
+fn standing_camera(dressed: &Dressed, yaw: f32) -> OrbitCamera {
+    if dressed.avatar.is_some() {
+        OrbitCamera::facing(yaw).for_height(dressed.body_height())
+    } else {
+        garment_camera(dressed, yaw)
     }
 }
 
@@ -625,7 +635,7 @@ pub fn techpack_views(
             sides
                 .iter()
                 .map(|(angle, caption)| {
-                    let camera = garment_camera(&dressed, *angle);
+                    let camera = garment_camera(&dressed, angle.yaw());
                     Ok((garment_png(gpu, &dressed, &camera, w, h)?, *caption))
                 })
                 .collect::<Result<_, RenderError>>()?
@@ -699,7 +709,7 @@ pub fn render(
         }
         View::Garment(fit_map) => {
             let dressed = Dressed::of(ws, fit_map)?;
-            let camera = OrbitCamera::default().for_height(dressed.body_height());
+            let camera = standing_camera(&dressed, OrbitCamera::default().yaw);
             let png = garment_png(gpu, &dressed, &camera, width, height)?;
             let mut facts = json!({ "view": "3d", "drape": dressed.state, "pieces": dressed.pieces.len(), "avatar": dressed.avatar.is_some() });
             if let Some(fit) = &dressed.fit {
@@ -732,10 +742,8 @@ pub fn render(
                 PhotoCamera::Angle {
                     angle,
                     close_up: true,
-                } => garment_camera(&dressed, angle),
-                PhotoCamera::Angle { angle, .. } => {
-                    OrbitCamera::facing(angle.yaw()).for_height(dressed.body_height())
-                }
+                } => garment_camera(&dressed, angle.yaw()),
+                PhotoCamera::Angle { angle, .. } => standing_camera(&dressed, angle.yaw()),
                 PhotoCamera::Scene(camera) => camera,
             };
             let png = photo::render_png(gpu, &scene, &camera, options.settings, width, height)

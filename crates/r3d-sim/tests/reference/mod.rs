@@ -570,3 +570,146 @@ pub fn an_interfaced_band_stands_where_a_bare_one_falls(make: Make) {
     assert!(bare < 0.7, "the bare band stands {bare}");
     assert!(fused > 0.8, "the interfaced band falls: {fused}");
 }
+
+/// A cushion: two `side` metre squares of `n × n` vertices facing out,
+/// `gap` apart, sewn all around (or along three sides only with `open`),
+/// weightless, stuffed at `pressure` (Pa). The front's vertices come
+/// first, then the back's.
+fn cushion(side: f32, n: usize, pressure: f32, open: bool) -> SimScene {
+    let gap = 0.03;
+    let front = sheet(side, side, n, Vec2::Y, |r| {
+        Vec3::new(r.x, 1.0 + r.y, gap / 2.0)
+    });
+    // Mirrored, so it faces −z: its outside is out of the cushion too.
+    let back = sheet(side, side, n, Vec2::Y, |r| {
+        Vec3::new(side - r.x, 1.0 + r.y, -gap / 2.0)
+    });
+    let offset = front.particles.len() as u32;
+    let mut scene = front;
+    scene.particles.extend(back.particles);
+    scene
+        .triangles
+        .extend(back.triangles.into_iter().map(|t| Triangle {
+            vertices: t.vertices.map(|v| v + offset),
+            ..t
+        }));
+    let at = |i: usize, j: usize| (j * n + i) as u32;
+    let mirror = |i: usize, j: usize| offset + at(n - 1 - i, j);
+    let mut edge: Vec<(usize, usize)> = Vec::new();
+    for k in 0..n {
+        edge.push((0, k));
+        edge.push((n - 1, k));
+        edge.push((k, 0));
+        if !open {
+            edge.push((k, n - 1));
+        }
+    }
+    edge.sort_unstable();
+    edge.dedup();
+    scene.seams = edge
+        .iter()
+        .map(|(i, j)| [at(*i, *j), mirror(*i, *j)])
+        .collect();
+    scene.weightless = true;
+    scene.pressure = pressure;
+    scene
+}
+
+fn centroid(s: &dyn Solver) -> Vec3 {
+    s.positions().iter().sum::<Vec3>() / s.positions().len() as f32
+}
+
+/// The largest angle between the normals of two triangles sharing an
+/// edge, over the triangles of the first `particles` particles whose
+/// corners all lie at least `margin` vertices in from the sheet's edges
+/// (radians): how creased the cloth is away from its seams.
+fn largest_crease(s: &dyn Solver, scene: &SimScene, n: usize, margin: usize) -> f32 {
+    let x = s.positions();
+    let inner = |v: u32| {
+        let (i, j) = (v as usize % (n * n) % n, v as usize % (n * n) / n);
+        i >= margin && j >= margin && i < n - margin && j < n - margin
+    };
+    let mut by_edge: std::collections::HashMap<(u32, u32), Vec3> = Default::default();
+    let mut worst = 0.0f32;
+    for t in &scene.triangles {
+        let v = t.vertices;
+        if !v.iter().all(|i| inner(*i)) {
+            continue;
+        }
+        let normal = (x[v[1] as usize] - x[v[0] as usize])
+            .cross(x[v[2] as usize] - x[v[0] as usize])
+            .normalize();
+        for k in 0..3 {
+            let (a, b) = (v[k], v[(k + 1) % 3]);
+            let key = (a.min(b), a.max(b));
+            if let Some(other) = by_edge.insert(key, normal) {
+                worst = worst.max(normal.dot(other).clamp(-1.0, 1.0).acos());
+            }
+        }
+    }
+    worst
+}
+
+/// How thick a cushion (see [`cushion`]) is in its middle after 3 s,
+/// how far it drifted, and the solver.
+fn swell(make: Make, scene: SimScene, n: usize) -> (f32, f32, Box<dyn Solver>) {
+    let start =
+        scene.particles.iter().map(|p| p.position).sum::<Vec3>() / scene.particles.len() as f32;
+    let s = run(make, scene, 3.0);
+    let middle = (n / 2) * n + n / 2;
+    let depth = s.positions()[middle].z - s.positions()[n * n + middle].z;
+    (depth, centroid(&*s).distance(start), s)
+}
+
+/// Weightless, a cushion keeps the shape its seams give it: its faces
+/// smooth, its seams closed, where it was laid, at rest. Stuffed, it
+/// swells into a pillow, as smooth.
+pub fn a_stuffed_cushion_swells_smooth_and_stays_put(make: Make) {
+    let (side, n) = (0.3, 16);
+    let mut depths = Vec::new();
+    for pressure in [0.0f32, 200.0] {
+        let scene = cushion(side, n, pressure, false);
+        let (depth, moved, mut s) = swell(make, scene.clone(), n);
+        depths.push(depth);
+        let st = s.stats();
+        assert!(st.max_seam_gap < 0.003, "seams open: {st:?}");
+        assert!(moved < 0.01, "drifted {moved} m at {pressure} Pa");
+        // Three rows in from the seams: a pillow's edge turns sharply
+        // there; a crease is 30° and more between two triangles, its
+        // round about 15° on 2 cm triangles.
+        let crease = largest_crease(&*s, &scene, n, 3).to_degrees();
+        assert!(crease < 20.0, "creased by {crease}° at {pressure} Pa");
+        let before = s.positions().to_vec();
+        s.step(1.0 / 60.0).unwrap();
+        let fastest = s
+            .positions()
+            .iter()
+            .zip(&before)
+            .map(|(a, b)| a.distance(*b) * 60.0)
+            .fold(0.0, f32::max);
+        assert!(
+            fastest < 0.05,
+            "still moving at {fastest} m/s ({pressure} Pa)"
+        );
+    }
+    let [bare, stuffed] = depths[..] else {
+        unreachable!()
+    };
+    assert!(
+        stuffed > bare + 0.03,
+        "not stuffed: {stuffed} m thick, {bare} m without stuffing"
+    );
+}
+
+/// An open bag is not stuffed (it would fly off its mouth), even with a
+/// pressure; weightless, it stays where it was laid.
+pub fn an_open_bag_is_not_stuffed(make: Make) {
+    let n = 16;
+    let (bare, _, _) = swell(make, cushion(0.3, n, 0.0, true), n);
+    let (pushed, moved, _) = swell(make, cushion(0.3, n, 200.0, true), n);
+    assert!(
+        (pushed - bare).abs() < 1e-4,
+        "the open bag swelled: {pushed} m, {bare} m without"
+    );
+    assert!(moved < 0.01, "drifted {moved} m");
+}

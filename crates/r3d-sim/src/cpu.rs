@@ -30,8 +30,8 @@ use crate::model::{ElasticLink, Hinge, Membrane, Model, UNSEWN};
 use crate::motion::{Posed, touch};
 use crate::scene::SimScene;
 use crate::solver::{
-    CLOSURE_COMPLIANCE, GRAB_COMPLIANCE, NEAR, SKIN, SUBSTEPS, Solver, StepError, StepStats,
-    closure_target, dihedral, elastic_target, grabbed, sewing,
+    CLOSURE_COMPLIANCE, Drift, GRAB_COMPLIANCE, NEAR, SKIN, SUBSTEPS, Solver, StepError, StepStats,
+    closure_target, dihedral, elastic_target, grabbed, inflation, sewing, stuffing,
 };
 
 /// A patch of cloth held by the user.
@@ -69,6 +69,9 @@ pub struct CpuSolver {
     /// hold it as one with the particle it is sewn to (half the
     /// difference of their motions; zero when held alone; reused buffer).
     slide: Vec<Vec3>,
+    /// Per particle: the stuffing's push on it this substep (N; reused
+    /// buffer).
+    stuffed: Vec<Vec3>,
     /// Where the particles were at the start of the last frame.
     start: Vec<Vec3>,
     grab: Option<Grab>,
@@ -107,6 +110,7 @@ impl CpuSolver {
             edge_push: vec![(Vec3::ZERO, 0); n],
             press: vec![Vec3::ZERO; n],
             slide: vec![Vec3::ZERO; n],
+            stuffed: vec![Vec3::ZERO; n],
             start: model.positions.clone(),
             grab: None,
             time: 0.0,
@@ -117,6 +121,23 @@ impl CpuSolver {
 
     fn substep(&mut self, h: f32) {
         let (gravity, seam_alpha) = sewing(self.time, !self.model.seams.is_empty());
+        let gravity = if self.model.weightless {
+            Vec3::ZERO
+        } else {
+            gravity
+        };
+        let pressure = self.model.pressure * inflation(self.time);
+        self.stuffed.fill(Vec3::ZERO);
+        if pressure > 0.0 {
+            let cloth = self.model.inflated.len();
+            stuffing(
+                &self.x,
+                self.model.layers.triangles.get(..cloth).unwrap_or_default(),
+                &self.model.inflated,
+                pressure,
+                &mut self.stuffed,
+            );
+        }
         // Where the body's parts are at the start and the end of the
         // substep.
         let posed = self
@@ -128,7 +149,7 @@ impl CpuSolver {
         for i in 0..self.x.len() {
             self.prev[i] = self.x[i];
             if w[i] > 0.0 {
-                self.v[i] += gravity * h;
+                self.v[i] += (gravity + self.stuffed[i] * w[i]) * h;
                 self.x[i] += self.v[i] * h;
             }
         }
@@ -361,6 +382,16 @@ impl Solver for CpuSolver {
 
     fn step(&mut self, frame_dt: f32) -> Result<(), StepError> {
         let h = frame_dt / SUBSTEPS as f32;
+        // A free weightless cloth keeps no rigid motion.
+        if self.model.weightless
+            && let Some(drift) = Drift::of(&self.x, &self.v, &self.model.inv_mass)
+        {
+            for ((v, x), w) in self.v.iter_mut().zip(&self.x).zip(&self.model.inv_mass) {
+                if *w > 0.0 {
+                    *v -= drift.at(*x);
+                }
+            }
+        }
         self.start.clone_from(&self.x);
         self.model
             .self_contact

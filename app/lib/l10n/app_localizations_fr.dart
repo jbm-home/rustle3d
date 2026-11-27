@@ -1927,6 +1927,8 @@ class LFr extends L {
       'panel_add_hole': 'Découper un trou',
       'panel_remove_hole': 'Boucher un trou',
       'panel_boolean': 'Joindre ou découper',
+      'object_set': 'Faire un objet',
+      'object_clear': 'Porter sur un mannequin',
       'other': '$step',
     });
     return '$_temp0';
@@ -3954,4 +3956,152 @@ class LFr extends L {
   String presetBaby(String months) {
     return 'Bébé $months mois';
   }
+
+  @override
+  String get newProjectTitle => 'Nouveau projet';
+
+  @override
+  String get kindWorn => 'Vêtement';
+
+  @override
+  String get kindWornBlurb => 'Porté : drapé sur un mannequin';
+
+  @override
+  String get kindObject => 'Objet';
+
+  @override
+  String get kindObjectBlurb => 'Sans mannequin : sac, coussin, accessoire';
+
+  @override
+  String get garmentSizes => 'Mesures du vêtement';
+
+  @override
+  String get templateCushion => 'Coussin';
+
+  @override
+  String get templateCushionBlurb =>
+      'Deux carrés cousus tout autour, rembourré.';
+
+  @override
+  String sizeYears(String age) {
+    return '$age ans';
+  }
+
+  @override
+  String sizeMonths(String months) {
+    return '$months mois';
+  }
+
+  @override
+  String get bodySize => 'Taille';
+
+  @override
+  String get silhouette => 'Silhouette';
+
+  @override
+  String get silhouetteBalanced => 'Standard';
+
+  @override
+  String get silhouetteBalancedHint => 'Les proportions du barème';
+
+  @override
+  String get silhouetteHourglass => 'Sablier (X)';
+
+  @override
+  String get silhouetteHourglassHint => 'Taille marquée';
+
+  @override
+  String get silhouettePear => 'Poire (A)';
+
+  @override
+  String get silhouettePearHint => 'Hanches plus larges que la poitrine';
+
+  @override
+  String get silhouetteStraight => 'Droite (H)';
+
+  @override
+  String get silhouetteStraightHint => 'Peu de taille, hanches plus étroites';
+
+  @override
+  String get silhouetteRound => 'Ronde (O)';
+
+  @override
+  String get silhouetteRoundHint => 'Plus forte à la taille';
+
+  @override
+  String get silhouetteInverted => 'Triangle inversé (V)';
+
+  @override
+  String get silhouetteInvertedHint =>
+      'Hanches étroites sous une poitrine large';
+
+  @override
+  String get silhouetteSlim => 'Mince';
+
+  @override
+  String get silhouetteSlimHint => 'Plus mince que le barème à cet âge';
+
+  @override
+  String get silhouetteSturdy => 'Fort';
+
+  @override
+  String get silhouetteSturdyHint => 'Plus fort que le barème à cet âge';
+
+  @override
+  String get myBodies => 'Mes corps';
+
+  @override
+  String get myBodiesTip => 'Partir d’un de vos corps enregistrés';
+
+  @override
+  String chartMeasurements(String chart) {
+    return 'Mesures du barème $chart : modifiez-les si besoin.';
+  }
+
+  @override
+  String get typedMeasurements => 'Vos mesures.';
+
+  @override
+  String typedNearestSize(String size) {
+    return 'Vos mesures correspondent à une taille $size.';
+  }
+
+  @override
+  String nearestSizeOn(String size, String chart) {
+    return 'Taille la plus proche : $size ($chart)';
+  }
+
+  @override
+  String get stuffing => 'Rembourrage';
+
+  @override
+  String get stuffingNone => 'Aucun';
+
+  @override
+  String get stuffingFirm => 'Ferme';
+
+  @override
+  String get stuffingHint =>
+      'Seules les parties fermées tout autour sont rembourrées (un coussin, une peluche) ; un sac ouvert garde la forme de ses coutures.';
+
+  @override
+  String get objectTitle => 'Objet';
+
+  @override
+  String get objectSubtitle =>
+      'Sans mannequin : en 3D, l’objet flotte sans pesanteur, dans la forme que lui donnent ses coutures.';
+
+  @override
+  String get objectWear => 'Le porter sur un mannequin';
+
+  @override
+  String get objectMade =>
+      'Le projet est maintenant un objet : sans mannequin ni pesanteur en 3D.';
+
+  @override
+  String get bodyMenuObject => 'En faire un objet (sans mannequin)';
+
+  @override
+  String get errObject =>
+      'Ce projet est un objet, sans mannequin : portez-le d’abord sur un mannequin.';
 }

@@ -45,3 +45,5 @@ descriptions, public papers, open standards, general garment-making knowledge.
 | 33 | [Children](33-children.md) | M39 |
 | 34 | [Diagnostic report of a drape](34-diagnostic-report.md) | M41 |
 | 35 | [Environment lighting for photos](35-environment-lighting.md) | M42 |
+| 36 | [Objects: projects without a body](36-objects.md) | M46 |
+| 37 | [The body at creation: size, silhouette and height](37-body-at-creation.md) | M47 |

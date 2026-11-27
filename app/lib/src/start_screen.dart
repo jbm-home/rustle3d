@@ -2,6 +2,7 @@
 // measurements), start blank, reopen a recent project, or rename, export,
 // delete and import whole projects (docs/ux.md §1, docs/specs/06 and 11).
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
@@ -12,11 +13,12 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'design/tokens.dart';
 import 'i18n.dart';
+import 'body_picker.dart';
 import 'busy.dart';
 import 'pattern_library.dart' show showPatternLibrary;
+import 'object_panel.dart' show StuffingSlider;
 import 'projects.dart';
 import 'rust/api/engine.dart';
-import 'rust/api/library.dart';
 import 'rust/api/templates.dart';
 import 'support.dart';
 import 'update.dart';
@@ -34,6 +36,7 @@ const _templates = [
   ('straight_skirt', Icons.straighten_rounded),
   ('a_line_skirt', Icons.change_history_rounded),
   ('tote_bag', Icons.shopping_bag_outlined),
+  ('cushion', Icons.weekend_outlined),
   ('bodysuit', Icons.child_care_rounded),
   ('pyjama', Icons.bedtime_outlined),
   ('jogging_suit', Icons.directions_run_outlined),
@@ -61,6 +64,7 @@ const _startPreset = {
   'straight_skirt' => (l.templateStraightSkirt, l.templateStraightSkirtBlurb),
   'a_line_skirt' => (l.templateALineSkirt, l.templateALineSkirtBlurb),
   'tote_bag' => (l.templateToteBag, l.templateToteBagBlurb),
+  'cushion' => (l.templateCushion, l.templateCushionBlurb),
   'sweatshirt' => (l.templateSweatshirt, l.templateSweatshirtBlurb),
   'bodysuit' => (l.templateBodysuit, l.templateBodysuitBlurb),
   'pyjama' => (l.templatePyjama, l.templatePyjamaBlurb),
@@ -232,10 +236,11 @@ class _StartScreenState extends State<StartScreen> {
     super.dispose();
   }
 
-  Future<void> _newGarment(String template, String title) async {
+  /// Make a project from [template] (none: a blank one) called [title].
+  Future<void> _newProject(String? template, String title) async {
     final path = await showDialog<String>(
       context: context,
-      builder: (_) => _NewGarmentDialog(
+      builder: (_) => _NewProjectDialog(
         store: widget.store,
         template: template,
         title: title,
@@ -244,17 +249,7 @@ class _StartScreenState extends State<StartScreen> {
     if (path != null) widget.onOpen(path);
   }
 
-  Future<void> _blank() async {
-    try {
-      final path = await widget.store.create(
-        name: context.l.untitled,
-        body: widget.store.standardBody(),
-      );
-      widget.onOpen(path);
-    } on ApiError catch (e) {
-      if (mounted) _toast(context, context.error(e));
-    }
-  }
+  void _blank() => _newProject(null, context.l.untitled);
 
   Future<void> _openFromDisk() async {
     final path = await _pickProject(context);
@@ -441,7 +436,7 @@ class _StartScreenState extends State<StartScreen> {
                                 subtitle: blurb,
                                 icon: icon,
                                 picture: _thumbs.template(id, widget.dark),
-                                onTap: () => _newGarment(id, title),
+                                onTap: () => _newProject(id, title),
                               ),
                         ],
                       ),
@@ -1227,48 +1222,64 @@ String _ago(BuildContext context, DateTime t) {
   return DateFormat.yMMMd(Localizations.localeOf(context).toString()).format(t);
 }
 
-/// Name the garment, pick the body, check the sizes, create.
-class _NewGarmentDialog extends StatefulWidget {
-  const _NewGarmentDialog({
+/// The kinds of project a template can start (object or not), the
+/// first by default; a blank project can start either.
+const _templateKinds = {
+  'cushion': [true],
+  'tote_bag': [false, true],
+};
+
+/// Name the project, choose whether it is worn (and on which body) or an
+/// object (and how stuffed), check the template's sizes, create
+/// (docs/specs/36-objects.md, 37-body-at-creation.md).
+class _NewProjectDialog extends StatefulWidget {
+  const _NewProjectDialog({
     required this.store,
     required this.template,
     required this.title,
   });
 
   final ProjectStore store;
-  final String template;
+
+  /// The template drafted, none for a blank project.
+  final String? template;
   final String title;
 
   @override
-  State<_NewGarmentDialog> createState() => _NewGarmentDialogState();
+  State<_NewProjectDialog> createState() => _NewProjectDialogState();
 }
 
-class _NewGarmentDialogState extends State<_NewGarmentDialog> {
+class _NewProjectDialogState extends State<_NewProjectDialog> {
   late final _name = TextEditingController(text: widget.title);
-  late final List<Map<String, dynamic>> _presets = (jsonDecode(
-    bodyPresets(libraryDir: widget.store.libraryDir),
-  ) as List).cast<Map<String, dynamic>>();
-  late Map<String, dynamic> _body =
-      _presets
-          .where((p) => p['name'] == _startPreset[widget.template])
-          .firstOrNull ??
-      widget.store.standardBody();
+  late final List<bool> _kinds =
+      _templateKinds[widget.template] ??
+      (widget.template == null ? const [false, true] : const [false]);
+  late bool _object = _kinds.first;
+  double _stuffing = 0.5;
+
+  /// The body chosen (`{name, body}`), null while a measurement is out
+  /// of range.
+  Map<String, dynamic>? _body;
   final Map<String, TextEditingController> _sizes = {};
 
-  /// Whether the sizes for the body are known.
-  bool _loaded = false;
+  /// Whether the template's sizes are being worked out for the body (the
+  /// body is fitted: a second or more), and which request is the latest.
+  bool _loading = false;
+  int _request = 0;
+  Timer? _debounce;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _loadSizes(_body);
-    });
+    if (_object) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _bodyChanged(null));
+    }
   }
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _name.dispose();
     for (final c in _sizes.values) {
       c.dispose();
@@ -1276,31 +1287,43 @@ class _NewGarmentDialogState extends State<_NewGarmentDialog> {
     super.dispose();
   }
 
-  /// Choose [body] and show the template's default sizes for it. The body
-  /// is fitted first (a second or more): off the UI thread, with a card.
+  void _bodyChanged(Map<String, dynamic>? body) {
+    if (!mounted) return;
+    setState(() => _body = body);
+    if (widget.template == null) return;
+    _debounce?.cancel();
+    // An object's sizes do not depend on a body: the standard one's.
+    final forSizes = _object ? widget.store.standardBody() : body;
+    if (forSizes == null) return;
+    setState(() => _loading = true);
+    _debounce = Timer(
+      const Duration(milliseconds: 400),
+      () => _loadSizes(forSizes),
+    );
+  }
+
+  /// The template's default sizes for [body], off the UI thread.
   Future<void> _loadSizes(Map<String, dynamic> body) async {
-    final l = context.l;
+    final request = ++_request;
     final String out;
     try {
-      out = await runBusy(
-        context,
-        null,
-        l.busyBodyTitle,
-        () => templateList(bodyJson: jsonEncode(body['body'])),
-        step: l.busyBodyFit,
-      );
+      out = await templateList(bodyJson: jsonEncode(body['body']));
     } on ApiError catch (e) {
-      if (mounted) setState(() => _error = context.error(e));
+      if (mounted && request == _request) {
+        setState(() {
+          _loading = false;
+          _error = context.error(e);
+        });
+      }
       return;
     }
-    if (!mounted) return;
+    if (!mounted || request != _request) return;
     final entry = (jsonDecode(out) as List).firstWhere(
       (t) => t['template'] == widget.template,
     );
     final sizes = (entry['sizes'] as Map<String, dynamic>);
     setState(() {
-      _body = body;
-      _loaded = true;
+      _loading = false;
       _error = null;
       for (final c in _sizes.values) {
         c.dispose();
@@ -1318,7 +1341,19 @@ class _NewGarmentDialogState extends State<_NewGarmentDialog> {
     });
   }
 
+  void _chooseKind(bool object) {
+    if (object == _object) return;
+    setState(() => _object = object);
+    _bodyChanged(_body);
+  }
+
+  bool get _ready =>
+      !_loading &&
+      (_object || _body != null) &&
+      (widget.template == null || _sizes.isNotEmpty);
+
   Future<void> _create() async {
+    if (!_ready) return;
     final sizes = <String, double>{};
     for (final e in _sizes.entries) {
       final v = double.tryParse(e.value.text.replaceAll(',', '.'));
@@ -1336,7 +1371,8 @@ class _NewGarmentDialogState extends State<_NewGarmentDialog> {
     try {
       final path = await widget.store.create(
         name: name,
-        body: _body,
+        body: _object ? null : _body,
+        stuffing: _object ? _stuffing : null,
         template: widget.template,
         sizes: sizes,
         pieceNames: pieceNames(context.l),
@@ -1354,6 +1390,17 @@ class _NewGarmentDialogState extends State<_NewGarmentDialog> {
     }
   }
 
+  Widget _section(String title) {
+    final p = Tokens.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: Space.l, bottom: Space.s),
+      child: Text(
+        title,
+        style: ts(fontSize: 14, fontWeight: FontWeight.w600, color: p.text),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
@@ -1362,9 +1409,12 @@ class _NewGarmentDialogState extends State<_NewGarmentDialog> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(kRadius * 1.4),
       ),
-      child: SizedBox(
-        width: 520,
-        child: Padding(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 580,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+        ),
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(Space.xl),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1372,11 +1422,14 @@ class _NewGarmentDialogState extends State<_NewGarmentDialog> {
             children: [
               Row(
                 children: [
-                  Text(
-                    l.newGarmentTitle(widget.title),
-                    style: ts(fontSize: 20, fontWeight: FontWeight.w700),
+                  Expanded(
+                    child: Text(
+                      widget.template == null
+                          ? l.newProjectTitle
+                          : l.newGarmentTitle(widget.title),
+                      style: ts(fontSize: 20, fontWeight: FontWeight.w700),
+                    ),
                   ),
-                  const Spacer(),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
                     icon: Icon(Icons.close_rounded, color: p.textMuted),
@@ -1391,58 +1444,98 @@ class _NewGarmentDialogState extends State<_NewGarmentDialog> {
                   border: const OutlineInputBorder(),
                 ),
               ),
-              const SizedBox(height: Space.l),
-              DropdownButtonFormField<String>(
-                initialValue: _body['name'] as String,
-                decoration: InputDecoration(
-                  labelText: l.fieldBody,
-                  border: const OutlineInputBorder(),
-                  prefixIcon: const Icon(
-                    Icons.accessibility_new_rounded,
-                    size: 18,
-                  ),
-                ),
-                items: [
-                  for (final x in _presets)
-                    DropdownMenuItem(
-                      value: x['name'] as String,
-                      child: Text(context.presetName(x)),
+              if (_kinds.length > 1) ...[
+                const SizedBox(height: Space.l),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _KindTile(
+                        key: const Key('kindWorn'),
+                        icon: Icons.accessibility_new_rounded,
+                        title: l.kindWorn,
+                        blurb: l.kindWornBlurb,
+                        selected: !_object,
+                        onTap: () => _chooseKind(false),
+                      ),
                     ),
-                ],
-                onChanged: (name) =>
-                    _loadSizes(_presets.firstWhere((x) => x['name'] == name)),
-              ),
-              const SizedBox(height: Space.l),
-              Wrap(
-                spacing: Space.m,
-                runSpacing: Space.m,
-                children: [
-                  for (final e in _sizes.entries)
-                    SizedBox(
-                      width: 224,
-                      child: Tooltip(
-                        message: _sizeText(l, e.key).$2,
-                        child: TextField(
-                          controller: e.value,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
+                    const SizedBox(width: Space.m),
+                    Expanded(
+                      child: _KindTile(
+                        key: const Key('kindObject'),
+                        icon: Icons.view_in_ar_outlined,
+                        title: l.kindObject,
+                        blurb: l.kindObjectBlurb,
+                        selected: _object,
+                        onTap: () => _chooseKind(true),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              AnimatedSize(
+                duration: const Duration(milliseconds: 180),
+                alignment: Alignment.topCenter,
+                child: _object
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: Space.l),
+                        child: StuffingSlider(
+                          value: _stuffing,
+                          onChanged: (v) => setState(() => _stuffing = v),
+                        ),
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _section(l.fieldBody),
+                          BodyPicker(
+                            libraryDir: widget.store.libraryDir,
+                            start: _startPreset[widget.template],
+                            onChanged: _bodyChanged,
                           ),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(
-                              RegExp(r'[0-9.,]'),
+                        ],
+                      ),
+              ),
+              if (widget.template != null) ...[
+                _section(l.garmentSizes),
+                if (_loading)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: Space.s),
+                    child: LinearProgressIndicator(minHeight: 2),
+                  ),
+                Wrap(
+                  key: const Key('templateSizes'),
+                  spacing: Space.m,
+                  runSpacing: Space.m,
+                  children: [
+                    for (final e in _sizes.entries)
+                      SizedBox(
+                        width: 166,
+                        child: Tooltip(
+                          message: _sizeText(l, e.key).$2,
+                          child: TextField(
+                            controller: e.value,
+                            enabled: !_loading,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
                             ),
-                          ],
-                          onSubmitted: (_) => _create(),
-                          decoration: InputDecoration(
-                            labelText: _sizeText(l, e.key).$1,
-                            suffixText: l.cm,
-                            border: const OutlineInputBorder(),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                RegExp(r'[0-9.,]'),
+                              ),
+                            ],
+                            onSubmitted: (_) => _create(),
+                            decoration: InputDecoration(
+                              labelText: _sizeText(l, e.key).$1,
+                              suffixText: l.cm,
+                              isDense: true,
+                              border: const OutlineInputBorder(),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                ],
-              ),
+                  ],
+                ),
+              ],
               if (_error != null) ...[
                 const SizedBox(height: Space.m),
                 Text(_error!, style: ts(fontSize: 13, color: p.danger)),
@@ -1457,14 +1550,90 @@ class _NewGarmentDialogState extends State<_NewGarmentDialog> {
                   ),
                   const SizedBox(width: Space.s),
                   FilledButton.icon(
-                    // Not before the sizes for the body are known.
-                    onPressed: _loaded ? _create : null,
+                    key: const Key('createProject'),
+                    onPressed: _ready ? _create : null,
                     icon: const Icon(Icons.auto_awesome_rounded, size: 18),
                     label: Text(l.create),
                   ),
                 ],
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One kind of project to choose: a card with an icon, a title and what
+/// it is for, outlined in the accent colour when chosen.
+class _KindTile extends StatelessWidget {
+  const _KindTile({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.blurb,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String blurb;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Tokens.of(context);
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: selected ? p.accentSoft : p.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(kRadius),
+          side: BorderSide(
+            color: selected ? p.accent : p.border,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(kRadius),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(Space.m),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(icon, size: 22, color: selected ? p.accent : p.textMuted),
+                const SizedBox(width: Space.s),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: ts(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: p.text,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        blurb,
+                        style: ts(
+                          fontSize: 12,
+                          color: p.textMuted,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

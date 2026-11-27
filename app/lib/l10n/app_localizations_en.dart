@@ -1912,6 +1912,8 @@ class LEn extends L {
       'panel_add_hole': 'Cut hole',
       'panel_remove_hole': 'Fill hole',
       'panel_boolean': 'Join or cut pieces',
+      'object_set': 'Make an object',
+      'object_clear': 'Wear on a body',
       'other': '$step',
     });
     return '$_temp0';
@@ -3924,4 +3926,150 @@ class LEn extends L {
   String presetBaby(String months) {
     return 'Baby $months months';
   }
+
+  @override
+  String get newProjectTitle => 'New project';
+
+  @override
+  String get kindWorn => 'Garment';
+
+  @override
+  String get kindWornBlurb => 'Worn: draped on a body';
+
+  @override
+  String get kindObject => 'Object';
+
+  @override
+  String get kindObjectBlurb => 'No body: a bag, a cushion, an accessory';
+
+  @override
+  String get garmentSizes => 'Garment measurements';
+
+  @override
+  String get templateCushion => 'Cushion';
+
+  @override
+  String get templateCushionBlurb => 'Two squares sewn all around, stuffed.';
+
+  @override
+  String sizeYears(String age) {
+    return '$age years';
+  }
+
+  @override
+  String sizeMonths(String months) {
+    return '$months months';
+  }
+
+  @override
+  String get bodySize => 'Size';
+
+  @override
+  String get silhouette => 'Silhouette';
+
+  @override
+  String get silhouetteBalanced => 'Standard';
+
+  @override
+  String get silhouetteBalancedHint => 'The size chart\'s proportions';
+
+  @override
+  String get silhouetteHourglass => 'Hourglass';
+
+  @override
+  String get silhouetteHourglassHint => 'A marked waist';
+
+  @override
+  String get silhouettePear => 'Pear';
+
+  @override
+  String get silhouettePearHint => 'Hips fuller than the bust';
+
+  @override
+  String get silhouetteStraight => 'Straight';
+
+  @override
+  String get silhouetteStraightHint => 'Little waist, narrower hips';
+
+  @override
+  String get silhouetteRound => 'Round';
+
+  @override
+  String get silhouetteRoundHint => 'Fuller at the waist';
+
+  @override
+  String get silhouetteInverted => 'Inverted triangle';
+
+  @override
+  String get silhouetteInvertedHint => 'Narrower hips under a broad chest';
+
+  @override
+  String get silhouetteSlim => 'Slim';
+
+  @override
+  String get silhouetteSlimHint => 'Slimmer than the chart for this age';
+
+  @override
+  String get silhouetteSturdy => 'Sturdy';
+
+  @override
+  String get silhouetteSturdyHint => 'Fuller than the chart for this age';
+
+  @override
+  String get myBodies => 'My bodies';
+
+  @override
+  String get myBodiesTip => 'Start from one of your saved bodies';
+
+  @override
+  String chartMeasurements(String chart) {
+    return 'The $chart size chart\'s measurements: change them if you like.';
+  }
+
+  @override
+  String get typedMeasurements => 'Your measurements.';
+
+  @override
+  String typedNearestSize(String size) {
+    return 'Your measurements make a size $size.';
+  }
+
+  @override
+  String nearestSizeOn(String size, String chart) {
+    return 'Nearest size: $size ($chart)';
+  }
+
+  @override
+  String get stuffing => 'Stuffing';
+
+  @override
+  String get stuffingNone => 'None';
+
+  @override
+  String get stuffingFirm => 'Firm';
+
+  @override
+  String get stuffingHint =>
+      'Only parts closed all around are stuffed (a cushion, a toy); an open bag keeps the shape of its seams.';
+
+  @override
+  String get objectTitle => 'Object';
+
+  @override
+  String get objectSubtitle =>
+      'No body: in 3D the object floats without weight, in the shape its seams give it.';
+
+  @override
+  String get objectWear => 'Wear it on a body';
+
+  @override
+  String get objectMade =>
+      'The project is now an object: no body, no weight in 3D.';
+
+  @override
+  String get bodyMenuObject => 'Make it an object (no body)';
+
+  @override
+  String get errObject =>
+      'This project is an object, without a body: wear it on a body first.';
 }

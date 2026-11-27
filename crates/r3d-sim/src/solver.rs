@@ -67,6 +67,118 @@ pub fn sewing(time: f32, has_seams: bool) -> (Vec3, f32) {
     (gravity, 10f32.powf(-3.0 - 6.0 * ramp))
 }
 
+/// A weightless scene's cloth moves as if this many times heavier: it
+/// carries its stuffing's inertia. Without weight its shape at rest does
+/// not depend on its mass, but light cloth under a stuffing's pressure
+/// accelerates at over a hundred g, and its stretched triangles,
+/// corrected that hard every substep, flutter and spin
+/// (docs/physics.md, "Objects").
+pub const WEIGHTLESS_INERTIA: f32 = 30.0;
+/// The least velocity damping of a weightless scene (per second): an
+/// object is shown at rest, nothing rubs on a body to stop it.
+pub const WEIGHTLESS_DAMPING: f32 = 5.0;
+
+/// A rigid motion of the whole cloth (velocities, m/s): what a free
+/// weightless scene must not have. Without any outside force it should
+/// keep none, but rounding gains some: corrections smaller than a
+/// position's last bit round unevenly and add up to a slow drift, and
+/// the cloth turns (docs/physics.md, "Objects").
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct Drift {
+    /// The mass-weighted mean velocity.
+    pub velocity: Vec3,
+    /// The angular velocity about `centre`.
+    pub spin: Vec3,
+    /// The centre of mass.
+    pub centre: Vec3,
+}
+
+impl Drift {
+    /// The rigid motion of the free particles at `x` moving at `v`, with
+    /// inverse masses `inv_mass` (pinned ones, 0, left out: a weightless
+    /// bag hung from pins should not swing about them either); `None`
+    /// without free particles.
+    pub fn of(x: &[Vec3], v: &[Vec3], inv_mass: &[f32]) -> Option<Self> {
+        let free = || {
+            x.iter()
+                .zip(v)
+                .zip(inv_mass)
+                .filter(|(_, w)| **w > 0.0)
+                .map(|((p, v), w)| (p.as_dvec3(), v.as_dvec3(), 1.0 / f64::from(*w)))
+        };
+        let mut mass = 0.0f64;
+        let (mut centre, mut momentum) = (glam::DVec3::ZERO, glam::DVec3::ZERO);
+        for (p, v, m) in free() {
+            mass += m;
+            centre += p * m;
+            momentum += v * m;
+        }
+        if mass <= 0.0 {
+            return None;
+        }
+        centre /= mass;
+        let velocity = momentum / mass;
+        let (mut spin_momentum, mut inertia) = (glam::DVec3::ZERO, glam::DMat3::ZERO);
+        for (p, v, m) in free() {
+            let r = p - centre;
+            spin_momentum += r.cross(v - velocity) * m;
+            inertia += (glam::DMat3::from_diagonal(glam::DVec3::splat(r.length_squared()))
+                - glam::DMat3::from_cols(r * r.x, r * r.y, r * r.z))
+                * m;
+        }
+        // A cloth lying along a line has no inertia about it: no spin to
+        // remove there.
+        let spin = if inertia.determinant().abs() > 1e-18 {
+            inertia.inverse() * spin_momentum
+        } else {
+            glam::DVec3::ZERO
+        };
+        Some(Self {
+            velocity: velocity.as_vec3(),
+            spin: spin.as_vec3(),
+            centre: centre.as_vec3(),
+        })
+    }
+
+    /// The rigid motion's velocity at `p`.
+    pub fn at(&self, p: Vec3) -> Vec3 {
+        self.velocity + self.spin.cross(p - self.centre)
+    }
+}
+
+/// How much of the stuffing's pressure pushes at `time` (0 → 1): none
+/// while the seams close (the cloth is not closed yet, so pressure would
+/// push it off), then growing over as long again.
+pub fn inflation(time: f32) -> f32 {
+    ((time - SEWING_TIME) / SEWING_TIME).clamp(0.0, 1.0)
+}
+
+/// The stuffing's push on each particle of `x` (N): `pressure` (Pa) on
+/// every `inflated` triangle of `triangles`, along its area-weighted
+/// normal `(b − a) × (c − a) / 2` (its right side), a third to each
+/// corner. Added to `out`.
+pub fn stuffing(
+    x: &[Vec3],
+    triangles: &[[u32; 3]],
+    inflated: &[bool],
+    pressure: f32,
+    out: &mut [Vec3],
+) {
+    for (t, on) in triangles.iter().zip(inflated) {
+        if !on {
+            continue;
+        }
+        let at = |i: u32| x.get(i as usize).copied().unwrap_or_default();
+        let (a, b, c) = (at(t[0]), at(t[1]), at(t[2]));
+        let push = (b - a).cross(c - a) * (pressure / 6.0);
+        for v in t {
+            if let Some(o) = out.get_mut(*v as usize) {
+                *o += push;
+            }
+        }
+    }
+}
+
 /// Statistics of the last step.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct StepStats {

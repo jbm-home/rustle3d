@@ -56,6 +56,8 @@ maintainer's briefs that specs cite as "ROADMAP Mxx" in their
 | M43 | Fabric relief: normal and roughness maps | A denim's weave and a satin's sheen show in the 3D view and the photo |
 | M44 | Fabric presets from open measurements | Presets whose weights and thicknesses come from a published dataset, each value with its source |
 | M45 | Self-collision by contacts | A folded skirt's layers lie on each other, without the puffy ~8 mm gap |
+| M46 | Objects: projects without a body ✅ (2026-11-28) | A cushion drapes round and smooth, stuffed; a tote bag as an object hangs flat, without folds |
+| M47 | The body at creation: size, silhouette, height ✅ (2026-11-28) | A project made for a women's 38 pear shape, 1.60 m; its size range starts around its own size |
 
 Next: M43; M16's Linux part when the work
 moves to Linux.
@@ -267,6 +269,11 @@ As noted when each milestone closed; recheck before taking one up.
   field of large scans, compressed glTF.
 - **Game export (M15)**: the `MSFT_lod` extension; roughness or sheen
   maps.
+- **Objects (M46)**: an object resting on a table (gravity and a floor:
+  a bag standing on its base); stuffing per garment; a weightless tote
+  bag's handles wave a little (two strips joined only at their ends).
+- **Body at creation (M47)**: the fifteen other measurements at
+  creation; a silhouette for an imported body.
 
 ## Later (architecture kept ready, not scheduled)
 

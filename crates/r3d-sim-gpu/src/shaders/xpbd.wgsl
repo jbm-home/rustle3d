@@ -19,8 +19,14 @@ struct Step {
     params: vec4f,
     // xyz: where the grab pulls its particle.
     grab_target: vec4f,
-    // x: how far the sewing ramp has gone (0–1).
+    // x: how far the sewing ramp has gone (0–1), y: the stuffing's
+    // pressure (Pa).
     sewing: vec4f,
+    // The rigid motion taken off the velocities (r3d-sim `Drift`, zero
+    // but at a weightless frame's first substep): velocity, spin, centre.
+    drift_velocity: vec4f,
+    drift_spin: vec4f,
+    drift_centre: vec4f,
 }
 
 struct Range {
@@ -57,7 +63,8 @@ struct Scene {
 struct LayerTri {
     v: vec4u,
     bridged: u32,
-    _pad0: u32,
+    // 1 if the stuffing pushes it (r3d-sim `Model::inflated`).
+    inflated: u32,
     _pad1: u32,
     _pad2: u32,
 }
@@ -175,10 +182,37 @@ fn predict(@builtin(global_invocation_id) id: vec3u) {
     prev[i] = p;
     if pdata[i].x > 0.0 {
         let h = step.gravity_h.w;
-        let v = vel[i].xyz + step.gravity_h.xyz * h;
+        let rigid = step.drift_velocity.xyz + cross(step.drift_spin.xyz, p.xyz - step.drift_centre.xyz);
+        let v = vel[i].xyz - rigid + step.gravity_h.xyz * h;
         vel[i] = vec4f(v, 0.0);
         x[i] = vec4f(p.xyz + v * h, 0.0);
     }
+}
+
+// The stuffing's push (r3d-sim `stuffing`): the pressure on each
+// inflated triangle the particle is a corner of, along its area-weighted
+// normal, a third to each corner; it changes the velocity before
+// `predict`. Reads positions only, so particles do not race.
+@compute @workgroup_size(WG)
+fn inflate(@builtin(global_invocation_id) id: vec3u) {
+    let i = id.x;
+    if i >= scene.counts.x || pdata[i].x <= 0.0 {
+        return;
+    }
+    let cloth = u32(scene.layers.y);
+    var push = vec3f(0.0);
+    for (var k = incident_csr[i]; k < incident_csr[i + 1u]; k++) {
+        let t = incident_csr[k];
+        if t >= cloth || triangles[t].inflated == 0u {
+            continue;
+        }
+        let v = triangles[t].v;
+        let a = x[v.x].xyz;
+        push += cross(x[v.y].xyz - a, x[v.z].xyz - a);
+    }
+    let h = step.gravity_h.w;
+    let dv = push * (step.sewing.y / 6.0) * pdata[i].x * h;
+    vel[i] = vec4f(vel[i].xyz + dv, 0.0);
 }
 
 @compute @workgroup_size(WG)

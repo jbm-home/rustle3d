@@ -70,7 +70,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 1608442284;
+  int get rustContentHash => -1317761769;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -554,6 +554,8 @@ abstract class RustLibApi extends BaseApi {
 
   String crateApiLibraryLibraryPatterns({required String libraryDir});
 
+  String crateApiTemplatesNearestSize({required String bodyJson});
+
   Future<Uint8List> crateApiTemplatesProjectThumbnail({
     required String path,
     required int width,
@@ -590,6 +592,15 @@ abstract class RustLibApi extends BaseApi {
   });
 
   void crateApiEngineSetUiAdapter({required PlatformInt64 luid});
+
+  String crateApiTemplatesSizeBody({
+    required String chart,
+    required String size,
+    required String silhouette,
+    double? heightCm,
+  });
+
+  String crateApiTemplatesSizeCharts();
 
   Future<String> crateApiTemplatesTemplateList({required String bodyJson});
 
@@ -4027,6 +4038,33 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  String crateApiTemplatesNearestSize({required String bodyJson}) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(bodyJson, serializer);
+          return pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 105,
+          )!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_api_error,
+        ),
+        constMeta: kCrateApiTemplatesNearestSizeConstMeta,
+        argValues: [bodyJson],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTemplatesNearestSizeConstMeta =>
+      const TaskConstMeta(debugName: "nearest_size", argNames: ["bodyJson"]);
+
+  @override
   Future<Uint8List> crateApiTemplatesProjectThumbnail({
     required String path,
     required int width,
@@ -4044,7 +4082,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 105,
+            funcId: 106,
             port: port_,
           );
         },
@@ -4081,7 +4119,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 106,
+            funcId: 107,
           )!;
         },
         codec: SseCodec(
@@ -4117,7 +4155,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 107,
+            funcId: 108,
           )!;
         },
         codec: SseCodec(
@@ -4151,7 +4189,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 108,
+            funcId: 109,
           )!;
         },
         codec: SseCodec(
@@ -4185,7 +4223,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 109,
+            funcId: 110,
           )!;
         },
         codec: SseCodec(
@@ -4221,7 +4259,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 110,
+            funcId: 111,
           )!;
         },
         codec: SseCodec(
@@ -4251,7 +4289,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 111,
+            funcId: 112,
           )!;
         },
         codec: SseCodec(
@@ -4269,6 +4307,69 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "set_ui_adapter", argNames: ["luid"]);
 
   @override
+  String crateApiTemplatesSizeBody({
+    required String chart,
+    required String size,
+    required String silhouette,
+    double? heightCm,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(chart, serializer);
+          sse_encode_String(size, serializer);
+          sse_encode_String(silhouette, serializer);
+          sse_encode_opt_box_autoadd_f_64(heightCm, serializer);
+          return pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 113,
+          )!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_api_error,
+        ),
+        constMeta: kCrateApiTemplatesSizeBodyConstMeta,
+        argValues: [chart, size, silhouette, heightCm],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTemplatesSizeBodyConstMeta => const TaskConstMeta(
+    debugName: "size_body",
+    argNames: ["chart", "size", "silhouette", "heightCm"],
+  );
+
+  @override
+  String crateApiTemplatesSizeCharts() {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          return pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 114,
+          )!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_api_error,
+        ),
+        constMeta: kCrateApiTemplatesSizeChartsConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTemplatesSizeChartsConstMeta =>
+      const TaskConstMeta(debugName: "size_charts", argNames: []);
+
+  @override
   Future<String> crateApiTemplatesTemplateList({required String bodyJson}) {
     return handler.executeNormal(
       NormalTask(
@@ -4278,7 +4379,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 112,
+            funcId: 115,
             port: port_,
           );
         },
@@ -4314,7 +4415,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 113,
+            funcId: 116,
             port: port_,
           );
         },

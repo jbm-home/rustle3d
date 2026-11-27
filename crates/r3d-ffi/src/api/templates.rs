@@ -42,6 +42,47 @@ pub fn template_list(body_json: String) -> Result<String, ApiError> {
     Ok(list.to_string())
 }
 
+/// The built-in size charts as the `grading.charts` query gives them,
+/// without a body (`nearest` null): a new project's body is chosen from
+/// them (spec 37).
+#[frb(sync)]
+pub fn size_charts() -> Result<String, ApiError> {
+    let s = Session::new(Project::new("Preview"));
+    let charts = s
+        .query(&Query::GradingCharts(
+            r3d_commands::queries::GradingCharts {},
+        ))
+        .map_err(err)?;
+    Ok(charts.to_string())
+}
+
+/// The body (a `Body` as JSON) of `size` on `chart`, shaped by
+/// `silhouette`, `height_cm` tall when given: the `avatar.size_body`
+/// query.
+#[frb(sync)]
+pub fn size_body(
+    chart: String,
+    size: String,
+    silhouette: String,
+    height_cm: Option<f64>,
+) -> Result<String, ApiError> {
+    let mut s = Session::new(Project::new("Preview"));
+    let step = Step::from_value(serde_json::json!({
+        "type": "avatar.size_body", "chart": chart, "size": size,
+        "silhouette": silhouette, "height_cm": height_cm,
+    }))
+    .map_err(err)?;
+    Ok(s.run_step(&step).map_err(err)?.to_string())
+}
+
+/// The chart and size nearest `body_json` (a `Body`): `{chart, name}`.
+#[frb(sync)]
+pub fn nearest_size(body_json: String) -> Result<String, ApiError> {
+    let body = body_of(&body_json)?;
+    let chart = r3d_commands::commands::SizeChart::of(&body);
+    Ok(serde_json::json!({"chart": chart, "name": chart.nearest(&body)}).to_string())
+}
+
 /// A PNG picture of `template`'s pattern pieces at default sizes for a
 /// standard body, on the board colours of `colors`.
 pub fn template_thumbnail(

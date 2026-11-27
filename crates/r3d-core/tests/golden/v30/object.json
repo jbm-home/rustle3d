@@ -1,0 +1,32 @@
+{
+  "format": "rustle3d.project",
+  "schema_version": 30,
+  "project": {
+    "name": "Golden object",
+    "display_unit": "mm",
+    "next_id": 2,
+    "garments": {
+      "garment:1": {
+        "name": "Garment 1",
+        "fabric": "cotton",
+        "color": null,
+        "layer": 0
+      }
+    },
+    "panels": {},
+    "points": {},
+    "edges": {},
+    "notches": {},
+    "internal_lines": {},
+    "avatar": null,
+    "seams": {},
+    "pins": {},
+    "grading": null,
+    "constraints": {},
+    "guides": {},
+    "variables": {},
+    "object": {
+      "stuffing": 0.7
+    }
+  }
+}

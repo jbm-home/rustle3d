@@ -96,3 +96,13 @@ fn an_interfaced_band_stands_where_a_bare_one_falls() {
 fn an_elastic_holds_the_cloth_up_on_the_body() {
     on_gpu(reference::an_elastic_holds_the_cloth_up_on_the_body);
 }
+
+#[test]
+fn a_stuffed_cushion_swells_smooth_and_stays_put() {
+    on_gpu(reference::a_stuffed_cushion_swells_smooth_and_stays_put);
+}
+
+#[test]
+fn an_open_bag_is_not_stuffed() {
+    on_gpu(reference::an_open_bag_is_not_stuffed);
+}

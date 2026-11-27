@@ -465,3 +465,58 @@ fn every_chart_size_is_fitted() {
         }
     }
 }
+
+/// The avatar's size is read on its chart, and a chart size gives a body
+/// of that shape (spec 37): a range is then built around the body's own
+/// size, not the chart's middle.
+#[test]
+fn the_body_knows_its_size() {
+    let mut s = Session::new(Project::new("t"));
+    let charts = ok(&mut s, json!({"type": "grading.charts"}));
+    assert!(
+        charts
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|c| c["nearest"].is_null())
+    );
+    common::women_m(&mut s);
+    let charts = ok(&mut s, json!({"type": "grading.charts"}));
+    let women = charts
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["chart"] == "women")
+        .unwrap();
+    assert_eq!(women["nearest"], "40");
+    assert_eq!(women["silhouettes"][0], "balanced");
+    let men = charts
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["chart"] == "men")
+        .unwrap();
+    assert!(men["nearest"].is_null());
+    let got = ok(&mut s, json!({"type": "avatar.get"}));
+    assert_eq!(got["size"], json!({"chart": "women", "name": "40"}));
+
+    let body = ok(
+        &mut s,
+        json!({"type": "avatar.size_body", "chart": "women", "size": "36",
+            "silhouette": "hourglass", "height_cm": 160}),
+    );
+    assert_eq!(
+        body,
+        json!({"masculinity": 0.0, "height_cm": 160.0, "bust_cm": 84.0,
+            "waist_cm": 60.0, "hips_cm": 92.0})
+    );
+    let e = run(
+        &mut s,
+        json!({"type": "avatar.size_body", "chart": "women", "size": "37"}),
+    )
+    .unwrap_err();
+    assert_eq!(e.message().code, "invalid.unknown_size");
+    ok(&mut s, json!({"type": "avatar.set", "body": body}));
+    let got = ok(&mut s, json!({"type": "avatar.get"}));
+    assert_eq!(got["size"]["name"], "36");
+}

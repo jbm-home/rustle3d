@@ -86,4 +86,10 @@ pub struct SimScene {
     pub motion: Option<BodyMotion>,
     /// Collide with the ground plane y = 0.
     pub ground: bool,
+    /// No gravity: an object shown in the shape its seams give it rather
+    /// than hanging (docs/physics.md, "Objects").
+    pub weightless: bool,
+    /// Pressure pushing the cloth closed all around towards its right
+    /// side, as stuffing does (Pa); 0: none.
+    pub pressure: f32,
 }

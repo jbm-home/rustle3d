@@ -35,8 +35,8 @@ use r3d_sim::model::Model;
 use r3d_sim::motion::{BodyMotion, ITERATIONS, ON_SKIN};
 use r3d_sim::selfcollide::MARGIN;
 use r3d_sim::solver::{
-    CLOSING_SPEED, CLOSURE_COMPLIANCE, GRAB_COMPLIANCE, NEAR, SEWING_TIME, SKIN, SUBSTEPS,
-    StepError, StepStats, grabbed, sewing, sewing_ramp,
+    CLOSING_SPEED, CLOSURE_COMPLIANCE, Drift, GRAB_COMPLIANCE, NEAR, SEWING_TIME, SKIN, SUBSTEPS,
+    StepError, StepStats, grabbed, inflation, sewing, sewing_ramp,
 };
 use r3d_sim::{SimScene, Solver};
 
@@ -79,8 +79,12 @@ struct StepUniform {
     gravity_h: [f32; 4],
     params: [f32; 4],
     grab_target: [f32; 4],
-    /// x: how far the sewing ramp has gone (0–1).
+    /// x: how far the sewing ramp has gone (0–1), y: the stuffing's
+    /// pressure (Pa).
     sewing: [f32; 4],
+    /// The rigid motion `predict` takes off the first substep's
+    /// velocities (r3d-sim `Drift`): velocity, spin, centre.
+    drift: [[f32; 4]; 3],
 }
 
 #[repr(C)]
@@ -113,7 +117,9 @@ struct GpuLayerTri {
     v: [u32; 4],
     /// The cloth triangle a seam's bridge continues ([`NONE`]: cloth).
     bridged: u32,
-    _pad: [u32; 3],
+    /// 1 if the stuffing pushes it.
+    inflated: u32,
+    _pad: [u32; 2],
 }
 
 #[repr(C)]
@@ -216,8 +222,9 @@ mod kernel {
     pub const LAYER_AVERAGE: usize = 24;
     pub const ELASTIC: usize = 25;
     pub const SHARE: usize = 26;
+    pub const INFLATE: usize = 27;
 
-    pub const ALL: [(&str, &[u32]); 27] = [
+    pub const ALL: [(&str, &[u32]); 28] = [
         ("predict", &[X, PREV, VEL, PDATA]),
         ("membrane", &[X, PDATA, MEMBRANES]),
         ("hinge", &[X, PDATA, HINGES]),
@@ -291,6 +298,7 @@ mod kernel {
         ("layer_average", &[X, LAYER_DELTA, DELTA, SEWN]),
         ("elastic", &[X, PDATA, ELASTICS, PRESS]),
         ("share", &[X, PREV, PRESS, PARTNER]),
+        ("inflate", &[X, VEL, PDATA, INCIDENT, TRIANGLES]),
     ];
 }
 
@@ -524,6 +532,11 @@ pub struct GpuSolver {
     seams: Vec<[u32; 2]>,
     closures: Vec<[u32; 2]>,
     has_seams: bool,
+    /// No gravity, and the stuffing's pressure (Pa).
+    weightless: bool,
+    pressure: f32,
+    /// The last frame's length (s; 0 before the first).
+    last_dt: f32,
     /// Positions read back after the last step, and before it.
     x: Vec<Vec3>,
     start: Vec<Vec3>,
@@ -791,7 +804,8 @@ impl GpuSolver {
                     .checked_sub(layers.cloth)
                     .and_then(|b| layers.bridged.get(b).copied())
                     .unwrap_or(NONE),
-                _pad: [0; 3],
+                inflated: u32::from(model.inflated.get(k).copied().unwrap_or(false)),
+                _pad: [0; 2],
             })
             .collect();
         let incident_csr = csr(layers.incident.iter().map(Vec::as_slice));
@@ -1107,7 +1121,11 @@ impl GpuSolver {
             all(HASH_SCATTER),
         ];
         let mut frame_passes = Vec::new();
-        let mut substep_passes = vec![all(PREDICT)];
+        let mut substep_passes = Vec::new();
+        if model.pressure > 0.0 && model.inflated.iter().any(|t| *t) {
+            substep_passes.push(all(INFLATE));
+        }
+        substep_passes.push(all(PREDICT));
         // Gather the candidates again if the cloth has moved.
         let mut regather_passes = Vec::new();
         if layered {
@@ -1190,6 +1208,9 @@ impl GpuSolver {
             seams: model.seams,
             closures: model.closures,
             has_seams: !seams.is_empty(),
+            weightless: model.weightless,
+            pressure: model.pressure,
+            last_dt: 0.0,
             start: model.positions.clone(),
             x: model.positions,
             grab: None,
@@ -1299,8 +1320,28 @@ impl Solver for GpuSolver {
         let h = frame_dt / SUBSTEPS as f32;
         let mut bytes = vec![0u8; (SLOT * u64::from(SUBSTEPS)) as usize];
         let target = self.grab.unwrap_or_default();
+        // A free weightless cloth keeps no rigid motion: its velocities
+        // estimated from the last frame's motion.
+        let drift = self
+            .weightless
+            .then(|| {
+                let v: Vec<Vec3> = self
+                    .x
+                    .iter()
+                    .zip(&self.start)
+                    .map(|(a, b)| (*a - *b) / self.last_dt)
+                    .collect();
+                Drift::of(&self.x, &v, &self.inv_mass)
+            })
+            .flatten()
+            .filter(|_| self.last_dt > 0.0)
+            .map_or([[0.0; 4]; 3], |d| {
+                [d.velocity, d.spin, d.centre].map(|v| [v.x, v.y, v.z, 0.0])
+            });
         for s in 0..SUBSTEPS as usize {
-            let (gravity, seam_alpha) = sewing(self.time + s as f32 * h, self.has_seams);
+            let t = self.time + s as f32 * h;
+            let (gravity, seam_alpha) = sewing(t, self.has_seams);
+            let gravity = if self.weightless { Vec3::ZERO } else { gravity };
             let u = StepUniform {
                 gravity_h: [gravity.x, gravity.y, gravity.z, h],
                 params: [
@@ -1310,7 +1351,8 @@ impl Solver for GpuSolver {
                     s as f32,
                 ],
                 grab_target: [target.x, target.y, target.z, 0.0],
-                sewing: [sewing_ramp(self.time + s as f32 * h), 0.0, 0.0, 0.0],
+                sewing: [sewing_ramp(t), self.pressure * inflation(t), 0.0, 0.0],
+                drift: if s == 0 { drift } else { [[0.0; 4]; 3] },
             };
             let at = s * SLOT as usize;
             bytes[at..at + std::mem::size_of::<StepUniform>()]
@@ -1345,6 +1387,7 @@ impl Solver for GpuSolver {
         }
         result?;
         self.time += frame_dt;
+        self.last_dt = frame_dt;
         self.stats =
             StepStats::measure(&self.x, &self.start, frame_dt, &self.seams, &self.closures);
         Ok(())

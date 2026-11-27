@@ -145,14 +145,16 @@ class ProjectStore {
   }
 
   /// Make a project called [name] for [body] (a preset entry: `{name,
-  /// body}`), drafted from [template] with [sizes] if given, its pieces
-  /// renamed by [pieceNames], and return its folder. The project is then
-  /// opened fresh, so its history starts empty. Drafting takes seconds
-  /// (the body is fitted): [busy] runs the long steps, showing their
-  /// progress.
+  /// body}`), or an object stuffed by [stuffing] when [body] is null
+  /// (docs/specs/36-objects.md), drafted from [template] with [sizes] if
+  /// given, its pieces renamed by [pieceNames], and return its folder.
+  /// The project is then opened fresh, so its history starts empty.
+  /// Drafting takes seconds (the body is fitted): [busy] runs the long
+  /// steps, showing their progress.
   Future<String> create({
     required String name,
-    required Map<String, dynamic> body,
+    required Map<String, dynamic>? body,
+    double? stuffing,
     Future<String> Function(Engine engine, Future<String> Function()) busy =
         _noCard,
     String? template,
@@ -163,11 +165,15 @@ class ProjectStore {
     final engine = Engine.open(path: path);
     try {
       engine.run(
-        stepJson: jsonEncode({
-          'type': 'avatar.set',
-          'body': body['body'],
-          'preset': body['name'],
-        }),
+        stepJson: jsonEncode(
+          body == null
+              ? {'type': 'object.set', 'stuffing': ?stuffing}
+              : {
+                  'type': 'avatar.set',
+                  'body': body['body'],
+                  'preset': ?body['name'],
+                },
+        ),
       );
       if (template != null) {
         await busy(
