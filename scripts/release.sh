@@ -102,7 +102,7 @@ case "$os" in
 esac
 cat > "$legal/README.txt" <<EOF
 Rustle3D $version - 3D garment design: draft patterns, sew, drape.
-https://rustle3d.com
+https://app.rustle3d.com
 
 Rustle3D is free software under the GNU General Public License, version 3
 or later (LICENSE). Its source code, for this exact version:
@@ -115,7 +115,7 @@ crates) and LICENSES-flutter.txt (Flutter and its packages).
 r3d is the command-line tool (r3d --help). $cli_where.
 
 The packages are not signed yet: the first launch needs one extra step,
-explained in the user guide, https://rustle3d.com/en/guide/ (Installing).
+explained in the user guide, https://app.rustle3d.com/en/guide/ (Installing).
 EOF
 
 case "$os" in

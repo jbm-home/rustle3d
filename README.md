@@ -36,7 +36,7 @@ interface, on macOS, Windows and Linux.
 
 ## Download
 
-Get the latest version from [rustle3d.com](https://rustle3d.com) or the
+Get the latest version from [app.rustle3d.com](https://app.rustle3d.com) or the
 [releases page](https://github.com/jbm-home/rustle3d/releases/latest):
 
 | System | Download |

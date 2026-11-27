@@ -84,7 +84,7 @@ knowing pattern making, and I learn along the way.
   cards with a picture of their pattern; "Open…" for a project anywhere on
   disk, and "All projects" for the rest), New (template cards with
   thumbnails generated offscreen by our renderer, and a blank project),
-  and Rustle3D (the version, updates and news on rustle3d.com, the
+  and Rustle3D (the version, updates and news on app.rustle3d.com, the
   projects folder).
 - Measurements are entered on a body silhouette with labelled fields and
   sensible defaults per size (S/M/L).

@@ -122,7 +122,7 @@ class StartScreen extends StatefulWidget {
 const _recentCount = 4;
 
 /// Where updates and news are published.
-final _website = Uri.parse('https://rustle3d.com');
+final _website = Uri.parse('https://app.rustle3d.com');
 
 /// Pictures of patterns (templates and projects), cached per theme.
 class _Thumbs {

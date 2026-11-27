@@ -142,7 +142,7 @@ If `cargo` is not on `PATH`, run `source ~/.cargo/env` first.
   maintainer tests each milestone against its spec.
 - Documentation and code are in English.
 - **User guide for the website**: `docs/user-guide.md` is the source of
-  the user documentation on rustle3d.com (plain words, for users, not
+  the user documentation on app.rustle3d.com (plain words, for users, not
   developers). Every user-visible change (tool, shortcut, menu, format,
   limit) updates it in the same commit, and its "Last updated" line.
 - **End of a piece of work**: tell the user whether to go on in this

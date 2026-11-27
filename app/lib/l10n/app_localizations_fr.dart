@@ -200,7 +200,7 @@ class LFr extends L {
   }
 
   @override
-  String get updatesLink => 'Mises à jour et actualités sur rustle3d.com';
+  String get updatesLink => 'Mises à jour et actualités sur app.rustle3d.com';
 
   @override
   String get supportLink => 'Soutenir Rustle3D';
@@ -228,7 +228,7 @@ class LFr extends L {
 
   @override
   String get updateText =>
-      'Téléchargez-la sur rustle3d.com et installez-la par-dessus cette version : vos projets sont conservés.';
+      'Téléchargez-la sur app.rustle3d.com et installez-la par-dessus cette version : vos projets sont conservés.';
 
   @override
   String get updateDownload => 'Télécharger';
@@ -244,7 +244,7 @@ class LFr extends L {
 
   @override
   String get updateAutoHint =>
-      'L’application demande à rustle3d.com le numéro de la dernière version, en n’envoyant que sa propre version et son système. Elle ne télécharge ni n’installe jamais rien d’elle-même.';
+      'L’application demande à app.rustle3d.com le numéro de la dernière version, en n’envoyant que sa propre version et son système. Elle ne télécharge ni n’installe jamais rien d’elle-même.';
 
   @override
   String get updateCheckNow => 'Vérifier maintenant';
@@ -254,7 +254,7 @@ class LFr extends L {
 
   @override
   String get updateFailed =>
-      'Impossible de joindre rustle3d.com. Vérifiez votre connexion et réessayez.';
+      'Impossible de joindre app.rustle3d.com. Vérifiez votre connexion et réessayez.';
 
   @override
   String get updateCheck => 'Rechercher les mises à jour';

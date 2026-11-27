@@ -1,5 +1,5 @@
 // Telling the user a new version is out, without getting in the way: at
-// most once a day, the app reads https://rustle3d.com/latest.json (written
+// most once a day, the app reads https://app.rustle3d.com/latest.json (written
 // by the website when it is built for a release). A newer version shows a
 // card on the start screen, never while someone works. Nothing is installed
 // by the app: the card opens the download page. Offline or on any error the
@@ -16,11 +16,11 @@ import 'design/tokens.dart';
 import 'i18n.dart';
 
 /// Where the website publishes the latest version.
-final latestUrl = Uri.parse('https://rustle3d.com/latest.json');
+final latestUrl = Uri.parse('https://app.rustle3d.com/latest.json');
 
 /// The download page, in the UI language.
 Uri downloadUrl(String language) =>
-    Uri.parse('https://rustle3d.com/$language/download/');
+    Uri.parse('https://app.rustle3d.com/$language/download/');
 
 /// The shortest time between two checks.
 const _checkGap = Duration(days: 1);

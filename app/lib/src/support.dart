@@ -14,7 +14,7 @@ import 'i18n.dart';
 
 /// The donation page. One address the site controls, so the platform
 /// behind it can change without a new release of the app.
-final donateUrl = Uri.parse('https://rustle3d.com/donate');
+final donateUrl = Uri.parse('https://app.rustle3d.com/donate');
 
 /// Launches before the card may show for the first time.
 const _launchesBeforeFirstReminder = 10;

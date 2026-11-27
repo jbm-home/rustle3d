@@ -1,6 +1,6 @@
 # Building Rustle3D from source
 
-To use Rustle3D, download it from [rustle3d.com](https://rustle3d.com) or
+To use Rustle3D, download it from [app.rustle3d.com](https://app.rustle3d.com) or
 the [releases](https://github.com/jbm-home/rustle3d/releases): nothing
 to build. This page is for contributors, and for anyone who would rather
 run the app built from its source code.

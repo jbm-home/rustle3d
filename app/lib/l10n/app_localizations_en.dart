@@ -198,7 +198,7 @@ class LEn extends L {
   }
 
   @override
-  String get updatesLink => 'Updates and news on rustle3d.com';
+  String get updatesLink => 'Updates and news on app.rustle3d.com';
 
   @override
   String get supportLink => 'Support Rustle3D';
@@ -226,7 +226,7 @@ class LEn extends L {
 
   @override
   String get updateText =>
-      'Download it from rustle3d.com and install it over this version: your projects are kept.';
+      'Download it from app.rustle3d.com and install it over this version: your projects are kept.';
 
   @override
   String get updateDownload => 'Download';
@@ -242,7 +242,7 @@ class LEn extends L {
 
   @override
   String get updateAutoHint =>
-      'The app asks rustle3d.com for the latest version number, sending only its own version and system. It never downloads or installs anything by itself.';
+      'The app asks app.rustle3d.com for the latest version number, sending only its own version and system. It never downloads or installs anything by itself.';
 
   @override
   String get updateCheckNow => 'Check now';
@@ -252,7 +252,7 @@ class LEn extends L {
 
   @override
   String get updateFailed =>
-      'rustle3d.com could not be reached. Check your connection and try again.';
+      'app.rustle3d.com could not be reached. Check your connection and try again.';
 
   @override
   String get updateCheck => 'Check for updates';

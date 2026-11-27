@@ -50,9 +50,9 @@ pub fn manifest(r3d: &Path) -> Value {
         "display_name": "Rustle3D",
         "version": env!("CARGO_PKG_VERSION"),
         "description": "Design garments in Rustle3D: draft and sew pattern pieces, drape them on the avatar and look at the result, live in the project open in the app.",
-        "author": { "name": "Rustle3D", "url": "https://rustle3d.com" },
-        "homepage": "https://rustle3d.com",
-        "documentation": "https://rustle3d.com/en/guide/",
+        "author": { "name": "Rustle3D", "url": "https://app.rustle3d.com" },
+        "homepage": "https://app.rustle3d.com",
+        "documentation": "https://app.rustle3d.com/en/guide/",
         "license": "GPL-3.0-or-later",
         "icon": "icon.png",
         "server": {

@@ -94,7 +94,7 @@
       }
     }
   },
-  "updatesLink": "Updates and news on rustle3d.com",
+  "updatesLink": "Updates and news on app.rustle3d.com",
   "supportLink": "Support Rustle3D",
   "supportTitle": "Rustle3D is free and open source",
   "supportText": "If it is useful to you, a donation helps cover its costs: hosting, test hardware and development time. Everything stays free either way.",
@@ -109,15 +109,15 @@
       }
     }
   },
-  "updateText": "Download it from rustle3d.com and install it over this version: your projects are kept.",
+  "updateText": "Download it from app.rustle3d.com and install it over this version: your projects are kept.",
   "updateDownload": "Download",
   "updateSkip": "Skip this version",
   "updatesTitle": "Updates",
   "updateAuto": "Check for updates once a day",
-  "updateAutoHint": "The app asks rustle3d.com for the latest version number, sending only its own version and system. It never downloads or installs anything by itself.",
+  "updateAutoHint": "The app asks app.rustle3d.com for the latest version number, sending only its own version and system. It never downloads or installs anything by itself.",
   "updateCheckNow": "Check now",
   "updateLatest": "You have the latest version.",
-  "updateFailed": "rustle3d.com could not be reached. Check your connection and try again.",
+  "updateFailed": "app.rustle3d.com could not be reached. Check your connection and try again.",
   "updateCheck": "Check for updates",
   "cannotOpen": "Could not open {target}.",
   "@cannotOpen": {
