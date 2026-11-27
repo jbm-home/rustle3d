@@ -203,6 +203,10 @@ pub enum CommandError {
     },
     #[error("{panel} is wider than the fabric ({width_mm} mm) in every direction it may lie")]
     MarkerTooNarrow { panel: AnyId, width_mm: f64 },
+    #[error(
+        "{line} leaves its piece or crosses its outline: move it back inside, or remove it (internal_line.remove)"
+    )]
+    LineOutside { line: AnyId },
     #[error("nothing to simulate: place at least one panel around the body (panel.place)")]
     NothingToSimulate,
     #[error("stopped before the end: nothing was changed")]
@@ -294,6 +298,7 @@ impl Localizable for CommandError {
             Self::NothingToUndo => Message::new("nothing_to_undo", text),
             Self::NothingToRedo => Message::new("nothing_to_redo", text),
             Self::NothingToSimulate => Message::new("nothing_to_simulate", text),
+            Self::LineOutside { line } => Message::new("line_outside", text).arg("line", line),
             Self::MarkerTooNarrow { panel, width_mm } => Message::new("marker_too_narrow", text)
                 .arg("panel", panel)
                 .arg("width_mm", width_mm),

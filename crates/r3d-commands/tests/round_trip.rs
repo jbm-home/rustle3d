@@ -218,8 +218,11 @@ fn every_command_round_trips() {
     h.round_trip(json!({"type": "quilting.set", "quilting": quilting,
         "pattern": "channels", "loft_mm": 12}));
     h.round_trip(json!({"type": "quilting.remove", "quilting": quilting}));
-    h.round_trip(json!({"type": "elastic.shirr", "panel": poly_panel,
+    let shirring = h.round_trip(json!({"type": "elastic.shirr", "panel": poly_panel,
         "edge": poly.created[5].to_string(), "rows": 3}));
+    // A shirring row's elastic, with its line.
+    h.round_trip(json!({"type": "elastic.remove",
+        "elastic": shirring.created[1].to_string()}));
 
     let split = h.round_trip(json!({"type": "edge.split", "edge": edge, "at_mm": 100}));
     let new_point = split.created[0].to_string();

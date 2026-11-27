@@ -102,6 +102,7 @@ extension Messages on BuildContext {
       'nothing_to_redo' => l.errNothingToRedo,
       'nothing_to_simulate' => l.errNothingToSimulate,
       'marker_too_narrow' => l.errMarkerTooNarrow,
+      'line_outside' => l.errLineOutside,
       'cancelled' => l.errCancelled,
       'invalid.inverted' => l.errInverted,
       'model.malformed' => l.errModelMalformed(arg('format'), arg('detail')),

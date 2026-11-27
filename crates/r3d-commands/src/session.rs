@@ -138,11 +138,13 @@ impl Session {
         for (i, cmd) in cmds.iter().enumerate() {
             outputs.push(cmd.apply(&mut tx, progress).map_err(|e| wrap(i, e))?);
         }
-        // Constraints hold after every step; then the derived geometry
-        // follows (symmetric halves, then linked mirror copies, which may
-        // copy a symmetric piece).
+        // Constraints hold after every step; shirring rows follow their
+        // pieces' outlines; then the derived geometry follows (symmetric
+        // halves, then linked mirror copies, which may copy a symmetric
+        // piece).
         crate::commands::settle_constraints(&mut tx)?;
         crate::commands::settle_trims(&mut tx);
+        crate::commands::settle_shirring(&mut tx);
         crate::commands::settle_details(&mut tx);
         crate::commands::sync_symmetry(&mut tx)?;
         crate::commands::sync_mirrors(&mut tx)?;

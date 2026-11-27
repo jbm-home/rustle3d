@@ -433,6 +433,7 @@ fn sample() -> Project {
             },
             ratio: 0.6,
             width_mm: 10.0,
+            shirring: false,
         }),
     );
     // Two rows of heavy white topstitching along the top (v23).
@@ -477,6 +478,34 @@ fn sample() -> Project {
             padding_gsm: 100.0,
             stitch_mm: 3.0,
             color: None,
+        }),
+    );
+    // A shirring row across the piece (v29).
+    let row = tx.new_internal_line_id();
+    tx.put_internal_line(
+        row,
+        InternalLine {
+            panel,
+            start: DVec2::new(1.0, 540.0),
+            segments: vec![PathSegment::Line {
+                to: DVec2::new(399.0, 540.0),
+            }],
+        },
+    );
+    let shirring = tx.new_detail_id();
+    tx.put_detail(
+        shirring,
+        Detail::Elastic(Elastic {
+            side: SeamSide {
+                edges: Vec::new(),
+                line: Some(row),
+                from_mm: None,
+                to_mm: None,
+                reversed: false,
+            },
+            ratio: 0.75,
+            width_mm: 2.0,
+            shirring: true,
         }),
     );
     tx.commit();

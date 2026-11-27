@@ -2877,6 +2877,10 @@ class LEn extends L {
       'A piece is wider than the fabric: choose a wider fabric.';
 
   @override
+  String get errLineOutside =>
+      'A line drawn on a piece now leaves it: move it back inside the piece, or delete it.';
+
+  @override
   String garmentTotals(int pieces, String area, String mass) {
     return '$pieces pieces · $area m² of fabric cut · $mass g';
   }

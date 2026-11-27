@@ -73,7 +73,20 @@ and the topstitching.
   edge, the next ones a gap apart (default 15 mm), across the whole
   piece, stopping 1 mm short of its outline. Undo removes the lines
   and the elastics together.
+- Each row is a **shirring row** (schema v29, 2026-11-27): when the
+  piece's outline changes (a point moved, an edge reshaped), the row
+  keeps its straight line and its
+  ends follow the outline, 1 mm short of it, on the stretch of the
+  piece nearest the row's middle; a row the piece no longer runs
+  across (under 10 mm) goes, with its elastic. Removing a row's elastic
+  (`elastic.remove`) removes its line too, unless something else is on
+  it (a seam, a topstitch…). A row whose line was redrawn as a curve is
+  left as it is.
 - Removing the side (the edge or the line) removes its elastic.
+- An internal line left outside its piece by an outline edit (a line
+  drawn by hand with an elastic, a seam) is named by the drape:
+  `simulate` fails with `line_outside` and the line, to move back
+  inside or remove.
 
 ### Topstitching
 - A **topstitch** runs along a side (as an elastic's) in 1 to 3

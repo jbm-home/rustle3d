@@ -4,7 +4,7 @@
 
 mod common;
 
-use r3d_commands::drape::simulate;
+use r3d_commands::drape::{prepare, simulate};
 use r3d_commands::progress::Progress;
 use r3d_commands::{CommandError, Session, Step};
 use r3d_core::{Localizable, Project};
@@ -119,6 +119,184 @@ fn shirring_adds_rows_of_elastic_across_the_piece() {
     )
     .unwrap();
     assert_eq!(s.project().details().len(), 3);
+}
+
+/// The shirring rows' lines, bottom to top, as (start, end).
+fn rows(s: &Session) -> Vec<(r3d_geom::DVec2, r3d_geom::DVec2)> {
+    let mut rows: Vec<_> = s
+        .project()
+        .internal_lines()
+        .values()
+        .map(|l| {
+            let r3d_core::PathSegment::Line { to } = l.segments[0] else {
+                panic!("a straight row");
+            };
+            (l.start, to)
+        })
+        .collect();
+    rows.sort_by(|a, b| a.0.y.total_cmp(&b.0.y));
+    rows
+}
+
+#[test]
+fn shirring_rows_follow_the_outline() {
+    let mut s = Session::new(Project::new("t"));
+    common::women_m(&mut s);
+    let r = run(
+        &mut s,
+        json!({"type": "panel.create_rect", "origin": [0, 0], "width": 400, "height": 300}),
+    )
+    .unwrap();
+    let created = r["created"].as_array().unwrap();
+    let (panel, top_right, top_left, top) = (&created[0], &created[3], &created[4], &created[7]);
+    run(
+        &mut s,
+        json!({"type": "elastic.shirr", "panel": panel, "edge": top, "rows": 4,
+            "first_mm": 20, "gap_mm": 12}),
+    )
+    .unwrap();
+    let before = rows(&s);
+    // The right side slants in: each row ends 1 mm short of it, at its
+    // own height.
+    run(
+        &mut s,
+        json!({"type": "point.move", "point": top_right, "to": [300, 300]}),
+    )
+    .unwrap();
+    let after = rows(&s);
+    assert_eq!(after.len(), 4);
+    for ((a0, a1), (b0, _)) in after.iter().zip(&before) {
+        assert_eq!(a0.y, b0.y);
+        assert_eq!(a1.y, b0.y);
+        // Along the top edge: right to left.
+        assert!((a1.x - 1.0).abs() < 1e-6, "{a1}");
+        let side = 400.0 - 100.0 * a0.y / 300.0;
+        assert!((a0.x - (side - 1.0)).abs() < 1e-6, "{a0} vs {side}");
+    }
+    // The piece meshes with them.
+    run(
+        &mut s,
+        json!({"type": "panel.place", "panel": panel, "angle_deg": 0, "top_cm": 120}),
+    )
+    .unwrap();
+    prepare(s.project(), None).unwrap();
+    // One undo step: the move and the rows.
+    s.undo().unwrap();
+    s.undo().unwrap();
+    assert_eq!(rows(&s), before);
+    s.redo().unwrap();
+    assert_eq!(rows(&s), after);
+    // The top comes down past three rows: they go, with their elastics.
+    run(
+        &mut s,
+        json!({"type": "point.move", "point": top_left, "to": [0, 250]}),
+    )
+    .unwrap();
+    assert_eq!(rows(&s).len(), 4);
+    run(
+        &mut s,
+        json!({"type": "point.move", "point": top_right, "to": [300, 250]}),
+    )
+    .unwrap();
+    assert_eq!(rows(&s).len(), 1);
+    assert_eq!(s.project().details().len(), 1);
+    s.project().check_integrity().unwrap();
+    s.undo().unwrap();
+    assert_eq!(rows(&s).len(), 4);
+    assert_eq!(s.project().details().len(), 4);
+}
+
+#[test]
+fn removing_a_shirring_row_removes_its_line() {
+    let mut s = Session::new(Project::new("t"));
+    let (panel, edges) = rect(&mut s);
+    let out = run(
+        &mut s,
+        json!({"type": "elastic.shirr", "panel": panel, "edge": edges[2], "rows": 3}),
+    )
+    .unwrap();
+    // Created: line, elastic, line, elastic…
+    let created = out["created"].as_array().unwrap();
+    run(
+        &mut s,
+        json!({"type": "elastic.remove", "elastic": created[1]}),
+    )
+    .unwrap();
+    assert_eq!(s.project().internal_lines().len(), 2);
+    assert_eq!(s.project().details().len(), 2);
+    s.undo().unwrap();
+    assert_eq!(s.project().internal_lines().len(), 3);
+    // A row topstitched too keeps its line.
+    run(
+        &mut s,
+        json!({"type": "topstitch.add", "side": {"line": created[2]}, "offset_mm": 0}),
+    )
+    .unwrap();
+    run(
+        &mut s,
+        json!({"type": "elastic.remove", "elastic": created[3]}),
+    )
+    .unwrap();
+    assert_eq!(s.project().internal_lines().len(), 3);
+    // An elastic on a line drawn by hand leaves the line.
+    let line = run(
+        &mut s,
+        json!({"type": "internal_line.add", "panel": panel, "start": [50, 50],
+            "segments": [{"kind": "line", "to": [350, 50]}]}),
+    )
+    .unwrap()["created"][0]
+        .clone();
+    let elastic = run(
+        &mut s,
+        json!({"type": "elastic.add", "side": {"line": line}}),
+    )
+    .unwrap()["created"][0]
+        .clone();
+    run(
+        &mut s,
+        json!({"type": "elastic.remove", "elastic": elastic}),
+    )
+    .unwrap();
+    assert_eq!(s.project().internal_lines().len(), 4);
+}
+
+#[test]
+fn a_line_left_outside_its_piece_is_named_by_the_drape() {
+    let mut s = Session::new(Project::new("t"));
+    common::women_m(&mut s);
+    let r = run(
+        &mut s,
+        json!({"type": "panel.create_rect", "origin": [0, 0], "width": 400, "height": 300}),
+    )
+    .unwrap();
+    let created = r["created"].as_array().unwrap();
+    let (panel, top_right) = (&created[0], &created[3]);
+    let line = run(
+        &mut s,
+        json!({"type": "internal_line.add", "panel": panel, "start": [20, 250],
+            "segments": [{"kind": "line", "to": [380, 250]}]}),
+    )
+    .unwrap()["created"][0]
+        .clone();
+    run(
+        &mut s,
+        json!({"type": "elastic.add", "side": {"line": line}}),
+    )
+    .unwrap();
+    run(
+        &mut s,
+        json!({"type": "point.move", "point": top_right, "to": [300, 300]}),
+    )
+    .unwrap();
+    run(
+        &mut s,
+        json!({"type": "panel.place", "panel": panel, "angle_deg": 0, "top_cm": 120}),
+    )
+    .unwrap();
+    let err = prepare(s.project(), None).unwrap_err();
+    let m = err.message();
+    assert_eq!(m.code, "line_outside");
+    assert_eq!(m.args["line"], line.as_str().unwrap());
 }
 
 #[test]

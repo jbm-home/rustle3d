@@ -96,7 +96,7 @@ Choose the unit used to display lengths (storage is always mm).
 
 ### `avatar.set`
 
-Set the avatar's body: masculinity (0 feminine – 1 masculine), height, bust, waist and hips in cm, and for a child its age_years (0–18; left out: an adult). The 3D body is fitted to these measurements, with a child's proportions at that age; avatar.get reports what it actually measures.
+Set the avatar's body. The measurements go inside `body`, not at the top level: {"body": {"masculinity": 0, "height_cm": 168, "bust_cm": 92, "waist_cm": 74, "hips_cm": 100}}; masculinity 0 feminine – 1 masculine, the rest in cm, and for a child `age_years` (0–18; left out: an adult). `preset` only records which preset the body came from: to use one, copy its `body` from avatar.presets. The 3D body is fitted to these measurements, with a child's proportions at that age; avatar.get reports what it actually measures.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -153,10 +153,10 @@ Set the avatar's body: masculinity (0 feminine – 1 masculine), height, bust, w
   "properties": {
     "body": {
       "$ref": "#/$defs/Body",
-      "description": "Measurements in cm; `masculinity` 0 = feminine body, 1 = masculine."
+      "description": "The measurements: `masculinity` (0 = feminine body, 1 =\nmasculine), `height_cm`, `bust_cm`, `waist_cm`, `hips_cm`, and\n`age_years` for a child."
     },
     "preset": {
-      "description": "Name of the preset the measurements come from, if any.",
+      "description": "Name of the preset the measurements come from, if any (a label:\nthe body is still given in `body`).",
       "type": [
         "string",
         "null"
@@ -3443,7 +3443,7 @@ Change an elastic: its `ratio` (or `relaxed_mm`) and its `width_mm`; what is omi
 
 ### `elastic.remove`
 
-Remove an elastic: its side no longer gathers.
+Remove an elastic: its side no longer gathers. A shirring row's line goes with it, unless something else is sewn on it.
 
 <details><summary>Parameters (JSON schema)</summary>
 
@@ -3476,7 +3476,7 @@ Remove an elastic: its side no longer gathers.
 
 ### `elastic.shirr`
 
-Shirr a piece: `rows` parallel rows of elastic across it, along `edge`'s chord, the first `first_mm` inside it (default 15), then every `gap_mm` (default 15), each an internal line with its elastic (`ratio`, default 0.75; `width_mm`, default 2), stopping 1 mm short of the outline. One undo step. Returns the lines and the elastics.
+Shirr a piece: `rows` parallel rows of elastic across it, along `edge`'s chord, the first `first_mm` inside it (default 15), then every `gap_mm` (default 15), each an internal line with its elastic (`ratio`, default 0.75; `width_mm`, default 2), stopping 1 mm short of the outline. When the outline changes the rows follow it (a row the piece no longer runs across goes); `elastic.remove` on a row removes its line too. One undo step. Returns the lines and the elastics.
 
 <details><summary>Parameters (JSON schema)</summary>
 

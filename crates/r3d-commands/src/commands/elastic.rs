@@ -3,8 +3,8 @@
 use r3d_core::detail::{ELASTIC_RATIO, ELASTIC_WIDTH_MM};
 use r3d_core::seam::Span;
 use r3d_core::{
-    Detail, DetailId, EdgeId, Elastic, InternalLine, PanelId, PathSegment, Project, SeamSide,
-    Topstitch, Transaction,
+    Detail, DetailId, EdgeId, Elastic, InterfacingArea, InternalLine, InternalLineId, PanelId,
+    PathSegment, Project, SeamSide, Topstitch, Transaction,
 };
 use r3d_geom::DVec2;
 use schemars::JsonSchema;
@@ -28,6 +28,9 @@ pub const SHIRRING_WIDTH_MM: f64 = 2.0;
 const SHIRRING_MARGIN_MM: f64 = 1.0;
 /// The most shirring rows in one go.
 pub const MAX_SHIRRING_ROWS: u32 = 30;
+/// A shirring row shorter than this (mm) once the outline changed is
+/// removed: the piece no longer runs across it.
+const MIN_SHIRRING_ROW_MM: f64 = 10.0;
 
 fn ratio(field: &'static str, r: f64) -> Result<f64, CommandError> {
     finite(field, &[r])?;
@@ -144,6 +147,7 @@ impl CommandSpec for ElasticAdd {
                 side,
                 ratio,
                 width_mm,
+                shirring: false,
             }),
         );
         Ok(CommandOutput {
@@ -206,15 +210,36 @@ pub struct ElasticRemove {
 }
 
 impl Described for ElasticRemove {
-    const SUMMARY: &'static str = "Remove an elastic: its side no longer gathers.";
+    const SUMMARY: &'static str = "Remove an elastic: its side no longer gathers. A shirring row's line goes with it, unless something else is sewn on it.";
 }
 
 impl CommandSpec for ElasticRemove {
     fn apply(&self, tx: &mut Transaction<'_>) -> Result<CommandOutput, CommandError> {
-        get_elastic(tx.project(), self.elastic)?;
+        let e = get_elastic(tx.project(), self.elastic)?;
         tx.remove_detail(self.elastic);
+        if let (true, Some(line)) = (e.shirring, e.side.line)
+            && !line_in_use(tx.project(), line)
+        {
+            tx.remove_internal_line(line);
+        }
         Ok(CommandOutput::default())
     }
+}
+
+/// Something (a seam, a zipper, a detail) is on the internal line.
+fn line_in_use(p: &Project, line: InternalLineId) -> bool {
+    let on = |side: &SeamSide| side.line == Some(line);
+    p.seams().values().any(|s| on(&s.a) || on(&s.b))
+        || p.zippers().values().any(|z| on(&z.a) || on(&z.b))
+        || p.details().values().any(|d| match d {
+            Detail::Elastic(Elastic { side, .. }) | Detail::Topstitch(Topstitch { side, .. }) => {
+                on(side)
+            }
+            Detail::Interfacing(i) => {
+                matches!(i.area, InterfacingArea::Inside { line: l } if l == line)
+            }
+            Detail::Quilting(q) => q.line == Some(line),
+        })
 }
 
 /// Shirr a piece: parallel rows of elastic.
@@ -241,7 +266,7 @@ pub struct ElasticShirr {
 }
 
 impl Described for ElasticShirr {
-    const SUMMARY: &'static str = "Shirr a piece: `rows` parallel rows of elastic across it, along `edge`'s chord, the first `first_mm` inside it (default 15), then every `gap_mm` (default 15), each an internal line with its elastic (`ratio`, default 0.75; `width_mm`, default 2), stopping 1 mm short of the outline. One undo step. Returns the lines and the elastics.";
+    const SUMMARY: &'static str = "Shirr a piece: `rows` parallel rows of elastic across it, along `edge`'s chord, the first `first_mm` inside it (default 15), then every `gap_mm` (default 15), each an internal line with its elastic (`ratio`, default 0.75; `width_mm`, default 2), stopping 1 mm short of the outline. When the outline changes the rows follow it (a row the piece no longer runs across goes); `elastic.remove` on a row removes its line too. One undo step. Returns the lines and the elastics.";
 }
 
 /// Where the straight line through `origin` along `dir` is inside the
@@ -312,11 +337,8 @@ impl CommandSpec for ElasticShirr {
             .ok_or_else(|| CommandError::invalid("edge", Invalid::ZeroVector))?;
         // Outlines turn counter-clockwise: the inside is on the left.
         let inward = dir.perp();
-        let mut loops = vec![
-            p.panel_outline(self.panel)
-                .ok_or_else(|| CommandError::not_found(self.panel))?,
-        ];
-        loops.extend(p.hole_outlines(self.panel));
+        let loops =
+            piece_loops(p, self.panel).ok_or_else(|| CommandError::not_found(self.panel))?;
         let mut rows: Vec<(DVec2, DVec2)> = Vec::new();
         for k in 0..self.rows {
             let origin = a.pos + inward * (first + gap * f64::from(k));
@@ -354,6 +376,7 @@ impl CommandSpec for ElasticShirr {
                     },
                     ratio,
                     width_mm,
+                    shirring: true,
                 }),
             );
             created.push(line.into());
@@ -362,6 +385,87 @@ impl CommandSpec for ElasticShirr {
         Ok(CommandOutput { created })
     }
 }
+
+/// The piece's outline and holes, as loops.
+fn piece_loops(p: &Project, panel: PanelId) -> Option<Vec<Vec<DVec2>>> {
+    let mut loops = vec![p.panel_outline(panel)?];
+    loops.extend(p.hole_outlines(panel));
+    Some(loops)
+}
+
+/// After a step: each shirring row runs across its piece as it is now,
+/// 1 mm short of the outline, along its own straight line (the stretch
+/// of the piece nearest its middle); a row the piece no longer runs
+/// across goes, with its elastic. A row whose line was redrawn (not one
+/// straight segment) is left as it is. The changes join the step's undo
+/// step.
+pub(crate) fn settle_shirring(tx: &mut Transaction<'_>) {
+    let p = tx.project();
+    let mut moved: Vec<(InternalLineId, InternalLine)> = Vec::new();
+    let mut gone: Vec<(DetailId, InternalLineId)> = Vec::new();
+    let mut loops: std::collections::BTreeMap<PanelId, Option<Vec<Vec<DVec2>>>> =
+        std::collections::BTreeMap::new();
+    for (id, e) in p.elastics() {
+        let (true, Some(line_id)) = (e.shirring, e.side.line) else {
+            continue;
+        };
+        let Some(line) = p.internal_line(line_id) else {
+            continue;
+        };
+        let [PathSegment::Line { to }] = line.segments.as_slice() else {
+            continue;
+        };
+        let (start, to) = (line.start, *to);
+        let length = start.distance(to);
+        let Some(dir) = (to - start).try_normalize() else {
+            continue;
+        };
+        let Some(piece) = loops
+            .entry(line.panel)
+            .or_insert_with(|| piece_loops(p, line.panel))
+        else {
+            continue;
+        };
+        let middle = 0.5 * length;
+        let nearest = inside_stretches(piece, start, dir)
+            .into_iter()
+            .map(|(t0, t1)| (t0 + SHIRRING_MARGIN_MM, t1 - SHIRRING_MARGIN_MM))
+            .filter(|(t0, t1)| t1 - t0 >= MIN_SHIRRING_ROW_MM)
+            .min_by(|a, b| {
+                let off = |(t0, t1): &(f64, f64)| (t0 - middle).max(middle - t1).max(0.0);
+                off(a).total_cmp(&off(b))
+            });
+        match nearest {
+            None => gone.push((id, line_id)),
+            Some((t0, t1)) => {
+                let (a, b) = (start + dir * t0, start + dir * t1);
+                if a.distance(start) > ROW_MOVED_MM || b.distance(to) > ROW_MOVED_MM {
+                    moved.push((
+                        line_id,
+                        InternalLine {
+                            start: a,
+                            segments: vec![PathSegment::Line { to: b }],
+                            ..line.clone()
+                        },
+                    ));
+                }
+            }
+        }
+    }
+    for (id, line) in moved {
+        tx.put_internal_line(id, line);
+    }
+    for (elastic, line) in gone {
+        tx.remove_detail(elastic);
+        if !line_in_use(tx.project(), line) {
+            tx.remove_internal_line(line);
+        }
+    }
+}
+
+/// A shirring row's end closer than this (mm) to where it belongs is
+/// left alone (rounding).
+const ROW_MOVED_MM: f64 = 1e-6;
 
 /// After a step: drop the details whose sides or areas are gone. The changes join
 /// the step's undo step.

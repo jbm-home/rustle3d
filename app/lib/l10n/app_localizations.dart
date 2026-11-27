@@ -4861,6 +4861,12 @@ abstract class L {
   /// **'A piece is wider than the fabric: choose a wider fabric.'**
   String get errMarkerTooNarrow;
 
+  /// No description provided for @errLineOutside.
+  ///
+  /// In en, this message translates to:
+  /// **'A line drawn on a piece now leaves it: move it back inside the piece, or delete it.'**
+  String get errLineOutside;
+
   /// No description provided for @garmentTotals.
   ///
   /// In en, this message translates to:

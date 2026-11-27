@@ -20,7 +20,7 @@ use crate::model::Project;
 /// Identifies a Rustle3D project file.
 pub const FORMAT: &str = "rustle3d.project";
 /// Version written by this build.
-pub const SCHEMA_VERSION: u32 = 28;
+pub const SCHEMA_VERSION: u32 = 29;
 
 type Migration = fn(Value) -> Result<Value, FileError>;
 
@@ -53,6 +53,7 @@ const MIGRATIONS: &[Migration] = &[
     migrate_v25_to_v26,
     migrate_v26_to_v27,
     migrate_v27_to_v28,
+    migrate_v28_to_v29,
 ];
 
 fn object<'a>(
@@ -62,6 +63,13 @@ fn object<'a>(
     value.as_object_mut().ok_or_else(|| FileError::Json {
         detail: format!("{what} is not an object"),
     })
+}
+
+/// v29 marks an elastic as a shirring row (`shirring`, absent: not
+/// one). Nothing to convert: rows shirred before stay plain elastics on
+/// their lines.
+fn migrate_v28_to_v29(project: Value) -> Result<Value, FileError> {
+    Ok(project)
 }
 
 /// v28 adds how the project's photos are taken (`photo`, absent: not

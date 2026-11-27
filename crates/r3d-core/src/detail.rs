@@ -440,6 +440,11 @@ pub struct Elastic {
     pub ratio: f64,
     /// Its width (mm): how strongly it pulls.
     pub width_mm: f64,
+    /// A shirring row (`elastic.shirr`): its internal line was made for
+    /// it, runs straight across the piece, follows the outline (1 mm
+    /// short of it) when the piece changes, and goes with the elastic.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub shirring: bool,
 }
 
 impl Elastic {

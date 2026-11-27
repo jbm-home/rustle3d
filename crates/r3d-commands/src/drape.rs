@@ -34,7 +34,7 @@ use r3d_core::{
 };
 use r3d_geom::DVec2;
 use r3d_geom::Rigid;
-use r3d_geom::mesh::{FineZone, mesh_panel};
+use r3d_geom::mesh::{FineZone, MeshError, mesh_panel};
 use r3d_sim::collide::{Skin, StaticMesh};
 use r3d_sim::motion::BodyMotion;
 use r3d_sim::scene::{Closure, Particle, Triangle};
@@ -2114,8 +2114,22 @@ pub fn build(
             }
         }
         let quilt_end = line_pts.len();
-        let mesh = mesh_panel(&boundary, &hole_pts, &line_pts, &fine, piece_spacing)
-            .map_err(|e| CommandError::internal(format!("{panel_id}: {e}")))?;
+        let mesh =
+            mesh_panel(&boundary, &hole_pts, &line_pts, &fine, piece_spacing).map_err(|e| {
+                // An internal line moved out by an outline edit: the
+                // user's to fix. Anything else is a bug.
+                match e {
+                    MeshError::LineOutside(k) => match lines.get(k) {
+                        Some((Track::Line(line), _)) => CommandError::LineOutside {
+                            line: (*line).into(),
+                        },
+                        _ => CommandError::internal(format!("{panel_id}: {e}")),
+                    },
+                    MeshError::InvalidBoundary => {
+                        CommandError::internal(format!("{panel_id}: {e}"))
+                    }
+                }
+            })?;
         let quilted: Vec<Vec<u32>> = mesh
             .lines
             .get(quilt_start..quilt_end)

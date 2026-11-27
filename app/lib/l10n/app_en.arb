@@ -1325,6 +1325,7 @@
   "cutArea": "Cut area",
   "pieceMass": "Mass",
   "errMarkerTooNarrow": "A piece is wider than the fabric: choose a wider fabric.",
+  "errLineOutside": "A line drawn on a piece now leaves it: move it back inside the piece, or delete it.",
   "garmentTotals": "{pieces} pieces · {area} m² of fabric cut · {mass} g",
   "@garmentTotals": {
     "placeholders": {

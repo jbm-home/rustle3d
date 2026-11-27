@@ -31,18 +31,22 @@ pub struct PanelMesh {
 pub enum MeshError {
     /// Fewer than 3 points, non-finite coordinates or repeated points.
     InvalidBoundary,
-    /// A line inside the panel crosses its outline or a hole, or leaves it.
-    LineOutside,
+    /// A line inside the panel (its index in the lines given) crosses
+    /// its outline or a hole, or leaves it.
+    LineOutside(usize),
 }
 
 impl std::fmt::Display for MeshError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            MeshError::InvalidBoundary => {
-                "the panel outline cannot be meshed (too few, repeated or invalid points)"
-            }
-            MeshError::LineOutside => "a line sewn inside the panel crosses or leaves its outline",
-        })
+        match self {
+            MeshError::InvalidBoundary => f.write_str(
+                "the panel outline cannot be meshed (too few, repeated or invalid points)",
+            ),
+            MeshError::LineOutside(k) => write!(
+                f,
+                "line {k} sewn inside the panel crosses or leaves its outline"
+            ),
+        }
     }
 }
 
@@ -142,7 +146,7 @@ fn constrain_lines(
         crate::polygon::contains(boundary, p)
             && !holes.iter().any(|h| crate::polygon::contains(h, p))
     };
-    let mut place = |cdt: &mut Cdt, p: DVec2| -> Result<FixedVertexHandle, MeshError> {
+    let mut place = |cdt: &mut Cdt, p: DVec2, k: usize| -> Result<FixedVertexHandle, MeshError> {
         if let Some(h) = placed.near(p) {
             return Ok(h);
         }
@@ -163,7 +167,7 @@ fn constrain_lines(
         }
         let h = cdt
             .insert(Point2::new(at.x, at.y))
-            .map_err(|_| MeshError::LineOutside)?;
+            .map_err(|_| MeshError::LineOutside(k))?;
         placed.put(p, h);
         placed.put(at, h);
         Ok(h)
@@ -173,11 +177,11 @@ fn constrain_lines(
         let mut handles = Vec::with_capacity(line.len());
         let mut walk: Vec<FixedVertexHandle> = Vec::new();
         for (i, p) in line.iter().enumerate() {
-            let h = place(cdt, *p)?;
+            let h = place(cdt, *p, k)?;
             walk.push(h);
             handles.push(h);
             for q in crossings.get(&(k, i)).into_iter().flatten() {
-                walk.push(place(cdt, *q)?);
+                walk.push(place(cdt, *q, k)?);
             }
         }
         for w in walk.windows(2) {
@@ -186,7 +190,7 @@ fn constrain_lines(
                     continue;
                 }
                 if !cdt.can_add_constraint(*a, *b) {
-                    return Err(MeshError::LineOutside);
+                    return Err(MeshError::LineOutside(k));
                 }
                 cdt.add_constraint(*a, *b);
             }
@@ -478,8 +482,8 @@ pub fn mesh_panel(
     if spacing.is_nan() || spacing <= 0.0 {
         return Err(MeshError::InvalidBoundary);
     }
-    if lines.iter().flatten().any(|p| !p.is_finite()) {
-        return Err(MeshError::LineOutside);
+    if let Some(k) = lines.iter().position(|l| l.iter().any(|p| !p.is_finite())) {
+        return Err(MeshError::LineOutside(k));
     }
     let lattice = lattice(fine, boundary, holes, lines);
     let mut cdt: Cdt = ConstrainedDelaunayTriangulation::new();
@@ -599,7 +603,8 @@ pub fn mesh_panel(
             .collect::<Result<_, _>>()?,
         lines: line_handles
             .iter()
-            .map(|h| remap(h, MeshError::LineOutside))
+            .enumerate()
+            .map(|(k, h)| remap(h, MeshError::LineOutside(k)))
             .collect::<Result<_, _>>()?,
         vertices,
         triangles: triangles_out,
@@ -736,7 +741,7 @@ mod tests {
         let out = vec![DVec2::new(50.0, 90.0), DVec2::new(50.0, 130.0)];
         assert_eq!(
             mesh_panel(&boundary, &[], &[out], &[], 10.0),
-            Err(MeshError::LineOutside)
+            Err(MeshError::LineOutside(0))
         );
     }
 

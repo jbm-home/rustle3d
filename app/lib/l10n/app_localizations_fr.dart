@@ -2902,6 +2902,10 @@ class LFr extends L {
       'Une pièce est plus large que le tissu : choisissez une laize plus grande.';
 
   @override
+  String get errLineOutside =>
+      'Une ligne tracée sur une pièce en sort maintenant : ramenez-la dans la pièce ou supprimez-la.';
+
+  @override
   String garmentTotals(int pieces, String area, String mass) {
     return '$pieces pièces · $area m² de tissu coupé · $mass g';
   }

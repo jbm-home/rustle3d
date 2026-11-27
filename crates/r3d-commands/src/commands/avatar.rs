@@ -39,15 +39,18 @@ pub(crate) fn validate_body(b: &Body) -> Result<(), CommandError> {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AvatarSet {
-    /// Measurements in cm; `masculinity` 0 = feminine body, 1 = masculine.
+    /// The measurements: `masculinity` (0 = feminine body, 1 =
+    /// masculine), `height_cm`, `bust_cm`, `waist_cm`, `hips_cm`, and
+    /// `age_years` for a child.
     pub body: Body,
-    /// Name of the preset the measurements come from, if any.
+    /// Name of the preset the measurements come from, if any (a label:
+    /// the body is still given in `body`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preset: Option<String>,
 }
 
 impl Described for AvatarSet {
-    const SUMMARY: &'static str = "Set the avatar's body: masculinity (0 feminine – 1 masculine), height, bust, waist and hips in cm, and for a child its age_years (0–18; left out: an adult). The 3D body is fitted to these measurements, with a child's proportions at that age; avatar.get reports what it actually measures.";
+    const SUMMARY: &'static str = "Set the avatar's body. The measurements go inside `body`, not at the top level: {\"body\": {\"masculinity\": 0, \"height_cm\": 168, \"bust_cm\": 92, \"waist_cm\": 74, \"hips_cm\": 100}}; masculinity 0 feminine – 1 masculine, the rest in cm, and for a child `age_years` (0–18; left out: an adult). `preset` only records which preset the body came from: to use one, copy its `body` from avatar.presets. The 3D body is fitted to these measurements, with a child's proportions at that age; avatar.get reports what it actually measures.";
 }
 
 impl CommandSpec for AvatarSet {

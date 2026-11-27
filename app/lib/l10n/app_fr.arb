@@ -794,6 +794,7 @@
   "cutArea": "Surface coupée",
   "pieceMass": "Masse",
   "errMarkerTooNarrow": "Une pièce est plus large que le tissu : choisissez une laize plus grande.",
+  "errLineOutside": "Une ligne tracée sur une pièce en sort maintenant : ramenez-la dans la pièce ou supprimez-la.",
   "garmentTotals": "{pieces} pièces · {area} m² de tissu coupé · {mass} g",
   "fitTip": "Voir où le vêtement serre",
   "fitOff": "Couleurs du tissu",
