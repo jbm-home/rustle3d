@@ -243,11 +243,18 @@ fn mens(template: &str) -> Session {
 
 #[test]
 fn trousers_fit_a_mens_body() {
-    let (low, high) = drape(&mens("trousers"), 180);
-    eprintln!("men's trousers: {low:.3}..{high:.3}");
-    // They settle a few centimetres under the waist (1.08 m), held by
+    let mut s = mens("trousers");
+    let got = run(&mut s, json!({"type": "avatar.get"}));
+    let waist = got["heights_cm"]["waist"].as_f64().unwrap() as f32 / 100.0;
+    let (low, high) = drape(&s, 180);
+    eprintln!("men's trousers: {low:.3}..{high:.3}, waist at {waist:.3}");
+    // They settle a few centimetres under the body's waist, held by
     // friction alone: the waist's hold is open (ROADMAP, open points).
-    assert!(high > 1.03, "trousers slid down: top at {high}");
+    // Measured from the waist the body has, which moves with its fit.
+    assert!(
+        high > waist - 0.05,
+        "trousers slid down: top at {high}, waist at {waist}"
+    );
     assert!(low > 0.01 && low < 0.05, "hem at {low}");
 }
 

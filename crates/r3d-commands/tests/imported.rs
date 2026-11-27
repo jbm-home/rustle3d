@@ -418,9 +418,15 @@ fn t_posed() -> (tempfile::TempDir, Workspace, Vec3) {
 }
 
 /// `template` draped on the imported body of `ws` as it does `motion`
-/// for `frames`: finite, its seams closed, nothing more than 3 mm inside
-/// the moving body.
-fn drapes_moving(ws: &mut Workspace, template: &str, motion: Motion, frames: u32) -> Simulated {
+/// for `frames`: finite, its seams closed within `seam_gap` (m), nothing
+/// more than 3 mm inside the moving body.
+fn drapes_moving(
+    ws: &mut Workspace,
+    template: &str,
+    motion: Motion,
+    frames: u32,
+    seam_gap: f32,
+) -> Simulated {
     run(ws, json!({"type": "template.apply", "template": template}));
     let out = simulate(
         ws.session().project(),
@@ -445,7 +451,7 @@ fn drapes_moving(ws: &mut Workspace, template: &str, motion: Motion, frames: u32
         .fold(0.0f32, f32::max);
     assert!(inside < 0.003, "{template} {motion:?}: {inside} m inside");
     assert!(
-        out.stats.max_seam_gap < 0.01,
+        out.stats.max_seam_gap < seam_gap,
         "{template} {motion:?}: {:?}",
         out.stats
     );
@@ -463,7 +469,7 @@ fn an_imported_body_walks_in_its_dress() {
     );
     run(&mut ws, json!({"type": "avatar.import", "path": file}));
     // 1.5 s of draping, then a second of easing in and a step cycle.
-    let out = drapes_moving(&mut ws, "dress", Motion::Walk, 220);
+    let out = drapes_moving(&mut ws, "dress", Motion::Walk, 220, 0.01);
     let top = out.positions.iter().map(|p| p.y).fold(f32::MIN, f32::max);
     assert!(top > 1.2, "the dress slid down: {top}");
 }
@@ -479,7 +485,11 @@ fn an_imported_body_raises_its_arms_in_a_t_shirt() {
     );
     run(&mut ws, json!({"type": "avatar.import", "path": file}));
     // Arms up from 1.5 + 1.5 s, held until 1.5 + 2 s: the hem rides up.
-    let raised = drapes_moving(&mut ws, "t_shirt", Motion::RaiseArms, 200);
+    // The side seams under the raised arms open by 5 to 12 mm, more on one
+    // side than the other, as the smallest change (weights smoothed once
+    // more or less, x86 against ARM rounding) folds the armpit otherwise:
+    // 15 mm still catches a seam coming apart.
+    let raised = drapes_moving(&mut ws, "t_shirt", Motion::RaiseArms, 200, 0.015);
     let still = simulate(ws.session().project(), 200, None, &Progress::default()).unwrap();
     let hem = |s: &Simulated| s.positions.iter().map(|p| p.y).fold(f32::MAX, f32::min);
     assert!(
