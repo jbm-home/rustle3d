@@ -18,6 +18,7 @@ import 'busy.dart';
 import 'pattern_library.dart' show showPatternLibrary;
 import 'object_panel.dart' show StuffingSlider;
 import 'projects.dart';
+import 'region.dart';
 import 'rust/api/engine.dart';
 import 'rust/api/templates.dart';
 import 'support.dart';
@@ -1262,6 +1263,11 @@ class _NewProjectDialogState extends State<_NewProjectDialog> {
   Map<String, dynamic>? _body;
   final Map<String, TextEditingController> _sizes = {};
 
+  /// The template's sizes (cm) as worked out, until typed in: inches
+  /// show rounded.
+  final _sizesExact = <String, double>{};
+  Region? _region;
+
   /// Whether the template's sizes are being worked out for the body (the
   /// body is fitted: a second or more), and which request is the latest.
   bool _loading = false;
@@ -1275,6 +1281,14 @@ class _NewProjectDialogState extends State<_NewProjectDialog> {
     if (_object) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _bodyChanged(null));
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final region = context.region;
+    if (_region case final was?) convertCmFields(_sizes.values, was, region);
+    _region = region;
   }
 
   @override
@@ -1322,6 +1336,7 @@ class _NewProjectDialogState extends State<_NewProjectDialog> {
       (t) => t['template'] == widget.template,
     );
     final sizes = (entry['sizes'] as Map<String, dynamic>);
+    final region = context.region;
     setState(() {
       _loading = false;
       _error = null;
@@ -1333,10 +1348,13 @@ class _NewProjectDialogState extends State<_NewProjectDialog> {
         ..addAll({
           for (final e in sizes.entries)
             e.key: TextEditingController(
-              text: (e.value as num).toStringAsFixed(
-                (e.value as num) % 1 == 0 ? 0 : 1,
-              ),
+              text: cmText(region, (e.value as num).toDouble(), digits: 1),
             ),
+        });
+      _sizesExact
+        ..clear()
+        ..addAll({
+          for (final e in sizes.entries) e.key: (e.value as num).toDouble(),
         });
     });
   }
@@ -1356,7 +1374,7 @@ class _NewProjectDialogState extends State<_NewProjectDialog> {
     if (!_ready) return;
     final sizes = <String, double>{};
     for (final e in _sizes.entries) {
-      final v = double.tryParse(e.value.text.replaceAll(',', '.'));
+      final v = _sizesExact[e.key] ?? cmOf(context.region, e.value.text);
       if (v == null || v <= 0) {
         setState(
           () => _error = context.l.sizeMustBePositive(
@@ -1523,10 +1541,11 @@ class _NewProjectDialogState extends State<_NewProjectDialog> {
                                 RegExp(r'[0-9.,]'),
                               ),
                             ],
+                            onChanged: (_) => _sizesExact.remove(e.key),
                             onSubmitted: (_) => _create(),
                             decoration: InputDecoration(
                               labelText: _sizeText(l, e.key).$1,
-                              suffixText: l.cm,
+                              suffixText: context.region.cmUnit(l),
                               isDense: true,
                               border: const OutlineInputBorder(),
                             ),

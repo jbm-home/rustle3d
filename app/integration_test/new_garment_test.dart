@@ -2,7 +2,8 @@
 // 37-body-at-creation.md): the body is chosen by who it dresses, a size
 // and a silhouette, typed measurements say the size they make, the
 // template's sizes follow the body without blocking the window; a blank
-// project can be an object, which opens without a body.
+// project can be an object, which opens without a body. Sizes and lengths
+// are written in the user's system and units (38-region.md).
 
 import 'dart:io';
 
@@ -17,9 +18,13 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async => await RustLib.init());
 
+  /// A fresh library in EU sizes and centimetres, whatever this
+  /// machine's region.
   ProjectStore newStore() {
     final dir = Directory.systemTemp.createTempSync('r3d').path;
     File('$dir/tour-seen').createSync();
+    File('$dir/region.json')
+        .writeAsStringSync('{"sizes": "eu", "units": "metric"}');
     Directory('$dir/projects').createSync();
     return ProjectStore(projectsDir: '$dir/projects', libraryDir: dir);
   }
@@ -70,8 +75,10 @@ void main() {
 
     // Another size: its measurements, and the template's sizes for it.
     await tester.tap(find.byKey(const Key('bodySize')));
-    await until(tester, () => find.text('44').evaluate().isNotEmpty);
-    await tester.tap(find.text('44').last);
+    // The menu says each size's letter beside it.
+    final size44 = find.text('44   L', findRichText: true);
+    await until(tester, () => size44.evaluate().isNotEmpty);
+    await tester.tap(size44.last);
     await tester.pump();
     expect(field('bust_cm'), '100');
     await until(tester, () => ready(tester) && sizes().join() != first.join());
@@ -93,6 +100,54 @@ void main() {
     expect(find.text('Changing the body'), findsNothing);
     await until(tester, () => ready(tester));
     expect(sizes(), isNot(first));
+  });
+
+  testWidgets('sizes and lengths in US sizes and inches, remembered', (
+    tester,
+  ) async {
+    Finder shownSize(String size) => find.descendant(
+      of: find.byKey(const Key('bodySize')),
+      matching: find.text(size),
+    );
+    String field(String key) => tester
+        .widget<TextField>(find.byKey(Key('bodyField_$key')))
+        .controller!
+        .text;
+    final store = newStore();
+    await tester.pumpWidget(Rustle3dApp(store: store));
+    await until(tester, () => find.text('T-shirt').evaluate().isNotEmpty);
+    await tester.tap(find.text('T-shirt').first);
+    await until(tester, () => ready(tester));
+    expect(shownSize('38'), findsOneWidget);
+
+    // US sizes: the women's 38 is a 6.
+    await tester.tap(find.byKey(const Key('sizeSystem')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.byKey(const Key('sizeSystem_us')));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(shownSize('6'), findsOneWidget);
+    expect(find.text('US'), findsOneWidget);
+
+    // Inches: the bust of 88 cm reads 34.6 in, and still makes the 38.
+    await tester.tap(find.text('in'));
+    await tester.pump();
+    expect(field('bust_cm'), '34.6');
+    await tester.enterText(find.byKey(const Key('bodyField_bust_cm')), '36.2');
+    await tester.pump();
+    // 92 cm: a 40, an 8 in US sizes.
+    expect(find.textContaining('make a size 8'), findsOneWidget);
+
+    // Remembered: the next window starts in US sizes and inches.
+    final saved = File('${store.libraryDir}/region.json').readAsStringSync();
+    expect(saved, contains('"us"'));
+    expect(saved, contains('"imperial"'));
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(Rustle3dApp(store: store));
+    await until(tester, () => find.text('T-shirt').evaluate().isNotEmpty);
+    await tester.tap(find.text('T-shirt').first);
+    await until(tester, () => ready(tester));
+    expect(shownSize('6'), findsOneWidget);
+    expect(field('height_cm'), '66.1');
   });
 
   testWidgets('a blank project made as an object has no body', (tester) async {

@@ -147,6 +147,50 @@ impl SizeChart {
             .map(|(name, _)| name)
     }
 
+    /// A size's name in other countries' systems, as
+    /// `{"eu", "us", "uk", "letters"}`; adults only (children's sizes are
+    /// their age everywhere). Approximate equivalences from common size
+    /// conversion tables (general garment-making knowledge): women's US
+    /// = EU − 32 and UK = EU − 28; men's US and UK = the chest in inches
+    /// (EU − 10); letters cover one or two sizes each.
+    pub fn labels(self, name: &str) -> Option<BTreeMap<&'static str, String>> {
+        let n: i32 = name.trim().parse().ok()?;
+        let (us, uk, letters) = match self {
+            SizeChart::Women => (
+                n - 32,
+                n - 28,
+                match n {
+                    ..=32 => "XXS",
+                    33..=34 => "XS",
+                    35..=36 => "S",
+                    37..=40 => "M",
+                    41..=44 => "L",
+                    45..=48 => "XL",
+                    49..=52 => "XXL",
+                    _ => "3XL",
+                },
+            ),
+            SizeChart::Men => (
+                n - 10,
+                n - 10,
+                match n {
+                    ..=46 => "S",
+                    47..=50 => "M",
+                    51..=54 => "L",
+                    55..=58 => "XL",
+                    _ => "XXL",
+                },
+            ),
+            _ => return None,
+        };
+        Some(BTreeMap::from([
+            ("eu", n.to_string()),
+            ("us", us.to_string()),
+            ("uk", uk.to_string()),
+            ("letters", letters.to_string()),
+        ]))
+    }
+
     /// The silhouettes offered on this chart, the chart's own first
     /// (children's from slim to round).
     pub fn silhouettes(self) -> &'static [Silhouette] {
@@ -753,6 +797,27 @@ mod tests {
         let women = SizeChart::Women.sizes();
         let bust = |n: &str| women.iter().find(|(s, _)| s == n).unwrap().1.bust_cm;
         assert_eq!((bust("36"), bust("46"), bust("52")), (84.0, 104.0, 122.0));
+    }
+
+    #[test]
+    fn sizes_are_named_in_other_systems() {
+        let w = SizeChart::Women.labels("38").unwrap();
+        assert_eq!((&*w["us"], &*w["uk"], &*w["letters"]), ("6", "10", "M"));
+        let m = SizeChart::Men.labels("50").unwrap();
+        assert_eq!((&*m["us"], &*m["uk"], &*m["letters"]), ("40", "40", "M"));
+        assert!(SizeChart::Girls.labels("6").is_none());
+        // The built-in letter presets are named as the chart names their
+        // size.
+        for p in r3d_avatar::presets::builtin() {
+            let Some((who, letter)) = p.name.split_once(' ') else {
+                continue;
+            };
+            let chart = SizeChart::of(&p.body);
+            let size = chart.nearest(&p.body).unwrap();
+            if let Some(labels) = chart.labels(&size) {
+                assert_eq!(labels["letters"], letter, "{who}");
+            }
+        }
     }
 
     #[test]

@@ -422,8 +422,8 @@ class LFr extends L {
   String get measBust => 'Tour de poitrine';
 
   @override
-  String measBetween(String measure, int min, int max) {
-    return '$measure doit être entre $min et $max cm.';
+  String measBetween(String measure, String min, String max, String unit) {
+    return '$measure doit être entre $min et $max $unit.';
   }
 
   @override
@@ -4104,4 +4104,27 @@ class LFr extends L {
   @override
   String get errObject =>
       'Ce projet est un objet, sans mannequin : portez-le d’abord sur un mannequin.';
+
+  @override
+  String get inch => 'po';
+
+  @override
+  String get sizeSystemEu => 'EU';
+
+  @override
+  String get sizeSystemUs => 'US';
+
+  @override
+  String get sizeSystemUk => 'UK';
+
+  @override
+  String get sizeSystemLetters => 'S·M·L';
+
+  @override
+  String get sizeSystemTip =>
+      'Comment les tailles sont écrites : européennes (38), américaines (6), britanniques (10) ou en lettres (M). Retenu pour la prochaine fois.';
+
+  @override
+  String get unitsTip =>
+      'Longueurs en centimètres ou en pouces. Retenu pour la prochaine fois.';
 }

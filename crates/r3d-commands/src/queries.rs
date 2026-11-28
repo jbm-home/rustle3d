@@ -1030,7 +1030,7 @@ impl QuerySpec for GradingCheck {
 pub struct GradingCharts {}
 
 impl Described for GradingCharts {
-    const SUMMARY: &'static str = "The built-in size charts for grading.use_chart: each chart's sizes with their bodies (cm), the silhouettes it offers (avatar.size_body), and `nearest`: on the chart that dresses the project's avatar, the size nearest its body (null on the others and without an avatar).";
+    const SUMMARY: &'static str = "The built-in size charts for grading.use_chart: each chart's sizes with their bodies (cm) and, for adults, `labels`: the size's name in the `eu`, `us`, `uk` and `letters` (XS…3XL) systems, approximate; the silhouettes it offers (avatar.size_body), and `nearest`: on the chart that dresses the project's avatar, the size nearest its body (null on the others and without an avatar).";
 }
 
 impl QuerySpec for GradingCharts {
@@ -1043,7 +1043,10 @@ impl QuerySpec for GradingCharts {
                 let sizes: Vec<Value> = c
                     .sizes()
                     .into_iter()
-                    .map(|(name, body)| serde_json::json!({"name": name, "body": body}))
+                    .map(|(name, body)| {
+                        let labels = c.labels(&name);
+                        serde_json::json!({"name": name, "body": body, "labels": labels})
+                    })
                     .collect();
                 let nearest = body
                     .filter(|b| SizeChart::of(b) == c)

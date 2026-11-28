@@ -10,6 +10,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'design/tokens.dart';
 import 'i18n.dart';
+import 'region.dart';
 import 'rust/api/engine.dart';
 import 'rust/api/library.dart';
 import 'rust/api/templates.dart';
@@ -39,14 +40,6 @@ String chartName(L l, String chart) => switch (chart) {
   'boys' => l.chartBoys,
   'babies' => l.chartBabies,
   _ => chart,
-};
-
-/// A size's name for the UI: the number for adults, the age for
-/// children.
-String sizeName(L l, String chart, String size) => switch (chart) {
-  'girls' || 'boys' => l.sizeYears(size),
-  'babies' => l.sizeMonths(size.replaceAll('m', '')),
-  _ => size,
 };
 
 /// A silhouette's name and what it means, on [chart].
@@ -132,14 +125,32 @@ class _BodyPickerState extends State<BodyPicker> {
   String? _nearest;
   String? _error;
 
+  /// The region the fields are written in.
+  Region? _region;
+
+  /// The fields' exact values (cm) until they are typed in: inches show
+  /// rounded.
+  final _exact = <String, double>{};
+
   @override
   void initState() {
     super.initState();
     final (chart, size) = chartSizeOf(widget.start) ?? ('women', '38');
     _chart = chart;
     _size = _sizes(chart).contains(size) ? size : _startSize[chart]!;
-    _fill(keepHeight: false);
     WidgetsBinding.instance.addPostFrameCallback((_) => _emit());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final region = context.region;
+    if (_region case final was?) {
+      convertCmFields(_values.values, was, region);
+    }
+    final first = _region == null;
+    _region = region;
+    if (first) _fill(keepHeight: false);
   }
 
   @override
@@ -165,13 +176,12 @@ class _BodyPickerState extends State<BodyPicker> {
               as Map)['body']
           as Map<String, dynamic>;
 
-  String _text(num v) => v % 1 == 0 ? v.toStringAsFixed(0) : '$v';
-
   /// The chart's measurements for the size and silhouette; the height
   /// typed is kept unless [keepHeight] is false.
   void _fill({bool keepHeight = true}) {
+    final region = _region ?? const Region();
     final height = keepHeight
-        ? double.tryParse(_values['height_cm']!.text.replaceAll(',', '.'))
+        ? _exact['height_cm'] ?? cmOf(region, _values['height_cm']!.text)
         : null;
     final body = jsonDecode(
       sizeBody(
@@ -182,7 +192,9 @@ class _BodyPickerState extends State<BodyPicker> {
       ),
     ) as Map<String, dynamic>;
     for (final e in _values.entries) {
-      e.value.text = _text(body[e.key] as num);
+      final cm = (body[e.key] as num).toDouble();
+      e.value.text = cmText(region, cm);
+      _exact[e.key] = cm;
     }
     _typed = false;
     _mineName = null;
@@ -197,18 +209,21 @@ class _BodyPickerState extends State<BodyPicker> {
       'masculinity': base['masculinity'],
       if (base['age_years'] != null) 'age_years': base['age_years'],
     };
+    final region = context.region;
     for (final e in _values.entries) {
-      final v = double.tryParse(e.value.text.replaceAll(',', '.'));
+      final v = _exact[e.key] ?? cmOf(region, e.value.text);
       final (min, max) = _fields[e.key]!;
-      if (v == null || v < min || v > max) {
+      // A field that rounds to a bound is within it.
+      if (v == null || v < min - 0.05 || v > max + 0.05) {
         _error = context.l.measBetween(
           _fieldLabel(context.l, e.key),
-          min.round(),
-          max.round(),
+          cmText(region, min),
+          cmText(region, max),
+          region.cmUnit(context.l),
         );
         return null;
       }
-      body[e.key] = v;
+      body[e.key] = v.clamp(min, max);
     }
     _error = null;
     return body;
@@ -264,11 +279,14 @@ class _BodyPickerState extends State<BodyPicker> {
   void _chooseMine(Map<String, dynamic> preset) {
     final body = preset['body'] as Map<String, dynamic>;
     final chart = jsonDecode(nearestSize(bodyJson: jsonEncode(body)));
+    final region = context.region;
     setState(() {
       _chart = chart['chart'] as String;
       _size = chart['name'] as String? ?? _startSize[_chart]!;
       for (final e in _values.entries) {
-        e.value.text = _text(body[e.key] as num);
+        final cm = (body[e.key] as num).toDouble();
+        e.value.text = cmText(region, cm, digits: 1);
+        _exact[e.key] = cm;
       }
       _typed = true;
       _mineName = preset['name'] as String;
@@ -339,7 +357,7 @@ class _BodyPickerState extends State<BodyPicker> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             SizedBox(
-              width: 150,
+              width: 190,
               child: DropdownButtonFormField<String>(
                 key: const Key('bodySize'),
                 initialValue: _size,
@@ -350,11 +368,16 @@ class _BodyPickerState extends State<BodyPicker> {
                       : l.bodyAge,
                   border: const OutlineInputBorder(),
                 ),
+                // The menu says what each size is in other systems.
+                selectedItemBuilder: (context) => [
+                  for (final s in _sizes(_chart))
+                    Text(sizeName(context, _chart, s)),
+                ],
                 items: [
                   for (final s in _sizes(_chart))
                     DropdownMenuItem(
                       value: s,
-                      child: Text(sizeName(l, _chart, s)),
+                      child: sizeItem(context, _chart, s),
                     ),
                 ],
                 onChanged: (s) {
@@ -362,6 +385,10 @@ class _BodyPickerState extends State<BodyPicker> {
                 },
               ),
             ),
+            if (_chart == 'women' || _chart == 'men') ...[
+              const SizedBox(width: Space.xs),
+              const SizeSystemButton(),
+            ],
             const SizedBox(width: Space.m),
             Expanded(
               child: AnimatedSwitcher(
@@ -369,7 +396,7 @@ class _BodyPickerState extends State<BodyPicker> {
                 child: Text(
                   key: ValueKey((_typed, _nearest)),
                   differs
-                      ? l.typedNearestSize(sizeName(l, _chart, _nearest!))
+                      ? l.typedNearestSize(sizeName(context, _chart, _nearest!))
                       : _typed
                       ? l.typedMeasurements
                       : l.chartMeasurements(chartName(l, _chart)),
@@ -424,16 +451,18 @@ class _BodyPickerState extends State<BodyPicker> {
                   ],
                   onChanged: (_) {
                     _typed = true;
+                    _exact.remove(e.key);
                     _emit();
                   },
                   decoration: InputDecoration(
                     labelText: _fieldLabel(l, e.key),
-                    suffixText: l.cm,
+                    suffixText: context.region.cmUnit(l),
                     isDense: true,
                     border: const OutlineInputBorder(),
                   ),
                 ),
               ),
+            const UnitsButton(),
           ],
         ),
         if (_error != null) ...[
@@ -455,13 +484,14 @@ String _fieldLabel(L l, String key) => switch (key) {
 
 /// The size `body` (a `Body` as JSON) makes on the chart that dresses it,
 /// for display: "40 (Woman)".
-String? nearestSizeText(L l, Map<String, dynamic> body) {
+String? nearestSizeText(BuildContext context, Map<String, dynamic> body) {
+  final l = context.l;
   try {
     final got = jsonDecode(nearestSize(bodyJson: jsonEncode(body)));
     final name = got['name'] as String?;
     if (name == null) return null;
     final chart = got['chart'] as String;
-    return l.nearestSizeOn(sizeName(l, chart, name), chartName(l, chart));
+    return l.nearestSizeOn(sizeName(context, chart, name), chartName(l, chart));
   } on ApiError {
     return null;
   }

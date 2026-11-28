@@ -7,6 +7,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'design/tokens.dart';
 import 'i18n.dart';
+import 'region.dart';
 
 /// The 3D body this far (cm) from a value it should take shows the gap.
 const _gapCm = 1.0;
@@ -132,13 +133,22 @@ class _RowState extends State<_Row> {
   bool get _estimated => widget.measure['estimated'] == true;
   double get _cm => (widget.measure['cm'] as num).toDouble();
 
+  /// The region the field is written in.
+  Region _region = const Region();
+
   @override
   void initState() {
     super.initState();
-    _show();
     _focus.addListener(() {
       if (!_focus.hasFocus) _submit();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _region = context.region;
+    _show();
   }
 
   @override
@@ -155,10 +165,8 @@ class _RowState extends State<_Row> {
   }
 
   /// A typed value in the field; an estimate only as its hint.
-  void _show() => _field.text = _estimated ? '' : _format(_cm);
-
-  String _format(double v) =>
-      v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+  void _show() =>
+      _field.text = _estimated ? '' : cmText(_region, _cm, digits: 1);
 
   void _submit() {
     final text = _field.text.trim();
@@ -166,8 +174,8 @@ class _RowState extends State<_Row> {
       if (!_estimated) widget.onSet(null);
       return;
     }
-    final v = double.tryParse(text.replaceAll(',', '.'));
-    if (v == null || (!_estimated && v == _cm)) {
+    final v = cmOf(_region, text);
+    if (v == null || (!_estimated && text == cmText(_region, _cm, digits: 1))) {
       _show();
       return;
     }
@@ -213,7 +221,8 @@ class _RowState extends State<_Row> {
                 if (gap)
                   Text(
                     l.measAvatarReaches(
-                      '${context.number(reached, 1)} ${l.cm}',
+                      '${context.number(_region.fromCm(reached), 1)} '
+                      '${_region.cmUnit(l)}',
                     ),
                     style: ts(fontSize: 11.5, color: p.danger, height: 1.3),
                   ),
@@ -237,10 +246,10 @@ class _RowState extends State<_Row> {
               style: ts(fontSize: 13.5, tabular: true),
               decoration: InputDecoration(
                 isDense: true,
-                hintText: context.number(_cm, 1),
+                hintText: context.number(_region.fromCm(_cm), 1),
                 helperText: _estimated ? l.measEstimated : null,
                 helperStyle: ts(fontSize: 10.5, color: p.textMuted),
-                suffixText: l.cm,
+                suffixText: _region.cmUnit(l),
                 border: const OutlineInputBorder(),
               ),
             ),

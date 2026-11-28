@@ -22,6 +22,7 @@ import 'object_panel.dart';
 import 'pattern_library.dart';
 import 'photo.dart';
 import 'projector.dart';
+import 'region.dart';
 import 'techpack.dart';
 import 'tour.dart';
 import 'rust/api/engine.dart';
@@ -7086,6 +7087,19 @@ class _SizeRange extends StatelessWidget {
   final bool showOnBoard;
   final ValueChanged<bool> onShowOnBoard;
 
+  /// The built-in chart [sizes] come from: the one dressing the body if
+  /// it has them all (women's and men's share 44 to 56), else the first
+  /// that does; none for a range of the user's own.
+  String? _chartOf(List<String> sizes) {
+    final charts = (query({'type': 'grading.charts'}) as List<dynamic>?) ?? [];
+    bool all(dynamic c) =>
+        sizes.every((s) => (c['sizes'] as List).any((x) => x['name'] == s));
+    final fits = charts.where(all).toList();
+    final c =
+        fits.where((c) => c['nearest'] != null).firstOrNull ?? fits.firstOrNull;
+    return c?['chart'] as String?;
+  }
+
   Future<void> _pick(BuildContext context) async {
     final charts = query({'type': 'grading.charts'}) as List<dynamic>?;
     if (charts == null) return;
@@ -7126,6 +7140,8 @@ class _SizeRange extends StatelessWidget {
     }
     final sizes = [for (final s in g['sizes'] as List) s as String];
     final base = g['base'] as String?;
+    final chart = _chartOf(sizes);
+    String name(String s) => chart == null ? s : sizeName(context, chart, s);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -7137,7 +7153,9 @@ class _SizeRange extends StatelessWidget {
           children: [
             for (final s in sizes)
               Chip(
-                label: Text(s == base ? '$s · ${l.sizeBaseTag}' : s),
+                label: Text(
+                  s == base ? '${name(s)} · ${l.sizeBaseTag}' : name(s),
+                ),
                 visualDensity: VisualDensity.compact,
                 side: BorderSide(color: s == base ? p.accent : p.border),
               ),
@@ -7149,7 +7167,8 @@ class _SizeRange extends StatelessWidget {
           initialValue: g['shown'] as String?,
           decoration: InputDecoration(labelText: l.sizeShown),
           items: [
-            for (final s in sizes) DropdownMenuItem(value: s, child: Text(s)),
+            for (final s in sizes)
+              DropdownMenuItem(value: s, child: Text(name(s))),
           ],
           onChanged: (to) => run({'type': 'grading.show_size', 'size': to}),
         ),
@@ -7227,7 +7246,13 @@ class _SizeChartDialogState extends State<_SizeChartDialog> {
     ];
     // The range in use; else the chart dressing the body, around its
     // size.
-    final chart = widget.charts
+    // The body's chart first: women's and men's share 44 to 56.
+    final byBody = [...widget.charts]
+      ..sort(
+        (a, b) =>
+            (a['nearest'] == null ? 1 : 0) - (b['nearest'] == null ? 1 : 0),
+      );
+    final chart = byBody
         .map((c) => c['chart'] as String)
         .firstWhere(
           (c) => sizes.isNotEmpty && sizes.every(_names(c).contains),
@@ -7279,8 +7304,13 @@ class _SizeChartDialogState extends State<_SizeChartDialog> {
       key: ValueKey('$label-$_chart-${options.length}'),
       initialValue: options.contains(value) ? value : null,
       decoration: InputDecoration(labelText: label),
+      // The menu says what each size is in other systems.
+      selectedItemBuilder: (context) => [
+        for (final s in options) Text(sizeName(context, _chart, s)),
+      ],
       items: [
-        for (final s in options) DropdownMenuItem(value: s, child: Text(s)),
+        for (final s in options)
+          DropdownMenuItem(value: s, child: sizeItem(context, _chart, s)),
       ],
       onChanged: (v) {
         if (v != null) setState(() => onPick(v));
@@ -7319,6 +7349,10 @@ class _SizeChartDialogState extends State<_SizeChartDialog> {
                 ),
                 const SizedBox(width: Space.s),
                 Expanded(child: pick(l.sizeTo, _to, names, (v) => _to = v)),
+                if (_chart == 'women' || _chart == 'men') ...[
+                  const SizedBox(width: Space.xs),
+                  const SizeSystemButton(),
+                ],
               ],
             ),
             const SizedBox(height: Space.m),

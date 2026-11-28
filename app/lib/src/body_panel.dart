@@ -11,6 +11,7 @@ import 'busy.dart';
 import 'design/tokens.dart';
 import 'i18n.dart';
 import 'measurements.dart';
+import 'region.dart';
 import 'rust/api/engine.dart';
 import 'rust/api/library.dart';
 
@@ -87,10 +88,29 @@ class _BodyPanelState extends State<_BodyPanel> {
   bool _naming = false;
   final _name = TextEditingController();
 
+  /// The region the fields are written in, once known.
+  Region? _region;
+
+  /// The fields' exact values (cm) until they are typed in: inches show
+  /// rounded.
+  final _exact = <String, double>{};
+
   @override
   void initState() {
     super.initState();
     _loadPresets();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final region = context.region;
+    final was = _region;
+    _region = region;
+    if (was != null) {
+      convertCmFields(_fields.values, was, region);
+      return;
+    }
     final current = jsonDecode(
       widget.engine.run(stepJson: '{"type":"avatar.get"}'),
     );
@@ -159,7 +179,9 @@ class _BodyPanelState extends State<_BodyPanel> {
   void _setBody(Map<String, dynamic> body) {
     _masculinity = (body['masculinity'] as num).toDouble();
     for (final e in _fields.entries) {
-      e.value.text = (body[e.key] as num).toStringAsFixed(0);
+      final cm = (body[e.key] as num).toDouble();
+      e.value.text = cmText(_region ?? const Region(), cm);
+      _exact[e.key] = cm;
     }
     final age = body['age_years'] as num?;
     _child = age != null;
@@ -170,20 +192,23 @@ class _BodyPanelState extends State<_BodyPanel> {
 
   Map<String, Object>? _readBody() {
     final body = <String, Object>{'masculinity': _masculinity};
+    final region = context.region;
     for (final e in _fields.entries) {
-      final v = double.tryParse(e.value.text.replaceAll(',', '.'));
+      final v = _exact[e.key] ?? cmOf(region, e.value.text);
       final (min, max) = _ranges[e.key]!;
-      if (v == null || v < min || v > max) {
+      // A field that rounds to a bound is within it.
+      if (v == null || v < min - 0.05 || v > max + 0.05) {
         setState(
           () => _error = context.l.measBetween(
             _label(context.l, e.key),
-            min.round(),
-            max.round(),
+            cmText(region, min),
+            cmText(region, max),
+            region.cmUnit(context.l),
           ),
         );
         return null;
       }
-      body[e.key] = v;
+      body[e.key] = v.clamp(min, max);
     }
     if (_child) {
       final v = double.tryParse(_age.text.replaceAll(',', '.'));
@@ -192,8 +217,9 @@ class _BodyPanelState extends State<_BodyPanel> {
         setState(
           () => _error = context.l.measBetween(
             context.l.bodyAge,
-            min.round(),
-            max.round(),
+            '${min.round()}',
+            '${max.round()}',
+            context.l.bodyAgeYears,
           ),
         );
         return null;
@@ -284,7 +310,7 @@ class _BodyPanelState extends State<_BodyPanel> {
   String? _nearestText(L l) {
     final body = <String, Object>{'masculinity': _masculinity};
     for (final e in _fields.entries) {
-      final v = double.tryParse(e.value.text.replaceAll(',', '.'));
+      final v = _exact[e.key] ?? cmOf(context.region, e.value.text);
       if (v == null) return null;
       body[e.key] = v;
     }
@@ -293,7 +319,7 @@ class _BodyPanelState extends State<_BodyPanel> {
       if (age == null) return null;
       body['age_years'] = age;
     }
-    return nearestSizeText(l, body);
+    return nearestSizeText(context, body);
   }
 
   bool get _isCustom =>
@@ -437,15 +463,19 @@ class _BodyPanelState extends State<_BodyPanel> {
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
                     ],
-                    onChanged: (_) => setState(() => _preset = null),
+                    onChanged: (_) => setState(() {
+                      _preset = null;
+                      _exact.remove(e.key);
+                    }),
                     onSubmitted: (_) => _apply(),
                     decoration: InputDecoration(
                       labelText: _label(l, e.key),
-                      suffixText: l.cm,
+                      suffixText: context.region.cmUnit(l),
                       border: const OutlineInputBorder(),
                     ),
                   ),
                 ),
+              const UnitsButton(),
             ],
           ),
           if (_nearestText(l) case final size?) ...[
@@ -521,8 +551,10 @@ class _Achieved extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
+    final region = context.region;
     String v(String k) =>
-        '${context.number(achieved[k] as num, 1)} ${context.l.cm}';
+        '${context.number(region.fromCm((achieved[k] as num).toDouble()), 1)} '
+        '${region.cmUnit(context.l)}';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(Space.m),

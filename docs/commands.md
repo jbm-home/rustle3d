@@ -7850,7 +7850,7 @@ Check the grading in every size of the range: the seams (not gathered) whose two
 
 ### `grading.charts`
 
-The built-in size charts for grading.use_chart: each chart's sizes with their bodies (cm), the silhouettes it offers (avatar.size_body), and `nearest`: on the chart that dresses the project's avatar, the size nearest its body (null on the others and without an avatar).
+The built-in size charts for grading.use_chart: each chart's sizes with their bodies (cm) and, for adults, `labels`: the size's name in the `eu`, `us`, `uk` and `letters` (XS…3XL) systems, approximate; the silhouettes it offers (avatar.size_body), and `nearest`: on the chart that dresses the project's avatar, the size nearest its body (null on the others and without an avatar).
 
 <details><summary>Parameters (JSON schema)</summary>
 

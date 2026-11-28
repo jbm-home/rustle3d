@@ -820,8 +820,8 @@ abstract class L {
   /// No description provided for @measBetween.
   ///
   /// In en, this message translates to:
-  /// **'{measure} must be between {min} and {max} cm.'**
-  String measBetween(String measure, int min, int max);
+  /// **'{measure} must be between {min} and {max} {unit}.'**
+  String measBetween(String measure, String min, String max, String unit);
 
   /// No description provided for @presetName.
   ///
@@ -6954,6 +6954,48 @@ abstract class L {
   /// In en, this message translates to:
   /// **'This project is an object, without a body: wear it on a body first.'**
   String get errObject;
+
+  /// No description provided for @inch.
+  ///
+  /// In en, this message translates to:
+  /// **'in'**
+  String get inch;
+
+  /// No description provided for @sizeSystemEu.
+  ///
+  /// In en, this message translates to:
+  /// **'EU'**
+  String get sizeSystemEu;
+
+  /// No description provided for @sizeSystemUs.
+  ///
+  /// In en, this message translates to:
+  /// **'US'**
+  String get sizeSystemUs;
+
+  /// No description provided for @sizeSystemUk.
+  ///
+  /// In en, this message translates to:
+  /// **'UK'**
+  String get sizeSystemUk;
+
+  /// No description provided for @sizeSystemLetters.
+  ///
+  /// In en, this message translates to:
+  /// **'S·M·L'**
+  String get sizeSystemLetters;
+
+  /// No description provided for @sizeSystemTip.
+  ///
+  /// In en, this message translates to:
+  /// **'How sizes are written: European (38), American (6), British (10) or letters (M). Remembered for next time.'**
+  String get sizeSystemTip;
+
+  /// No description provided for @unitsTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Lengths in centimetres or inches. Remembered for next time.'**
+  String get unitsTip;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

@@ -8,6 +8,7 @@ import 'package:material_ui/material_ui.dart';
 import 'src/design/tokens.dart';
 import 'src/i18n.dart';
 import 'src/projects.dart';
+import 'src/region.dart';
 import 'src/rust/api/engine.dart';
 import 'src/rust/api/templates.dart';
 import 'src/rust/frb_generated.dart';
@@ -100,6 +101,14 @@ class _Rustle3dAppState extends State<Rustle3dApp> {
   late final _support =
       widget.support ?? SupportMemory(widget.store.libraryDir);
   late String _language = _languageMemory.code;
+  late final _regionMemory = RegionMemory(widget.store.libraryDir);
+  late final _region = ValueNotifier(_regionMemory.read());
+
+  @override
+  void dispose() {
+    _region.dispose();
+    super.dispose();
+  }
 
   void _setLanguage(String code) {
     _languageMemory.code = code;
@@ -153,41 +162,45 @@ class _Rustle3dAppState extends State<Rustle3dApp> {
     final engine = _engine;
     return Tokens(
       dark: _dark,
-      child: MaterialApp(
-        title: 'Rustle3D',
-        debugShowCheckedModeBanner: false,
-        scaffoldMessengerKey: _messenger,
-        theme: buildTheme(_dark),
-        locale: Locale(_language),
-        localizationsDelegates: const [
-          L.delegate,
-          ...GlobalMaterialLocalizations.delegates,
-        ],
-        supportedLocales: L.supportedLocales,
-        home: AnimatedSwitcher(
-          duration: Motion.normal,
-          child: engine == null
-              ? StartScreen(
-                  key: const ValueKey('start'),
-                  store: widget.store,
-                  support: _support,
-                  updates: widget.updates,
-                  dark: _dark,
-                  onToggleTheme: _toggleTheme,
-                  language: _language,
-                  onLanguage: _setLanguage,
-                  onOpen: _open,
-                )
-              : Shell(
-                  key: ObjectKey(engine),
-                  engine: engine,
-                  libraryDir: widget.store.libraryDir,
-                  dark: _dark,
-                  onToggleTheme: _toggleTheme,
-                  language: _language,
-                  onLanguage: _setLanguage,
-                  onHome: _home,
-                ),
+      child: RegionScope(
+        region: _region,
+        memory: _regionMemory,
+        child: MaterialApp(
+          title: 'Rustle3D',
+          debugShowCheckedModeBanner: false,
+          scaffoldMessengerKey: _messenger,
+          theme: buildTheme(_dark),
+          locale: Locale(_language),
+          localizationsDelegates: const [
+            L.delegate,
+            ...GlobalMaterialLocalizations.delegates,
+          ],
+          supportedLocales: L.supportedLocales,
+          home: AnimatedSwitcher(
+            duration: Motion.normal,
+            child: engine == null
+                ? StartScreen(
+                    key: const ValueKey('start'),
+                    store: widget.store,
+                    support: _support,
+                    updates: widget.updates,
+                    dark: _dark,
+                    onToggleTheme: _toggleTheme,
+                    language: _language,
+                    onLanguage: _setLanguage,
+                    onOpen: _open,
+                  )
+                : Shell(
+                    key: ObjectKey(engine),
+                    engine: engine,
+                    libraryDir: widget.store.libraryDir,
+                    dark: _dark,
+                    onToggleTheme: _toggleTheme,
+                    language: _language,
+                    onLanguage: _setLanguage,
+                    onHome: _home,
+                  ),
+          ),
         ),
       ),
     );

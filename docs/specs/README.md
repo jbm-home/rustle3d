@@ -47,3 +47,4 @@ descriptions, public papers, open standards, general garment-making knowledge.
 | 35 | [Environment lighting for photos](35-environment-lighting.md) | M42 |
 | 36 | [Objects: projects without a body](36-objects.md) | M46 |
 | 37 | [The body at creation: size, silhouette and height](37-body-at-creation.md) | M47 |
+| 38 | [Sizes and units of the user's region](38-region.md) | M48 |

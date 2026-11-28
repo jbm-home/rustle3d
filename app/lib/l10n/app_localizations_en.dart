@@ -419,8 +419,8 @@ class LEn extends L {
   String get measBust => 'Bust / chest';
 
   @override
-  String measBetween(String measure, int min, int max) {
-    return '$measure must be between $min and $max cm.';
+  String measBetween(String measure, String min, String max, String unit) {
+    return '$measure must be between $min and $max $unit.';
   }
 
   @override
@@ -4072,4 +4072,27 @@ class LEn extends L {
   @override
   String get errObject =>
       'This project is an object, without a body: wear it on a body first.';
+
+  @override
+  String get inch => 'in';
+
+  @override
+  String get sizeSystemEu => 'EU';
+
+  @override
+  String get sizeSystemUs => 'US';
+
+  @override
+  String get sizeSystemUk => 'UK';
+
+  @override
+  String get sizeSystemLetters => 'S·M·L';
+
+  @override
+  String get sizeSystemTip =>
+      'How sizes are written: European (38), American (6), British (10) or letters (M). Remembered for next time.';
+
+  @override
+  String get unitsTip =>
+      'Lengths in centimetres or inches. Remembered for next time.';
 }

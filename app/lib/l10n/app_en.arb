@@ -235,17 +235,20 @@
   "bodyMasculine": "Masculine body",
   "measHeight": "Height",
   "measBust": "Bust / chest",
-  "measBetween": "{measure} must be between {min} and {max} cm.",
+  "measBetween": "{measure} must be between {min} and {max} {unit}.",
   "@measBetween": {
     "placeholders": {
       "measure": {
         "type": "String"
       },
       "min": {
-        "type": "int"
+        "type": "String"
       },
       "max": {
-        "type": "int"
+        "type": "String"
+      },
+      "unit": {
+        "type": "String"
       }
     }
   },
@@ -2070,5 +2073,12 @@
   "objectWear": "Wear it on a body",
   "objectMade": "The project is now an object: no body, no weight in 3D.",
   "bodyMenuObject": "Make it an object (no body)",
-  "errObject": "This project is an object, without a body: wear it on a body first."
+  "errObject": "This project is an object, without a body: wear it on a body first.",
+  "inch": "in",
+  "sizeSystemEu": "EU",
+  "sizeSystemUs": "US",
+  "sizeSystemUk": "UK",
+  "sizeSystemLetters": "S·M·L",
+  "sizeSystemTip": "How sizes are written: European (38), American (6), British (10) or letters (M). Remembered for next time.",
+  "unitsTip": "Lengths in centimetres or inches. Remembered for next time."
 }

@@ -120,7 +120,7 @@
   "bodyMasculine": "Corps masculin",
   "measHeight": "Stature",
   "measBust": "Tour de poitrine",
-  "measBetween": "{measure} doit être entre {min} et {max} cm.",
+  "measBetween": "{measure} doit être entre {min} et {max} {unit}.",
   "presetName": "Nom du modèle",
   "saveAsPreset": "Enregistrer comme modèle",
   "deletePreset": "Supprimer le modèle",
@@ -1142,5 +1142,12 @@
   "objectWear": "Le porter sur un mannequin",
   "objectMade": "Le projet est maintenant un objet : sans mannequin ni pesanteur en 3D.",
   "bodyMenuObject": "En faire un objet (sans mannequin)",
-  "errObject": "Ce projet est un objet, sans mannequin : portez-le d’abord sur un mannequin."
+  "errObject": "Ce projet est un objet, sans mannequin : portez-le d’abord sur un mannequin.",
+  "inch": "po",
+  "sizeSystemEu": "EU",
+  "sizeSystemUs": "US",
+  "sizeSystemUk": "UK",
+  "sizeSystemLetters": "S·M·L",
+  "sizeSystemTip": "Comment les tailles sont écrites : européennes (38), américaines (6), britanniques (10) ou en lettres (M). Retenu pour la prochaine fois.",
+  "unitsTip": "Longueurs en centimètres ou en pouces. Retenu pour la prochaine fois."
 }
