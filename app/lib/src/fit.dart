@@ -147,7 +147,7 @@ class _TapeCard extends StatelessWidget {
     final l = context.l;
     String cm(double? v, [bool signed = false]) {
       if (v == null) return '–';
-      final text = '${context.number(v, 1)} cm';
+      final text = context.measure(Quantity.cm, v, 1);
       return signed && v > 0 ? '+$text' : text;
     }
 
@@ -201,7 +201,7 @@ class _TapeCard extends StatelessWidget {
           row(l.tapeEase, cm(r.easeCm, true), strong: true),
           row(
             l.tapeGap,
-            r.gapMm == null ? '–' : '${context.number(r.gapMm!)} mm',
+            r.gapMm == null ? '–' : context.measure(Quantity.mm, r.gapMm!),
           ),
           if (!r.closed && r.garmentCm != null) note(l.tapeOpen),
         ],

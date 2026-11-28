@@ -197,10 +197,15 @@ class _DimensionFieldState extends State<_DimensionField> {
 
   bool get _angle => widget.constraint['kind'] == 'angle';
 
-  /// The value as shown: cm, or degrees.
+  Quantity get _unit => _angle ? Quantity.degrees : Quantity.cm;
+
+  /// The value: degrees, or cm.
   double get _value => _angle
       ? (widget.constraint['deg'] as num).toDouble()
       : (widget.constraint['mm'] as num).toDouble() / 10;
+
+  /// The value as shown: degrees, cm or inches.
+  String get _shown => context.fieldText(_unit, _value, 1);
 
   @override
   void initState() {
@@ -216,7 +221,7 @@ class _DimensionFieldState extends State<_DimensionField> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_focus.hasFocus) _text.text = context.decimal(_value, _angle ? 1 : 1);
+    if (!_focus.hasFocus) _text.text = _shown;
   }
 
   @override
@@ -228,7 +233,7 @@ class _DimensionFieldState extends State<_DimensionField> {
 
   void _submit() {
     final text = _text.text.trim();
-    final typed = _parseNumber(text);
+    final typed = context.fieldValue(_unit, text);
     if (typed == null && text.isNotEmpty) {
       // Not a number: a formula.
       widget.run({
@@ -238,8 +243,9 @@ class _DimensionFieldState extends State<_DimensionField> {
       });
       return;
     }
-    if (typed == null || typed <= 0 || typed == _value) {
-      _text.text = context.decimal(_value, 1);
+    // Left as shown, the value stays exact (not rounded to inches).
+    if (typed == null || typed <= 0 || typed == _value || text == _shown) {
+      _text.text = _shown;
       return;
     }
     widget.run({
@@ -265,7 +271,7 @@ class _DimensionFieldState extends State<_DimensionField> {
       focus: _focus,
       formula: true,
       autofocus: widget.autofocus,
-      unit: _angle ? '°' : context.l.cm,
+      unit: context.unitOf(_unit),
       // Leaving the field applies the value, and gives the keys back to
       // the board's tools.
       onSubmitted: _leave,
@@ -402,7 +408,7 @@ Offset? _labelAnchor(Map<String, dynamic> c, List<Offset> marks) {
 String _labelText(BuildContext context, Map<String, dynamic> c) {
   final value = c['kind'] == 'angle'
       ? '${context.number(c['deg'] as num, 1)}°'
-      : '${context.number((c['mm'] as num) / 10, 1)} ${context.l.cm}';
+      : context.length(c['mm'] as num);
   return switch (c['name']) {
     final String name => '$name  $value',
     _ => value,
@@ -549,13 +555,15 @@ void _paintSnap(
 Future<(List<double>, int)?> _askNumbers(
   BuildContext context, {
   required String title,
-  required List<(String, String, double)> fields,
+  required List<(String, Quantity, double)> fields,
   List<String> choices = const [],
   String? hint,
 }) {
+  final shown = [
+    for (final (_, unit, v) in fields) context.fieldText(unit, v, 1),
+  ];
   final controllers = [
-    for (final (_, _, v) in fields)
-      TextEditingController(text: context.decimal(v, 1)),
+    for (final text in shown) TextEditingController(text: text),
   ];
   var choice = 0;
   return showDialog<(List<double>, int)>(
@@ -564,7 +572,13 @@ Future<(List<double>, int)?> _askNumbers(
       builder: (context, setState) {
         final l = context.l;
         void done() {
-          final values = [for (final c in controllers) _parseNumber(c.text)];
+          // A value left as shown stays exact (not rounded to inches).
+          final values = [
+            for (final (i, c) in controllers.indexed)
+              c.text == shown[i]
+                  ? fields[i].$3
+                  : context.fieldValue(fields[i].$2, c.text),
+          ];
           if (values.any((v) => v == null)) return;
           Navigator.pop(context, ([for (final v in values) v!], choice));
         }
@@ -600,7 +614,7 @@ Future<(List<double>, int)?> _askNumbers(
                           width: 110,
                           child: _NumberField(
                             controller: c,
-                            unit: unit,
+                            unit: context.unitOf(unit),
                             signed: true,
                             onSubmitted: done,
                           ),
@@ -859,7 +873,7 @@ class _VariablesCard extends StatelessWidget {
                 ),
                 if (v['mm'] case final num mm)
                   Text(
-                    '${context.number(mm / 10, 1)} ${l.cm}',
+                    context.length(mm),
                     style: ts(
                       fontSize: 12.5,
                       color: p.textMuted,

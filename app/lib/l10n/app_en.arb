@@ -168,10 +168,13 @@
   },
   "fieldName": "Name",
   "fieldBody": "Body",
-  "sizeMustBePositive": "{size} must be a positive number of cm.",
+  "sizeMustBePositive": "{size} must be a positive number of {unit}.",
   "@sizeMustBePositive": {
     "placeholders": {
       "size": {
+        "type": "String"
+      },
+      "unit": {
         "type": "String"
       }
     }
@@ -606,7 +609,7 @@
   "fabricSilkBlurb": "Light and fluid",
   "fabricWool": "Wool",
   "fabricWoolBlurb": "Soft, with body",
-  "edgeLength": "Edge · {length} cm",
+  "edgeLength": "Edge · {length}",
   "@edgeLength": {
     "placeholders": {
       "length": {
@@ -616,7 +619,7 @@
   },
   "edgeOpen": "Open edge (a hem or an opening). In 3D, ⇧-drag it to lengthen the garment.",
   "edgeLengthLabel": "Length",
-  "edgeSewn": "Sewn to {piece} · {mismatch} mm difference. Its length changes on both sides. In 3D, ⇧-drag it to take it in.",
+  "edgeSewn": "Sewn to {piece} · {mismatch} difference. Its length changes on both sides. In 3D, ⇧-drag it to take it in.",
   "@edgeSewn": {
     "placeholders": {
       "piece": {
@@ -639,7 +642,7 @@
   },
   "flipSeam": "Flip seam",
   "unpick": "Unpick",
-  "changeTakenIn": "Taken in {amount} mm",
+  "changeTakenIn": "Taken in {amount}",
   "@changeTakenIn": {
     "placeholders": {
       "amount": {
@@ -647,7 +650,7 @@
       }
     }
   },
-  "changeLetOut": "Let out {amount} mm",
+  "changeLetOut": "Let out {amount}",
   "@changeLetOut": {
     "placeholders": {
       "amount": {
@@ -655,7 +658,7 @@
       }
     }
   },
-  "changeLonger": "Longer {amount} mm",
+  "changeLonger": "Longer {amount}",
   "@changeLonger": {
     "placeholders": {
       "amount": {
@@ -663,7 +666,7 @@
       }
     }
   },
-  "changeMoved": "Moved {amount} mm",
+  "changeMoved": "Moved {amount}",
   "@changeMoved": {
     "placeholders": {
       "amount": {
@@ -671,7 +674,7 @@
       }
     }
   },
-  "changeShorter": "Shorter {amount} mm",
+  "changeShorter": "Shorter {amount}",
   "@changeShorter": {
     "placeholders": {
       "amount": {
@@ -1316,12 +1319,26 @@
   "techpackLetter": "Letter pages",
   "garmentNotes": "Notes",
   "garmentNotesHint": "Sewing and finishing notes, printed in the tech pack",
-  "projectorHelp": "Drag or use the arrow keys to bring the pattern under the projector (Shift: 10 cm). Home: back to the middle. M: mirror · R: turn · I: contrast · C: calibrate · Esc: close.",
+  "projectorHelp": "Drag or use the arrow keys to bring the pattern under the projector (Shift: {step}). Home: back to the middle. M: mirror · R: turn · I: contrast · C: calibrate · Esc: close.",
+  "@projectorHelp": {
+    "placeholders": {
+      "step": {
+        "type": "String"
+      }
+    }
+  },
   "projectorCalibrate": "Calibrate",
   "projectorMirror": "Mirror",
   "projectorTurn": "Turn",
   "projectorContrast": "Contrast",
-  "projectorCalibrateHint": "The square below should be 20 cm a side on the table. Measure its sides with a ruler and type them in.",
+  "projectorCalibrateHint": "The square below should be {side} a side on the table. Measure its sides with a ruler and type them in.",
+  "@projectorCalibrateHint": {
+    "placeholders": {
+      "side": {
+        "type": "String"
+      }
+    }
+  },
   "projectorMeasuredWidth": "Width measured",
   "projectorMeasuredHeight": "Height measured",
   "projectorApply": "Apply",
@@ -1335,7 +1352,7 @@
   "pieceMass": "Mass",
   "errMarkerTooNarrow": "A piece is wider than the fabric: choose a wider fabric.",
   "errLineOutside": "A line drawn on a piece now leaves it: move it back inside the piece, or delete it.",
-  "garmentTotals": "{pieces} pieces · {area} m² of fabric cut · {mass} g",
+  "garmentTotals": "{pieces} pieces · {area} of fabric cut · {mass} g",
   "@garmentTotals": {
     "placeholders": {
       "pieces": {
@@ -1415,18 +1432,18 @@
   "toastZipperAdded": "Zipper added.",
   "buttonClickPiece": "Click on a piece.",
   "trimsTitle": "Buttons and zippers",
-  "trimButton": "Button · {mm} mm",
+  "trimButton": "Button · {size}",
   "@trimButton": {
     "placeholders": {
-      "mm": {
+      "size": {
         "type": "String"
       }
     }
   },
-  "trimButtonhole": "Buttonhole · {mm} mm button on {piece}",
+  "trimButtonhole": "Buttonhole · {size} button on {piece}",
   "@trimButtonhole": {
     "placeholders": {
-      "mm": {
+      "size": {
         "type": "String"
       },
       "piece": {
@@ -1435,10 +1452,10 @@
     }
   },
   "trimButtoned": "Buttoned",
-  "trimZipper": "Zipper · {cm} cm",
+  "trimZipper": "Zipper · {length}",
   "@trimZipper": {
     "placeholders": {
-      "cm": {
+      "length": {
         "type": "String"
       }
     }
@@ -1497,7 +1514,14 @@
   "bodyUp": "Up axis",
   "bodyTurn": "Turn",
   "bodyPoints": "Arrangement points",
-  "bodyPointsHint": "Inside the body, in cm: across (left +), height, depth (front +). Drag them in the 3D view with Body › Show arrangement points.",
+  "bodyPointsHint": "Inside the body, in {unit}: across (left +), height, depth (front +). Drag them in the 3D view with Body › Show arrangement points.",
+  "@bodyPointsHint": {
+    "placeholders": {
+      "unit": {
+        "type": "String"
+      }
+    }
+  },
   "bodyGuessAgain": "Guess again",
   "bodyHasWarnings": "The body has things to check.",
   "pointChest": "Chest",
@@ -1775,10 +1799,10 @@
   "shirringFirst": "First row from the edge",
   "shirringGap": "Between rows",
   "detailsTitle": "Construction details",
-  "detailElastic": "Elastic · {cm} cm, {width} mm wide",
+  "detailElastic": "Elastic · {length}, {width} wide",
   "@detailElastic": {
     "placeholders": {
-      "cm": {
+      "length": {
         "type": "String"
       },
       "width": {
@@ -1798,13 +1822,13 @@
   "topstitchStitch": "Stitch length",
   "threadNormal": "Sewing thread",
   "threadHeavy": "Topstitching thread",
-  "detailTopstitch": "{rows, plural, =1{1 row} other{{rows} rows}} · {mm} mm from the edge, {stitch} mm stitches",
+  "detailTopstitch": "{rows, plural, =1{1 row} other{{rows} rows}} · {distance} from the edge, {stitch} stitches",
   "@detailTopstitch": {
     "placeholders": {
       "rows": {
         "type": "int"
       },
-      "mm": {
+      "distance": {
         "type": "String"
       },
       "stitch": {
@@ -1834,13 +1858,13 @@
   "interfacingLight": "light",
   "interfacingMedium": "medium",
   "interfacingHeavy": "heavy",
-  "detailInterfacing": "Interfacing, {weight} · {cm2} cm²",
+  "detailInterfacing": "Interfacing, {weight} · {area}",
   "@detailInterfacing": {
     "placeholders": {
       "weight": {
         "type": "String"
       },
-      "cm2": {
+      "area": {
         "type": "String"
       }
     }
@@ -1860,16 +1884,16 @@
   "quiltingLoft": "Padding",
   "quiltingDiamonds": "diamonds",
   "quiltingChannels": "channels",
-  "detailQuilting": "Quilted in {pattern} · {cm} cm apart, {mm} mm padding",
+  "detailQuilting": "Quilted in {pattern} · {spacing} apart, {loft} padding",
   "@detailQuilting": {
     "placeholders": {
       "pattern": {
         "type": "String"
       },
-      "cm": {
+      "spacing": {
         "type": "String"
       },
-      "mm": {
+      "loft": {
         "type": "String"
       }
     }
@@ -2075,6 +2099,8 @@
   "bodyMenuObject": "Make it an object (no body)",
   "errObject": "This project is an object, without a body: wear it on a body first.",
   "inch": "in",
+  "metre": "m",
+  "yard": "yd",
   "sizeSystemEu": "EU",
   "sizeSystemUs": "US",
   "sizeSystemUk": "UK",

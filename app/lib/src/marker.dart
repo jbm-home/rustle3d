@@ -47,6 +47,10 @@ class _MarkerDialogState extends State<_MarkerDialog> {
   late String? _garment;
   final Set<String> _sizes = {};
   final _width = TextEditingController();
+
+  /// The fabric width (cm) last put in the field, kept exact while the
+  /// field shows it rounded to inches.
+  double _widthCm = 150;
   Map<String, dynamic>? _marker;
   String? _error;
   String? _saved;
@@ -82,7 +86,7 @@ class _MarkerDialogState extends State<_MarkerDialog> {
     if (shown != null) _sizes.add(shown);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _width.text = context.decimal(_fabricWidthCm(_garment) ?? 150, 0);
+      _showWidth(_fabricWidthCm(_garment) ?? 150);
       _layOut();
     });
   }
@@ -93,6 +97,17 @@ class _MarkerDialogState extends State<_MarkerDialog> {
     super.dispose();
   }
 
+  void _showWidth(double cm) {
+    _widthCm = cm;
+    _width.text = context.fieldText(Quantity.cm, cm);
+  }
+
+  /// The width in the field (cm), exact if left as shown.
+  double? get _typedWidthCm =>
+      _width.text == context.fieldText(Quantity.cm, _widthCm)
+      ? _widthCm
+      : context.fieldValue(Quantity.cm, _width.text);
+
   String get _spec => jsonEncode({
     'garment': ?_garment,
     if (_allSizes.isNotEmpty)
@@ -100,7 +115,7 @@ class _MarkerDialogState extends State<_MarkerDialog> {
         for (final s in _allSizes)
           if (_sizes.contains(s)) s,
       ],
-    if (_parseNumber(_width.text) case final cm?) 'width_mm': cm * 10,
+    if (_typedWidthCm case final cm?) 'width_mm': cm * 10,
   });
 
   Future<void> _layOut() async {
@@ -193,9 +208,7 @@ class _MarkerDialogState extends State<_MarkerDialog> {
                 ],
                 onChanged: (g) {
                   setState(() => _garment = g);
-                  if (_fabricWidthCm(g) case final cm?) {
-                    _width.text = context.decimal(cm, 0);
-                  }
+                  if (_fabricWidthCm(g) case final cm?) _showWidth(cm);
                   _layOut();
                 },
               ),
@@ -231,7 +244,7 @@ class _MarkerDialogState extends State<_MarkerDialog> {
                   child: _NumberField(
                     key: const Key('marker-width'),
                     controller: _width,
-                    unit: l.cm,
+                    unit: context.unitOf(Quantity.cm),
                     onSubmitted: _layOut,
                   ),
                 ),
@@ -277,8 +290,10 @@ class _MarkerDialogState extends State<_MarkerDialog> {
                 Expanded(
                   child: _Stat(
                     label: l.markerLength,
-                    value:
-                        '${num2(m == null ? null : (m['length_mm'] as num) / 1000, 2)} m',
+                    value: switch (m?['length_mm']) {
+                      final num mm => context.measure(Quantity.m, mm / 1000, 2),
+                      _ => '—',
+                    },
                   ),
                 ),
                 const SizedBox(width: Space.s),
@@ -292,7 +307,10 @@ class _MarkerDialogState extends State<_MarkerDialog> {
                 Expanded(
                   child: _Stat(
                     label: l.markerYardage,
-                    value: '${num2(m?['yardage_m'], 2)} m',
+                    value: switch (m?['yardage_m']) {
+                      final num v => context.measure(Quantity.m, v, 2),
+                      _ => '—',
+                    },
                   ),
                 ),
                 const SizedBox(width: Space.s),

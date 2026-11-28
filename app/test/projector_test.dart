@@ -9,7 +9,7 @@ import 'package:rustle3d/src/projector.dart';
 void main() {
   test('a square measured too large shrinks the scale', () {
     const s = ProjectorSettings();
-    final c = s.calibrated(220, 180);
+    final c = s.calibrated(200, 220, 180);
     expect(c.pxPerMmX, closeTo(defaultPxPerMm * 200 / 220, 1e-12));
     expect(c.pxPerMmY, closeTo(defaultPxPerMm * 200 / 180, 1e-12));
   });

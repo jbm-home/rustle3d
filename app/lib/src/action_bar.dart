@@ -293,7 +293,10 @@ extension _Bar on _ShellState {
     final picked = await _askNumbers(
       context,
       title: l.elasticTitle,
-      fields: [(l.elasticRatio, '%', 75), (l.elasticWidth, 'mm', 10)],
+      fields: [
+        (l.elasticRatio, Quantity.percent, 75),
+        (l.elasticWidth, Quantity.mm, 10),
+      ],
     );
     if (picked == null || !mounted) return;
     final [ratio, width] = picked.$1;
@@ -315,7 +318,7 @@ extension _Bar on _ShellState {
     final picked = await _askNumbers(
       context,
       title: l.interfacingTitle,
-      fields: [if (edge != null) (l.interfacingWidth, l.cm, 4)],
+      fields: [if (edge != null) (l.interfacingWidth, Quantity.cm, 4)],
       choices: [l.interfacingLight, l.interfacingMedium, l.interfacingHeavy],
     );
     if (picked == null || !mounted) return;
@@ -342,7 +345,10 @@ extension _Bar on _ShellState {
     final picked = await _askNumbers(
       context,
       title: l.quiltingTitle,
-      fields: [(l.quiltingSpacing, l.cm, 5), (l.quiltingLoft, 'mm', 8)],
+      fields: [
+        (l.quiltingSpacing, Quantity.cm, 5),
+        (l.quiltingLoft, Quantity.mm, 8),
+      ],
       choices: [l.quiltingDiamonds, l.quiltingChannels],
     );
     if (picked == null || !mounted) return;
@@ -365,10 +371,10 @@ extension _Bar on _ShellState {
       context,
       title: l.topstitchTitle,
       fields: [
-        (l.topstitchRows, '', 1),
-        (l.topstitchDistance, 'mm', 6),
-        (l.topstitchGap, 'mm', 6),
-        (l.topstitchStitch, 'mm', 3),
+        (l.topstitchRows, Quantity.count, 1),
+        (l.topstitchDistance, Quantity.mm, 6),
+        (l.topstitchGap, Quantity.mm, 6),
+        (l.topstitchStitch, Quantity.mm, 3),
       ],
       choices: [l.threadNormal, l.threadHeavy],
     );
@@ -393,10 +399,10 @@ extension _Bar on _ShellState {
       context,
       title: l.shirringTitle,
       fields: [
-        (l.shirringRows, '', 5),
-        (l.shirringFirst, l.cm, 1.5),
-        (l.shirringGap, l.cm, 1.5),
-        (l.elasticRatio, '%', 75),
+        (l.shirringRows, Quantity.count, 5),
+        (l.shirringFirst, Quantity.cm, 1.5),
+        (l.shirringGap, Quantity.cm, 1.5),
+        (l.elasticRatio, Quantity.percent, 75),
       ],
     );
     if (picked == null || !mounted) return;
@@ -432,7 +438,7 @@ extension _Bar on _ShellState {
               final picked = await _askNumbers(
                 context,
                 title: l.rotatePiece,
-                fields: [(l.rotateAngle, '°', 90)],
+                fields: [(l.rotateAngle, Quantity.degrees, 90)],
                 hint: l.rotatePieceHint,
               );
               final angle = picked?.$1.first ?? 0;
@@ -451,7 +457,10 @@ extension _Bar on _ShellState {
               final picked = await _askNumbers(
                 context,
                 title: l.scalePiece,
-                fields: [(l.scaleAcross, '%', 100), (l.scaleUpDown, '%', 100)],
+                fields: [
+                  (l.scaleAcross, Quantity.percent, 100),
+                  (l.scaleUpDown, Quantity.percent, 100),
+                ],
               );
               if (picked == null) return;
               final [x, y] = picked.$1;

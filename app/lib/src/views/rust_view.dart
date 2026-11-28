@@ -14,6 +14,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../design/tokens.dart';
 import '../i18n.dart';
+import '../region.dart';
 import '../rust/api/engine.dart';
 
 const _channel = MethodChannel('dev.rustle3d/texture');
@@ -738,8 +739,8 @@ class _RustViewState extends State<RustView>
   }
 }
 
-/// "Longer 30 mm", "Taken in 12 mm", "Moved 8 mm"… next to the cursor while changing
-/// the pattern in 3D.
+/// "Longer 30 mm", "Taken in 12 mm", "Moved 8 mm" (or in inches)… next to
+/// the cursor while changing the pattern in 3D.
 class _ChangeLabel extends StatelessWidget {
   const _ChangeLabel({required this.change});
 
@@ -748,7 +749,7 @@ class _ChangeLabel extends StatelessWidget {
   String _text(BuildContext context) {
     final l = context.l;
     final mm = change.mm;
-    final amount = context.number(mm.abs());
+    final amount = context.measure(Quantity.mm, mm.abs());
     return switch (change.kind) {
       'fit' => mm >= 0 ? l.changeTakenIn(amount) : l.changeLetOut(amount),
       'move' => l.changeMoved(amount),

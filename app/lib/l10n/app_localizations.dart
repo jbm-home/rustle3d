@@ -628,8 +628,8 @@ abstract class L {
   /// No description provided for @sizeMustBePositive.
   ///
   /// In en, this message translates to:
-  /// **'{size} must be a positive number of cm.'**
-  String sizeMustBePositive(String size);
+  /// **'{size} must be a positive number of {unit}.'**
+  String sizeMustBePositive(String size, String unit);
 
   /// No description provided for @sizeChest.
   ///
@@ -2218,7 +2218,7 @@ abstract class L {
   /// No description provided for @edgeLength.
   ///
   /// In en, this message translates to:
-  /// **'Edge · {length} cm'**
+  /// **'Edge · {length}'**
   String edgeLength(String length);
 
   /// No description provided for @edgeOpen.
@@ -2236,7 +2236,7 @@ abstract class L {
   /// No description provided for @edgeSewn.
   ///
   /// In en, this message translates to:
-  /// **'Sewn to {piece} · {mismatch} mm difference. Its length changes on both sides. In 3D, ⇧-drag it to take it in.'**
+  /// **'Sewn to {piece} · {mismatch} difference. Its length changes on both sides. In 3D, ⇧-drag it to take it in.'**
   String edgeSewn(String piece, String mismatch);
 
   /// No description provided for @matchOtherSide.
@@ -2272,31 +2272,31 @@ abstract class L {
   /// No description provided for @changeTakenIn.
   ///
   /// In en, this message translates to:
-  /// **'Taken in {amount} mm'**
+  /// **'Taken in {amount}'**
   String changeTakenIn(String amount);
 
   /// No description provided for @changeLetOut.
   ///
   /// In en, this message translates to:
-  /// **'Let out {amount} mm'**
+  /// **'Let out {amount}'**
   String changeLetOut(String amount);
 
   /// No description provided for @changeLonger.
   ///
   /// In en, this message translates to:
-  /// **'Longer {amount} mm'**
+  /// **'Longer {amount}'**
   String changeLonger(String amount);
 
   /// No description provided for @changeMoved.
   ///
   /// In en, this message translates to:
-  /// **'Moved {amount} mm'**
+  /// **'Moved {amount}'**
   String changeMoved(String amount);
 
   /// No description provided for @changeShorter.
   ///
   /// In en, this message translates to:
-  /// **'Shorter {amount} mm'**
+  /// **'Shorter {amount}'**
   String changeShorter(String amount);
 
   /// No description provided for @learnIntro.
@@ -4756,8 +4756,8 @@ abstract class L {
   /// No description provided for @projectorHelp.
   ///
   /// In en, this message translates to:
-  /// **'Drag or use the arrow keys to bring the pattern under the projector (Shift: 10 cm). Home: back to the middle. M: mirror · R: turn · I: contrast · C: calibrate · Esc: close.'**
-  String get projectorHelp;
+  /// **'Drag or use the arrow keys to bring the pattern under the projector (Shift: {step}). Home: back to the middle. M: mirror · R: turn · I: contrast · C: calibrate · Esc: close.'**
+  String projectorHelp(String step);
 
   /// No description provided for @projectorCalibrate.
   ///
@@ -4786,8 +4786,8 @@ abstract class L {
   /// No description provided for @projectorCalibrateHint.
   ///
   /// In en, this message translates to:
-  /// **'The square below should be 20 cm a side on the table. Measure its sides with a ruler and type them in.'**
-  String get projectorCalibrateHint;
+  /// **'The square below should be {side} a side on the table. Measure its sides with a ruler and type them in.'**
+  String projectorCalibrateHint(String side);
 
   /// No description provided for @projectorMeasuredWidth.
   ///
@@ -4870,7 +4870,7 @@ abstract class L {
   /// No description provided for @garmentTotals.
   ///
   /// In en, this message translates to:
-  /// **'{pieces} pieces · {area} m² of fabric cut · {mass} g'**
+  /// **'{pieces} pieces · {area} of fabric cut · {mass} g'**
   String garmentTotals(int pieces, String area, String mass);
 
   /// No description provided for @fitTip.
@@ -5212,14 +5212,14 @@ abstract class L {
   /// No description provided for @trimButton.
   ///
   /// In en, this message translates to:
-  /// **'Button · {mm} mm'**
-  String trimButton(String mm);
+  /// **'Button · {size}'**
+  String trimButton(String size);
 
   /// No description provided for @trimButtonhole.
   ///
   /// In en, this message translates to:
-  /// **'Buttonhole · {mm} mm button on {piece}'**
-  String trimButtonhole(String mm, String piece);
+  /// **'Buttonhole · {size} button on {piece}'**
+  String trimButtonhole(String size, String piece);
 
   /// No description provided for @trimButtoned.
   ///
@@ -5230,8 +5230,8 @@ abstract class L {
   /// No description provided for @trimZipper.
   ///
   /// In en, this message translates to:
-  /// **'Zipper · {cm} cm'**
-  String trimZipper(String cm);
+  /// **'Zipper · {length}'**
+  String trimZipper(String length);
 
   /// No description provided for @trimOpen.
   ///
@@ -5440,8 +5440,8 @@ abstract class L {
   /// No description provided for @bodyPointsHint.
   ///
   /// In en, this message translates to:
-  /// **'Inside the body, in cm: across (left +), height, depth (front +). Drag them in the 3D view with Body › Show arrangement points.'**
-  String get bodyPointsHint;
+  /// **'Inside the body, in {unit}: across (left +), height, depth (front +). Drag them in the 3D view with Body › Show arrangement points.'**
+  String bodyPointsHint(String unit);
 
   /// No description provided for @bodyGuessAgain.
   ///
@@ -6004,8 +6004,8 @@ abstract class L {
   /// No description provided for @detailElastic.
   ///
   /// In en, this message translates to:
-  /// **'Elastic · {cm} cm, {width} mm wide'**
-  String detailElastic(String cm, String width);
+  /// **'Elastic · {length}, {width} wide'**
+  String detailElastic(String length, String width);
 
   /// No description provided for @tpElastic.
   ///
@@ -6082,8 +6082,8 @@ abstract class L {
   /// No description provided for @detailTopstitch.
   ///
   /// In en, this message translates to:
-  /// **'{rows, plural, =1{1 row} other{{rows} rows}} · {mm} mm from the edge, {stitch} mm stitches'**
-  String detailTopstitch(int rows, String mm, String stitch);
+  /// **'{rows, plural, =1{1 row} other{{rows} rows}} · {distance} from the edge, {stitch} stitches'**
+  String detailTopstitch(int rows, String distance, String stitch);
 
   /// No description provided for @errOtherKind.
   ///
@@ -6220,8 +6220,8 @@ abstract class L {
   /// No description provided for @detailInterfacing.
   ///
   /// In en, this message translates to:
-  /// **'Interfacing, {weight} · {cm2} cm²'**
-  String detailInterfacing(String weight, String cm2);
+  /// **'Interfacing, {weight} · {area}'**
+  String detailInterfacing(String weight, String area);
 
   /// No description provided for @errNotClosed.
   ///
@@ -6316,8 +6316,8 @@ abstract class L {
   /// No description provided for @detailQuilting.
   ///
   /// In en, this message translates to:
-  /// **'Quilted in {pattern} · {cm} cm apart, {mm} mm padding'**
-  String detailQuilting(String pattern, String cm, String mm);
+  /// **'Quilted in {pattern} · {spacing} apart, {loft} padding'**
+  String detailQuilting(String pattern, String spacing, String loft);
 
   /// No description provided for @tpPadding.
   ///
@@ -6960,6 +6960,18 @@ abstract class L {
   /// In en, this message translates to:
   /// **'in'**
   String get inch;
+
+  /// No description provided for @metre.
+  ///
+  /// In en, this message translates to:
+  /// **'m'**
+  String get metre;
+
+  /// No description provided for @yard.
+  ///
+  /// In en, this message translates to:
+  /// **'yd'**
+  String get yard;
 
   /// No description provided for @sizeSystemEu.
   ///

@@ -313,8 +313,8 @@ class LFr extends L {
   String get fieldBody => 'Corps';
 
   @override
-  String sizeMustBePositive(String size) {
-    return '$size doit être un nombre de cm positif.';
+  String sizeMustBePositive(String size, String unit) {
+    return '$size doit être un nombre positif ($unit).';
   }
 
   @override
@@ -1229,7 +1229,7 @@ class LFr extends L {
 
   @override
   String edgeLength(String length) {
-    return 'Bord · $length cm';
+    return 'Bord · $length';
   }
 
   @override
@@ -1241,7 +1241,7 @@ class LFr extends L {
 
   @override
   String edgeSewn(String piece, String mismatch) {
-    return 'Cousu à $piece · $mismatch mm d’écart. Sa longueur change des deux côtés. En 3D, ⇧-glissez-le pour le reprendre.';
+    return 'Cousu à $piece · $mismatch d’écart. Sa longueur change des deux côtés. En 3D, ⇧-glissez-le pour le reprendre.';
   }
 
   @override
@@ -1263,27 +1263,27 @@ class LFr extends L {
 
   @override
   String changeTakenIn(String amount) {
-    return 'Repris de $amount mm';
+    return 'Repris de $amount';
   }
 
   @override
   String changeLetOut(String amount) {
-    return 'Relâché de $amount mm';
+    return 'Relâché de $amount';
   }
 
   @override
   String changeLonger(String amount) {
-    return 'Rallongé de $amount mm';
+    return 'Rallongé de $amount';
   }
 
   @override
   String changeMoved(String amount) {
-    return 'Déplacé de $amount mm';
+    return 'Déplacé de $amount';
   }
 
   @override
   String changeShorter(String amount) {
-    return 'Raccourci de $amount mm';
+    return 'Raccourci de $amount';
   }
 
   @override
@@ -2847,8 +2847,9 @@ class LFr extends L {
       'Notes de montage et de finition, imprimées dans le dossier technique';
 
   @override
-  String get projectorHelp =>
-      'Faites glisser ou utilisez les flèches pour amener le patron sous le projecteur (Maj : 10 cm). Origine : retour au centre. M : miroir · R : tourner · I : contraste · C : calibrer · Échap : fermer.';
+  String projectorHelp(String step) {
+    return 'Faites glisser ou utilisez les flèches pour amener le patron sous le projecteur (Maj : $step). Origine : retour au centre. M : miroir · R : tourner · I : contraste · C : calibrer · Échap : fermer.';
+  }
 
   @override
   String get projectorCalibrate => 'Calibrer';
@@ -2863,8 +2864,9 @@ class LFr extends L {
   String get projectorContrast => 'Contraste';
 
   @override
-  String get projectorCalibrateHint =>
-      'Le carré ci-dessous devrait mesurer 20 cm de côté sur la table. Mesurez ses côtés avec une règle et saisissez-les.';
+  String projectorCalibrateHint(String side) {
+    return 'Le carré ci-dessous devrait mesurer $side de côté sur la table. Mesurez ses côtés avec une règle et saisissez-les.';
+  }
 
   @override
   String get projectorMeasuredWidth => 'Largeur mesurée';
@@ -2909,7 +2911,7 @@ class LFr extends L {
 
   @override
   String garmentTotals(int pieces, String area, String mass) {
-    return '$pieces pièces · $area m² de tissu coupé · $mass g';
+    return '$pieces pièces · $area de tissu coupé · $mass g';
   }
 
   @override
@@ -3093,21 +3095,21 @@ class LFr extends L {
   String get trimsTitle => 'Boutons et fermetures';
 
   @override
-  String trimButton(String mm) {
-    return 'Bouton · $mm mm';
+  String trimButton(String size) {
+    return 'Bouton · $size';
   }
 
   @override
-  String trimButtonhole(String mm, String piece) {
-    return 'Boutonnière · bouton de $mm mm sur $piece';
+  String trimButtonhole(String size, String piece) {
+    return 'Boutonnière · bouton de $size sur $piece';
   }
 
   @override
   String get trimButtoned => 'Boutonné';
 
   @override
-  String trimZipper(String cm) {
-    return 'Fermeture éclair · $cm cm';
+  String trimZipper(String length) {
+    return 'Fermeture éclair · $length';
   }
 
   @override
@@ -3218,8 +3220,9 @@ class LFr extends L {
   String get bodyPoints => 'Points de placement';
 
   @override
-  String get bodyPointsHint =>
-      'Dans le corps, en cm : largeur (gauche +), hauteur, profondeur (devant +). Déplacez-les dans la vue 3D avec Corps › Afficher les points de placement.';
+  String bodyPointsHint(String unit) {
+    return 'Dans le corps, en $unit : largeur (gauche +), hauteur, profondeur (devant +). Déplacez-les dans la vue 3D avec Corps › Afficher les points de placement.';
+  }
 
   @override
   String get bodyGuessAgain => 'Replacer';
@@ -3567,8 +3570,8 @@ class LFr extends L {
   String get detailsTitle => 'Détails de montage';
 
   @override
-  String detailElastic(String cm, String width) {
-    return 'Élastique · $cm cm, $width mm de large';
+  String detailElastic(String length, String width) {
+    return 'Élastique · $length, $width de large';
   }
 
   @override
@@ -3609,14 +3612,14 @@ class LFr extends L {
   String get threadHeavy => 'Fil à surpiquer';
 
   @override
-  String detailTopstitch(int rows, String mm, String stitch) {
+  String detailTopstitch(int rows, String distance, String stitch) {
     String _temp0 = intl.Intl.pluralLogic(
       rows,
       locale: localeName,
       other: '$rows rangs',
       one: '1 rang',
     );
-    return '$_temp0 · à $mm mm du bord, points de $stitch mm';
+    return '$_temp0 · à $distance du bord, points de $stitch';
   }
 
   @override
@@ -3688,8 +3691,8 @@ class LFr extends L {
   String get interfacingHeavy => 'fort';
 
   @override
-  String detailInterfacing(String weight, String cm2) {
-    return 'Entoilage $weight · $cm2 cm²';
+  String detailInterfacing(String weight, String area) {
+    return 'Entoilage $weight · $area';
   }
 
   @override
@@ -3739,8 +3742,8 @@ class LFr extends L {
   String get quiltingChannels => 'canaux';
 
   @override
-  String detailQuilting(String pattern, String cm, String mm) {
-    return 'Matelassé en $pattern · tous les $cm cm, rembourrage $mm mm';
+  String detailQuilting(String pattern, String spacing, String loft) {
+    return 'Matelassé en $pattern · tous les $spacing, rembourrage $loft';
   }
 
   @override
@@ -4107,6 +4110,12 @@ class LFr extends L {
 
   @override
   String get inch => 'po';
+
+  @override
+  String get metre => 'm';
+
+  @override
+  String get yard => 'vg';
 
   @override
   String get sizeSystemEu => 'EU';

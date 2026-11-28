@@ -311,8 +311,8 @@ class LEn extends L {
   String get fieldBody => 'Body';
 
   @override
-  String sizeMustBePositive(String size) {
-    return '$size must be a positive number of cm.';
+  String sizeMustBePositive(String size, String unit) {
+    return '$size must be a positive number of $unit.';
   }
 
   @override
@@ -1219,7 +1219,7 @@ class LEn extends L {
 
   @override
   String edgeLength(String length) {
-    return 'Edge · $length cm';
+    return 'Edge · $length';
   }
 
   @override
@@ -1231,7 +1231,7 @@ class LEn extends L {
 
   @override
   String edgeSewn(String piece, String mismatch) {
-    return 'Sewn to $piece · $mismatch mm difference. Its length changes on both sides. In 3D, ⇧-drag it to take it in.';
+    return 'Sewn to $piece · $mismatch difference. Its length changes on both sides. In 3D, ⇧-drag it to take it in.';
   }
 
   @override
@@ -1253,27 +1253,27 @@ class LEn extends L {
 
   @override
   String changeTakenIn(String amount) {
-    return 'Taken in $amount mm';
+    return 'Taken in $amount';
   }
 
   @override
   String changeLetOut(String amount) {
-    return 'Let out $amount mm';
+    return 'Let out $amount';
   }
 
   @override
   String changeLonger(String amount) {
-    return 'Longer $amount mm';
+    return 'Longer $amount';
   }
 
   @override
   String changeMoved(String amount) {
-    return 'Moved $amount mm';
+    return 'Moved $amount';
   }
 
   @override
   String changeShorter(String amount) {
-    return 'Shorter $amount mm';
+    return 'Shorter $amount';
   }
 
   @override
@@ -2822,8 +2822,9 @@ class LEn extends L {
       'Sewing and finishing notes, printed in the tech pack';
 
   @override
-  String get projectorHelp =>
-      'Drag or use the arrow keys to bring the pattern under the projector (Shift: 10 cm). Home: back to the middle. M: mirror · R: turn · I: contrast · C: calibrate · Esc: close.';
+  String projectorHelp(String step) {
+    return 'Drag or use the arrow keys to bring the pattern under the projector (Shift: $step). Home: back to the middle. M: mirror · R: turn · I: contrast · C: calibrate · Esc: close.';
+  }
 
   @override
   String get projectorCalibrate => 'Calibrate';
@@ -2838,8 +2839,9 @@ class LEn extends L {
   String get projectorContrast => 'Contrast';
 
   @override
-  String get projectorCalibrateHint =>
-      'The square below should be 20 cm a side on the table. Measure its sides with a ruler and type them in.';
+  String projectorCalibrateHint(String side) {
+    return 'The square below should be $side a side on the table. Measure its sides with a ruler and type them in.';
+  }
 
   @override
   String get projectorMeasuredWidth => 'Width measured';
@@ -2884,7 +2886,7 @@ class LEn extends L {
 
   @override
   String garmentTotals(int pieces, String area, String mass) {
-    return '$pieces pieces · $area m² of fabric cut · $mass g';
+    return '$pieces pieces · $area of fabric cut · $mass g';
   }
 
   @override
@@ -3066,21 +3068,21 @@ class LEn extends L {
   String get trimsTitle => 'Buttons and zippers';
 
   @override
-  String trimButton(String mm) {
-    return 'Button · $mm mm';
+  String trimButton(String size) {
+    return 'Button · $size';
   }
 
   @override
-  String trimButtonhole(String mm, String piece) {
-    return 'Buttonhole · $mm mm button on $piece';
+  String trimButtonhole(String size, String piece) {
+    return 'Buttonhole · $size button on $piece';
   }
 
   @override
   String get trimButtoned => 'Buttoned';
 
   @override
-  String trimZipper(String cm) {
-    return 'Zipper · $cm cm';
+  String trimZipper(String length) {
+    return 'Zipper · $length';
   }
 
   @override
@@ -3190,8 +3192,9 @@ class LEn extends L {
   String get bodyPoints => 'Arrangement points';
 
   @override
-  String get bodyPointsHint =>
-      'Inside the body, in cm: across (left +), height, depth (front +). Drag them in the 3D view with Body › Show arrangement points.';
+  String bodyPointsHint(String unit) {
+    return 'Inside the body, in $unit: across (left +), height, depth (front +). Drag them in the 3D view with Body › Show arrangement points.';
+  }
 
   @override
   String get bodyGuessAgain => 'Guess again';
@@ -3538,8 +3541,8 @@ class LEn extends L {
   String get detailsTitle => 'Construction details';
 
   @override
-  String detailElastic(String cm, String width) {
-    return 'Elastic · $cm cm, $width mm wide';
+  String detailElastic(String length, String width) {
+    return 'Elastic · $length, $width wide';
   }
 
   @override
@@ -3580,14 +3583,14 @@ class LEn extends L {
   String get threadHeavy => 'Topstitching thread';
 
   @override
-  String detailTopstitch(int rows, String mm, String stitch) {
+  String detailTopstitch(int rows, String distance, String stitch) {
     String _temp0 = intl.Intl.pluralLogic(
       rows,
       locale: localeName,
       other: '$rows rows',
       one: '1 row',
     );
-    return '$_temp0 · $mm mm from the edge, $stitch mm stitches';
+    return '$_temp0 · $distance from the edge, $stitch stitches';
   }
 
   @override
@@ -3659,8 +3662,8 @@ class LEn extends L {
   String get interfacingHeavy => 'heavy';
 
   @override
-  String detailInterfacing(String weight, String cm2) {
-    return 'Interfacing, $weight · $cm2 cm²';
+  String detailInterfacing(String weight, String area) {
+    return 'Interfacing, $weight · $area';
   }
 
   @override
@@ -3710,8 +3713,8 @@ class LEn extends L {
   String get quiltingChannels => 'channels';
 
   @override
-  String detailQuilting(String pattern, String cm, String mm) {
-    return 'Quilted in $pattern · $cm cm apart, $mm mm padding';
+  String detailQuilting(String pattern, String spacing, String loft) {
+    return 'Quilted in $pattern · $spacing apart, $loft padding';
   }
 
   @override
@@ -4075,6 +4078,12 @@ class LEn extends L {
 
   @override
   String get inch => 'in';
+
+  @override
+  String get metre => 'm';
+
+  @override
+  String get yard => 'yd';
 
   @override
   String get sizeSystemEu => 'EU';

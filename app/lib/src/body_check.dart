@@ -10,6 +10,7 @@ import 'package:material_ui/material_ui.dart';
 import 'busy.dart';
 import 'design/tokens.dart';
 import 'i18n.dart';
+import 'region.dart';
 import 'rust/api/engine.dart';
 
 Future<void> showBodyCheck(
@@ -105,10 +106,34 @@ class _BodyCheckState extends State<_BodyCheck> {
   final _turn = TextEditingController();
   final _points = <String, List<TextEditingController>>{};
 
+  /// Each point's place (mm), as checked.
+  final _pointsMm = <String, List<double>>{};
+
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _showPoints();
+  }
+
+  String _shown(double mm) => context.fieldText(Quantity.cm, mm / 10, 1);
+
+  /// The points' fields, in cm or inches.
+  void _showPoints() {
+    for (final MapEntry(key: name, value: at) in _pointsMm.entries) {
+      final row = _points.putIfAbsent(
+        name,
+        () => [for (var i = 0; i < 3; i++) TextEditingController()],
+      );
+      for (final (i, mm) in at.indexed) {
+        row[i].text = _shown(mm);
+      }
+    }
   }
 
   @override
@@ -130,15 +155,9 @@ class _BodyCheckState extends State<_BodyCheck> {
       _check = check;
       _turn.text = (check['turn_deg'] as num).toStringAsFixed(0);
       for (final p in (check['points'] as List).cast<Map>()) {
-        final name = p['point'] as String;
-        final at = (p['at_mm'] as List).cast<num>();
-        final row = _points.putIfAbsent(
-          name,
-          () => [for (var i = 0; i < 3; i++) TextEditingController()],
-        );
-        for (var i = 0; i < 3; i++) {
-          row[i].text = (at[i] / 10).toStringAsFixed(1);
-        }
+        _pointsMm[p['point'] as String] = [
+          for (final v in (p['at_mm'] as List).take(3)) (v as num).toDouble(),
+        ];
       }
     } on ApiError catch (e) {
       _error = context.error(e);
@@ -160,6 +179,7 @@ class _BodyCheckState extends State<_BodyCheck> {
       setState(() {
         _error = null;
         _load();
+        _showPoints();
       });
       widget.onChanged();
     } on ApiError catch (e) {
@@ -169,16 +189,18 @@ class _BodyCheckState extends State<_BodyCheck> {
 
   void _setPoint(String name) {
     final row = _points[name];
-    if (row == null) return;
+    final was = _pointsMm[name];
+    if (row == null || was == null) return;
+    // A coordinate left as shown stays exact (not rounded to inches).
     final mm = [
-      for (final c in row) double.tryParse(c.text.replaceAll(',', '.')),
+      for (final (i, c) in row.indexed)
+        if (i < was.length && c.text == _shown(was[i]))
+          was[i]
+        else if (context.fieldValue(Quantity.cm, c.text) case final cm?)
+          cm * 10,
     ];
-    if (mm.any((v) => v == null)) return;
-    _step({
-      'type': 'avatar.set_point',
-      'point': name,
-      'at_mm': [for (final v in mm) v! * 10],
-    });
+    if (mm.length != row.length) return;
+    _step({'type': 'avatar.set_point', 'point': name, 'at_mm': mm});
   }
 
   @override
@@ -372,7 +394,7 @@ class _BodyCheckState extends State<_BodyCheck> {
                 ],
               ),
               Text(
-                l.bodyPointsHint,
+                l.bodyPointsHint(context.unitOf(Quantity.cm)),
                 style: ts(fontSize: 12.5, color: p.textMuted, height: 1.4),
               ),
               const SizedBox(height: Space.s),
@@ -436,7 +458,7 @@ class _PointRow extends StatelessWidget {
                 style: ts(fontSize: 13, tabular: true),
                 decoration: InputDecoration(
                   isDense: true,
-                  suffixText: context.l.cm,
+                  suffixText: context.unitOf(Quantity.cm),
                   border: const OutlineInputBorder(),
                 ),
               ),

@@ -14,15 +14,18 @@ import 'package:material_ui/material_ui.dart';
 
 import 'design/tokens.dart';
 import 'i18n.dart';
+import 'region.dart';
 
 /// Logical pixels per millimetre before any calibration: 96 per inch.
 const defaultPxPerMm = 96 / 25.4;
 
-/// Side of the calibration square (mm).
-const calibrationMm = 200.0;
+/// Side of the calibration square (mm): 20 cm, or 8 in.
+double calibrationMm(Region r) => r.inches ? 8 * mmPerInch : 200;
 
-/// Length of the scale bar always shown in a corner (mm).
-const _scaleBarMm = 100.0;
+/// The scale bar always shown in a corner, the arrow keys' long step:
+/// 10 cm, or 4 in. Its length (mm) and its label.
+(double, String) _scaleBar(Region r, L l) =>
+    r.inches ? (4 * mmPerInch, '4 ${l.inch}') : (100, '10 ${l.cm}');
 
 /// How the projector is set up.
 class ProjectorSettings {
@@ -61,11 +64,15 @@ class ProjectorSettings {
     dark: dark ?? this.dark,
   );
 
-  /// The scale after the calibration square ([calibrationMm] at this
+  /// The scale after the calibration square ([squareMm] a side at this
   /// scale) was measured [widthMm] × [heightMm] on the table.
-  ProjectorSettings calibrated(double widthMm, double heightMm) => copyWith(
-    pxPerMmX: pxPerMmX * calibrationMm / widthMm,
-    pxPerMmY: pxPerMmY * calibrationMm / heightMm,
+  ProjectorSettings calibrated(
+    double squareMm,
+    double widthMm,
+    double heightMm,
+  ) => copyWith(
+    pxPerMmX: pxPerMmX * squareMm / widthMm,
+    pxPerMmY: pxPerMmY * squareMm / heightMm,
   );
 
   Map<String, Object?> toJson() => {
@@ -215,7 +222,13 @@ class ProjectorPageState extends State<ProjectorPage> {
   /// Apply the sides measured on the table (cm).
   void calibrate(double widthCm, double heightCm) {
     if (!(widthCm > 0) || !(heightCm > 0)) return;
-    _set(settings.calibrated(widthCm * 10, heightCm * 10));
+    _set(
+      settings.calibrated(
+        calibrationMm(context.region),
+        widthCm * 10,
+        heightCm * 10,
+      ),
+    );
     setState(() => calibrating = false);
     _focus.requestFocus();
   }
@@ -231,7 +244,8 @@ class ProjectorPageState extends State<ProjectorPage> {
       }
       return KeyEventResult.ignored;
     }
-    final step = HardwareKeyboard.instance.isShiftPressed ? 100.0 : 10.0;
+    final (bar, _) = _scaleBar(context.region, context.l);
+    final step = HardwareKeyboard.instance.isShiftPressed ? bar : bar / 10;
     final k = e.logicalKey;
     void move(Offset by) => setState(() => pan += by);
     if (k == LogicalKeyboardKey.arrowLeft) {
@@ -308,8 +322,10 @@ class ProjectorPageState extends State<ProjectorPage> {
                     settings: settings,
                     ink: ink,
                     paper: paper,
-                    square: calibrating,
-                    scaleLabel: '${(_scaleBarMm / 10).round()} ${l.cm}',
+                    squareMm: calibrating
+                        ? calibrationMm(context.region)
+                        : null,
+                    bar: _scaleBar(context.region, l),
                   ),
                 ),
               ),
@@ -329,7 +345,7 @@ class ProjectorPageState extends State<ProjectorPage> {
                 children: [
                   Expanded(
                     child: Text(
-                      l.projectorHelp,
+                      l.projectorHelp(_scaleBar(context.region, l).$2),
                       style: ts(
                         fontSize: 12,
                         color: ink.withValues(alpha: 0.6),
@@ -416,15 +432,13 @@ class _CalibrationCard extends StatelessWidget {
   final VoidCallback onReset;
   final VoidCallback onCancel;
 
-  double? _parse(String s) => double.tryParse(s.trim().replaceAll(',', '.'));
-
   @override
   Widget build(BuildContext context) {
     final p = Tokens.of(context);
     final l = context.l;
     void apply() {
-      final w = _parse(width.text);
-      final h = _parse(height.text);
+      final w = context.fieldValue(Quantity.cm, width.text);
+      final h = context.fieldValue(Quantity.cm, height.text);
       if (w != null && h != null) onApply(w, h);
     }
 
@@ -436,7 +450,7 @@ class _CalibrationCard extends StatelessWidget {
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
         decoration: InputDecoration(
           labelText: label,
-          suffixText: l.cm,
+          suffixText: context.unitOf(Quantity.cm),
           isDense: true,
         ),
         onSubmitted: (_) => apply(),
@@ -460,7 +474,9 @@ class _CalibrationCard extends StatelessWidget {
           ),
           const SizedBox(height: Space.xs),
           Text(
-            l.projectorCalibrateHint,
+            l.projectorCalibrateHint(
+              context.measure(Quantity.mm, calibrationMm(context.region)),
+            ),
             style: ts(fontSize: 12.5, height: 1.4, color: p.textMuted),
           ),
           const SizedBox(height: Space.s),
@@ -508,8 +524,8 @@ class _ProjectorPainter extends CustomPainter {
     required this.settings,
     required this.ink,
     required this.paper,
-    required this.square,
-    required this.scaleLabel,
+    required this.squareMm,
+    required this.bar,
   });
 
   final List<_Line> lines;
@@ -520,9 +536,11 @@ class _ProjectorPainter extends CustomPainter {
   final Color ink;
   final Color paper;
 
-  /// Draw the calibration square instead of the pattern.
-  final bool square;
-  final String scaleLabel;
+  /// The calibration square's side (mm), drawn instead of the pattern.
+  final double? squareMm;
+
+  /// The scale bar's length (mm) and label.
+  final (double, String) bar;
 
   /// A pattern point (mm, y up) on the screen.
   Offset _place(Offset p, Size size) {
@@ -546,9 +564,9 @@ class _ProjectorPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
-    if (square) {
-      final w = calibrationMm * settings.pxPerMmX;
-      final h = calibrationMm * settings.pxPerMmY;
+    if (squareMm case final side?) {
+      final w = side * settings.pxPerMmX;
+      final h = side * settings.pxPerMmY;
       canvas.drawRect(
         Rect.fromCenter(center: size.center(Offset.zero), width: w, height: h),
         stroke..strokeWidth = 2,
@@ -585,8 +603,8 @@ class _ProjectorPainter extends CustomPainter {
       final at = _place(label.at, size);
       painter.paint(canvas, at - Offset(painter.width / 2, painter.height / 2));
     }
-    // The scale bar, bottom right: 10 cm across and down.
-    final bar = _scaleBarMm;
+    // The scale bar, bottom right: 10 cm (or 4 in) across and down.
+    final (bar, scaleLabel) = this.bar;
     final corner = Offset(size.width - 24, size.height - 24);
     stroke.strokeWidth = 2;
     canvas.drawPath(
@@ -649,7 +667,8 @@ class _ProjectorPainter extends CustomPainter {
   bool shouldRepaint(_ProjectorPainter old) =>
       old.pan != pan ||
       old.settings != settings ||
-      old.square != square ||
+      old.squareMm != squareMm ||
+      old.bar != bar ||
       old.lines != lines ||
       old.ink != ink;
 }

@@ -58,9 +58,9 @@ maintainer's briefs that specs cite as "ROADMAP Mxx" in their
 | M45 | Self-collision by contacts | A folded skirt's layers lie on each other, without the puffy ~8 mm gap |
 | M46 | Objects: projects without a body ✅ (2026-11-28) | A cushion drapes round and smooth, stuffed; a tote bag as an object hangs flat, without folds |
 | M47 | The body at creation: size, silhouette, height ✅ (2026-11-28) | A project made for a women's 38 pear shape, 1.60 m; its size range starts around its own size |
-| M48 | Sizes and units of the user's region (step 1 ✅ 2026-11-28: sizes, body measurements) | A user in the US sees a 6 for the 38 and measurements in inches; every length of the app follows (step 2) |
+| M48 | Sizes and units of the user's region ✅ 2026-11-28 (step 1: sizes, body measurements; step 2: every length) | A user in the US sees a 6 for the 38 and measurements in inches; every length of the app follows (step 2) |
 
-Next: M48 step 2 (every length in inches, spec 38), then M43; M16's Linux part when the work
+Next: M43; M16's Linux part when the work
 moves to Linux.
 
 ## Planned milestones (proposed 2026-11-26)

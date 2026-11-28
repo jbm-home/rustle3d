@@ -1122,7 +1122,7 @@ class _ShellState extends State<Shell> {
     final picked = await _askNumbers(
       context,
       title: l.toolDart,
-      fields: [(l.dartWidth, l.cm, 2), (l.dartLength, l.cm, 10)],
+      fields: [(l.dartWidth, Quantity.cm, 2), (l.dartLength, Quantity.cm, 10)],
     );
     if (picked == null || !mounted) return;
     final [w, len] = picked.$1;
@@ -1144,7 +1144,10 @@ class _ShellState extends State<Shell> {
     final picked = await _askNumbers(
       context,
       title: l.toolPleat,
-      fields: [(l.pleatDepth, l.cm, 3), (l.pleatStitched, l.cm, 0)],
+      fields: [
+        (l.pleatDepth, Quantity.cm, 3),
+        (l.pleatStitched, Quantity.cm, 0),
+      ],
       choices: [l.pleatKnife, l.pleatBox],
     );
     if (picked == null || !mounted) return;
@@ -1180,7 +1183,7 @@ class _ShellState extends State<Shell> {
     final picked = await _askNumbers(
       context,
       title: l.arcTitle,
-      fields: [(l.arcBulge, l.cm, (lengthMm / 80).clamp(0.5, 20))],
+      fields: [(l.arcBulge, Quantity.cm, (lengthMm / 80).clamp(0.5, 20))],
       hint: l.arcHint,
     );
     if (picked == null || !mounted) return;
@@ -1206,7 +1209,7 @@ class _ShellState extends State<Shell> {
     final picked = await _askNumbers(
       context,
       title: l.toolEllipse,
-      fields: [(l.width, l.cm, 30), (l.height, l.cm, 20)],
+      fields: [(l.width, Quantity.cm, 30), (l.height, Quantity.cm, 20)],
     );
     if (picked == null || !mounted) return;
     final [w, h] = picked.$1;
@@ -1249,7 +1252,10 @@ class _ShellState extends State<Shell> {
     final picked = await _askNumbers(
       context,
       title: l.toolSector,
-      fields: [(l.sectorWaist, l.cm, waist + 2), (l.sectorLength, l.cm, 60)],
+      fields: [
+        (l.sectorWaist, Quantity.cm, waist + 2),
+        (l.sectorLength, Quantity.cm, 60),
+      ],
       choices: [l.sectorFull, l.sectorHalf, l.sectorQuarter],
       hint: l.sectorHint,
     );
@@ -2021,7 +2027,6 @@ class _ShellState extends State<Shell> {
     }
     final at = _dimPointer;
     if (at == null) return;
-    final cm = context.l.cm;
     switch (_dimPicks) {
       case [final a, final b] when _isCorner(a):
         final (pa, pb) = (_pickPoints(a).first, _pickPoints(b).first);
@@ -2046,7 +2051,7 @@ class _ShellState extends State<Shell> {
         _pill(
           canvas,
           Offset.lerp(toScreen(s), toScreen(e), 0.5)!,
-          '${context.number(mm / 10, 1)} $cm',
+          context.length(mm),
           p.surface,
           p.accent,
         );
@@ -2059,7 +2064,7 @@ class _ShellState extends State<Shell> {
         _pill(
           canvas,
           toScreen(at) + const Offset(0, -18),
-          '${context.number(mm / 10, 1)} $cm',
+          context.length(mm),
           p.surface,
           p.accent,
         );
@@ -4570,14 +4575,14 @@ class _PanelInspector extends StatelessWidget {
             Expanded(
               child: _Stat(
                 label: l.area,
-                value: '${context.number(area, 3)} m²',
+                value: context.measure(Quantity.m2, area, 3),
               ),
             ),
             const SizedBox(width: Space.s),
             Expanded(
               child: _Stat(
                 label: l.perimeter,
-                value: '${context.number(perimeter, 1)} ${l.cm}',
+                value: context.measure(Quantity.cm, perimeter, 1),
               ),
             ),
           ],
@@ -4589,8 +4594,11 @@ class _PanelInspector extends StatelessWidget {
               Expanded(
                 child: _Stat(
                   label: l.cutArea,
-                  value:
-                      '${context.number((f['cut_area_mm2'] as num) / 1e6, 3)} m²',
+                  value: context.measure(
+                    Quantity.m2,
+                    (f['cut_area_mm2'] as num) / 1e6,
+                    3,
+                  ),
                 ),
               ),
               const SizedBox(width: Space.s),
@@ -4605,17 +4613,15 @@ class _PanelInspector extends StatelessWidget {
         ],
         const SizedBox(height: Space.xl),
         _SliderRow(
+          fieldKey: const Key('seam-allowance'),
           label: l.seamAllowance,
           value: allowance,
           min: 0,
           max: 30,
-          unit: 'mm',
+          unit: Quantity.mm,
           enabled: !linked,
-          onChanged: (v) => run({
-            'type': 'panel.set_seam_allowance',
-            'panel': id,
-            'mm': v.roundToDouble(),
-          }),
+          onChanged: (v) =>
+              run({'type': 'panel.set_seam_allowance', 'panel': id, 'mm': v}),
         ),
         const SizedBox(height: Space.l),
         _SliderRow(
@@ -4623,7 +4629,7 @@ class _PanelInspector extends StatelessWidget {
           value: grain.clamp(0, 180),
           min: 0,
           max: 180,
-          unit: '°',
+          unit: Quantity.degrees,
           enabled: !linked,
           onChanged: (v) => run({
             'type': 'panel.set_grain',
@@ -4786,7 +4792,7 @@ class _PlacementCard extends StatelessWidget {
           value: angle.clamp(0, 359),
           min: 0,
           max: 359,
-          unit: '°',
+          unit: Quantity.degrees,
           enabled: true,
           onChanged: (v) => update(angleDeg: v),
         ),
@@ -4796,7 +4802,7 @@ class _PlacementCard extends StatelessWidget {
           value: top.clamp(40, 200),
           min: 40,
           max: 200,
-          unit: l.cm,
+          unit: Quantity.cm,
           enabled: true,
           onChanged: (v) => update(topCm: v),
         ),
@@ -4840,7 +4846,9 @@ class _Stat extends StatelessWidget {
   }
 }
 
-/// A slider whose value can also be typed.
+/// A slider whose value can also be typed, in the user's units: the
+/// value, its range and [onChanged] stay in [unit]'s own unit, rounded to
+/// what is shown.
 class _SliderRow extends StatefulWidget {
   const _SliderRow({
     required this.label,
@@ -4860,11 +4868,11 @@ class _SliderRow extends StatefulWidget {
   final double value;
   final double min;
   final double max;
-  final String unit;
+  final Quantity unit;
   final bool enabled;
   final ValueChanged<double> onChanged;
 
-  /// Decimals shown and kept.
+  /// Decimals shown and kept, in the metric units.
   final int digits;
 
   /// What can be typed, if wider than the slider's range.
@@ -4877,10 +4885,13 @@ class _SliderRow extends StatefulWidget {
 }
 
 class _SliderRowState extends State<_SliderRow> {
-  late final _text = TextEditingController(text: _shown(widget.value));
+  final _text = TextEditingController();
   final _focus = FocusNode();
 
-  String _shown(double v) => context.decimal(v, widget.digits);
+  String _shown(double v) => context.fieldText(widget.unit, v, widget.digits);
+
+  double _rounded(double v) =>
+      context.region.rounded(widget.unit, v, widget.digits);
 
   @override
   void initState() {
@@ -4889,6 +4900,13 @@ class _SliderRowState extends State<_SliderRow> {
     _focus.addListener(() {
       if (!_focus.hasFocus) _submit();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The units changed (or the first build).
+    if (!_focus.hasFocus) _text.text = _shown(widget.value);
   }
 
   @override
@@ -4905,14 +4923,17 @@ class _SliderRowState extends State<_SliderRow> {
   }
 
   void _submit() {
-    final typed = _parseNumber(_text.text);
-    if (typed == null) {
+    final typed = context.fieldValue(widget.unit, _text.text);
+    // Left as shown: the value stays exact (not rounded to inches).
+    if (typed == null || _text.text == _shown(widget.value)) {
       _text.text = _shown(widget.value);
       return;
     }
-    final v = typed
-        .clamp(widget.typedMin ?? widget.min, widget.typedMax ?? widget.max)
-        .toDouble();
+    final v = _rounded(
+      typed
+          .clamp(widget.typedMin ?? widget.min, widget.typedMax ?? widget.max)
+          .toDouble(),
+    );
     _text.text = _shown(v);
     if (v != widget.value) widget.onChanged(v);
   }
@@ -4941,7 +4962,7 @@ class _SliderRowState extends State<_SliderRow> {
                 key: widget.fieldKey,
                 controller: _text,
                 focus: _focus,
-                unit: widget.unit,
+                unit: context.unitOf(widget.unit),
                 enabled: widget.enabled,
                 onSubmitted: _submit,
               ),
@@ -4952,7 +4973,9 @@ class _SliderRowState extends State<_SliderRow> {
           value: widget.value.clamp(widget.min, widget.max),
           min: widget.min,
           max: widget.max,
-          onChanged: widget.enabled ? widget.onChanged : null,
+          onChanged: widget.enabled
+              ? (v) => widget.onChanged(_rounded(v))
+              : null,
         ),
       ],
     );
@@ -5821,9 +5844,15 @@ class _FabricDetailsState extends State<_FabricDetails> {
     String shown(Object? v, double scale, int digits) =>
         v is num ? context.decimal(v / scale, digits) : '';
     _weight.text = shown(_details['weight_gsm'], 1, 0);
-    _width.text = shown(_details['width_mm'], 10, 0);
+    _width.text = _widthShown;
     _price.text = shown(_details['price_per_m'], 1, 2);
   }
+
+  /// The fabric's width as shown, in cm or inches.
+  String get _widthShown => switch (_details['width_mm']) {
+    final num mm => context.fieldText(Quantity.cm, mm / 10),
+    _ => '',
+  };
 
   @override
   void initState() {
@@ -5857,18 +5886,22 @@ class _FabricDetailsState extends State<_FabricDetails> {
 
   void _submit() {
     final weight = _parseNumber(_weight.text);
-    final width = _parseNumber(_width.text);
+    // Left as shown, the width stays exact (not rounded to inches).
+    final typedCm = context.fieldValue(Quantity.cm, _width.text);
+    final width = _width.text == _widthShown
+        ? (_details['width_mm'] as num?)?.toDouble()
+        : (typedCm == null ? null : typedCm * 10);
     final price = _parseNumber(_price.text);
     final step = <String, Object?>{
       'type': 'garment.set_fabric_details',
       'garment': widget.garment,
       'weight_gsm': ?weight,
-      'width_mm': ?(width == null ? null : width * 10),
+      'width_mm': ?width,
       'price_per_m': ?price,
     };
     final now = <String, Object?>{
       'weight_gsm': ?weight,
-      'width_mm': ?(width == null ? null : width * 10),
+      'width_mm': ?width,
       'price_per_m': ?price,
     };
     final was = {
@@ -5931,7 +5964,13 @@ class _FabricDetailsState extends State<_FabricDetails> {
               hint: usual == null ? null : context.decimal(usual, 0),
             ),
             const SizedBox(width: Space.xs),
-            field(l.fabricWidth, _width, _focus[1], l.cm, 'fabric-width'),
+            field(
+              l.fabricWidth,
+              _width,
+              _focus[1],
+              context.unitOf(Quantity.cm),
+              'fabric-width',
+            ),
             const SizedBox(width: Space.xs),
             field(l.fabricPrice, _price, _focus[2], '', 'fabric-price'),
           ],
@@ -5941,7 +5980,11 @@ class _FabricDetailsState extends State<_FabricDetails> {
           Text(
             l.garmentTotals(
               totals['pieces'] as int,
-              context.number((totals['cut_area_mm2'] as num) / 1e6, 2),
+              context.measure(
+                Quantity.m2,
+                (totals['cut_area_mm2'] as num) / 1e6,
+                2,
+              ),
               context.number(totals['mass_g'] as num, 0),
             ),
             style: ts(fontSize: 12, height: 1.4, color: p.textMuted),
@@ -6186,7 +6229,7 @@ class _PrintPicker extends StatelessWidget {
             digits: 1,
             typedMin: 0.1,
             typedMax: 500,
-            unit: l.cm,
+            unit: Quantity.cm,
             enabled: true,
             onChanged: (v) => _set(width: v * 10),
           ),
@@ -6198,7 +6241,7 @@ class _PrintPicker extends StatelessWidget {
             max: 90,
             typedMin: -180,
             typedMax: 180,
-            unit: '°',
+            unit: Quantity.degrees,
             enabled: true,
             onChanged: (v) => _set(angle: v.roundToDouble()),
           ),
@@ -6248,7 +6291,7 @@ class _PiecePrint extends StatelessWidget {
           digits: 1,
           typedMin: -500,
           typedMax: 500,
-          unit: l.cm,
+          unit: Quantity.cm,
           enabled: true,
           onChanged: (v) => set(dx: v * 10),
         ),
@@ -6261,7 +6304,7 @@ class _PiecePrint extends StatelessWidget {
           digits: 1,
           typedMin: -500,
           typedMax: 500,
-          unit: l.cm,
+          unit: Quantity.cm,
           enabled: true,
           onChanged: (v) => set(dy: v * 10),
         ),
@@ -6274,7 +6317,7 @@ class _PiecePrint extends StatelessWidget {
           max: 90,
           typedMin: -180,
           typedMax: 180,
-          unit: '°',
+          unit: Quantity.degrees,
           enabled: true,
           onChanged: (v) => set(turn: v.roundToDouble()),
         ),
@@ -6431,10 +6474,16 @@ class _TrimsCard extends StatelessWidget {
                   child: Text(
                     b['panel'] == panel
                         ? l.trimButton(
-                            context.number(b['diameter_mm'] as num, 0),
+                            context.measure(
+                              Quantity.mm,
+                              b['diameter_mm'] as num,
+                            ),
                           )
                         : l.trimButtonhole(
-                            context.number(b['diameter_mm'] as num, 0),
+                            context.measure(
+                              Quantity.mm,
+                              b['diameter_mm'] as num,
+                            ),
                             '${b['panel_name'] ?? b['panel']}',
                           ),
                     style: label,
@@ -6479,9 +6528,7 @@ class _TrimsCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    l.trimZipper(
-                      context.number((z['length_mm'] as num? ?? 0) / 10, 1),
-                    ),
+                    l.trimZipper(context.length(z['length_mm'] as num? ?? 0)),
                     style: label,
                   ),
                 ),
@@ -6496,7 +6543,7 @@ class _TrimsCard extends StatelessWidget {
                 value: (z['open_mm'] as num).toDouble() / 10,
                 min: 0,
                 max: ((z['length_mm'] as num? ?? 0) / 10).toDouble(),
-                unit: l.cm,
+                unit: Quantity.cm,
                 digits: 1,
                 enabled: true,
                 onChanged: (cm) => run({
@@ -6576,8 +6623,8 @@ class _DetailsCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     l.detailElastic(
-                      context.number((e['relaxed_mm'] as num? ?? 0) / 10, 1),
-                      context.number(e['width_mm'] as num, 0),
+                      context.length(e['relaxed_mm'] as num? ?? 0),
+                      context.measure(Quantity.mm, e['width_mm'] as num),
                     ),
                     style: label,
                   ),
@@ -6599,7 +6646,7 @@ class _DetailsCard extends StatelessWidget {
                 value: (e['ratio'] as num).toDouble() * 100,
                 min: 20,
                 max: 100,
-                unit: '%',
+                unit: Quantity.percent,
                 enabled: true,
                 onChanged: (pc) => run({
                   'type': 'elastic.set',
@@ -6618,8 +6665,8 @@ class _DetailsCard extends StatelessWidget {
                       q['pattern'] == 'channels'
                           ? l.quiltingChannels
                           : l.quiltingDiamonds,
-                      context.number((q['spacing_mm'] as num) / 10, 1),
-                      context.number(q['loft_mm'] as num, 0),
+                      context.length(q['spacing_mm'] as num),
+                      context.measure(Quantity.mm, q['loft_mm'] as num),
                     ),
                     style: label,
                   ),
@@ -6638,11 +6685,17 @@ class _DetailsCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    l.detailInterfacing(switch (i['weight']) {
-                      'light' => l.interfacingLight,
-                      'heavy' => l.interfacingHeavy,
-                      _ => l.interfacingMedium,
-                    }, context.number((i['area_mm2'] as num? ?? 0) / 100, 0)),
+                    l.detailInterfacing(
+                      switch (i['weight']) {
+                        'light' => l.interfacingLight,
+                        'heavy' => l.interfacingHeavy,
+                        _ => l.interfacingMedium,
+                      },
+                      context.measure(
+                        Quantity.cm2,
+                        (i['area_mm2'] as num? ?? 0) / 100,
+                      ),
+                    ),
                     style: label,
                   ),
                 ),
@@ -6680,8 +6733,8 @@ class _DetailsCard extends StatelessWidget {
                   child: Text(
                     l.detailTopstitch(
                       t['rows'] as int,
-                      context.number(t['offset_mm'] as num, 1),
-                      context.number(t['stitch_mm'] as num, 1),
+                      context.measure(Quantity.mm, t['offset_mm'] as num, 1),
+                      context.measure(Quantity.mm, t['stitch_mm'] as num, 1),
                     ),
                     style: label,
                   ),
@@ -6747,7 +6800,7 @@ class _EdgeCard extends StatelessWidget {
               Icon(Icons.timeline_rounded, size: 16, color: p.accent),
               const SizedBox(width: Space.s),
               Text(
-                l.edgeLength(context.number(length, 1)),
+                l.edgeLength(context.measure(Quantity.cm, length, 1)),
                 style: ts(
                   fontSize: 13.5,
                   fontWeight: FontWeight.w600,
@@ -6763,7 +6816,11 @@ class _EdgeCard extends StatelessWidget {
                   ? l.edgeOpen
                   : l.edgeSewn(
                       '${other['panel_name'] ?? other['panel']}',
-                      context.number(seam['mismatch_mm'] as num, 1),
+                      context.measure(
+                        Quantity.mm,
+                        seam['mismatch_mm'] as num,
+                        1,
+                      ),
                     ),
             ),
             style: ts(fontSize: 12.5, height: 1.45, color: p.textMuted),
@@ -6858,7 +6915,7 @@ class _EdgeCard extends StatelessWidget {
               value: ((seam['ease_mm'] as num?) ?? 0).toDouble() / 10,
               min: -5,
               max: 5,
-              unit: l.cm,
+              unit: Quantity.cm,
               digits: 1,
               enabled: true,
               onChanged: (cm) => run({
@@ -6920,11 +6977,11 @@ class _LengthControlState extends State<_LengthControl> {
     max: (_picked * 1.5).ceilToDouble(),
     typedMin: 0.1,
     typedMax: 1000,
-    unit: context.l.cm,
+    unit: Quantity.cm,
     digits: 1,
     enabled: true,
     fieldKey: widget.fieldKey,
-    onChanged: (cm) => widget.onCm((cm * 10).roundToDouble() / 10),
+    onChanged: widget.onCm,
   );
 }
 
@@ -7409,8 +7466,8 @@ class _GradeControl extends StatefulWidget {
 }
 
 class _GradeControlState extends State<_GradeControl> {
-  late final TextEditingController _x;
-  late final TextEditingController _y;
+  final _x = TextEditingController();
+  final _y = TextEditingController();
 
   /// The step to the next size up (or from the one below, at the top).
   Offset get _step {
@@ -7429,16 +7486,13 @@ class _GradeControlState extends State<_GradeControl> {
     return true;
   }
 
-  static String _text(double v) {
-    final r = (v * 10).round() / 10;
-    return r == r.roundToDouble() ? r.toStringAsFixed(0) : r.toString();
-  }
+  String _shown(double mm) => context.fieldText(Quantity.mm, mm, 1);
 
   @override
-  void initState() {
-    super.initState();
-    _x = TextEditingController(text: _text(_step.dx));
-    _y = TextEditingController(text: _text(_step.dy));
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _x.text = _shown(_step.dx);
+    _y.text = _shown(_step.dy);
   }
 
   @override
@@ -7449,7 +7503,10 @@ class _GradeControlState extends State<_GradeControl> {
   }
 
   void _submit() {
-    final (x, y) = (_parseNumber(_x.text), _parseNumber(_y.text));
+    // A value left as shown stays exact (not rounded to inches).
+    double? typed(TextEditingController c, double mm) =>
+        c.text == _shown(mm) ? mm : context.fieldValue(Quantity.mm, c.text);
+    final (x, y) = (typed(_x, _step.dx), typed(_y, _step.dy));
     if (x == null || y == null) return;
     widget.onStep(Offset(x, y));
   }
@@ -7467,7 +7524,7 @@ class _GradeControlState extends State<_GradeControl> {
             child: _NumberField(
               key: Key('grade-$axis'),
               controller: c,
-              unit: 'mm',
+              unit: context.unitOf(Quantity.mm),
               signed: true,
               onSubmitted: _submit,
             ),

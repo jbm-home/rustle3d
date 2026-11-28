@@ -307,3 +307,94 @@ void convertCmFields(
     if (cmOf(from, c.text) case final cm?) c.text = cmText(to, cm, digits: 1);
   }
 }
+
+/// What a number in a field or a label is, in the document's own unit:
+/// a length in millimetres or centimetres (shown in inches in the imperial
+/// units) or in metres (yards), an area in square centimetres (square
+/// inches) or square metres (square yards), an angle, a percentage, a
+/// count.
+enum Quantity { mm, cm, m, cm2, m2, degrees, percent, count }
+
+/// Metres in a yard.
+const mPerYard = 0.9144;
+
+/// Square centimetres in a square inch.
+const _cm2PerIn2 = mmPerInch * mmPerInch / 100;
+
+extension QuantityShown on Region {
+  /// [q]'s unit for the user: mm, cm or in, °, %, none for a count.
+  String unitOf(L l, Quantity q) => switch (q) {
+    Quantity.mm => inches ? l.inch : l.mm,
+    Quantity.cm => inches ? l.inch : l.cm,
+    Quantity.m => inches ? l.yard : l.metre,
+    Quantity.cm2 => '${inches ? l.inch : l.cm}²',
+    Quantity.m2 => '${inches ? l.yard : l.metre}²',
+    Quantity.degrees => '°',
+    Quantity.percent => '%',
+    Quantity.count => '',
+  };
+
+  /// A value of [q] as shown.
+  double shown(Quantity q, double v) => switch (q) {
+    Quantity.mm when inches => v / mmPerInch,
+    Quantity.cm when inches => v * 10 / mmPerInch,
+    Quantity.m when inches => v / mPerYard,
+    Quantity.cm2 when inches => v / _cm2PerIn2,
+    Quantity.m2 when inches => v / (mPerYard * mPerYard),
+    _ => v,
+  };
+
+  /// A value as typed, back in [q]'s own unit.
+  double typed(Quantity q, double shown) => switch (q) {
+    Quantity.mm when inches => shown * mmPerInch,
+    Quantity.cm when inches => shown * mmPerInch / 10,
+    Quantity.m when inches => shown * mPerYard,
+    Quantity.cm2 when inches => shown * _cm2PerIn2,
+    Quantity.m2 when inches => shown * mPerYard * mPerYard,
+    _ => shown,
+  };
+
+  /// The decimals [q] is shown with, [digits] being the metric ones: an
+  /// inch is 2.54 cm, so one more for centimetres and two more for
+  /// millimetres, at most two (a quarter of a millimetre).
+  int digitsOf(Quantity q, int digits) => switch (q) {
+    Quantity.mm when inches => (digits + 2).clamp(0, 2),
+    Quantity.cm when inches => (digits + 1).clamp(0, 2),
+    _ => digits,
+  };
+
+  /// [v] rounded to what is shown of it, in its own unit.
+  double rounded(Quantity q, double v, int digits) {
+    final f = _pow10(digitsOf(q, digits));
+    return typed(q, (shown(q, v) * f).round() / f);
+  }
+}
+
+extension QuantityOf on BuildContext {
+  /// [q]'s unit in the user's units: mm, cm or in, °, %.
+  String unitOf(Quantity q) => region.unitOf(l, q);
+
+  /// [v] for a label, with its unit: "12.5 cm", "4.92 in" ([digits] in
+  /// the metric units).
+  String measure(Quantity q, num v, [int digits = 0]) {
+    final r = region;
+    return '${number(r.shown(q, v.toDouble()), r.digitsOf(q, digits))} '
+        '${r.unitOf(l, q)}';
+  }
+
+  /// A length in millimetres for a label, to the millimetre: "12.5 cm",
+  /// "4.92 in".
+  String length(num mm) => measure(Quantity.cm, mm / 10, 1);
+
+  /// [v] for a field the user edits, in the user's units.
+  String fieldText(Quantity q, num v, [int digits = 0]) {
+    final r = region;
+    return decimal(r.shown(q, v.toDouble()), r.digitsOf(q, digits));
+  }
+
+  /// A field's number back in [q]'s own unit; null if it is not one.
+  double? fieldValue(Quantity q, String text) {
+    final v = double.tryParse(text.trim().replaceAll(',', '.'));
+    return v == null ? null : region.typed(q, v);
+  }
+}

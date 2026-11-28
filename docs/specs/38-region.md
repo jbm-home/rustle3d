@@ -8,17 +8,26 @@ done in two steps to avoid regressions); general garment-making
 knowledge (common women's and men's size conversion tables between
 European, American, British and letter sizes).
 
-## Status (2026-11-28, M48 step 1)
+## Status (2026-11-28, M48 done)
 
-Implemented: the size system everywhere a size is shown (new-project
-window, Body panel, the Sizes section and its chart window); the units
-for body measurements (new-project window with the template's
-measurements, Body panel, More measurements).
+Step 1: the size system everywhere a size is shown (new-project window,
+Body panel, the Sizes section and its chart window); the units for body
+measurements (new-project window with the template's measurements, Body
+panel, More measurements).
 
-Not yet (step 2): every other length of the app in inches (the board,
-the inspector, the action bar's fields, dimensions, marker, projector,
-exports' labels). A size range keeps its European names in the project
-file and in exports (DXF `Size:`, tech pack).
+Step 2: every other length of the app follows the units: the board's
+dimensions and live measurements, the inspector (sliders, fields,
+labels, areas), the action bar's windows, the tape measure and the 3D
+drag labels, the body check's points, the marker (fabric width in
+inches, length and fabric to buy in yards), the projector (an 8 in
+calibration square and a 4 in scale bar and step in inches).
+
+Not converted: exported files (tech pack PDF, DXF, SVG, PDF pattern)
+stay metric with their unit in each label; the game export's shell
+thickness stays in mm (game engines work in metric); the photo lens
+(mm) and place size (m) keep their usual units; fabric weight stays in
+g/m² and its price per metre. A size range keeps its European names in
+the project file and in exports (DXF `Size:`, tech pack).
 
 ## User story
 As a designer in the United States, I start a project and see sizes
@@ -36,9 +45,13 @@ app shows them from then on.
   60 XXL), each built-in letter preset (Women M…) being the letter of
   its own nearest size. Children's sizes are their age everywhere.
 - **Units.** Centimetres (and millimetres where the app uses them) or
-  inches. Values are stored in mm/cm as before: only what is shown and
-  typed changes. A value shown rounded in inches (34.6 in) is kept exact
-  until it is typed in.
+  inches; metres or yards for the fabric to buy; cm² and m² or in² and
+  yd² for areas. Values are stored in mm/cm as before: only what is
+  shown and typed changes. Inches get one more decimal than centimetres
+  and two more than millimetres, at most two (a quarter of a
+  millimetre). A value shown rounded in inches (34.6 in) is kept exact
+  until it is typed in; a typed one is kept to the hundredth of an inch
+  (a quarter inch is 6.35 mm, not 6).
 - **First launch.** Guessed from the system's region: United States
   (and Liberia, Myanmar) US sizes and inches; Canada US sizes in
   centimetres; United Kingdom, Ireland, Australia, New Zealand UK sizes
@@ -63,5 +76,7 @@ app shows them from then on.
 - In US sizes the new T-shirt starts on a 6; in inches its bust reads
   34.6; typing 36.2 says "Your measurements make a size 8".
 - Quit and reopen: the window starts in US sizes and inches.
+- In inches, a 20 × 40 cm piece's sewing line reads 47.24 in, its 10 mm
+  seam allowance 0.39 in; typing 0.25 sets 6.35 mm.
 - `grading.charts`: the women's 38 is US 6, UK 10, M; the men's 50 is
   US 40, M.

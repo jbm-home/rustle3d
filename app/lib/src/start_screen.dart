@@ -1379,6 +1379,7 @@ class _NewProjectDialogState extends State<_NewProjectDialog> {
         setState(
           () => _error = context.l.sizeMustBePositive(
             _sizeText(context.l, e.key).$1,
+            context.region.cmUnit(context.l),
           ),
         );
         return;
